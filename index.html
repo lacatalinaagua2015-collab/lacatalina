@@ -505,7 +505,7 @@ function App() {
   useEffect(() => {
     if (!apiKey || !binId) return;
     setSyncStatus("saving");
-    cloudLoad().then(function(data) {
+    cloudLoad().then(function(data) { if(!data) return;
       if (!data) { setSyncStatus("error"); return; }
       if (data.clientes?.length)   setClientes(data.clientes);
       if (data.ventas?.length)     setVentas(data.ventas);
@@ -526,7 +526,7 @@ function App() {
     setSyncStatus("saving");
     const data = { ...estadoRef.current, ...overrides, noVisitas: estadoRef.current.noVisitas||[], prospectos: estadoRef.current.prospectos||[] };
     estadoRef.current = data;
-    debounceSave(() => cloudSave(data).then(ok=>setSyncStatus(ok?"saved":"error")).catch(()=>setSyncStatus("error")));
+    debounceSave(() => cloudSave(data).then(function(ok){setSyncStatus(ok?"saved":"error");}).catch(function(){setSyncStatus("error");}));
   };
 
   const saveClientes = (v) => { setClientes(v); syncData({clientes:v}); };
