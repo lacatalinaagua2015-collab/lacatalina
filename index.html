@@ -430,7 +430,7 @@ const s = {
 
 function calcVenta(detalle, pago, montoPagado, saldoAplicado, productos) {
   const bruto = detalle.reduce((a,d)=>a+d.total,0);
-  const desc = pago==="transferencia" ? bruto*0.025 : 0;
+  const desc = 0; // retención solo en planilla, no afecta el monto de la venta
   const neto = bruto - desc;
   const aPagar = neto - (saldoAplicado||0);
   const pagadoNum = pago==="fiado" ? 0 : (montoPagado!==""&&!isNaN(Number(montoPagado)) ? Number(montoPagado) : aPagar);
@@ -634,7 +634,7 @@ function App() {
       {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onMensajes={()=>irA("mensajes")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} />}
       {pantalla==="diaPrincipal"   && <DiaPrincipal dia={diaActual} onIrClientes={()=>irA("selectorFechaClientes")} onIrPlanilla={()=>irA("selectorFechaPlanilla")} onVolver={()=>irA("menu")} />}
       {pantalla==="selectorFechaPlanilla" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("planilla");}} onVolver={()=>irA("diaPrincipal")} />}
-      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.dia===diaActual&&v.fechaKey===fechaActual)} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);irA("selectorFechaPlanilla");}} onVolver={()=>irA("selectorFechaPlanilla")} />}
+      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.dia===diaActual&&v.fechaKey===fechaActual)} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);irA("selectorFechaPlanilla");}} onVolver={()=>irA("selectorFechaPlanilla")} />}
       {pantalla==="selectorFechaClientes" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("inicioReparto");}} onVolver={()=>irA("diaPrincipal")} />}
       {pantalla==="inicioReparto"  && <InicioReparto dia={diaActual} fecha={fechaActual} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} cargasDia={cargasDia} onGuardar={p=>{savePlanilla(`${diaActual}_${fechaActual}`,p);irA("clientes");}} onVolver={()=>irA("selectorFechaClientes")} />}
       {pantalla==="clientes"       && <ListaClientes clientes={clientes.filter(c=>c.dia===diaActual)} dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual)} noVisitas={(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual)} onSeleccionar={c=>{setClienteId(c.id);irA("detalleCliente");}} onNuevoCliente={()=>irA("nuevoCliente")} onVolver={()=>irA("selectorFechaClientes")} onReordenar={lista=>{
@@ -803,7 +803,22 @@ function SelectorFecha({dia,planillas,ventas,noVisitas,onSeleccionar,onVolver}) 
         <span style={s.headerTitle}>Fechas de visita · {dia}</span>
       </div>
       <div style={{padding:"8px 16px"}}>
-        <p style={{fontSize:13,color:"var(--color-text-secondary)",marginBottom:12}}>Seleccioná la fecha de reparto para comenzar o continuar la jornada.</p>
+        <p style={{fontSize:13,color:"var(--color-text-secondary)",marginBottom:8}}>Seleccioná la fecha de reparto para comenzar o continuar la jornada.</p>
+        <div style={{...s.card,margin:"0 0 12px",display:"flex",gap:10,alignItems:"center"}}>
+          <div style={{flex:1}}>
+            <label style={s.label}>O ingresá una fecha libre (feriado, reparto especial)</label>
+            <input type="date" style={{...s.input,fontSize:14}}
+              defaultValue={hoyKey()}
+              id="fecha-libre-input"
+              onChange={e=>{
+                if(e.target.value){
+                  const d=new Date(e.target.value+'T12:00:00');
+                  onSeleccionar(e.target.value,d);
+                }
+              }}
+            />
+          </div>
+        </div>
         {meses.map(mes=>{
           const abierto = mes===mesAbierto;
           return (
@@ -1015,34 +1030,57 @@ function DiaPrincipal({dia,onIrClientes,onIrPlanilla,onVolver}) {
   );
 }
 
-function PlanillaDelDia({dia,fecha,ventas,planilla,onGuardar,onVolver}) {
+function PlanillaDelDia({dia,fecha,ventas,planilla,productos,onGuardar,onVolver}) {
   // Auto-calcular desde ventas del dia
-  const totalesPorProd = {b10:{vacios:0,plata:0,llenar:0},b20:{vacios:0,plata:0,llenar:0},soda:{vacios:0,plata:0,llenar:0}};
-  const costos = {"Bidón 10L":800,"Bidón 12L":800,"Bidón 20L":1100,"Sifón 1.5L":133.33};
+  const CAJON_SODA = 6;
+  // Costos dinámicos desde Config → Precios
+  const getProdCosto = (nombre) => {
+    const p = (productos||[]).find(x=>x.nombre===nombre);
+    return p ? (p.costo||0) : 0;
+  };
+  const costSifon  = getProdCosto("Sifón 1.5L") || 133.33;
+  const costB10    = getProdCosto("Bidón 10L")   || 800;
+  const costB20    = getProdCosto("Bidón 20L")   || 1100;
+  const COSTO_CAJON_SODA = costSifon * CAJON_SODA;
+  const totalesPorProd = {b10:{vacios:0,plata:0,llenar:0},b20:{vacios:0,plata:0,llenar:0},soda:{vacios:0,plata:0,llenar:0,cajones:0}};
   const prodKey = {"Bidón 10L":"b10","Bidón 20L":"b20","Sifón 1.5L":"soda"};
   ventas.forEach(v=>{
     v.detalle.forEach(d=>{
       const k=prodKey[d.nombre]; if(!k) return;
-      totalesPorProd[k].vacios  += d.cantidad;
-      totalesPorProd[k].plata   += d.total;
-      totalesPorProd[k].llenar  += (costos[d.nombre]||0)*d.cantidad;
+      totalesPorProd[k].vacios += d.cantidad;
+      totalesPorProd[k].plata  += d.total;
     });
   });
-  const totalVentaPlata = Object.values(totalesPorProd).reduce((a,p)=>a+p.plata,0);
-  const totalVentaLlenar= Object.values(totalesPorProd).reduce((a,p)=>a+p.llenar,0);
+  // Sifones se cobran por cajón completo (siempre se completa el cajón)
+  const sodaCajones = Math.ceil(totalesPorProd.soda.vacios/CAJON_SODA)||0;
+  totalesPorProd.soda.cajones = sodaCajones;
+  totalesPorProd.soda.llenar  = sodaCajones * COSTO_CAJON_SODA;
+  totalesPorProd.b10.llenar   = totalesPorProd.b10.vacios * costB10;
+  totalesPorProd.b20.llenar   = totalesPorProd.b20.vacios * costB20;
+  // Peso estimado automático
+  const pesoAuto = Math.round(sodaCajones*10.8 + totalesPorProd.b10.vacios*10.5 + totalesPorProd.b20.vacios*20.5);
+  const totalVentaPlata  = Object.values(totalesPorProd).reduce((a,p)=>a+p.plata,0);
+  const totalVentaLlenar = Object.values(totalesPorProd).reduce((a,p)=>a+p.llenar,0);
+  // Desglose cobranza
+  // Cobranza — todo calculado desde ventas registradas
+  const cobEfectivo   = ventas.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.neto||0),0);
+  const cobTransBruto = ventas.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v.neto||0),0);
+  const cobTransDesc  = Math.round(cobTransBruto*0.025);
+  const cobTransNeto  = cobTransBruto - cobTransDesc;
+  const cobFiado      = ventas.filter(v=>v.pago==="fiado").reduce((a,v)=>a+(v.neto||0),0);
+  // Cobros de saldo: cuando el cliente pagó más que la venta del día (pagó deuda anterior)
+  const cobSaldos     = ventas.reduce((a,v)=>{
+    const extra=(v.pagadoNum||0)-(v.neto||0);
+    return a+(extra>0?extra:0);
+  },0);
+  const fiadoNeto     = cobFiado - cobSaldos; // fiado pendiente real
 
-  // Solo campos que el usuario ingresa: llenos al salir, peso, bultos, gastos, efectivo, fiado
-  // Auto-fill cobranza from ventas if not already set
-  const efectivoAuto  = ventas.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
-  const transAuto     = ventas.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
-  const fiadoAuto     = ventas.filter(v=>v.pago==="fiado").reduce((a,v)=>a+(v.neto||0),0);
-
-  const retencionAuto = Math.round(transAuto * 0.025); // 2.5% de transferencias
   const [datos,setDatos] = useState(()=>({
     ...planilla,
-    efectivo:    planilla.efectivo    || (efectivoAuto > 0 ? String(Math.round(efectivoAuto)) : ""),
-    fiado:       planilla.fiado       || (fiadoAuto    > 0 ? String(Math.round(fiadoAuto))    : ""),
-    retenciones: planilla.retenciones || (retencionAuto > 0 ? String(retencionAuto) : ""),
+    peso:        planilla.peso        || (pesoAuto>0 ? String(pesoAuto) : ""),
+    efectivo:    planilla.efectivo    || (cobEfectivo>0   ? String(Math.round(cobEfectivo))   : ""),
+    fiado:       planilla.fiado       || (cobFiado>0      ? String(Math.round(cobFiado))      : ""),
+    retenciones: planilla.retenciones || (cobTransDesc>0  ? String(cobTransDesc)              : ""),
   }));
   const set = (k,v) => setDatos(d=>({...d,[k]:v}));
   const setProd=(pid,campo,v)=>setDatos(d=>({...d,productos:{...d.productos,[pid]:{...d.productos[pid],[campo]:v}}}));
@@ -1052,8 +1090,8 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,onGuardar,onVolver}) {
 
   const totalGastos=(datos.gastos||[]).reduce((a,g)=>a+num(g.monto),0);
   const efectivo=num(datos.efectivo), fiado=num(datos.fiado), retenciones=num(datos.retenciones);
-  const sobrante=efectivo-(totalVentaPlata-fiado-retenciones);
-  const ganancia=totalVentaPlata-totalVentaLlenar-totalGastos;
+  const sobrante=efectivo-(totalVentaPlata-fiado); // retenciones es informativo, no afecta el sobrante
+  const ganancia=(cobEfectivo+cobTransBruto+cobFiado+cobSaldos)-totalVentaLlenar-totalGastos;
   const totalLlenosIngresados=PRODUCTOS_CONFIG.reduce((a,p)=>a+num(datos.productos[p.id]?.llenos),0);
 
   return (
@@ -1083,13 +1121,18 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,onGuardar,onVolver}) {
           </div>
           {PRODUCTOS_CONFIG.map(p=>{
             const auto=totalesPorProd[p.id];
+            const esSoda = p.id==="soda";
             return (
               <div key={p.id} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr",padding:"6px 10px",borderBottom:"0.5px solid var(--color-border-tertiary)",alignItems:"center"}}>
-                <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-primary)"}}>{p.nombre}</div>
+                <div>
+                  <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-primary)"}}>{p.nombre}</div>
+                  {esSoda&&auto.cajones>0&&<div style={{fontSize:10,color:"#f5b942"}}>{auto.cajones} caj. ({auto.vacios} un.)</div>}
+                </div>
                 <div>
                   <input type="number" style={{...s.inputNum,width:"100%",fontSize:13}} value={datos.productos[p.id]?.llenos||""} onChange={e=>setProd(p.id,"llenos",e.target.value)} placeholder="0" />
+                  {esSoda&&datos.productos[p.id]?.llenos>0&&<div style={{fontSize:10,color:"var(--color-text-tertiary)",textAlign:"right"}}>{Math.floor((datos.productos[p.id]?.llenos||0)/6)} caj.</div>}
                 </div>
-                <div style={{textAlign:"right",fontSize:13,color:"var(--color-text-secondary)"}}>{auto.vacios||"—"}</div>
+                <div style={{textAlign:"right",fontSize:13,color:"var(--color-text-secondary)"}}>{esSoda?`${auto.cajones||"—"} caj`:(auto.vacios||"—")}</div>
                 <div style={{textAlign:"right",fontSize:13,color:"var(--color-text-primary)"}}>{auto.plata?fmt(auto.plata).replace("$",""):"—"}</div>
                 <div style={{textAlign:"right",fontSize:13,color:"var(--color-text-danger)"}}>{auto.llenar?fmt(auto.llenar).replace("$",""):"—"}</div>
               </div>
@@ -1131,7 +1174,12 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,onGuardar,onVolver}) {
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 0 8px"}}>
           <span style={{fontSize:10,color:"var(--color-text-tertiary)",fontWeight:500,textTransform:"uppercase",letterSpacing:"0.07em"}}>Cobranza del día</span>
           <button style={{...s.btn,fontSize:11,padding:"3px 10px"}}
-            onClick={()=>setDatos(d=>({...d,efectivo:String(Math.round(efectivoAuto)),retenciones:String(Math.round(transAuto*0.025)),fiado:String(Math.round(fiadoAuto))}))}>
+            onClick={()=>setDatos(d=>({...d,
+              peso:String(pesoAuto||d.peso||""),
+              efectivo:String(Math.round(cobEfectivo)),
+              retenciones:String(cobTransDesc),
+              fiado:String(Math.round(cobFiado))
+            }))}>
             ↻ Autocompletar desde ventas
           </button>
         </div>
@@ -1142,6 +1190,26 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,onGuardar,onVolver}) {
             </div>
           ))}
         </div>
+        {/* Desglose de transferencias */}
+        {cobTransBruto>0&&(
+          <div style={{...s.card,margin:"10px 0",background:"var(--color-background-tertiary)"}}>
+            <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8}}>Detalle transferencias</div>
+            {[["Monto bruto",fmt(cobTransBruto),"primary"],["Retención 2.5%",`−${fmt(cobTransDesc)}`,"danger"],["Neto recibido",fmt(cobTransNeto),"success"]].map(([l,v,c])=>(
+              <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+                <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>{l}</span>
+                <span style={{fontSize:13,fontWeight:500,color:`var(--color-text-${c})`}}>{v}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {cobSaldos>0&&(
+          <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-tertiary)"}}>
+            <div style={{display:"flex",justifyContent:"space-between"}}>
+              <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>Cobrado de deuda anterior</span>
+              <span style={{fontSize:13,fontWeight:500,color:"#4dd9a0"}}>{fmt(cobSaldos)}</span>
+            </div>
+          </div>
+        )}
         <div style={{marginTop:12}}>
           <label style={s.label}>Observaciones</label>
           <textarea style={{...s.input,minHeight:56,resize:"vertical"}} placeholder="Notas del día..." value={datos.obs||""} onChange={e=>set("obs",e.target.value)} />
@@ -1150,32 +1218,108 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,onGuardar,onVolver}) {
         {/* Resumen */}
         <div style={s.divider} />
         <span style={{...s.sectionTitle,padding:"0 0 10px"}}>Resumen del día</span>
-        <div style={{...s.card,margin:"0 0 6px",background:"var(--color-background-secondary)",padding:"14px 16px"}}>
-          {[["Entregas del día",`${ventas.length} clientes`,"primary",false],["Total cobrado",fmt(totalVentaPlata),"primary",false],["Gasto llenado",fmt(totalVentaLlenar),"danger",true],["Gastos extras",fmt(totalGastos),"danger",true]].map(([l,v,c,neg])=>(
+
+        {/* Ventas del día */}
+        <div style={{...s.card,margin:"0 0 8px",background:"var(--color-background-secondary)",padding:"14px 16px"}}>
+          <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Ventas registradas</div>
+          {[
+            ["Contado (efectivo)", fmt(cobEfectivo), "primary"],
+            ["Transferencias",     fmt(cobTransBruto), "info"],
+            ["Fiado del día",      fmt(cobFiado), "warning"],
+          ].map(([l,v,c])=>(
             <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
               <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>{l}</span>
-              <span style={{fontSize:13,fontWeight:500,color:`var(--color-text-${c})`}}>{neg?"−":""}{v}</span>
+              <span style={{fontSize:13,fontWeight:500,color:`var(--color-text-${c})`}}>{v}</span>
             </div>
           ))}
-          <div style={{display:"flex",justifyContent:"space-between",padding:"10px 0 4px"}}>
-            <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>Ganancia neta</span>
+          {cobSaldos>0&&(
+            <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+              <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>+ Cobro de saldos anteriores</span>
+              <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-success)"}}>{fmt(cobSaldos)}</span>
+            </div>
+          )}
+          <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0 2px"}}>
+            <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Total cobrado</span>
+            <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(cobEfectivo+cobTransBruto+cobSaldos)}</span>
+          </div>
+        </div>
+
+        {/* Efectivo en mano */}
+        <div style={{...s.card,margin:"0 0 8px",padding:"14px 16px"}}>
+          <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Efectivo en mano</div>
+          <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+            <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Efectivo cobrado (contado)</span>
+            <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{fmt(cobEfectivo)}</span>
+          </div>
+          {cobSaldos>0&&(
+            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+              <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>+ Cobro de saldos</span>
+              <span style={{fontSize:13,color:"var(--color-text-success)"}}>{fmt(cobSaldos)}</span>
+            </div>
+          )}
+          <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+            <span style={{fontSize:13,color:"var(--color-text-danger)"}}>− Llenado de envases</span>
+            <span style={{fontSize:13,color:"var(--color-text-danger)"}}>{fmt(totalVentaLlenar)}</span>
+          </div>
+          {totalGastos>0&&(
+            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+              <span style={{fontSize:13,color:"var(--color-text-danger)"}}>− Gastos extras</span>
+              <span style={{fontSize:13,color:"var(--color-text-danger)"}}>{fmt(totalGastos)}</span>
+            </div>
+          )}
+          <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0 2px"}}>
+            <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Efectivo en mano</span>
+            <span style={{fontSize:18,fontWeight:500,color:"var(--color-text-success)"}}>{fmt(cobEfectivo+cobSaldos-totalVentaLlenar-totalGastos)}</span>
+          </div>
+        </div>
+
+        {/* Transferencias */}
+        {cobTransBruto>0&&(
+          <div style={{...s.card,margin:"0 0 8px",padding:"14px 16px"}}>
+            <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Transferencias</div>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+              <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Monto total</span>
+              <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{fmt(cobTransBruto)}</span>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+              <span style={{fontSize:12,color:"var(--color-text-tertiary)"}}>Retención 2.5% (informativo)</span>
+              <span style={{fontSize:12,color:"var(--color-text-danger)"}}>−{fmt(cobTransDesc)}</span>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0 2px"}}>
+              <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Neto a acreditar</span>
+              <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-info)"}}>{fmt(cobTransNeto)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Fiado */}
+        <div style={{...s.card,margin:"0 0 8px",padding:"14px 16px"}}>
+          <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Fiado pendiente</div>
+          <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+            <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Fiado del día</span>
+            <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{fmt(cobFiado)}</span>
+          </div>
+          {cobSaldos>0&&(
+            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+              <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>− Cobros de saldos anteriores</span>
+              <span style={{fontSize:13,color:"var(--color-text-success)"}}>−{fmt(cobSaldos)}</span>
+            </div>
+          )}
+          <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0 2px"}}>
+            <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Fiado neto pendiente</span>
+            <span style={{fontSize:16,fontWeight:500,color:fiadoNeto>0?"var(--color-text-warning)":"var(--color-text-success)"}}>{fmt(Math.abs(fiadoNeto))}{fiadoNeto<0?" (a favor)":""}</span>
+          </div>
+        </div>
+
+        {/* Ganancia */}
+        <div style={{...s.card,margin:"0 0 16px",padding:"14px 16px",background:"var(--color-background-secondary)"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Ganancia neta del día</div>
+              <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>Total cobrado − Llenado − Gastos</div>
+            </div>
             <span style={{fontSize:22,fontWeight:500,color:ganancia>=0?"var(--color-text-success)":"var(--color-text-danger)"}}>{fmt(ganancia)}</span>
           </div>
-        </div>
-        <div style={{...s.card,margin:"0 0 6px",padding:"12px 16px"}}>
-          {[["Efectivo",fmt(efectivo)],["Fiado",fmt(fiado)],["Retenciones",fmt(retenciones)],["Total cobrado",fmt(efectivo+fiado+retenciones)]].map(([l,v],i)=>(
-            <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderTop:i===3?"0.5px solid var(--color-border-tertiary)":"none",fontWeight:i===3?500:400}}>
-              <span style={{fontSize:13,color:i===3?"var(--color-text-primary)":"var(--color-text-secondary)"}}>{l}</span>
-              <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{v}</span>
-            </div>
-          ))}
-        </div>
-        <div style={{...s.card,margin:"0 0 16px",padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div>
-            <div style={{fontSize:13,color:"var(--color-text-secondary)"}}>Sobrante / faltante de caja</div>
-            <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>Efectivo − (cobrado − fiado − retenciones)</div>
-          </div>
-          <span style={{fontSize:22,fontWeight:500,color:sobrante>=0?"var(--color-text-success)":"var(--color-text-danger)"}}>{sobrante>=0?"+":""}{fmt(sobrante)}</span>
         </div>
         <button style={s.btnPrimary} onClick={()=>onGuardar(datos)}>Guardar planilla</button>
       </div>
@@ -1297,8 +1441,9 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,onSelecci
   const clientesOrdenados = [...clientes].sort((a,b)=>(a.orden||9999)-(b.orden||9999));
   const filtrados  = clientesOrdenados.filter(c=>c.nombre.toLowerCase().includes(busqueda.toLowerCase()));
   // noesta 1ra vez = volver al final, por eso va separado
+  // volverAlFinal: solo clientes con noesta que NO fueron atendidos todavía
   const pendientesNormales = filtrados.filter(c=>!visitados.has(c.id)&&noVMap[c.id]!=="noesta");
-  const volverAlFinal      = filtrados.filter(c=>noVMap[c.id]==="noesta");
+  const volverAlFinal      = filtrados.filter(c=>noVMap[c.id]==="noesta"&&!atendidos.has(c.id));
   const pendientes         = [...pendientesNormales, ...volverAlFinal];
   const sinEntrega         = filtrados.filter(c=>visitadosSinVenta.has(c.id));
   const listos             = filtrados.filter(c=>atendidos.has(c.id));
@@ -1556,7 +1701,12 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
               </button>
           }
 
-          {/* Historial completo */}
+          {/* Tabs */}
+          <div style={s.tabBar}>
+            <button style={s.tab(tabDetalle==="historial")} onClick={()=>setTabDetalle("historial")}>Historial</button>
+            <button style={s.tab(tabDetalle==="envases")} onClick={()=>setTabDetalle("envases")}>Envases</button>
+          </div>
+          {tabDetalle==="historial"&&<>
           <div style={s.divider} />
           <span style={{...s.sectionTitle,padding:"0 0 8px"}}>Historial ({ventas.length} compras · {fmt(totalComprado)})</span>
           {historial.length===0&&<p style={{fontSize:13,color:"var(--color-text-tertiary)",padding:"4px 0"}}>Sin registros aún</p>}
@@ -1581,8 +1731,48 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
               }
             </div>
           ))}
+          </>}
 
+          {tabDetalle==="envases"&&(
+            <div style={{marginTop:8}}>
+              <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-tertiary)"}}>
+                <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8}}>Envases habituales asignados</div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  {cliente.sifon>0    && <div style={s.metricCard}><div style={s.metricLabel}>Sifón</div><div style={s.metricVal}>{cliente.sifon}</div></div>}
+                  {cliente.bidon10>0  && <div style={s.metricCard}><div style={s.metricLabel}>10L</div><div style={s.metricVal}>{cliente.bidon10}</div></div>}
+                  {cliente.bidon20>0  && <div style={s.metricCard}><div style={s.metricLabel}>20L</div><div style={s.metricVal}>{cliente.bidon20}</div></div>}
+                  {cliente.dispenser>0 && <div style={s.metricCard}><div style={s.metricLabel}>Dispenser</div><div style={s.metricVal}>{cliente.dispenser}</div></div>}
+                  {!cliente.sifon&&!cliente.bidon10&&!cliente.bidon20&&!cliente.dispenser&&
+                    <span style={{fontSize:13,color:"var(--color-text-tertiary)"}}>Sin envases asignados</span>}
+                </div>
+              </div>
+              <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",margin:"10px 0 6px"}}>Movimientos registrados</div>
+              {historial.filter(v=>(v.envPrest||[]).length>0||(v.envDev||[]).length>0).length===0&&
+                <p style={{fontSize:13,color:"var(--color-text-tertiary)"}}>Sin movimientos de envases registrados</p>}
+              {historial.filter(v=>(v.envPrest||[]).length>0||(v.envDev||[]).length>0).map(v=>(
+                <div key={v.id} style={{...s.card,margin:"0 0 8px"}}>
+                  <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginBottom:4}}>{v.fechaKey||v.dia}</div>
+                  {(v.envPrest||[]).map((e,i)=>(
+                    <div key={"p"+i} style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}>
+                      <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>+ Prestado: {e.prod}</span>
+                      <span style={s.badge("warning")}>×{e.cant}</span>
+                    </div>
+                  ))}
+                  {(v.envDev||[]).map((e,i)=>(
+                    <div key={"d"+i} style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}>
+                      <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>← Devuelto: {e.prod}</span>
+                      <span style={s.badge("success")}>×{e.cant}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
 
+          <div style={{...s.divider,marginTop:12}}/>
+          <button style={{...s.btnDanger,width:"100%",padding:"10px",fontSize:13}} onClick={()=>{if(window.confirm(`¿Eliminar a ${cliente.nombre}? Se borrarán también sus ventas.`))onEliminarCliente();}}>
+            Eliminar cliente
+          </button>
         </>}
         {editandoCliente && <EditCliente cliente={cliente} onGuardar={cambios=>{onEditar(cambios);setEditandoCliente(false);}} onEliminarCliente={onEliminarCliente} />}
       </div>
@@ -1642,7 +1832,7 @@ function EditVenta({venta,productos,onGuardar,onCancelar}) {
   const [obs,setObs]=useState(venta.obs||"");
   const detalle=productos.map(p=>({nombre:p.nombre,cantidad:cantidades[p.nombre]||0,precio:p.precio,total:(cantidades[p.nombre]||0)*p.precio})).filter(d=>d.cantidad>0);
   const bruto=detalle.reduce((a,d)=>a+d.total,0);
-  const neto=bruto-(pago==="transferencia"?bruto*0.025:0);
+  const neto=bruto; // monto real sin descuento
   return (
     <div style={{...s.card,margin:0,background:"var(--color-background-secondary)"}}>
       <p style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)",marginBottom:10}}>Editando venta</p>
@@ -1673,6 +1863,20 @@ function EditVenta({venta,productos,onGuardar,onCancelar}) {
 }
 
 function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVolver}) {
+  const [transConfirmada,setTransConfirmada] = React.useState(false);
+
+  const sonarTransferencia = () => {
+    try {
+      const ctx = new (window.AudioContext||window.webkitAudioContext)();
+      [523,659,784].forEach((freq,i)=>{
+        const osc=ctx.createOscillator(); const gain=ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value=freq; gain.gain.value=0.3;
+        osc.start(ctx.currentTime+i*0.15);
+        osc.stop(ctx.currentTime+i*0.15+0.15);
+      });
+    } catch(e){}
+  };
   const [cantidades,setCantidades]=useState(()=>{const m={};productos.forEach(p=>{const k=p.nombre==="Sifón 1.5L"?"sifon":p.nombre==="Bidón 10L"?"bidon10":"bidon20";m[p.nombre]=cliente[k]||0;});return m;});
   const [pago,setPago]=useState("contado");
   const [monto,setMonto]=useState("");
@@ -1683,7 +1887,7 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
   const [obs,setObs]=useState("");
   const detalle=productos.map(p=>({nombre:p.nombre,cantidad:cantidades[p.nombre]||0,precio:p.precio,total:(cantidades[p.nombre]||0)*p.precio})).filter(d=>d.cantidad>0);
   const bruto=detalle.reduce((a,d)=>a+d.total,0);
-  const desc=pago==="transferencia"?bruto*0.025:0;
+  const desc=0; // retención informativa solo en planilla
   const neto=bruto-desc;
   const saldoDisp=cliente.saldo>0?cliente.saldo:0;
   const saldoApl=(usarSaldo&&pago!=="fiado")?Math.min(saldoDisp,neto):0;
@@ -2839,241 +3043,245 @@ function FormCliente({inicial,onGuardar}) {
 }
 
 function Resumen({ventas,clientes,productos,planillas,noVisitas,onVolver}) {
-  const [filtro,setFiltro] = useState("todo");
+  const [filtro,setFiltro]   = React.useState("mes");   // mes | anio | todo | dia
+  const [mesSel,setMesSel]   = React.useState(()=>new Date().toISOString().slice(0,7)); // YYYY-MM
+  const [diaSel,setDiaSel]   = React.useState("todos");
   const chartRefs = {bar:React.useRef(null),donut:React.useRef(null),line:React.useRef(null)};
   const chartInst = React.useRef({});
 
-  const filtradas = filtro==="todo" ? ventas : ventas.filter(v=>v.dia===filtro);
-  const totalNeto = filtradas.reduce((a,v)=>a+(v.neto||0),0);
-  const totalGan  = filtradas.reduce((a,v)=>a+(v.ganancia||0),0);
-  const totalCosto= filtradas.reduce((a,v)=>a+(v.costo||0),0);
-  const porPago   = {};
-  filtradas.forEach(v=>{porPago[v.pago]=(porPago[v.pago]||0)+v.neto;});
-  const cantidades= {};
+  // ── Filtrado ──────────────────────────────────────────────────────────────
+  const filtradas = React.useMemo(()=>{
+    let r = ventas;
+    if(filtro==="mes")  r = r.filter(v=>(v.fechaKey||v.fecha||"").slice(0,7)===mesSel);
+    if(filtro==="anio") r = r.filter(v=>(v.fechaKey||v.fecha||"").slice(0,4)===mesSel.slice(0,4));
+    if(filtro==="dia")  r = diaSel==="todos" ? r : r.filter(v=>v.dia===diaSel);
+    return r;
+  },[ventas,filtro,mesSel,diaSel]);
+
+  // ── Métricas ──────────────────────────────────────────────────────────────
+  const totalNeto    = filtradas.reduce((a,v)=>a+(v.neto||0),0);
+  const totalGan     = filtradas.reduce((a,v)=>a+(v.ganancia||0),0);
+  const totalCosto   = filtradas.reduce((a,v)=>a+(v.costo||0),0);
+  const cobEfectivo  = filtradas.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.neto||0),0);
+  const cobTrans     = filtradas.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v.neto||0),0);
+  const cobFiado     = filtradas.filter(v=>v.pago==="fiado").reduce((a,v)=>a+(v.neto||0),0);
+  const cobSaldos    = filtradas.reduce((a,v)=>{const e=(v.pagadoNum||0)-(v.neto||0);return a+(e>0?e:0);},0);
+  const porPago      = {contado:cobEfectivo, transferencia:cobTrans, fiado:cobFiado};
+  const cantidades   = {};
   productos.forEach(p=>{cantidades[p.nombre]=0;});
   filtradas.forEach(v=>v.detalle.forEach(d=>{cantidades[d.nombre]=(cantidades[d.nombre]||0)+d.cantidad;}));
-  const conDeuda  = clientes.filter(c=>c.saldo<0);
-  const conFavor  = clientes.filter(c=>c.saldo>0);
+  const conDeuda     = clientes.filter(c=>c.saldo<0);
+  const conFavor     = clientes.filter(c=>c.saldo>0);
 
-  // Chart colors
-  const CC = {
-    blue:"#5daaff", green:"#4dd9a0", amber:"#f5b942", red:"#f07070",
-    gray:"#4a6a85", gridLine:"rgba(255,255,255,0.07)", textColor:"#7a9ab8"
-  };
-
-  const chartDefaults = {
-    color: CC.textColor,
-    font: { family: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", size: 11 }
-  };
-
-  // Data for charts
-  const ventasPorDia = DIAS.map(d=>({
-    dia: d,
-    total: ventas.filter(v=>v.dia===d).reduce((a,v)=>a+(v.neto||0),0),
-    count: ventas.filter(v=>v.dia===d).length,
-  }));
-
-  // Line chart: ventas agrupadas por fecha
-  const ventasPorFecha = {};
+  // ── Agrupación por mes (para vista anual e histórico) ─────────────────────
+  const porMes = {};
   ventas.forEach(v=>{
-    const fk = v.fechaKey||v.fecha?.slice(0,10)||"";
+    const fk = (v.fechaKey||v.fecha||"").slice(0,7);
     if(!fk) return;
-    ventasPorFecha[fk]=(ventasPorFecha[fk]||0)+(v.neto||0);
+    const anio = fk.slice(0,4);
+    if(filtro==="anio" && anio!==mesSel.slice(0,4)) return;
+    if(!porMes[fk]) porMes[fk]={mes:fk,total:0,efectivo:0,trans:0,fiado:0,ganancia:0,ventas:0};
+    porMes[fk].total    += v.neto||0;
+    porMes[fk].efectivo += v.pago==="contado"?v.neto||0:0;
+    porMes[fk].trans    += v.pago==="transferencia"?v.neto||0:0;
+    porMes[fk].fiado    += v.pago==="fiado"?v.neto||0:0;
+    porMes[fk].ganancia += v.ganancia||0;
+    porMes[fk].ventas   += 1;
   });
-  const fechasOrdenadas = Object.keys(ventasPorFecha).sort().slice(-12);
+  const mesesOrdenados = Object.values(porMes).sort((a,b)=>a.mes.localeCompare(b.mes));
+  const ultimosMeses   = mesesOrdenados.slice(-12);
+
+  // ── Chart.js ──────────────────────────────────────────────────────────────
+  const CC = {blue:"#5daaff",green:"#4dd9a0",amber:"#f5b942",red:"#f07070",gray:"#4a6a85",grid:"rgba(255,255,255,0.07)",text:"#7a9ab8"};
 
   React.useEffect(()=>{
     if(typeof Chart==="undefined") return;
-    Chart.defaults.color = CC.textColor;
-    Chart.defaults.font  = chartDefaults.font;
-
-    // Destroy previous
     Object.values(chartInst.current).forEach(c=>c?.destroy());
     chartInst.current={};
 
-    // ── Bar chart: ventas por día ──────────────────────────────────────────
-    if(chartRefs.bar.current){
+    // Bar — ventas por mes
+    if(chartRefs.bar.current && ultimosMeses.length>0){
       chartInst.current.bar = new Chart(chartRefs.bar.current,{
         type:"bar",
         data:{
-          labels: ventasPorDia.map(d=>d.dia.slice(0,3)),
-          datasets:[{
-            label:"Total ($)",
-            data: ventasPorDia.map(d=>d.total),
-            backgroundColor: ventasPorDia.map(d=>d.total>0?"#185FA5":"#1a2b3c"),
-            borderRadius:6, borderSkipped:false,
-          }]
+          labels: ultimosMeses.map(m=>{const [y,mo]=m.mes.split("-");return `${mo}/${y.slice(2)}`;}),
+          datasets:[
+            {label:"Efectivo", data:ultimosMeses.map(m=>m.efectivo), backgroundColor:"#185FA5", borderRadius:4, borderSkipped:false},
+            {label:"Transfer.", data:ultimosMeses.map(m=>m.trans),   backgroundColor:"#5daaff", borderRadius:4, borderSkipped:false},
+            {label:"Fiado",    data:ultimosMeses.map(m=>m.fiado),    backgroundColor:"#f5b942", borderRadius:4, borderSkipped:false},
+          ]
         },
-        options:{
-          responsive:true, maintainAspectRatio:false,
-          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`$${Math.round(c.raw).toLocaleString("es-AR")}`}}},
-          scales:{
-            x:{grid:{color:CC.gridLine},ticks:{color:CC.textColor}},
-            y:{grid:{color:CC.gridLine},ticks:{color:CC.textColor,callback:v=>`$${(v/1000).toFixed(0)}k`}}
-          }
-        }
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{color:CC.text,padding:8,font:{size:10}}},tooltip:{callbacks:{label:c=>`${c.dataset.label}: $${Math.round(c.raw).toLocaleString("es-AR")}`}}},scales:{x:{stacked:true,grid:{color:CC.grid},ticks:{color:CC.text,font:{size:10}}},y:{stacked:true,grid:{color:CC.grid},ticks:{color:CC.text,callback:v=>`$${(v/1000).toFixed(0)}k`}}}}
       });
     }
 
-    // ── Donut: forma de pago ───────────────────────────────────────────────
-    if(chartRefs.donut.current && Object.keys(porPago).length>0){
-      const labels = Object.keys(porPago);
-      const colores = {contado:CC.green, transferencia:CC.blue, fiado:CC.amber};
+    // Donut — forma de pago
+    if(chartRefs.donut.current && totalNeto>0){
+      const labels=["Efectivo","Transferencia","Fiado"];
+      const vals=[cobEfectivo,cobTrans,cobFiado];
       chartInst.current.donut = new Chart(chartRefs.donut.current,{
         type:"doughnut",
-        data:{
-          labels,
-          datasets:[{
-            data: labels.map(k=>porPago[k]),
-            backgroundColor: labels.map(k=>colores[k]||CC.gray),
-            borderWidth:0, hoverOffset:6,
-          }]
-        },
-        options:{
-          responsive:true, maintainAspectRatio:false, cutout:"68%",
-          plugins:{
-            legend:{position:"bottom",labels:{color:CC.textColor,padding:12,font:{size:11}}},
-            tooltip:{callbacks:{label:c=>`${c.label}: $${Math.round(c.raw).toLocaleString("es-AR")}`}}
-          }
-        }
+        data:{labels,datasets:[{data:vals,backgroundColor:[CC.blue,"#3a7fd4",CC.amber],borderWidth:0,hoverOffset:6}]},
+        options:{responsive:true,maintainAspectRatio:false,cutout:"68%",plugins:{legend:{position:"bottom",labels:{color:CC.text,padding:10,font:{size:10}}},tooltip:{callbacks:{label:c=>`${c.label}: $${Math.round(c.raw).toLocaleString("es-AR")}`}}}}
       });
     }
 
-    // ── Line chart: evolución por fecha ───────────────────────────────────
-    if(chartRefs.line.current && fechasOrdenadas.length>0){
+    // Line — evolución ganancia por mes
+    if(chartRefs.line.current && ultimosMeses.length>1){
       chartInst.current.line = new Chart(chartRefs.line.current,{
         type:"line",
         data:{
-          labels: fechasOrdenadas.map(f=>f.slice(5)),
-          datasets:[{
-            label:"Ventas",
-            data: fechasOrdenadas.map(f=>ventasPorFecha[f]||0),
-            borderColor:CC.blue, backgroundColor:"rgba(93,170,255,0.08)",
-            pointBackgroundColor:CC.blue, pointRadius:4,
-            borderWidth:2, tension:0.3, fill:true,
-          }]
+          labels:ultimosMeses.map(m=>{const [y,mo]=m.mes.split("-");return `${mo}/${y.slice(2)}`;}),
+          datasets:[{label:"Ganancia",data:ultimosMeses.map(m=>m.ganancia),borderColor:CC.green,backgroundColor:"rgba(77,217,160,0.08)",pointBackgroundColor:CC.green,pointRadius:4,borderWidth:2,tension:0.3,fill:true}]
         },
-        options:{
-          responsive:true, maintainAspectRatio:false,
-          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`$${Math.round(c.raw).toLocaleString("es-AR")}`}}},
-          scales:{
-            x:{grid:{color:CC.gridLine},ticks:{color:CC.textColor}},
-            y:{grid:{color:CC.gridLine},ticks:{color:CC.textColor,callback:v=>`$${(v/1000).toFixed(0)}k`}}
-          }
-        }
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`$${Math.round(c.raw).toLocaleString("es-AR")}`}}},scales:{x:{grid:{color:CC.grid},ticks:{color:CC.text,font:{size:10}}},y:{grid:{color:CC.grid},ticks:{color:CC.text,callback:v=>`$${(v/1000).toFixed(0)}k`}}}}
       });
     }
+    return ()=>{Object.values(chartInst.current).forEach(c=>c?.destroy());};
+  },[filtro,mesSel,diaSel,ventas]);
 
-    return ()=>{ Object.values(chartInst.current).forEach(c=>c?.destroy()); };
-  },[filtro, ventas]);
+  // ── Render ────────────────────────────────────────────────────────────────
+  const tituloFiltro = filtro==="mes"?`${mesSel.slice(5)}/${mesSel.slice(0,4)}`:filtro==="anio"?mesSel.slice(0,4):"Histórico completo";
 
   return (
     <div style={s.screen}>
       <div style={s.header}>
         <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>Resumen general</span>
+        <span style={s.headerTitle}>Resumen</span>
         <button style={{...s.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{
           const total=filtradas.reduce((a,v)=>a+(v.neto||0),0);
-          const gan=filtradas.reduce((a,v)=>a+(v.ganancia||0),0);
-          const texto=`*Resumen La Catalina${filtro!=="todo"?" · "+filtro:""}*\n\n`+
-            `💰 Efectivo: ${fmt(porPago.contado||0)}\n`+
-            `📲 Transfer: ${fmt(porPago.transferencia||0)}\n`+
-            `📝 Fiado: ${fmt(porPago.fiado||0)}\n`+
-            `📦 Total: ${fmt(total)}\n`+
-            `✅ Ganancia: ${fmt(gan)}\n\n`+
-            `Entregas: ${filtradas.length} clientes`;
+          const texto=`*Resumen La Catalina · ${tituloFiltro}*\n\n💰 Efectivo: ${fmt(cobEfectivo)}\n📲 Transfer: ${fmt(cobTrans)}\n📝 Fiado: ${fmt(cobFiado)}\n📦 Total: ${fmt(total)}\n✅ Ganancia: ${fmt(totalGan)}\n\nEntregas: ${filtradas.length} clientes`;
           window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`,"_blank");
         }}>💬 WA</button>
       </div>
 
-      <div style={{padding:"10px 14px"}}>
-        <select style={{...s.select,marginBottom:12}} value={filtro} onChange={e=>setFiltro(e.target.value)}>
-          <option value="todo">Todos los días</option>
-          {DIAS.map(d=><option key={d} value={d}>{d}</option>)}
-        </select>
-
-        {/* Métricas principales */}
-        <div style={{...s.grid2,marginBottom:8}}>
-          <div style={s.metricCard}><div style={s.metricLabel}>Total cobrado</div><div style={{...s.metricVal,color:"#5daaff"}}>{fmt(totalNeto)}</div></div>
-          <div style={s.metricCard}><div style={s.metricLabel}>Ganancia neta</div><div style={{...s.metricVal,color:"#4dd9a0"}}>{fmt(totalGan)}</div></div>
-          <div style={s.metricCard}><div style={s.metricLabel}>Costo llenado</div><div style={{...s.metricVal,color:"#f07070"}}>{fmt(totalCosto)}</div></div>
-          <div style={s.metricCard}><div style={s.metricLabel}>Entregas</div><div style={s.metricVal}>{filtradas.length}</div></div>
-        </div>
-
-        {/* ── Gráfico 1: Ventas por día ───────────────────────────────────── */}
-        {filtro==="todo"&&ventas.length>0&&(
-          <>
-            <span style={s.sectionTitle}>Ventas por día</span>
-            <div style={{...s.card,margin:"0 0 10px",padding:"12px 10px"}}>
-              <div style={{height:160}}><canvas ref={chartRefs.bar} /></div>
-            </div>
-          </>
-        )}
-
-        {/* ── Gráfico 2: Forma de pago ────────────────────────────────────── */}
-        {Object.keys(porPago).length>0&&(
-          <>
-            <span style={s.sectionTitle}>Distribución por forma de pago</span>
-            <div style={{...s.card,margin:"0 0 10px",padding:"12px 10px"}}>
-              <div style={{height:200}}><canvas ref={chartRefs.donut} /></div>
-            </div>
-            <div style={{...s.grid3,margin:"0 0 10px"}}>
-              {[["Efectivo",fmt(porPago.contado||0),"success"],["Transfer.",fmt(porPago.transferencia||0),"info"],["Fiado",fmt(porPago.fiado||0),"warning"]].map(([l,v,c])=>(
-                <div key={l} style={s.metricCard}><div style={s.metricLabel}>{l}</div><div style={{fontSize:13,fontWeight:500,color:`var(--color-text-${c})`}}>{v}</div></div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* ── Gráfico 3: Evolución ────────────────────────────────────────── */}
-        {fechasOrdenadas.length>1&&(
-          <>
-            <span style={s.sectionTitle}>Evolución de ventas</span>
-            <div style={{...s.card,margin:"0 0 10px",padding:"12px 10px"}}>
-              <div style={{height:160}}><canvas ref={chartRefs.line} /></div>
-            </div>
-          </>
-        )}
-
-        {/* Unidades por producto */}
-        <span style={s.sectionTitle}>Unidades entregadas</span>
-        <div style={{display:"flex",gap:6,marginBottom:10}}>
-          {productos.map(p=>(
-            <div key={p.id} style={{...s.metricCard,flex:1,textAlign:"center"}}>
-              <div style={s.metricLabel}>{p.nombre.replace(" 1.5L","").replace("Bidón ","")}</div>
-              <div style={{fontSize:22,fontWeight:500,color:"var(--color-text-primary)"}}>{cantidades[p.nombre]||0}</div>
-            </div>
+      {/* Selector de período */}
+      <div style={{padding:"10px 14px 6px"}}>
+        <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
+          {[["mes","Este mes"],["anio","Este año"],["todo","Histórico"],["dia","Por día"]].map(([v,l])=>(
+            <button key={v} style={{...s.btn,fontSize:12,padding:"5px 12px",background:filtro===v?"#185FA5":"var(--color-background-tertiary)",color:filtro===v?"#e2eaf4":"var(--color-text-secondary)",border:filtro===v?"none":"0.5px solid var(--color-border-secondary)"}}
+              onClick={()=>setFiltro(v)}>{l}</button>
           ))}
         </div>
-
-        {/* Saldos */}
-        {conDeuda.length>0&&(
-          <>
-            <span style={s.sectionTitle}>Con deuda · {fmt(conDeuda.reduce((a,c)=>a+Math.abs(c.saldo),0))}</span>
-            <div style={s.card}>
-              {conDeuda.map(c=>(
-                <div key={c.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-                  <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{c.nombre}</span>
-                  <span style={s.badge("danger")}>Debe {fmt(Math.abs(c.saldo))}</span>
-                </div>
-              ))}
-            </div>
-          </>
+        {(filtro==="mes"||filtro==="anio")&&(
+          <input type="month" style={{...s.input,marginBottom:6}} value={mesSel}
+            onChange={e=>setMesSel(e.target.value)} />
         )}
-        {conFavor.length>0&&(
-          <>
-            <span style={s.sectionTitle}>Saldos a favor</span>
-            <div style={s.card}>
-              {conFavor.map(c=>(
-                <div key={c.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-                  <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{c.nombre}</span>
-                  <span style={s.badge("success")}>{fmt(c.saldo)} a favor</span>
-                </div>
-              ))}
-            </div>
-          </>
+        {filtro==="dia"&&(
+          <select style={{...s.select,marginBottom:6}} value={diaSel} onChange={e=>setDiaSel(e.target.value)}>
+            <option value="todos">Todos los días</option>
+            {DIAS.map(d=><option key={d} value={d}>{d}</option>)}
+          </select>
         )}
       </div>
+
+      {/* Métricas principales */}
+      <div style={{...s.grid2,padding:"0 14px",gap:8,marginBottom:8}}>
+        <div style={s.metricCard}><div style={s.metricLabel}>Total vendido</div><div style={{...s.metricVal,color:"#5daaff"}}>{fmt(totalNeto)}</div><div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>{filtradas.length} entregas</div></div>
+        <div style={s.metricCard}><div style={s.metricLabel}>Ganancia neta</div><div style={{...s.metricVal,color:"#4dd9a0"}}>{fmt(totalGan)}</div><div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>−{fmt(totalCosto)} llenado</div></div>
+      </div>
+
+      {/* Desglose cobranza */}
+      <div style={{...s.grid3,padding:"0 14px",gap:6,marginBottom:10}}>
+        <div style={s.metricCard}><div style={s.metricLabel}>Efectivo</div><div style={{fontSize:15,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(cobEfectivo)}</div></div>
+        <div style={s.metricCard}><div style={s.metricLabel}>Transfer.</div><div style={{fontSize:15,fontWeight:500,color:"#5daaff"}}>{fmt(cobTrans)}</div></div>
+        <div style={s.metricCard}><div style={s.metricLabel}>Fiado</div><div style={{fontSize:15,fontWeight:500,color:"#f5b942"}}>{fmt(cobFiado)}</div></div>
+      </div>
+
+      {/* Gráfico barras apiladas por mes */}
+      {(filtro==="todo"||filtro==="anio")&&ultimosMeses.length>0&&(
+        <>
+          <span style={s.sectionTitle}>Ventas por mes (efectivo / transfer. / fiado)</span>
+          <div style={{...s.card,margin:"0 14px 8px",padding:"12px 10px"}}>
+            <div style={{height:180}}><canvas ref={chartRefs.bar} /></div>
+          </div>
+        </>
+      )}
+
+      {/* Gráfico donut forma de pago */}
+      {totalNeto>0&&(
+        <>
+          <span style={s.sectionTitle}>Distribución por forma de pago</span>
+          <div style={{...s.card,margin:"0 14px 8px",padding:"12px 10px"}}>
+            <div style={{height:180}}><canvas ref={chartRefs.donut} /></div>
+          </div>
+        </>
+      )}
+
+      {/* Gráfico línea evolución ganancia */}
+      {ultimosMeses.length>1&&(
+        <>
+          <span style={s.sectionTitle}>Evolución de ganancia por mes</span>
+          <div style={{...s.card,margin:"0 14px 8px",padding:"12px 10px"}}>
+            <div style={{height:150}}><canvas ref={chartRefs.line} /></div>
+          </div>
+        </>
+      )}
+
+      {/* Tabla mensual */}
+      {(filtro==="todo"||filtro==="anio")&&mesesOrdenados.length>0&&(
+        <>
+          <span style={s.sectionTitle}>Detalle por mes</span>
+          <div style={{...s.card,margin:"0 14px 8px",overflow:"hidden",padding:0}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"6px 10px",background:"var(--color-background-tertiary)",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+              {["Mes","Total","Efectivo+Trans","Ganancia"].map(h=><div key={h} style={{fontSize:10,color:"var(--color-text-secondary)",fontWeight:500,textAlign:h==="Mes"?"left":"right"}}>{h}</div>)}
+            </div>
+            {[...mesesOrdenados].reverse().map(m=>(
+              <div key={m.mes} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"7px 10px",borderBottom:"0.5px solid var(--color-border-tertiary)",alignItems:"center"}}>
+                <div style={{fontSize:12,color:"var(--color-text-primary)",fontWeight:500}}>{m.mes.slice(5)}/{m.mes.slice(0,4)}</div>
+                <div style={{textAlign:"right",fontSize:12,color:"var(--color-text-primary)"}}>{fmt(m.total)}</div>
+                <div style={{textAlign:"right",fontSize:12,color:"#5daaff"}}>{fmt(m.efectivo+m.trans)}</div>
+                <div style={{textAlign:"right",fontSize:12,color:"#4dd9a0"}}>{fmt(m.ganancia)}</div>
+              </div>
+            ))}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"8px 10px",background:"var(--color-background-tertiary)"}}>
+              <div style={{fontSize:11,color:"var(--color-text-secondary)",fontWeight:500}}>Total</div>
+              <div style={{textAlign:"right",fontSize:12,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(mesesOrdenados.reduce((a,m)=>a+m.total,0))}</div>
+              <div style={{textAlign:"right",fontSize:12,fontWeight:500,color:"#5daaff"}}>{fmt(mesesOrdenados.reduce((a,m)=>a+m.efectivo+m.trans,0))}</div>
+              <div style={{textAlign:"right",fontSize:12,fontWeight:500,color:"#4dd9a0"}}>{fmt(mesesOrdenados.reduce((a,m)=>a+m.ganancia,0))}</div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Unidades por producto */}
+      <span style={s.sectionTitle}>Unidades entregadas · {tituloFiltro}</span>
+      <div style={{display:"flex",gap:6,padding:"0 14px",marginBottom:10,flexWrap:"wrap"}}>
+        {productos.map(p=>(
+          <div key={p.id} style={{...s.metricCard,flex:1,minWidth:70,textAlign:"center"}}>
+            <div style={s.metricLabel}>{p.nombre.replace(" 1.5L","").replace("Bidón ","")}</div>
+            <div style={{fontSize:20,fontWeight:500,color:"var(--color-text-primary)"}}>{cantidades[p.nombre]||0}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Saldos */}
+      {conDeuda.length>0&&(
+        <>
+          <span style={s.sectionTitle}>Clientes con deuda · {fmt(conDeuda.reduce((a,c)=>a+Math.abs(c.saldo),0))}</span>
+          <div style={{...s.card,margin:"0 14px 8px"}}>
+            {conDeuda.map(c=>(
+              <div key={c.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+                <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{c.nombre}</span>
+                <span style={s.badge("danger")}>Debe {fmt(Math.abs(c.saldo))}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      {conFavor.length>0&&(
+        <>
+          <span style={s.sectionTitle}>Saldos a favor</span>
+          <div style={{...s.card,margin:"0 14px 8px"}}>
+            {conFavor.map(c=>(
+              <div key={c.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+                <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{c.nombre}</span>
+                <span style={s.badge("success")}>{fmt(c.saldo)} a favor</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -3203,13 +3411,14 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
           <div style={{padding:16}}>
             <p style={{fontSize:13,color:"var(--color-text-secondary)",marginBottom:16,lineHeight:1.6}}>
               Cantidades con las que salís cada día. Se usan como valores por defecto al iniciar el reparto.
+              Los sifones se ingresan en cajones (1 cajón = 6 sifones).
             </p>
-            {DIAS.filter(d=>d!=="Lunes").map(dia=>{
-              const c = (cargasDia||CARGA_DIA_DEFAULT)[dia]||{soda:0,b10:0,b20:0};
-              const cajones = Math.floor((c.soda||0)/6);
+            {DIAS.filter(d=>d!=="Lunes").map(function(dia){
+              var c = (cargasDia||CARGA_DIA_DEFAULT)[dia]||{soda:0,b10:0,b20:0};
+              var cajones = Math.floor((c.soda||0)/6);
               return (
                 <div key={dia} style={{...s.card,margin:"0 0 12px"}}>
-                  <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:10}}>{dia}</div>
+                  <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:12}}>{dia}</div>
                   <div style={s.grid3}>
                     <div>
                       <label style={{...s.label,textAlign:"center"}}>Cajones soda</label>
@@ -3217,8 +3426,9 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
                         value={cajones||""}
                         placeholder="0"
                         onChange={e=>{
-                          const caj=Number(e.target.value)||0;
-                          const nuevo={...(cargasDia||CARGA_DIA_DEFAULT),[dia]:{...c,soda:caj*6}};
+                          var caj=Number(e.target.value)||0;
+                          var nuevo=Object.assign({},cargasDia||CARGA_DIA_DEFAULT);
+                          nuevo[dia]=Object.assign({},c,{soda:caj*6});
                           setCargasDia(nuevo);
                         }} />
                       <div style={{fontSize:10,color:"var(--color-text-tertiary)",textAlign:"center",marginTop:2}}>{c.soda||0} unidades</div>
@@ -3229,7 +3439,8 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
                         value={c.b10||""}
                         placeholder="0"
                         onChange={e=>{
-                          const nuevo={...(cargasDia||CARGA_DIA_DEFAULT),[dia]:{...c,b10:Number(e.target.value)||0}};
+                          var nuevo=Object.assign({},cargasDia||CARGA_DIA_DEFAULT);
+                          nuevo[dia]=Object.assign({},c,{b10:Number(e.target.value)||0});
                           setCargasDia(nuevo);
                         }} />
                     </div>
@@ -3239,7 +3450,8 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
                         value={c.b20||""}
                         placeholder="0"
                         onChange={e=>{
-                          const nuevo={...(cargasDia||CARGA_DIA_DEFAULT),[dia]:{...c,b20:Number(e.target.value)||0}};
+                          var nuevo=Object.assign({},cargasDia||CARGA_DIA_DEFAULT);
+                          nuevo[dia]=Object.assign({},c,{b20:Number(e.target.value)||0});
                           setCargasDia(nuevo);
                         }} />
                     </div>
@@ -3247,7 +3459,7 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
                 </div>
               );
             })}
-            <button style={s.btnPrimary} onClick={()=>{ setCargasDia({...cargasDia}); alert("Cargas guardadas"); }}>Guardar cargas</button>
+            <button style={s.btnPrimary} onClick={()=>{ setCargasDia(Object.assign({},cargasDia)); alert("Cargas guardadas"); }}>Guardar cargas</button>
           </div>
         )}
         {tab==="backup"&&(
