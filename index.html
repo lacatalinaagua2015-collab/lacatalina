@@ -655,7 +655,8 @@ function App() {
           saveNoVisitas(nv);
         }}
         />}
-      {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>irA("venta")} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)} />}
+      {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>irA("venta")} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
+          onNoEstaCliente={()=>{const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noesta"}];saveNoVisitas(nv);}} />}
       {pantalla==="venta"          && cliente && <NuevaVenta cliente={cliente} productos={productos} fecha={fechaActual}
         onNoEsta={()=>{
           const prev=(noVisitas||[]).find(v=>v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual);
@@ -1063,13 +1064,14 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,productos,onGuardar,onVolver}
   const totalVentaLlenar = Object.values(totalesPorProd).reduce((a,p)=>a+p.llenar,0);
   // Desglose cobranza
   // Cobranza — todo calculado desde ventas registradas
-  const cobEfectivo   = ventas.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.neto||0),0);
-  const cobTransBruto = ventas.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v.neto||0),0);
+  // Transferencia siempre va como transferencia, aunque sea pago de deuda
+  const cobEfectivo   = ventas.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
+  const cobTransBruto = ventas.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
   const cobTransDesc  = Math.round(cobTransBruto*0.025);
   const cobTransNeto  = cobTransBruto - cobTransDesc;
   const cobFiado      = ventas.filter(v=>v.pago==="fiado").reduce((a,v)=>a+(v.neto||0),0);
-  // Cobros de saldo: cuando el cliente pagó más que la venta del día (pagó deuda anterior)
-  const cobSaldos     = ventas.reduce((a,v)=>{
+  // Cobros de saldo en efectivo: pagos extras sobre la venta (solo contado)
+  const cobSaldos     = ventas.filter(v=>v.pago==="contado").reduce((a,v)=>{
     const extra=(v.pagadoNum||0)-(v.neto||0);
     return a+(extra>0?extra:0);
   },0);
@@ -1505,13 +1507,15 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,onSelecci
           </div>
         </div>
         {(!visitados.has(c.id)||est==="noesta")&&!atendido&&(
-          <div style={{display:"flex",gap:6,marginTop:8,justifyContent:"flex-end"}}>
-            <button style={{background:"var(--color-background-warning)",color:"var(--color-text-warning)",border:"0.5px solid var(--color-border-warning)",borderRadius:8,padding:"5px 9px",fontSize:11,cursor:"pointer"}}
-              onClick={()=>marcarNoVisita(c.id,"noesta")}>
-              {est==="noesta"?"2ª vez: No estaba (cerrar)":"No está"}
+          <div style={{display:"flex",gap:8,marginTop:10}}>
+            <button style={{background:"var(--color-background-warning)",color:"var(--color-text-warning)",border:"1px solid var(--color-border-warning)",borderRadius:10,padding:"10px 0",fontSize:13,cursor:"pointer",fontWeight:500,flex:1}}
+              onClick={()=>marcarNoVisita(c.id,est==="noesta"?"noesta2":"noesta")}>
+              {est==="noesta"?"2ª vez":"🔄 No está"}
             </button>
-            <button style={{...s.btnDanger,fontSize:11,padding:"5px 9px"}} onClick={()=>marcarNoVisita(c.id,"noquiso")}>No quiere</button>
-            <button style={{background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:8,padding:"5px 12px",fontSize:12,cursor:"pointer",fontWeight:500}} onClick={()=>onSeleccionar(c)}>Atender →</button>
+            <button style={{background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"1px solid var(--color-border-danger)",borderRadius:10,padding:"10px 0",fontSize:13,cursor:"pointer",fontWeight:500,flex:1}}
+              onClick={()=>marcarNoVisita(c.id,"noquiso")}>No quiere</button>
+            <button style={{background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:10,padding:"10px 0",fontSize:14,cursor:"pointer",fontWeight:600,flex:2}}
+              onClick={()=>onSeleccionar(c)}>Entregar →</button>
           </div>
         )}
         {(est==="noesta2"||est==="noquiso")&&!atendido&&(
@@ -1588,7 +1592,7 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,onSelecci
   );
 }
 
-function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onEditar,onEliminarVenta,onEditarVenta,onEliminarCliente}) {
+function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onEditar,onEliminarVenta,onEditarVenta,onEliminarCliente,onNoEstaCliente}) {
   const [editandoCliente,setEditandoCliente] = useState(false);
   const [editandoVentaId,setEditandoVentaId] = useState(null);
   const [tabDetalle,setTabDetalle] = useState("historial");
@@ -1696,9 +1700,15 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
                   {ventaHoy.detalle.map(d=>`${d.nombre} ×${d.cantidad}`).join(" · ")} · {ventaHoy.pago}
                 </div>
               </div>
-            : <button style={{...s.btnPrimary,marginBottom:12}} onClick={onVenta}>
-                + Registrar entrega de hoy
-              </button>
+            : <div style={{display:"flex",gap:8,marginBottom:12}}>
+                <button style={{background:"var(--color-background-warning)",color:"var(--color-text-warning)",border:"1px solid var(--color-border-warning)",borderRadius:10,padding:"12px 0",fontSize:14,cursor:"pointer",fontWeight:500,flex:1}}
+                  onClick={()=>{onNoEstaCliente&&onNoEstaCliente();onVolver();}}>
+                  🔄 No está
+                </button>
+                <button style={{...s.btnPrimary,padding:"12px 0",fontSize:15,borderRadius:10,flex:2}} onClick={onVenta}>
+                  📦 Registrar entrega
+                </button>
+              </div>
           }
 
           {/* Tabs */}
@@ -1770,9 +1780,16 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
           )}
 
           <div style={{...s.divider,marginTop:12}}/>
-          <button style={{...s.btnDanger,width:"100%",padding:"10px",fontSize:13}} onClick={()=>{if(window.confirm(`¿Eliminar a ${cliente.nombre}? Se borrarán también sus ventas.`))onEliminarCliente();}}>
-            Eliminar cliente
-          </button>
+          <details style={{marginTop:4}}>
+            <summary style={{fontSize:12,color:"var(--color-text-tertiary)",cursor:"pointer",padding:"4px 0",listStyle:"none",display:"flex",alignItems:"center",gap:4}}>
+              ⚙ Opciones avanzadas
+            </summary>
+            <div style={{marginTop:8}}>
+              <button style={{...s.btnDanger,width:"100%",padding:"10px",fontSize:13}} onClick={()=>{if(window.confirm(`¿Eliminar a ${cliente.nombre}? Se borrarán también sus ventas.`))onEliminarCliente();}}>
+                Eliminar cliente
+              </button>
+            </div>
+          </details>
         </>}
         {editandoCliente && <EditCliente cliente={cliente} onGuardar={cambios=>{onEditar(cambios);setEditandoCliente(false);}} onEliminarCliente={onEliminarCliente} />}
       </div>
