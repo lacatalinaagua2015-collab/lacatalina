@@ -466,7 +466,7 @@ function App() {
     if(!s||typeof s!=="object") return base;
     if(s.soderia&&typeof s.soderia==="object") {
       return {
-        soderia:{sifon:s.soderia.sifon||0,bidon10:s.soderia.bidon10||0,bidon20:s.soderia.bidon20||0},
+        soderia:{sifon:s.soderia?.sifon||0,bidon10:s.soderia?.bidon10||0,bidon20:s.soderia?.bidon20||0},
         casa:   {sifon:s.casa?.sifon||0,bidon10:s.casa?.bidon10||0,bidon20:s.casa?.bidon20||0},
         camion: {sifon:s.camion?.sifon||0,bidon10:s.camion?.bidon10||0,bidon20:s.camion?.bidon20||0},
       };
@@ -558,7 +558,15 @@ function App() {
       if (data.clientes?.length)   setClientes(data.clientes);
       if (data.ventas?.length)     setVentas(data.ventas);
       if (data.planillas)          setPlanillas(data.planillas);
-      if (data.stock)              setStock(data.stock);
+      if (data.stock) {
+        const ds = data.stock;
+        const normStock = ds.soderia ? ds : {
+          soderia:{sifon:ds.sifon||0,bidon10:ds.bidon10||0,bidon20:ds.bidon20||0},
+          casa:   {sifon:0,bidon10:0,bidon20:0},
+          camion: {sifon:0,bidon10:0,bidon20:0},
+        };
+        setStock(normStock);
+      }
       if (data.productos?.length)  setProductos(data.productos);
       if (data.noVisitas?.length)  setNoVisitas(data.noVisitas);
       setSyncStatus("saved");
@@ -713,7 +721,7 @@ function App() {
       <SyncBar status={syncStatus} />
       {pantalla==="portada"        && <Portada onIngresar={()=>irA("menu")} />}
       {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onMensajes={()=>irA("mensajes")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} />}
-      {pantalla==="diaPrincipal"   && <DiaPrincipal dia={diaActual} onIrClientes={()=>irA("selectorFechaClientes")} onIrPlanilla={()=>irA("selectorFechaPlanilla")} onVolver={()=>irA("menu")} />}
+      {pantalla==="diaPrincipal"   && <DiaPrincipal dia={diaActual} onIrClientes={()=>irA("selectorFechaClientes")} onIrPlanilla={()=>irA("selectorFechaPlanilla")} onVolver={()=>irA("menu")} ventasPendientesTransfer={ventas.filter(v=>v.dia===diaActual&&v.fechaKey===fechaActual&&v.pago==="transferencia"&&!v.transConfirmada).length} />}
       {pantalla==="selectorFechaPlanilla" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("planilla");}} onVolver={()=>irA("diaPrincipal")} />}
       {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.dia===diaActual&&v.fechaKey===fechaActual)} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);irA("selectorFechaPlanilla");}} onVolver={()=>irA("selectorFechaPlanilla")} />}
       {pantalla==="selectorFechaClientes" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("inicioReparto");}} onVolver={()=>irA("diaPrincipal")} />}
@@ -742,6 +750,10 @@ function App() {
           const ordenados=[...lista].sort((a,b)=>(a.orden||9999)-(b.orden||9999));
           saveClientes([...otros,...ordenados]);
         }} onRegistrarNoVisita={(clienteId,motivo)=>{const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo}];saveNoVisitas(nv);}} onQuitarNoVisita={(clienteId)=>{const nv=(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual));saveNoVisitas(nv);}}
+        onConfirmarTransfer={(clienteId,ventaId)=>{
+          const nv=ventas.map(v=>v.id===ventaId?{...v,transConfirmada:!v.transConfirmada}:v);
+          saveVentas(nv);
+        }}
         prospectos={(prospectos||[]).filter(p=>p.dia===diaActual&&p.estado==="activo")}
         onVentaProspecto={(p)=>{
           if(!clientes.find(c=>c.id===p.id)){
@@ -1101,7 +1113,7 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
   );
 }
 
-function DiaPrincipal({dia,onIrClientes,onIrPlanilla,onVolver}) {
+function DiaPrincipal({dia,onIrClientes,onIrPlanilla,onVolver,ventasPendientesTransfer}) {
   return (
     <div style={s.screen}>
       <div style={s.header}>
@@ -1116,6 +1128,15 @@ function DiaPrincipal({dia,onIrClientes,onIrPlanilla,onVolver}) {
           </div>
           <span style={{color:"var(--color-text-tertiary)",fontSize:20}}>→</span>
         </button>
+        {ventasPendientesTransfer>0&&(
+          <div style={{...s.card,margin:"0 0 10px",background:"#1e3a5f",border:"1px solid #f5b942",display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:22}}>🔴</span>
+            <div>
+              <div style={{fontSize:13,fontWeight:500,color:"#f5b942"}}>{ventasPendientesTransfer} transferencia{ventasPendientesTransfer>1?"s":""}  sin confirmar</div>
+              <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>Tocá el 🔴 en la lista de clientes para confirmar</div>
+            </div>
+          </div>
+        )}
         <button style={{...s.card,margin:0,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"20px 16px"}} onClick={onIrClientes}>
           <div>
             <div style={{fontSize:17,fontWeight:500,color:"var(--color-text-primary)"}}>👥 Clientes del día</div>
@@ -1610,7 +1631,7 @@ function InicioReparto({dia,fecha,planilla,productos,cargasDia,stock,onGuardar,o
   );
 }
 
-function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto}) {
+function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onConfirmarTransfer}) {
   const [busqueda,setBusqueda] = useState("");
   const [editandoOrden,setEditandoOrden] = useState(null);
   const [ordenTemp,setOrdenTemp] = useState("");
@@ -1677,7 +1698,17 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,onSelecci
             }
           </div>
           <div style={{flex:1,cursor:"pointer",minWidth:0}} onClick={()=>onSeleccionar(c)}>
-            <div style={{fontWeight:500,fontSize:15,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nombre}</div>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <div style={{fontWeight:500,fontSize:15,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nombre}</div>
+              {(()=>{const vt=ventas.find(v=>v.clienteId===c.id&&v.fechaKey===fecha&&v.pago==="transferencia");
+                if(!vt) return null;
+                return <button style={{background:"none",border:"none",cursor:"pointer",fontSize:16,padding:0,lineHeight:1,flexShrink:0}}
+                  onClick={e=>{e.stopPropagation();onConfirmarTransfer&&onConfirmarTransfer(c.id,vt.id);}}
+                  title={vt.transConfirmada?"Confirmada":"Pendiente de confirmar"}>
+                  {vt.transConfirmada?"🟢":"🔴"}
+                </button>;
+              })()}
+            </div>
             <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:2}}>
               {c.calle?`${c.calle} ${c.nro||""}`:c.manzana?`Mz ${c.manzana} L ${c.lote}`:""}{c.barrio?` · ${c.barrio}`:""}
             </div>
@@ -2038,12 +2069,15 @@ function EditCliente({cliente,onGuardar,onEliminarCliente}) {
 
 function EditVenta({venta,productos,onGuardar,onCancelar}) {
   const [cantidades,setCantidades]=useState(()=>{const m={};productos.forEach(p=>{m[p.nombre]=0;});venta.detalle.forEach(d=>{m[d.nombre]=d.cantidad;});return m;});
-  const [pago,setPago]=useState(venta.pago);
-  const [monto,setMonto]=useState(String(venta.pagado||""));
+  const [pago,setPago]=useState(venta.pago||"contado");
+  const [monto,setMonto]=useState(()=>String(venta.pagadoNum||venta.neto||""));
+  const [montoEfec,setMontoEfec]=useState("");
+  const [montoTrans,setMontoTrans]=useState("");
   const [obs,setObs]=useState(venta.obs||"");
   const detalle=productos.map(p=>({nombre:p.nombre,cantidad:cantidades[p.nombre]||0,precio:p.precio,total:(cantidades[p.nombre]||0)*p.precio})).filter(d=>d.cantidad>0);
   const bruto=detalle.reduce((a,d)=>a+d.total,0);
-  const neto=bruto; // monto real sin descuento
+  const neto=bruto;
+  const sonarTrans = ()=>{try{const ctx=new(window.AudioContext||window.webkitAudioContext)();[523,659,784].forEach((f,i)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=f;g.gain.value=0.3;o.start(ctx.currentTime+i*0.15);o.stop(ctx.currentTime+i*0.15+0.15);});}catch(e){}};
   return (
     <div style={{...s.card,margin:0,background:"var(--color-background-secondary)"}}>
       <p style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)",marginBottom:10}}>Editando venta</p>
@@ -2057,17 +2091,54 @@ function EditVenta({venta,productos,onGuardar,onCancelar}) {
           </div>
         </div>
       ))}
+      {/* Forma de pago */}
       <div style={{display:"flex",gap:6,margin:"10px 0"}}>
-        {[["contado","Contado"],["transferencia","Transfer."],["fiado","Fiado"]].map(([v,l])=>(
-          <button key={v} style={{...s.btn,flex:1,fontSize:12,padding:"7px 4px",background:pago===v?"#185FA5":undefined,color:pago===v?"#fff":undefined,border:pago===v?"none":undefined}} onClick={()=>setPago(v)}>{l}</button>
+        {[["contado","Contado"],["transferencia","Transfer."],["fiado","Fiado"],["mixto","Mixto"]].map(([v,l])=>(
+          <button key={v} style={{...s.btn,flex:1,fontSize:12,padding:"8px 2px",background:pago===v?"#185FA5":undefined,color:pago===v?"#fff":undefined,border:pago===v?"none":undefined}} onClick={()=>setPago(v)}>{l}</button>
         ))}
       </div>
-      <div style={{marginBottom:8}}><label style={s.label}>Monto cobrado</label><input style={s.input} type="number" value={monto} onChange={e=>setMonto(e.target.value)} placeholder={String(Math.round(neto))} /></div>
-      <div style={{marginBottom:8}}><label style={s.label}>Observaciones</label><input style={s.input} value={obs} onChange={e=>setObs(e.target.value)} /></div>
+      {pago==="mixto"&&(
+        <div style={{...s.card,margin:"0 0 8px",background:"var(--color-background-tertiary)"}}>
+          <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:6}}>Total: {fmt(neto)}</div>
+          <div style={{display:"flex",gap:8}}>
+            <div style={{flex:1}}><label style={s.label}>Efectivo $</label><input style={s.input} type="number" placeholder="0" value={montoEfec} onChange={e=>setMontoEfec(e.target.value)}/></div>
+            <div style={{flex:1}}><label style={s.label}>Transferencia $</label><input style={s.input} type="number" placeholder="0" value={montoTrans} onChange={e=>setMontoTrans(e.target.value)}/></div>
+          </div>
+          {(Number(montoEfec||0)+Number(montoTrans||0))>0&&(
+            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:4}}>
+              Pagado: {fmt(Number(montoEfec||0)+Number(montoTrans||0))}
+              {(Number(montoEfec||0)+Number(montoTrans||0))<neto&&<span style={{color:"var(--color-text-warning)"}}> · Saldo: {fmt(neto-Number(montoEfec||0)-Number(montoTrans||0))}</span>}
+            </div>
+          )}
+        </div>
+      )}
+      {pago!=="fiado"&&pago!=="mixto"&&(
+        <div style={{marginBottom:8}}>
+          <label style={s.label}>Monto cobrado (vacío = {fmt(neto)} exacto)</label>
+          <input style={s.input} type="number" value={monto} onChange={e=>setMonto(e.target.value)} placeholder={String(Math.round(neto))}/>
+        </div>
+      )}
+      {pago==="transferencia"&&(
+        <div style={{...s.card,margin:"0 0 8px",background:"#1e3a5f",border:"0.5px solid #5daaff"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{fontSize:12,color:"#5daaff"}}>Confirmar transferencia</span>
+            <button style={{background:"#185FA5",color:"#fff",border:"none",borderRadius:6,padding:"5px 12px",fontSize:12,cursor:"pointer"}} onClick={sonarTrans}>🔔 Confirmar</button>
+          </div>
+        </div>
+      )}
+      <div style={{marginBottom:8}}><label style={s.label}>Observaciones</label><input style={s.input} value={obs} onChange={e=>setObs(e.target.value)}/></div>
       <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0",fontSize:14,fontWeight:500,color:"var(--color-text-primary)",borderTop:"0.5px solid var(--color-border-tertiary)"}}><span>Total</span><span>{fmt(neto)}</span></div>
       <div style={{display:"flex",gap:8,marginTop:8}}>
         <button style={{...s.btn,flex:1}} onClick={onCancelar}>Cancelar</button>
-        <button style={{...s.btnPrimary,flex:2,padding:"10px"}} onClick={()=>onGuardar(detalle,pago,monto,venta.saldoAplicado||0,obs)}>Guardar</button>
+        <button style={{...s.btnPrimary,flex:2,padding:"10px"}} onClick={()=>{
+          if(pago==="mixto"){
+            const ef=Number(montoEfec||0), tr=Number(montoTrans||0);
+            if(ef>0) onGuardar(detalle,"contado",String(ef),venta.saldoAplicado||0,obs+"[mixto ef+tr $"+tr+"]");
+            else onGuardar(detalle,"transferencia",String(tr),venta.saldoAplicado||0,obs);
+          } else {
+            onGuardar(detalle,pago,pago==="fiado"?"":monto,venta.saldoAplicado||0,obs);
+          }
+        }}>Guardar</button>
       </div>
     </div>
   );
