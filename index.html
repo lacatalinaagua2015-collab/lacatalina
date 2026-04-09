@@ -866,7 +866,7 @@ function SelectorFecha({dia,planillas,ventas,noVisitas,onSeleccionar,onVolver}) 
 
   const ventasPorFecha = {};
   ventas.filter(v=>v.dia===dia).forEach(v=>{
-    const fk = v.fecha?.slice(0,10)||"";
+    const fk = v.fechaKey || v.fecha?.slice(0,10) || "";
     ventasPorFecha[fk] = (ventasPorFecha[fk]||0) + 1;
   });
 
@@ -883,21 +883,6 @@ function SelectorFecha({dia,planillas,ventas,noVisitas,onSeleccionar,onVolver}) 
       </div>
       <div style={{padding:"8px 16px"}}>
         <p style={{fontSize:13,color:"var(--color-text-secondary)",marginBottom:8}}>Seleccioná la fecha de reparto para comenzar o continuar la jornada.</p>
-        <div style={{...s.card,margin:"0 0 12px",display:"flex",gap:10,alignItems:"center"}}>
-          <div style={{flex:1}}>
-            <label style={s.label}>O ingresá una fecha libre (feriado, reparto especial)</label>
-            <input type="date" style={{...s.input,fontSize:14}}
-              defaultValue={hoyKey()}
-              id="fecha-libre-input"
-              onChange={e=>{
-                if(e.target.value){
-                  const d=new Date(e.target.value+'T12:00:00');
-                  onSeleccionar(e.target.value,d);
-                }
-              }}
-            />
-          </div>
-        </div>
         {meses.map(mes=>{
           const abierto = mes===mesAbierto;
           return (
@@ -938,6 +923,18 @@ function SelectorFecha({dia,planillas,ventas,noVisitas,onSeleccionar,onVolver}) 
             </div>
           );
         })}
+        {/* Fecha especial al final */}
+        <div style={{...s.card,margin:"12px 0 0",background:"var(--color-background-tertiary)"}}>
+          <label style={s.label}>📅 Fecha especial (feriado o reparto extra)</label>
+          <input type="date" style={{...s.input,fontSize:14,marginTop:4}}
+            onChange={e=>{
+              if(e.target.value){
+                const d=new Date(e.target.value+'T12:00:00');
+                onSeleccionar(e.target.value,d);
+              }
+            }}
+          />
+        </div>
       </div>
     </div>
   );
