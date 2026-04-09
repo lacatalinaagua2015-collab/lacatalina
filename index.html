@@ -11,7 +11,7 @@
   <title>La Catalina · Reparto</title>
   <script>
     if('serviceWorker' in navigator){
-      const CACHE = 'lc-v2';
+      const CACHE = 'lc-v6';
       const ASSETS = [
         'https://unpkg.com/react@18/umd/react.production.min.js',
         'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -485,7 +485,9 @@ function App() {
   };
   // Auto-migrate old stock format on first load
   React.useEffect(()=>{
-    if(stockRaw && !stockRaw.soderia) setStockRaw(normStock(stockRaw));
+    // Force normalize stock on every mount
+    const normalized = normStock(stockRaw);
+    if(JSON.stringify(normalized) !== JSON.stringify(stockRaw)) setStockRaw(normalized);
   },[]);
   // Helper: transferir del camión a sodería al cerrar el día
   const cerrarCamion = (sobrLlenos, vacios) => {
@@ -3893,7 +3895,7 @@ root.render(<App />);
   <title>La Catalina · Reparto</title>
   <script>
     if('serviceWorker' in navigator){
-      const CACHE = 'lc-v2';
+      const CACHE = 'lc-v6';
       const ASSETS = [
         'https://unpkg.com/react@18/umd/react.production.min.js',
         'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
