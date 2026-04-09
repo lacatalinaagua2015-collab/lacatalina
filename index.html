@@ -440,9 +440,19 @@ function calcVenta(detalle, pago, montoPagado, saldoAplicado, productos) {
 }
 
 function App() {
-  const [pantalla, setPantalla]   = useState(()=>window.location.hash.slice(1)||"portada");
-  const [diaActual, setDiaActual] = useState("");
-  const [fechaActual, setFechaActual] = useState(""); // ISO date key YYYY-MM-DD
+  const [pantalla, setPantalla]   = useState(()=>{
+    const h = window.location.hash.slice(1)||"portada";
+    const needsDia = ["diaPrincipal","selectorFechaClientes","selectorFechaPlanilla","inicioReparto","clientes","detalleCliente","venta","planilla"];
+    const savedDia = (() => { try { return JSON.parse(localStorage.getItem("cat_dia_actual")||'""'); } catch{ return ""; } })();
+    if(needsDia.includes(h) && !savedDia) return "portada";
+    return h;
+  });
+  const [diaActual, setDiaActual]   = useLS("cat_dia_actual", "");
+  // Reset diaActual when it's invalid
+  React.useEffect(()=>{
+    if(diaActual && !DIAS.includes(diaActual)) setDiaActual("");
+  },[]);
+  const [fechaActual, setFechaActual] = useLS("cat_fecha_actual", ""); // ISO date key YYYY-MM-DD
   const [fechaObj, setFechaObj]   = useState(null);
   const [clienteId, setClienteId] = useState(null);
   const [noVisitas, setNoVisitas] = useLS("cat_novisitas_v1", []);
@@ -568,6 +578,8 @@ function App() {
 
   const cliente = clientes.find(c=>c.id===clienteId)||null;
   const irA = (p) => {
+    const needsDia = ["diaPrincipal","selectorFechaClientes","selectorFechaPlanilla","inicioReparto","clientes","detalleCliente","venta","planilla"];
+    if(needsDia.includes(p) && !diaActual) { setPantalla("menu"); window.history.pushState({pantalla:"menu"},'','#menu'); window.scrollTo(0,0); return; }
     setPantalla(p);
     window.scrollTo(0,0);
     window.history.pushState({pantalla:p},'',`#${p}`);
@@ -576,12 +588,11 @@ function App() {
   // Handle back button
   React.useEffect(()=>{
     const handler = (e)=>{
-      if(e.state?.pantalla) {
-        setPantalla(e.state.pantalla);
-        window.scrollTo(0,0);
-      } else {
-        setPantalla("portada");
-      }
+      const p = e.state?.pantalla || "portada";
+      const needsDia = ["diaPrincipal","selectorFechaClientes","selectorFechaPlanilla","inicioReparto","clientes","detalleCliente","venta","planilla"];
+      if(needsDia.includes(p) && !diaActual) { setPantalla("menu"); return; }
+      setPantalla(p);
+      window.scrollTo(0,0);
     };
     window.addEventListener('popstate', handler);
     return ()=>window.removeEventListener('popstate', handler);
