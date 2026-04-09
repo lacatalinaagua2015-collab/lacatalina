@@ -455,6 +455,17 @@ function App() {
     casa:   {sifon:0,bidon10:0,bidon20:0},
     camion: {sifon:0,bidon10:0,bidon20:0},
   });
+  // Migrar stock viejo formato a nuevo
+  const stockNorm = React.useMemo(()=>{
+    if(!stock) return {soderia:{sifon:0,bidon10:0,bidon20:0},casa:{sifon:0,bidon10:0,bidon20:0},camion:{sifon:0,bidon10:0,bidon20:0}};
+    if(stock.soderia) return stock; // ya es el nuevo formato
+    // formato viejo: {sifon, bidon10, bidon20} — migrar a sodería
+    return {
+      soderia:{sifon:stock.sifon||0,bidon10:stock.bidon10||0,bidon20:stock.bidon20||0},
+      casa:   {sifon:0,bidon10:0,bidon20:0},
+      camion: {sifon:0,bidon10:0,bidon20:0},
+    };
+  },[stock]);
   // Helper: transferir del camión a sodería al cerrar el día
   const cerrarCamion = (sobrLlenos, vacios) => {
     setStock(prev=>{
@@ -682,9 +693,9 @@ function App() {
       {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onMensajes={()=>irA("mensajes")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} />}
       {pantalla==="diaPrincipal"   && <DiaPrincipal dia={diaActual} onIrClientes={()=>irA("selectorFechaClientes")} onIrPlanilla={()=>irA("selectorFechaPlanilla")} onVolver={()=>irA("menu")} />}
       {pantalla==="selectorFechaPlanilla" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("planilla");}} onVolver={()=>irA("diaPrincipal")} />}
-      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.dia===diaActual&&v.fechaKey===fechaActual)} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stock} setStock={setStock} syncData={syncData} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);irA("selectorFechaPlanilla");}} onVolver={()=>irA("selectorFechaPlanilla")} />}
+      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.dia===diaActual&&v.fechaKey===fechaActual)} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);irA("selectorFechaPlanilla");}} onVolver={()=>irA("selectorFechaPlanilla")} />}
       {pantalla==="selectorFechaClientes" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("inicioReparto");}} onVolver={()=>irA("diaPrincipal")} />}
-      {pantalla==="inicioReparto"  && <InicioReparto dia={diaActual} fecha={fechaActual} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} cargasDia={cargasDia} stock={stock}
+      {pantalla==="inicioReparto"  && <InicioReparto dia={diaActual} fecha={fechaActual} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} cargasDia={cargasDia} stock={stockNorm}
         onGuardar={(p,descontar)=>{
           savePlanilla(`${diaActual}_${fechaActual}`,p);
           if(descontar){
@@ -791,7 +802,7 @@ function App() {
         saveClientes([...nuevos,{...datos,id:Date.now(),saldo:0,dispenser:datos.dispenser||0}].sort((a,b)=>DIAS.indexOf(a.dia)-DIAS.indexOf(b.dia)||(a.orden||9999)-(b.orden||9999)));
       }} onVolver={()=>irA("menu")} />}
       {pantalla==="resumen"        && <Resumen ventas={ventas} clientes={clientes} productos={productos} planillas={planillas} noVisitas={noVisitas||[]} onVolver={()=>irA("menu")} />}
-      {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stock} setStock={(s)=>{setStock(s);syncData({stock:s});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} onVolver={()=>irA("menu")} />}
+      {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stockNorm} setStock={(s)=>{setStock(s);syncData({stock:s});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} onVolver={()=>irA("menu")} />}
     </div>
   );
 }
@@ -1137,12 +1148,15 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,productos,stock,setStock,sync
   const cobTransDesc  = Math.round(cobTransBruto*0.025);
   const cobTransNeto  = cobTransBruto - cobTransDesc;
   const cobFiado      = ventas.filter(v=>v.pago==="fiado").reduce((a,v)=>a+(v.neto||0),0);
-  // Cobros de saldo en efectivo: pagos extras sobre la venta (solo contado)
-  const cobSaldos     = ventas.filter(v=>v.pago==="contado").reduce((a,v)=>{
-    const extra=(v.pagadoNum||0)-(v.neto||0);
-    return a+(extra>0?extra:0);
+  // Cobros de saldo: pagos extras sobre la venta del día (pagan deuda anterior)
+  const cobSaldosEfec  = ventas.filter(v=>v.pago==="contado").reduce((a,v)=>{
+    const extra=(v.pagadoNum||0)-(v.neto||0); return a+(extra>0?extra:0);
   },0);
-  const fiadoNeto     = cobFiado - cobSaldos; // fiado pendiente real
+  const cobSaldosTrans = ventas.filter(v=>v.pago==="transferencia").reduce((a,v)=>{
+    const extra=(v.pagadoNum||0)-(v.neto||0); return a+(extra>0?extra:0);
+  },0);
+  const cobSaldos      = cobSaldosEfec + cobSaldosTrans;
+  const fiadoNeto      = cobFiado - cobSaldos; // fiado pendiente real
 
   const [datos,setDatos] = useState(()=>({
     ...planilla,
@@ -1301,10 +1315,17 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,productos,stock,setStock,sync
               <span style={{fontSize:13,fontWeight:500,color:`var(--color-text-${c})`}}>{v}</span>
             </div>
           ))}
-          {cobSaldos>0&&(
+          {/* Cobros de deuda — separados por forma de pago */}
+          {cobSaldosEfec>0&&(
             <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-              <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>+ Cobro de saldos anteriores</span>
-              <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-success)"}}>{fmt(cobSaldos)}</span>
+              <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>+ Cobro deuda · efectivo</span>
+              <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-success)"}}>{fmt(cobSaldosEfec)}</span>
+            </div>
+          )}
+          {cobSaldosTrans>0&&(
+            <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+              <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>+ Cobro deuda · transferencia</span>
+              <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-info)"}}>{fmt(cobSaldosTrans)}</span>
             </div>
           )}
           <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0 2px"}}>
@@ -1320,10 +1341,16 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,productos,stock,setStock,sync
             <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Efectivo cobrado (contado)</span>
             <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{fmt(cobEfectivo)}</span>
           </div>
-          {cobSaldos>0&&(
+          {cobSaldosEfec>0&&(
             <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-              <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>+ Cobro de saldos</span>
-              <span style={{fontSize:13,color:"var(--color-text-success)"}}>{fmt(cobSaldos)}</span>
+              <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>+ Cobro deuda efectivo</span>
+              <span style={{fontSize:13,color:"var(--color-text-success)"}}>{fmt(cobSaldosEfec)}</span>
+            </div>
+          )}
+          {cobSaldosTrans>0&&(
+            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+              <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>+ Cobro deuda transferencia</span>
+              <span style={{fontSize:13,color:"var(--color-text-info)"}}>{fmt(cobSaldosTrans)}</span>
             </div>
           )}
           <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
@@ -1338,7 +1365,7 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,productos,stock,setStock,sync
           )}
           <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0 2px"}}>
             <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Efectivo en mano</span>
-            <span style={{fontSize:18,fontWeight:500,color:"var(--color-text-success)"}}>{fmt(cobEfectivo+cobSaldos-totalVentaLlenar-totalGastos)}</span>
+            <span style={{fontSize:18,fontWeight:500,color:"var(--color-text-success)"}}>{fmt(cobEfectivo+cobSaldosEfec-totalVentaLlenar-totalGastos)}</span>
           </div>
         </div>
 
@@ -3531,7 +3558,7 @@ function importarBackup(file,setClientes,setVentas,setPlanillas){
   reader.readAsArrayBuffer(file);
 }
 
-function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,planillas,setPlanillas,stock,setStock,onVolver}) {
+function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,planillas,setPlanillas,stock,setStock,cargasDia,setCargasDia,onVolver}) {
   const [tab,setTab]=useState("precios");
   const [editandoId,setEditandoId]=useState(null);
   const [importando,setImportando]=useState(false);
