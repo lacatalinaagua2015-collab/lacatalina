@@ -65,9 +65,11 @@ self.addEventListener('fetch',e=>{
       appId: "1:1092497470043:web:13c3eb5473541a7260c57e"
     };
     try {
-      firebase.initializeApp(firebaseConfig);
+      if(!firebase.apps || !firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
       window.db = firebase.firestore();
-    } catch(e) { console.error("Firebase init error:", e); }
+    } catch(e) { console.error("Firebase init error:", e); window.db = null; }
 
     function cloudSave(data) {
       if(!window.db) return Promise.resolve(false);
@@ -459,7 +461,21 @@ function App() {
   const [noVisitas, setNoVisitas] = useLS("cat_novisitas_v1", []);
   const [prospectos, setProspectos] = useLS("cat_prospectos_v1", []); // [{clienteId,dia,fecha,motivo}]
   const [clientes, setClientes]   = useLS("cat_clientes_v3", CLIENTES_INICIALES);
-  const [ventas, setVentas]       = useLS("cat_ventas_v3", []);
+  const [ventasRaw, setVentasRaw] = useLS("cat_ventas_v3", []);
+  const normalizarFechaKey = (v) => {
+    if(v.fechaKey) return v;
+    const fk = v.fecha ? (()=>{
+      const parts = v.fecha.split('/');
+      if(parts.length>=3){
+        const d=parts[0].trim(),m=parts[1].trim(),y=parts[2].split(',')[0].trim();
+        if(y.length===4) return y+'-'+m.padStart(2,'0')+'-'+d.padStart(2,'0');
+      }
+      return '';
+    })() : '';
+    return {...v, fechaKey:fk};
+  };
+  const ventas = React.useMemo(()=>(ventasRaw||[]).map(normalizarFechaKey),[ventasRaw]);
+  const setVentas = (arg) => setVentasRaw(typeof arg==='function' ? prev=>arg(prev) : arg);
   const [productos, setProductos] = useLS("cat_productos_v3", PRODUCTOS_INICIALES);
   const normStock = (s) => {
     const empty = {sifon:0,bidon10:0,bidon20:0};
@@ -559,7 +575,7 @@ function App() {
     cloudLoad().then(function(data) { if(!data) return;
       if (!data) { setSyncStatus("error"); return; }
       if (data.clientes?.length)   setClientes(data.clientes);
-      if (data.ventas?.length)     setVentas(data.ventas);
+      if (data.ventas?.length)     setVentasRaw(data.ventas);
       if (data.planillas)          setPlanillas(data.planillas);
       if (data.stock) {
         const ds = data.stock;
@@ -589,7 +605,7 @@ function App() {
   };
 
   const saveClientes = (v) => { setClientes(v); syncData({clientes:v}); };
-  const saveVentas   = (v) => { setVentas(v);   syncData({ventas:v}); };
+  const saveVentas   = (v) => { setVentasRaw(v);   syncData({ventas:v}); };
   const savePlanillasCloud = (v) => { setPlanillas(v); syncData({planillas:v}); };
   const saveStock    = (v) => { setStock(v);    syncData({stock:v}); };
   const saveProductos= (v) => { setProductos(v); syncData({productos:v}); };
@@ -1466,9 +1482,9 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,productos,stock,setStock,sync
           <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:10,lineHeight:1.5}}>
             Los llenos sobrantes del camión y los vacíos recuperados vuelven al stock de la sodería automáticamente.
           </div>
-          {stockNorm?.camion&&(
+          {stock?.camion&&(
             <div style={{display:"flex",gap:12,marginBottom:10}}>
-              {[["Sifón",stockNorm?.camion?.sifon||0],["10L",stockNorm?.camion?.bidon10||0],["20L",stockNorm?.camion?.bidon20||0]].map(([l,v])=>(
+              {[["Sifón",stock?.camion?.sifon||0],["10L",stock?.camion?.bidon10||0],["20L",stock?.camion?.bidon20||0]].map(([l,v])=>(
                 <div key={l} style={{textAlign:"center"}}>
                   <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>Camión {l}</div>
                   <div style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>{v||0}</div>
@@ -1617,11 +1633,11 @@ function InicioReparto({dia,fecha,planilla,productos,cargasDia,stock,onGuardar,o
         )}
       </div>
       {/* Stock sodería */}
-      {stockNorm?.soderia&&(
+      {stock?.soderia&&(
         <div style={{...s.card,margin:"10px 14px 0",background:"var(--color-background-tertiary)"}}>
           <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8}}>Stock actual · Sodería</div>
           <div style={{display:"flex",gap:16}}>
-            {[["Sifón",stockNorm?.soderia?.sifon||0],["Bidón 10L",stockNorm?.soderia?.bidon10||0],["Bidón 20L",stockNorm?.soderia?.bidon20||0]].map(([l,v])=>(
+            {[["Sifón",stock?.soderia?.sifon||0],["Bidón 10L",stock?.soderia?.bidon10||0],["Bidón 20L",stock?.soderia?.bidon20||0]].map(([l,v])=>(
               <div key={l} style={{textAlign:"center"}}>
                 <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{l}</div>
                 <div style={{fontSize:18,fontWeight:500,color:v>0?"var(--color-text-primary)":"var(--color-text-danger)"}}>{v||0}</div>
