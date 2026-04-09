@@ -450,7 +450,23 @@ function App() {
   const [clientes, setClientes]   = useLS("cat_clientes_v3", CLIENTES_INICIALES);
   const [ventas, setVentas]       = useLS("cat_ventas_v3", []);
   const [productos, setProductos] = useLS("cat_productos_v3", PRODUCTOS_INICIALES);
-  const [stock, setStock]         = useLS("cat_stock_v3", {sifon:0,bidon10:0,bidon20:0});
+  const [stock, setStock]         = useLS("cat_stock_v4", {
+    soderia:{sifon:0,bidon10:0,bidon20:0},
+    casa:   {sifon:0,bidon10:0,bidon20:0},
+    camion: {sifon:0,bidon10:0,bidon20:0},
+  });
+  // Helper: transferir del camión a sodería al cerrar el día
+  const cerrarCamion = (sobrLlenos, vacios) => {
+    setStock(prev=>{
+      const s = JSON.parse(JSON.stringify(prev));
+      ["sifon","bidon10","bidon20"].forEach(k=>{
+        s.soderia[k] = (s.soderia[k]||0) + (sobrLlenos[k]||0) + (vacios[k]||0);
+        s.camion[k]  = Math.max(0, (s.camion[k]||0) - (sobrLlenos[k]||0));
+      });
+      syncData({stock:s});
+      return s;
+    });
+  };
   const [planillas, setPlanillas] = useLS("cat_planillas_v1", {});
   // Firebase — credentials embedded in SDK config above
   const apiKey = "firebase";
@@ -574,19 +590,51 @@ function App() {
     return <SetupNube onSetup={(key,id)=>{ setApiKey(key); setBinId(id); setSyncStatus("saved"); }} />;
   }
 
-  const registrarVenta = (detalle, pago, montoPagado, saldoAplicado, envPrest, envDev, obs, opcionSaldo) => {
+  const registrarVenta = (detalle, pago, montoPagado, saldoAplicado, envPrest, envDev, obs, opcionSaldo, montoTrans2, saldoDeltaMixto) => {
     const c = cliente;
-    const calc = calcVenta(detalle, pago, montoPagado, saldoAplicado, productos);
+    // Auto-detectar envases prestados: cantidad entregada > cantidad asignada
+    const envAutoDetect = [];
+    const mapa = {sifon:"Sifón 1.5L", bidon10:"Bidón 10L", bidon20:"Bidón 20L"};
+    detalle.forEach(d=>{
+      const asignado = d.nombre==="Sifón 1.5L"?(c.sifon||0):d.nombre==="Bidón 10L"?(c.bidon10||0):d.nombre==="Bidón 20L"?(c.bidon20||0):0;
+      const extra = d.cantidad - asignado;
+      if(extra>0) envAutoDetect.push({prod:d.nombre, cant:String(extra)});
+    });
+    const envPrestFinal = [...(envPrest||[]).filter(e=>e.prod&&e.cant), ...envAutoDetect.filter(e=>!(envPrest||[]).some(ep=>ep.prod===e.prod))];
+
+    // Pago mixto: guardamos pago real según opción
+    const pagoReal = opcionSaldo==="mixto_ef"?"contado":opcionSaldo==="mixto_tr"?"transferencia":pago;
+    const obsExtra = montoTrans2>0?` [Mixto: ef $${montoPagado} + tr $${montoTrans2}]`:"";
+
+    const calc = calcVenta(detalle, pagoReal, montoPagado, saldoAplicado, productos);
     const nuevaVenta = {
       id:Date.now(), clienteId:c.id, cliente:c.nombre,
       dia:diaActual, fechaKey:fechaActual, fecha:new Date().toLocaleString("es-AR"),
-      detalle, pago, obs, saldoAplicado:saldoAplicado||0,
-      envPrest:(envPrest||[]).filter(e=>e.prod&&e.cant),
+      detalle, pago:pagoReal, obs:(obs||"")+obsExtra, saldoAplicado:saldoAplicado||0,
+      envPrest:envPrestFinal,
       envDev:(envDev||[]).filter(e=>e.prod&&e.cant), ...calc,
+      montoTrans:montoTrans2||0, montoEfec:opcionSaldo==="mixto_ef"?Number(montoPagado):0,
     };
-    const nuevasVentas = [...ventas, nuevaVenta];
+
+    // Si es pago mixto, también guardamos la parte de transferencia como venta separada
+    let nuevasVentas = [...ventas, nuevaVenta];
+    let saldoExtra = calc.saldoDelta;
+    if(montoTrans2>0 && opcionSaldo==="mixto_ef") {
+      // La parte de transferencia se registra como venta extra (solo el pago, sin productos)
+      const calcTr = calcVenta([{nombre:"Transferencia",cantidad:1,precio:montoTrans2,total:montoTrans2}],"transferencia",String(montoTrans2),0,productos);
+      const ventaTr = {
+        id:Date.now()+1, clienteId:c.id, cliente:c.nombre,
+        dia:diaActual, fechaKey:fechaActual, fecha:new Date().toLocaleString("es-AR"),
+        detalle:[{nombre:"Pago mixto (transfer.)",cantidad:1,precio:montoTrans2,total:montoTrans2}],
+        pago:"transferencia", obs:`[Parte transfer. de pago mixto]`, saldoAplicado:0,
+        envPrest:[], envDev:[], ...calcTr,
+      };
+      nuevasVentas = [...nuevasVentas, ventaTr];
+      saldoExtra += calcTr.saldoDelta;
+    }
+
     saveVentas(nuevasVentas);
-    const nuevosClientes = clientes.map(c2=>c2.id===c.id?{...c2,saldo:c.saldo+calc.saldoDelta}:c2);
+    const nuevosClientes = clientes.map(c2=>c2.id===c.id?{...c2,saldo:c.saldo+saldoExtra}:c2);
     saveClientes(nuevosClientes);
   };
 
@@ -634,9 +682,28 @@ function App() {
       {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onMensajes={()=>irA("mensajes")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} />}
       {pantalla==="diaPrincipal"   && <DiaPrincipal dia={diaActual} onIrClientes={()=>irA("selectorFechaClientes")} onIrPlanilla={()=>irA("selectorFechaPlanilla")} onVolver={()=>irA("menu")} />}
       {pantalla==="selectorFechaPlanilla" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("planilla");}} onVolver={()=>irA("diaPrincipal")} />}
-      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.dia===diaActual&&v.fechaKey===fechaActual)} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);irA("selectorFechaPlanilla");}} onVolver={()=>irA("selectorFechaPlanilla")} />}
+      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.dia===diaActual&&v.fechaKey===fechaActual)} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stock} setStock={setStock} syncData={syncData} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);irA("selectorFechaPlanilla");}} onVolver={()=>irA("selectorFechaPlanilla")} />}
       {pantalla==="selectorFechaClientes" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("inicioReparto");}} onVolver={()=>irA("diaPrincipal")} />}
-      {pantalla==="inicioReparto"  && <InicioReparto dia={diaActual} fecha={fechaActual} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} cargasDia={cargasDia} onGuardar={p=>{savePlanilla(`${diaActual}_${fechaActual}`,p);irA("clientes");}} onVolver={()=>irA("selectorFechaClientes")} />}
+      {pantalla==="inicioReparto"  && <InicioReparto dia={diaActual} fecha={fechaActual} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} cargasDia={cargasDia} stock={stock}
+        onGuardar={(p,descontar)=>{
+          savePlanilla(`${diaActual}_${fechaActual}`,p);
+          if(descontar){
+            setStock(prev=>{
+              const s=JSON.parse(JSON.stringify(prev));
+              const soda=Number(p.productos?.soda?.llenos||0);
+              const b10=Number(p.productos?.b10?.llenos||0);
+              const b20=Number(p.productos?.b20?.llenos||0);
+              s.soderia.sifon  =Math.max(0,(s.soderia.sifon||0)-soda);
+              s.soderia.bidon10=Math.max(0,(s.soderia.bidon10||0)-b10);
+              s.soderia.bidon20=Math.max(0,(s.soderia.bidon20||0)-b20);
+              s.camion.sifon   =(s.camion.sifon||0)+soda;
+              s.camion.bidon10 =(s.camion.bidon10||0)+b10;
+              s.camion.bidon20 =(s.camion.bidon20||0)+b20;
+              syncData({stock:s}); return s;
+            });
+          }
+          irA("clientes");
+        }} onVolver={()=>irA("selectorFechaClientes")} />}
       {pantalla==="clientes"       && <ListaClientes clientes={clientes.filter(c=>c.dia===diaActual)} dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual)} noVisitas={(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual)} onSeleccionar={c=>{setClienteId(c.id);irA("detalleCliente");}} onNuevoCliente={()=>irA("nuevoCliente")} onVolver={()=>irA("selectorFechaClientes")} onReordenar={lista=>{
           const otros=clientes.filter(c=>c.dia!==diaActual);
           const ordenados=[...lista].sort((a,b)=>(a.orden||9999)-(b.orden||9999));
@@ -724,7 +791,7 @@ function App() {
         saveClientes([...nuevos,{...datos,id:Date.now(),saldo:0,dispenser:datos.dispenser||0}].sort((a,b)=>DIAS.indexOf(a.dia)-DIAS.indexOf(b.dia)||(a.orden||9999)-(b.orden||9999)));
       }} onVolver={()=>irA("menu")} />}
       {pantalla==="resumen"        && <Resumen ventas={ventas} clientes={clientes} productos={productos} planillas={planillas} noVisitas={noVisitas||[]} onVolver={()=>irA("menu")} />}
-      {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stock} setStock={saveStock} cargasDia={cargasDia} setCargasDia={saveCargasDia} onVolver={()=>irA("menu")} />}
+      {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stock} setStock={(s)=>{setStock(s);syncData({stock:s});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} onVolver={()=>irA("menu")} />}
     </div>
   );
 }
@@ -1031,7 +1098,7 @@ function DiaPrincipal({dia,onIrClientes,onIrPlanilla,onVolver}) {
   );
 }
 
-function PlanillaDelDia({dia,fecha,ventas,planilla,productos,onGuardar,onVolver}) {
+function PlanillaDelDia({dia,fecha,ventas,planilla,productos,stock,setStock,syncData,onGuardar,onVolver}) {
   // Auto-calcular desde ventas del dia
   const CAJON_SODA = 6;
   // Costos dinámicos desde Config → Precios
@@ -1052,8 +1119,8 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,productos,onGuardar,onVolver}
       totalesPorProd[k].plata  += d.total;
     });
   });
-  // Sifones se cobran por cajón completo (siempre se completa el cajón)
-  const sodaCajones = Math.ceil(totalesPorProd.soda.vacios/CAJON_SODA)||0;
+  // Sifones: se redondea para ABAJO (61 sifones = 10 cajones, no 11)
+  const sodaCajones = Math.floor(totalesPorProd.soda.vacios/CAJON_SODA)||0;
   totalesPorProd.soda.cajones = sodaCajones;
   totalesPorProd.soda.llenar  = sodaCajones * COSTO_CAJON_SODA;
   totalesPorProd.b10.llenar   = totalesPorProd.b10.vacios * costB10;
@@ -1323,13 +1390,64 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,productos,onGuardar,onVolver}
             <span style={{fontSize:22,fontWeight:500,color:ganancia>=0?"var(--color-text-success)":"var(--color-text-danger)"}}>{fmt(ganancia)}</span>
           </div>
         </div>
+        {/* Cerrar día — devuelve sobrantes al stock de sodería */}
+        <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-tertiary)"}}>
+          <div style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)",marginBottom:6}}>🔒 Cerrar día de reparto</div>
+          <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:10,lineHeight:1.5}}>
+            Los llenos sobrantes del camión y los vacíos recuperados vuelven al stock de la sodería automáticamente.
+          </div>
+          {stock?.camion&&(
+            <div style={{display:"flex",gap:12,marginBottom:10}}>
+              {[["Sifón",stock.camion.sifon],["10L",stock.camion.bidon10],["20L",stock.camion.bidon20]].map(([l,v])=>(
+                <div key={l} style={{textAlign:"center"}}>
+                  <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>Camión {l}</div>
+                  <div style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>{v||0}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <button style={{...s.btn,width:"100%",padding:"12px",fontSize:14,borderRadius:10,background:"#0a2e1f",color:"#4dd9a0",border:"1px solid #4dd9a0"}}
+            onClick={()=>{
+              if(!window.confirm("¿Cerrar el día? Los sobrantes y vacíos del camión pasan a la sodería.")) return;
+              // llenos sobrantes = lo que cargaste - lo que vendiste
+              const llenSoda  = Number(datos.productos?.soda?.llenos||0) - totalesPorProd.soda.vacios;
+              const llenB10   = Number(datos.productos?.b10?.llenos||0)  - totalesPorProd.b10.vacios;
+              const llenB20   = Number(datos.productos?.b20?.llenos||0)  - totalesPorProd.b20.vacios;
+              // vacíos recuperados de clientes (de las ventas del día — los que devolvieron)
+              const vacSoda   = totalesPorProd.soda.vacios;
+              const vacB10    = totalesPorProd.b10.vacios;
+              const vacB20    = totalesPorProd.b20.vacios;
+              setStock(prev=>{
+                const s=JSON.parse(JSON.stringify(prev||{}));
+                if(!s.soderia) s.soderia={sifon:0,bidon10:0,bidon20:0};
+                if(!s.camion)  s.camion ={sifon:0,bidon10:0,bidon20:0};
+                // sobrantes llenos van a sodería
+                s.soderia.sifon   = (s.soderia.sifon||0)   + Math.max(0,llenSoda);
+                s.soderia.bidon10 = (s.soderia.bidon10||0) + Math.max(0,llenB10);
+                s.soderia.bidon20 = (s.soderia.bidon20||0) + Math.max(0,llenB20);
+                // vacíos recuperados también van a sodería (para rellenar)
+                s.soderia.sifon   += vacSoda;
+                s.soderia.bidon10 += vacB10;
+                s.soderia.bidon20 += vacB20;
+                // camión queda en cero
+                s.camion.sifon    = 0;
+                s.camion.bidon10  = 0;
+                s.camion.bidon20  = 0;
+                if(syncData) syncData({stock:s});
+                return s;
+              });
+              onGuardar({...datos, cerrado:true});
+            }}>
+            ✓ Cerrar día y actualizar stock
+          </button>
+        </div>
         <button style={s.btnPrimary} onClick={()=>onGuardar(datos)}>Guardar planilla</button>
       </div>
     </div>
   );
 }
 
-function InicioReparto({dia,fecha,planilla,productos,cargasDia,onGuardar,onVolver}) {
+function InicioReparto({dia,fecha,planilla,productos,cargasDia,stock,onGuardar,onVolver}) {
   const prodKeys = {"Sifón 1.5L":"soda","Bidón 10L":"b10","Bidón 20L":"b20"};
   const CAJON = 6; // sifones por cajón
   const [llenos,setLlenos] = useState(()=>{
@@ -1407,11 +1525,43 @@ function InicioReparto({dia,fecha,planilla,productos,cargasDia,onGuardar,onVolve
                 }]))
               }
             };
-            onGuardar(nuevaPlanilla);
+            onGuardar(nuevaPlanilla, true);
           }}>
-          {yaIniciado?"Actualizar y continuar →":"Comenzar reparto →"}
+          {yaIniciado?"Actualizar y continuar →":"🚀 Iniciar y descontar de sodería"}
         </button>
+        {!yaIniciado&&(
+          <button style={{...s.btn,width:"100%",padding:"12px",fontSize:13,borderRadius:10,marginTop:6}}
+            onClick={()=>{
+              const nuevaPlanilla = {
+                ...planilla,
+                iniciado:true,
+                productos: Object.fromEntries(
+                  Object.entries(cajones).map(([k,v])=>[k,{
+                    ...(planilla?.productos?.[k]||{}),
+                    llenos:v
+                  }])
+                )
+              };
+              onGuardar(nuevaPlanilla, false);
+            }}>
+            Iniciar sin descontar stock
+          </button>
+        )}
       </div>
+      {/* Stock sodería */}
+      {stock?.soderia&&(
+        <div style={{...s.card,margin:"10px 14px 0",background:"var(--color-background-tertiary)"}}>
+          <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8}}>Stock actual · Sodería</div>
+          <div style={{display:"flex",gap:16}}>
+            {[["Sifón",stock.soderia.sifon],["Bidón 10L",stock.soderia.bidon10],["Bidón 20L",stock.soderia.bidon20]].map(([l,v])=>(
+              <div key={l} style={{textAlign:"center"}}>
+                <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{l}</div>
+                <div style={{fontSize:18,fontWeight:500,color:v>0?"var(--color-text-primary)":"var(--color-text-danger)"}}>{v||0}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1897,6 +2047,9 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
   const [cantidades,setCantidades]=useState(()=>{const m={};productos.forEach(p=>{const k=p.nombre==="Sifón 1.5L"?"sifon":p.nombre==="Bidón 10L"?"bidon10":"bidon20";m[p.nombre]=cliente[k]||0;});return m;});
   const [pago,setPago]=useState("contado");
   const [monto,setMonto]=useState("");
+  const [montoEfec,setMontoEfec]=useState(""); // pago mixto: parte efectivo
+  const [montoTrans,setMontoTrans]=useState(""); // pago mixto: parte transferencia
+  const [transConfMixto,setTransConfMixto]=useState(false);
   const [usarSaldo,setUsarSaldo]=useState(false);
   const [opcionSaldo,setOpcionSaldo]=useState("compra"); // compra | todo | parcial
   const [envPrest,setEnvPrest]=useState([{prod:"",cant:""}]);
@@ -1939,10 +2092,44 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
         <div style={s.divider} />
         <label style={{...s.label,fontSize:13,marginBottom:8}}>Forma de pago</label>
         <div style={{display:"flex",gap:8,marginBottom:12}}>
-          {[["contado","Contado"],["transferencia","Transferencia"],["fiado","Fiado"]].map(([v,l])=>(
+          {[["contado","Contado"],["transferencia","Transfer."],["fiado","Fiado"],["mixto","Mixto"]].map(([v,l])=>(
             <button key={v} style={{...s.btn,flex:1,background:pago===v?"#185FA5":undefined,color:pago===v?"#fff":undefined,border:pago===v?"none":undefined,padding:"9px 4px",fontSize:13}} onClick={()=>setPago(v)}>{l}</button>
           ))}
         </div>
+        {/* Pago mixto: efectivo + transferencia */}
+        {pago==="mixto"&&(
+          <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-tertiary)"}}>
+            <div style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)",marginBottom:8}}>Desglose del pago mixto</div>
+            <div style={{display:"flex",gap:8,marginBottom:6}}>
+              <div style={{flex:1}}>
+                <label style={s.label}>Efectivo $</label>
+                <input style={s.input} type="number" placeholder="0" value={montoEfec} onChange={e=>setMontoEfec(e.target.value)} />
+              </div>
+              <div style={{flex:1}}>
+                <label style={s.label}>Transferencia $</label>
+                <input style={s.input} type="number" placeholder="0" value={montoTrans} onChange={e=>setMontoTrans(e.target.value)} />
+              </div>
+            </div>
+            {Number(montoEfec||0)+Number(montoTrans||0)>0&&(
+              <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>
+                Total pagado: {fmt(Number(montoEfec||0)+Number(montoTrans||0))} de {fmt(aPagar)}
+                {(Number(montoEfec||0)+Number(montoTrans||0))<aPagar&&
+                  <span style={{color:"var(--color-text-warning)"}}> · Queda {fmt(aPagar-Number(montoEfec||0)-Number(montoTrans||0))} de saldo</span>}
+              </div>
+            )}
+            {Number(montoTrans||0)>0&&(
+              <div style={{...s.card,margin:"8px 0 0",background:transConfMixto?"#0a2e1f":"#1e3a5f",border:transConfMixto?"0.5px solid #4dd9a0":"0.5px solid #5daaff"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{fontSize:12,color:transConfMixto?"#4dd9a0":"#5daaff"}}>{transConfMixto?"✓ Transfer. confirmada":"⏳ Confirmar transferencia"}</span>
+                  <button style={{background:transConfMixto?"#4dd9a0":"#185FA5",color:transConfMixto?"#0a2e1f":"#fff",border:"none",borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer"}}
+                    onClick={()=>{setTransConfMixto(!transConfMixto);if(!transConfMixto)sonarTransferencia();}}>
+                    {transConfMixto?"✓ OK":"Confirmar"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         {/* Saldo a favor — descontarlo */}
         {saldoDisp>0&&pago!=="fiado"&&(
           <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-success)",border:"0.5px solid var(--color-border-success)",cursor:"pointer"}} onClick={()=>setUsarSaldo(!usarSaldo)}>
@@ -2016,11 +2203,19 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
           </button>
         </div>
         <button style={{...s.btnPrimary,opacity:detalle.length===0?0.45:1}} disabled={detalle.length===0} onClick={()=>{
-          // If "paga todo" and no custom monto, auto-fill the total
-          const montoFinal = opcionSaldo==="todo"&&!monto
-            ? String(Math.round(Math.abs(cliente.saldo)+aPagar))
-            : monto;
-          onGuardar(detalle,pago,montoFinal,saldoApl,envPrest,envDev,obs,opcionSaldo);
+          if(pago==="mixto"){
+            // Pago mixto: guardamos 2 ventas separadas (efectivo + transferencia)
+            const ef=Number(montoEfec||0), tr=Number(montoTrans||0);
+            const totalPagado=ef+tr;
+            const saldoDelta=totalPagado-aPagar; // positivo=a favor, negativo=deuda
+            if(ef>0) onGuardar(detalle,"contado",String(ef),saldoApl,envPrest,envDev,obs,"mixto_ef",tr,saldoDelta);
+            else if(tr>0) onGuardar(detalle,"transferencia",String(tr),saldoApl,envPrest,envDev,obs,"mixto_tr",ef,saldoDelta);
+          } else {
+            const montoFinal = opcionSaldo==="todo"&&!monto
+              ? String(Math.round(Math.abs(cliente.saldo)+aPagar))
+              : monto;
+            onGuardar(detalle,pago,montoFinal,saldoApl,envPrest,envDev,obs,opcionSaldo);
+          }
         }}>
           Guardar venta
         </button>
@@ -3347,7 +3542,7 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
       <div style={s.header}><button style={s.backBtn} onClick={onVolver}>← Volver</button><span style={s.headerTitle}>Configuración</span></div>
       <div style={s.tabBar}>
         <button style={s.tab(tab==="precios")} onClick={()=>setTab("precios")}>Precios</button>
-        <button style={s.tab(tab==="envases")} onClick={()=>setTab("envases")}>Envases</button>
+        <button style={s.tab(tab==="stock")} onClick={()=>setTab("stock")}>Stock</button>
         <button style={s.tab(tab==="cargas")} onClick={()=>setTab("cargas")}>Cargas</button>
         <button style={s.tab(tab==="backup")} onClick={()=>setTab("backup")}>Backup</button>
       </div>
@@ -3477,6 +3672,35 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
               );
             })}
             <button style={s.btnPrimary} onClick={()=>{ setCargasDia(Object.assign({},cargasDia)); alert("Cargas guardadas"); }}>Guardar cargas</button>
+          </div>
+        )}
+        {tab==="stock"&&(
+          <div style={{padding:16}}>
+            <p style={{fontSize:13,color:"var(--color-text-secondary)",marginBottom:16,lineHeight:1.6}}>
+              Control de stock en los 3 lugares. Al iniciar reparto el camión se carga desde la sodería automáticamente.
+            </p>
+            {[["soderia","🏭 Sodería"],["casa","🏠 Casa"],["camion","🚚 Camión"]].map(([lugar,titulo])=>(
+              <div key={lugar} style={{...s.card,margin:"0 0 12px"}}>
+                <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:10}}>{titulo}</div>
+                <div style={s.grid3}>
+                  {[["sifon","Sifón"],["bidon10","Bidón 10L"],["bidon20","Bidón 20L"]].map(([k,l])=>(
+                    <div key={k}>
+                      <label style={{...s.label,textAlign:"center"}}>{l}</label>
+                      <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0}
+                        value={stock?.[lugar]?.[k]??0}
+                        onChange={e=>{
+                          const ns=JSON.parse(JSON.stringify(stock||{}));
+                          if(!ns[lugar]) ns[lugar]={sifon:0,bidon10:0,bidon20:0};
+                          ns[lugar][k]=Number(e.target.value)||0;
+                          setStock(ns);
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <button style={s.btnPrimary} onClick={()=>{syncData({stock});alert("Stock guardado");}}>Guardar stock</button>
           </div>
         )}
         {tab==="backup"&&(
