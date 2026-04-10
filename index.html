@@ -459,7 +459,11 @@ function App() {
   const [fechaObj, setFechaObj]   = useState(null);
   const [clienteId, setClienteId] = useState(null);
   const [noVisitas, setNoVisitas] = useLS("cat_novisitas_v1", []);
-  const [prospectos, setProspectos] = useLS("cat_prospectos_v1", []); // [{clienteId,dia,fecha,motivo}]
+  const [prospectos, setProspectos] = useLS("cat_prospectos_v1", []);
+  const [recordatorios, setRecordatorios] = useLS("cat_recordatorios_v1", []);
+  // recordatorio: {id, clienteId, clienteNombre, fecha, hora, motivo, dia, confirmado}
+  const saveRecordatorios = (r) => { setRecordatorios(r); syncData({recordatorios:r}); };
+  const recordatoriosActivos = (recordatorios||[]).filter(r=>!r.confirmado); // [{clienteId,dia,fecha,motivo}]
   const [clientes, setClientes]   = useLS("cat_clientes_v3", CLIENTES_INICIALES);
   const [ventasRaw, setVentasRaw] = useLS("cat_ventas_v3", []);
   const normalizarFechaKey = (v) => {
@@ -730,20 +734,45 @@ function App() {
     if(c){ const nc=clientes.map(x=>x.id===c.id?{...x,saldo:c.saldo-v.saldoDelta}:x); saveClientes(nc); }
   };
 
-  const editarVenta = (ventaId, detalle, pago, montoPagado, saldoAplicado, obs) => {
+  const editarVenta = (ventaId, detalle, pago, montoPagado, saldoAplicado, obs, montoTrans2) => {
     const vV = ventas.find(v=>v.id===ventaId); if(!vV) return;
     const c  = clientes.find(x=>x.id===vV.clienteId);
-    const calc = calcVenta(detalle, pago, montoPagado, saldoAplicado, productos);
-    const nev = ventas.map(v=>v.id===ventaId?{...vV,detalle,pago,obs,saldoAplicado:saldoAplicado||0,...calc}:v);
+    const pagoReal = pago==="mixto"?"contado":pago;
+    const calc = calcVenta(detalle, pagoReal, montoPagado, saldoAplicado, productos);
+    // Remove old transfer venta if existed (from previous mixto edit)
+    let nev = ventas.filter(v=>!(v.obs==="[Parte transfer. de pago mixto]"&&v.clienteId===vV.clienteId&&v.fechaKey===vV.fechaKey));
+    nev = nev.map(v=>v.id===ventaId?{...vV,detalle,pago:pagoReal,obs,saldoAplicado:saldoAplicado||0,...calc}:v);
+    let saldoExtra = c ? (c.saldo - vV.saldoDelta + calc.saldoDelta) : 0;
+    // If mixto, add transfer venta
+    if(pago==="mixto"&&montoTrans2>0){
+      const ventaTr = {
+        id:Date.now()+2, clienteId:vV.clienteId, cliente:vV.cliente,
+        dia:vV.dia, fechaKey:vV.fechaKey, fecha:vV.fecha,
+        detalle:[{nombre:"Pago mixto · transferencia",cantidad:1,precio:montoTrans2,total:montoTrans2}],
+        pago:"transferencia", obs:"[Parte transfer. de pago mixto]", saldoAplicado:0,
+        neto:montoTrans2, bruto:montoTrans2, desc:0, costo:0, ganancia:montoTrans2,
+        pagadoNum:montoTrans2, saldoDelta:montoTrans2, envPrest:[], envDev:[],
+      };
+      nev = [...nev, ventaTr];
+      saldoExtra += montoTrans2;
+    }
     saveVentas(nev);
-    if(c){ const nc=clientes.map(x=>x.id===c.id?{...x,saldo:c.saldo-vV.saldoDelta+calc.saldoDelta}:x); saveClientes(nc); }
+    if(c){ const nc=clientes.map(x=>x.id===c.id?{...x,saldo:saldoExtra}:x); saveClientes(nc); }
   };
 
   return (
     <div style={s.app}>
       <SyncBar status={syncStatus} />
       {pantalla==="portada"        && <Portada onIngresar={()=>irA("menu")} />}
-      {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onMensajes={()=>irA("mensajes")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} />}
+      {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onMensajes={()=>irA("mensajes")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)}
+          recordatoriosActivos={recordatoriosActivos}
+          onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
+          transferenciasPendientes={DIAS.map(dia=>{
+            const vts = ventas.filter(v=>v.dia===dia&&v.pago==="transferencia"&&!v.transConfirmada);
+            if(!vts.length) return null;
+            const fechas = [...new Set(vts.map(v=>v.fechaKey))].sort().reverse();
+            return {dia, fecha:fechas[0]||"", count:vts.length, monto:vts.reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0), ventas:vts};
+          }).filter(Boolean)} />}
       {pantalla==="diaPrincipal"   && <DiaPrincipal dia={diaActual} onIrClientes={()=>irA("selectorFechaClientes")} onIrPlanilla={()=>irA("selectorFechaPlanilla")} onVolver={()=>irA("menu")} ventasPendientesTransfer={ventas.filter(v=>v.dia===diaActual&&v.fechaKey===fechaActual&&v.pago==="transferencia"&&!v.transConfirmada).length} />}
       {pantalla==="selectorFechaPlanilla" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("planilla");}} onVolver={()=>irA("diaPrincipal")} />}
       {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.dia===diaActual&&v.fechaKey===fechaActual)} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);irA("selectorFechaPlanilla");}} onVolver={()=>irA("selectorFechaPlanilla")} />}
@@ -778,6 +807,7 @@ function App() {
           saveVentas(nv);
         }}
         prospectos={(prospectos||[]).filter(p=>p.dia===diaActual&&p.estado==="activo")}
+        recordatorios={recordatorios}
         onVentaProspecto={(p)=>{
           if(!clientes.find(c=>c.id===p.id)){
             saveClientes([...clientes,{...p,saldo:0,_esProspecto:true}]);
@@ -791,7 +821,10 @@ function App() {
         }}
         />}
       {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>irA("venta")} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
-          onNoEstaCliente={()=>{const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noesta"}];saveNoVisitas(nv);}} />}
+          onNoEstaCliente={()=>{const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noesta"}];saveNoVisitas(nv);}}
+          recordatorios={recordatorios}
+          onGuardarRecordatorio={(r)=>saveRecordatorios([...(recordatorios||[]),r])}
+          onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))} />}
       {pantalla==="venta"          && cliente && <NuevaVenta cliente={cliente} productos={productos} fecha={fechaActual}
         onNoEsta={()=>{
           const prev=(noVisitas||[]).find(v=>v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual);
@@ -1099,7 +1132,7 @@ function SetupNube({onSetup}) {
   );
 }
 
-function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onMensajes,onVolver,darkMode,onToggleDark}) {
+function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onMensajes,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio}) {
   return (
     <div style={s.screen}>
       <div style={s.header}>
@@ -1107,6 +1140,42 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
         <span style={s.headerTitle}>Reparto La Catalina</span>
         <button style={{...s.btn,padding:"5px 10px",fontSize:18,lineHeight:1}} onClick={onToggleDark}>{darkMode?"☀":"🌙"}</button>
       </div>
+      {recordatoriosActivos&&recordatoriosActivos.length>0&&(
+        <div style={{margin:"8px 14px 4px"}}>
+          <div style={{fontSize:11,fontWeight:500,color:"#5daaff",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.05em"}}>🔔 Recordatorios pendientes</div>
+          {recordatoriosActivos.slice(0,5).map(r=>(
+            <div key={r.id} style={{...s.card,margin:"0 0 6px",background:"#1e2e4a",border:"0.5px solid #5daaff",display:"flex",gap:8,alignItems:"flex-start"}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,fontWeight:500,color:"#5daaff"}}>{r.clienteNombre} · {r.dia}</div>
+                <div style={{fontSize:12,color:"var(--color-text-primary)",marginTop:2}}>{r.motivo}</div>
+                <div style={{fontSize:10,color:"var(--color-text-tertiary)",marginTop:2}}>{r.fecha}{r.hora?` · ${r.hora}`:""}</div>
+              </div>
+              <button style={{background:"#4dd9a0",color:"#0a2e1f",border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,fontWeight:600,cursor:"pointer",flexShrink:0,marginTop:2}}
+                onClick={()=>onConfirmarRecordatorio&&onConfirmarRecordatorio(r.id)}>✓</button>
+            </div>
+          ))}
+          {recordatoriosActivos.length>5&&<div style={{fontSize:11,color:"var(--color-text-tertiary)",textAlign:"center"}}>+{recordatoriosActivos.length-5} más</div>}
+        </div>
+      )}
+      {transferenciasPendientes&&transferenciasPendientes.length>0&&(
+        <div style={{margin:"8px 14px 4px"}}>
+          <div style={{fontSize:11,fontWeight:500,color:"#f5b942",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.05em"}}>🔴 Transferencias sin confirmar</div>
+          {transferenciasPendientes.map(({dia,fecha,count,monto,ventas:vts})=>(
+            <button key={dia+fecha} style={{...s.card,width:"100%",margin:"0 0 6px",background:"#1e3a5f",border:"1px solid #f5b942",display:"flex",alignItems:"center",gap:10,cursor:"pointer",textAlign:"left"}}
+              onClick={()=>onDia(dia)}>
+              <span style={{fontSize:18}}>🔴</span>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,fontWeight:500,color:"#f5b942"}}>{dia} · {count} transfer. sin confirmar</div>
+                <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:2}}>{vts.slice(0,3).map(v=>v.cliente).join(", ")}{vts.length>3?` +${vts.length-3} más`:""}</div>
+              </div>
+              <div style={{textAlign:"right",flexShrink:0}}>
+                <div style={{fontSize:13,fontWeight:500,color:"#f5b942"}}>{fmt(monto)}</div>
+                <div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>{fecha}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
       <span style={s.sectionTitle}>Días de reparto</span>
       <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:8}}>
         {dias.map(d=>(
@@ -1669,7 +1738,7 @@ function InicioReparto({dia,fecha,planilla,productos,cargasDia,stock,onGuardar,o
   );
 }
 
-function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onConfirmarTransfer}) {
+function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onConfirmarTransfer}) {
   const [busqueda,setBusqueda] = useState("");
   const [editandoOrden,setEditandoOrden] = useState(null);
   const [ordenTemp,setOrdenTemp] = useState("");
@@ -1738,6 +1807,9 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,onSelecci
           <div style={{flex:1,cursor:"pointer",minWidth:0}} onClick={()=>onSeleccionar(c)}>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
               <div style={{fontWeight:500,fontSize:15,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nombre}</div>
+              {(recordatorios||[]).some(r=>r.clienteId===c.id&&!r.confirmado)&&(
+                <span style={{fontSize:13,flexShrink:0}} title="Recordatorio pendiente">🔔</span>
+              )}
               {(()=>{const vt=ventas.find(v=>v.clienteId===c.id&&v.fechaKey===fecha&&v.pago==="transferencia");
                 if(!vt) return null;
                 return (
@@ -1858,13 +1930,15 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,onSelecci
   );
 }
 
-function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onEditar,onEliminarVenta,onEditarVenta,onEliminarCliente,onNoEstaCliente}) {
+function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onEditar,onEliminarVenta,onEditarVenta,onEliminarCliente,onNoEstaCliente,recordatorios,onGuardarRecordatorio,onConfirmarRecordatorio}) {
   const [editandoCliente,setEditandoCliente] = useState(false);
   const [editandoVentaId,setEditandoVentaId] = useState(null);
   const [tabDetalle,setTabDetalle] = useState("historial");
   const [editandoSaldo,setEditandoSaldo] = useState(false);
   const [tipoSaldoEdit,setTipoSaldoEdit] = useState("");
   const [montoSaldoEdit,setMontoSaldoEdit] = useState("");
+  const [mostrarRecordatorio,setMostrarRecordatorio] = useState(false);
+  const recActivos = (recordatorios||[]).filter(r=>r.clienteId===cliente.id&&!r.confirmado);
   const historial = [...ventas].reverse();
   const ventaHoy  = fecha ? ventas.find(v=>v.fechaKey===fecha) : null;
   const initials  = cliente.nombre.split(" ").slice(0,2).map(w=>w[0]||"").join("").toUpperCase();
@@ -1875,11 +1949,45 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
       <div style={s.header}>
         <button style={s.backBtn} onClick={onVolver}>← Volver</button>
         <span style={s.headerTitle}>{cliente.nombre}</span>
-        <button style={{...s.btn,fontSize:12,padding:"5px 12px"}} onClick={()=>{setEditandoCliente(!editandoCliente);setEditandoVentaId(null);}}>
-          {editandoCliente?"Cancelar":"Editar"}
-        </button>
+        <div style={{display:"flex",gap:4}}>
+          <button style={{...s.btn,padding:"4px 8px",fontSize:18,lineHeight:1,position:"relative"}}
+            onClick={()=>setMostrarRecordatorio(true)}>
+            🔔
+            {recActivos.length>0&&<span style={{position:"absolute",top:-3,right:-3,background:"#f5b942",color:"#0f1923",borderRadius:"50%",width:16,height:16,fontSize:9,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>{recActivos.length}</span>}
+          </button>
+          <button style={{...s.btn,fontSize:12,padding:"5px 10px"}} onClick={()=>{setEditandoCliente(!editandoCliente);setEditandoVentaId(null);}}>
+            {editandoCliente?"Cancelar":"Editar"}
+          </button>
+        </div>
       </div>
+      {mostrarRecordatorio&&(
+        <RecordatorioModal
+          cliente={cliente}
+          onGuardar={(datos)=>{
+            onGuardarRecordatorio&&onGuardarRecordatorio({...datos,clienteId:cliente.id,clienteNombre:cliente.nombre,dia:cliente.dia,id:Date.now(),confirmado:false});
+            setMostrarRecordatorio(false);
+          }}
+          onCerrar={()=>setMostrarRecordatorio(false)}
+        />
+      )}
       <div style={{padding:16}}>
+        {recActivos.length>0&&!editandoCliente&&(
+          <div style={{marginBottom:10}}>
+            {recActivos.map(r=>(
+              <div key={r.id} style={{...s.card,margin:"0 0 6px",background:"#2e1f06",border:"1px solid #f5b942",display:"flex",gap:10,alignItems:"flex-start"}}>
+                <span style={{fontSize:18,flexShrink:0}}>🔔</span>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,fontWeight:500,color:"#f5b942"}}>{r.fecha} {r.hora&&`· ${r.hora}`}</div>
+                  <div style={{fontSize:13,color:"var(--color-text-primary)",marginTop:2}}>{r.motivo}</div>
+                </div>
+                <button style={{background:"#4dd9a0",color:"#0a2e1f",border:"none",borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:600,cursor:"pointer",flexShrink:0}}
+                  onClick={()=>onConfirmarRecordatorio&&onConfirmarRecordatorio(r.id)}>
+                  ✓ Listo
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         {!editandoCliente && <>
           {/* Header cliente */}
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
@@ -1989,7 +2097,7 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
           {historial.map(v=>(
             <div key={v.id} style={{marginBottom:8}}>
               {editandoVentaId===v.id
-                ? <EditVenta venta={v} productos={productos} onGuardar={(d,p,m,sa,obs)=>{onEditarVenta(v.id,d,p,m,sa,obs);setEditandoVentaId(null);}} onCancelar={()=>setEditandoVentaId(null)} />
+                ? <EditVenta venta={v} productos={productos} onGuardar={(d,p,m,sa,obs,tr2)=>{onEditarVenta(v.id,d,p,m,sa,obs,tr2);setEditandoVentaId(null);}} onCancelar={()=>setEditandoVentaId(null)} />
                 : <div style={{...s.card,margin:0}}>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
                       <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{v.fechaKey||v.fecha?.slice(0,10)||v.dia} · {v.fecha?.slice(-8)||""}</span>
@@ -2108,7 +2216,7 @@ function EditCliente({cliente,onGuardar,onEliminarCliente}) {
   );
 }
 
-function EditVenta({venta,productos,onGuardar,onCancelar}) {
+function EditVenta({venta,productos,onGuardar,onCancelar}) { // onGuardar(detalle,pago,monto,saldoApl,obs,montoTrans2)
   const [cantidades,setCantidades]=useState(()=>{const m={};productos.forEach(p=>{m[p.nombre]=0;});venta.detalle.forEach(d=>{m[d.nombre]=d.cantidad;});return m;});
   const [pago,setPago]=useState(venta.pago||"contado");
   const [monto,setMonto]=useState(()=>String(venta.pagadoNum||venta.neto||""));
@@ -2174,12 +2282,48 @@ function EditVenta({venta,productos,onGuardar,onCancelar}) {
         <button style={{...s.btnPrimary,flex:2,padding:"10px"}} onClick={()=>{
           if(pago==="mixto"){
             const ef=Number(montoEfec||0), tr=Number(montoTrans||0);
-            if(ef>0) onGuardar(detalle,"contado",String(ef),venta.saldoAplicado||0,obs+"[mixto ef+tr $"+tr+"]");
-            else onGuardar(detalle,"transferencia",String(tr),venta.saldoAplicado||0,obs);
+            onGuardar(detalle,"mixto",String(ef),venta.saldoAplicado||0,
+              `[Mixto: ef $${ef} + tr $${tr}]`,tr);
           } else {
             onGuardar(detalle,pago,pago==="fiado"?"":monto,venta.saldoAplicado||0,obs);
           }
         }}>Guardar</button>
+      </div>
+    </div>
+  );
+}
+
+function RecordatorioModal({cliente,onGuardar,onCerrar}) {
+  const hoy = new Date();
+  const [fecha,setFecha] = React.useState(hoy.toISOString().slice(0,10));
+  const [hora,setHora]   = React.useState("10:00");
+  const [motivo,setMotivo] = React.useState("");
+  return (
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.7)",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{background:"var(--color-background-secondary)",borderRadius:16,padding:20,width:"100%",maxWidth:400,boxShadow:"0 8px 32px rgba(0,0,0,0.4)"}}>
+        <div style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)",marginBottom:4}}>🔔 Nuevo recordatorio</div>
+        <div style={{fontSize:13,color:"var(--color-text-secondary)",marginBottom:16}}>{cliente.nombre}</div>
+        <div style={{display:"flex",gap:8,marginBottom:10}}>
+          <div style={{flex:2}}>
+            <label style={s.label}>Fecha</label>
+            <input type="date" style={s.input} value={fecha} onChange={e=>setFecha(e.target.value)}/>
+          </div>
+          <div style={{flex:1}}>
+            <label style={s.label}>Hora</label>
+            <input type="time" style={s.input} value={hora} onChange={e=>setHora(e.target.value)}/>
+          </div>
+        </div>
+        <div style={{marginBottom:16}}>
+          <label style={s.label}>Motivo</label>
+          <textarea style={{...s.input,minHeight:70,resize:"vertical"}} placeholder="ej: Cobrar deuda $5.000, volver a visitar, entregar pedido..." value={motivo} onChange={e=>setMotivo(e.target.value)}/>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button style={{...s.btn,flex:1}} onClick={onCerrar}>Cancelar</button>
+          <button style={{...s.btnPrimary,flex:2}} onClick={()=>{
+            if(!motivo.trim()){alert("Ingresá el motivo");return;}
+            onGuardar({fecha,hora,motivo:motivo.trim()});
+          }}>Guardar recordatorio</button>
+        </div>
       </div>
     </div>
   );
