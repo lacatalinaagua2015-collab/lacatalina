@@ -685,7 +685,7 @@ function App() {
       // Registrar transferencia como venta separada vinculada
       const nTr = nuevaVenta.neto; // mismo neto para no duplicar
       const ventaTr = {
-        id:Date.now()+1, clienteId:c.id, cliente:c.nombre,
+        id:Date.now()+2, clienteId:c.id, cliente:c.nombre,
         dia:diaActual, fechaKey:fechaActual, fecha:new Date().toLocaleString("es-AR"),
         detalle:[{nombre:"Pago mixto · transferencia",cantidad:1,precio:montoTrans2,total:montoTrans2}],
         pago:"transferencia", obs:"[Parte transfer. de pago mixto]", saldoAplicado:0,
@@ -2185,6 +2185,40 @@ function EditVenta({venta,productos,onGuardar,onCancelar}) {
   );
 }
 
+function CobroDeudaPanel({saldo,onCobrar}) {
+  const [monto,setMonto] = React.useState("");
+  const [pago,setPago]   = React.useState("contado");
+  const [open,setOpen]   = React.useState(false);
+  const deuda = Math.abs(saldo);
+  if(!open) return (
+    <button style={{width:"100%",padding:"12px",fontSize:14,fontWeight:500,borderRadius:10,border:"1px solid var(--color-border-danger)",background:"var(--color-background-danger)",color:"var(--color-text-danger)",cursor:"pointer",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}
+      onClick={()=>setOpen(true)}>
+      💰 Cobrar deuda — {fmt(deuda)}
+    </button>
+  );
+  return (
+    <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-danger)",border:"0.5px solid var(--color-border-danger)"}}>
+      <div style={{fontSize:13,fontWeight:500,color:"var(--color-text-danger)",marginBottom:10}}>Cobrar deuda · Total pendiente: {fmt(deuda)}</div>
+      <div style={{display:"flex",gap:6,marginBottom:10}}>
+        {[["contado","Efectivo"],["transferencia","Transfer."]].map(([v,l])=>(
+          <button key={v} style={{...s.btn,flex:1,fontSize:13,padding:"9px 4px",background:pago===v?"#185FA5":undefined,color:pago===v?"#fff":undefined,border:pago===v?"none":undefined}} onClick={()=>setPago(v)}>{l}</button>
+        ))}
+      </div>
+      <div style={{marginBottom:8}}>
+        <label style={s.label}>Monto cobrado (vacío = todo {fmt(deuda)})</label>
+        <input style={s.input} type="number" placeholder={String(deuda)} value={monto} onChange={e=>setMonto(e.target.value)}/>
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <button style={{...s.btn,flex:1}} onClick={()=>setOpen(false)}>Cancelar</button>
+        <button style={{...s.btnPrimary,flex:2}} onClick={()=>{
+          const m = Number(monto)||deuda;
+          onCobrar(m,pago);
+        }}>Registrar cobro</button>
+      </div>
+    </div>
+  );
+}
+
 function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVolver}) {
   const [transConfirmada,setTransConfirmada] = React.useState(false);
 
@@ -2358,15 +2392,12 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
             No quiere
           </button>
         </div>
-        <button style={{...s.btn,width:"100%",padding:"11px",fontSize:13,marginBottom:8,borderRadius:10,background:"var(--color-background-tertiary)",border:"0.5px solid var(--color-border-secondary)"}}
-          onClick={()=>{
-            // Cobrar solo deuda sin compra
-            const montoCobro = Number(monto||0);
-            if(montoCobro<=0){alert("Ingresá el monto a cobrar");return;}
-            onGuardar([{nombre:"Cobro de deuda",cantidad:1,precio:0,total:0}],pago==="fiado"?"contado":pago,monto,0,[],[],obs||"Cobro de deuda","cobro_deuda");
-          }}>
-          💰 Solo cobrar deuda (sin entrega)
-        </button>
+        {/* Cobrar deuda sin entrega */}
+        {cliente.saldo<0&&(
+          <CobroDeudaPanel saldo={cliente.saldo} onCobrar={(mCobro,pCobro)=>{
+            onGuardar([{nombre:"Cobro de deuda",cantidad:1,precio:0,total:0}],pCobro,String(mCobro),0,[],[],`Cobro de deuda $${mCobro.toLocaleString("es-AR")} (${pCobro})`,"cobro_deuda");
+          }} />
+        )}
         <button style={{...s.btnPrimary,opacity:detalle.length===0?0.45:1}} disabled={detalle.length===0} onClick={()=>{
           if(pago==="mixto"){
             // Pago mixto: guardamos 2 ventas separadas (efectivo + transferencia)
