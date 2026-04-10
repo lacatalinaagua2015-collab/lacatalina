@@ -1517,31 +1517,13 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,productos,stock,setStock,sync
             <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Efectivo cobrado (contado)</span>
             <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{fmt(cobEfectivo)}</span>
           </div>
-          {cobSaldosEfec>0&&(
-            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-              <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>+ Cobro deuda efectivo</span>
-              <span style={{fontSize:13,color:"var(--color-text-success)"}}>{fmt(cobSaldosEfec)}</span>
-            </div>
-          )}
-          {cobSaldosTrans>0&&(
-            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-              <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>+ Cobro deuda transferencia</span>
-              <span style={{fontSize:13,color:"var(--color-text-info)"}}>{fmt(cobSaldosTrans)}</span>
-            </div>
-          )}
           <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
             <span style={{fontSize:13,color:"var(--color-text-danger)"}}>− Llenado de envases</span>
             <span style={{fontSize:13,color:"var(--color-text-danger)"}}>{fmt(totalVentaLlenar)}</span>
           </div>
-          {totalGastos>0&&(
-            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-              <span style={{fontSize:13,color:"var(--color-text-danger)"}}>− Gastos extras</span>
-              <span style={{fontSize:13,color:"var(--color-text-danger)"}}>{fmt(totalGastos)}</span>
-            </div>
-          )}
           <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0 2px"}}>
             <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Efectivo en mano</span>
-            <span style={{fontSize:18,fontWeight:500,color:"var(--color-text-success)"}}>{fmt(cobEfectivo+cobSaldosEfec-totalVentaLlenar-totalGastos)}</span>
+            <span style={{fontSize:18,fontWeight:500,color:"var(--color-text-success)"}}>{fmt(cobEfectivo-totalVentaLlenar)}</span>
           </div>
         </div>
 
