@@ -80,7 +80,9 @@ self.addEventListener('fetch',e=>{
           stock: data.stock || {},
           productos: data.productos || [],
           noVisitas: data.noVisitas || [],
-          cargasDia: data.cargasDia || {}
+          cargasDia: data.cargasDia || {},
+          recordatorios: data.recordatorios || [],
+          prospectos: data.prospectos || []
         })
       ];
       // clientes en chunks de 50
@@ -115,6 +117,8 @@ self.addEventListener('fetch',e=>{
         var cfg = results[0]; var cMeta = results[1]; var vMeta = results[2]; var prDoc = results[3];
         if(!cfg.exists) return null;
         var data = cfg.data();
+        if(!data.recordatorios) data.recordatorios = [];
+        if(!data.prospectos) data.prospectos = [];
         // load clientes
         var nc = cMeta.exists ? (cMeta.data().n||0) : 0;
         var vn = vMeta.exists ? (vMeta.data().n||0) : 0;
@@ -592,18 +596,20 @@ function App() {
       }
       if (data.productos?.length)  setProductos(data.productos);
       if (data.noVisitas?.length)  setNoVisitas(data.noVisitas);
+      if (data.prospectos?.length) setProspectos(data.prospectos);
+      if (data.recordatorios?.length) setRecordatorios(data.recordatorios);
       setSyncStatus("saved");
     });
   }, []);
 
   // Ref siempre actualizado — evita datos viejos en el debounce
-  const estadoRef = React.useRef({clientes,ventas,planillas,stock:stockNorm,productos,noVisitas});
-  React.useEffect(()=>{ estadoRef.current={clientes,ventas,planillas,stock:stockNorm,productos,noVisitas}; });
+  const estadoRef = React.useRef({clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios});
+  React.useEffect(()=>{ estadoRef.current={clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios}; });
 
   const syncData = (overrides={}) => {
     if(!window.db) return;
     setSyncStatus("saving");
-    const data = { ...estadoRef.current, ...overrides, noVisitas: estadoRef.current.noVisitas||[], prospectos: estadoRef.current.prospectos||[] };
+    const data = { ...estadoRef.current, ...overrides, noVisitas: estadoRef.current.noVisitas||[], prospectos: estadoRef.current.prospectos||[], recordatorios: estadoRef.current.recordatorios||[] };
     estadoRef.current = data;
     debounceSave(() => cloudSave(data).then(function(ok){setSyncStatus(ok?"saved":"error");}).catch(function(){setSyncStatus("error");}));
   };
@@ -824,7 +830,19 @@ function App() {
           onNoEstaCliente={()=>{const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noesta"}];saveNoVisitas(nv);}}
           recordatorios={recordatorios}
           onGuardarRecordatorio={(r)=>saveRecordatorios([...(recordatorios||[]),r])}
-          onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))} />}
+          onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
+          onCobrarSaldo={(monto,pago)=>{
+            const c=cliente;
+            const det=[{nombre:"Cobro de deuda",cantidad:1,precio:0,total:0}];
+            const calc=calcVenta(det,pago,String(monto),0,productos);
+            const vt={id:Date.now(),clienteId:c.id,cliente:c.nombre,dia:diaActual,fechaKey:fechaActual,fecha:new Date().toLocaleString("es-AR"),
+              detalle:det,pago,obs:`Cobro de deuda $${monto.toLocaleString("es-AR")} (${pago})`,saldoAplicado:0,
+              neto:0,bruto:0,desc:0,costo:0,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[]};
+            const nv=[...ventas,vt];
+            saveVentas(nv);
+            const nc=clientes.map(x=>x.id===c.id?{...x,saldo:(c.saldo||0)+monto}:x);
+            saveClientes(nc);
+          }} />}
       {pantalla==="venta"          && cliente && <NuevaVenta cliente={cliente} productos={productos} fecha={fechaActual}
         onNoEsta={()=>{
           const prev=(noVisitas||[]).find(v=>v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual);
@@ -1930,7 +1948,7 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
   );
 }
 
-function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onEditar,onEliminarVenta,onEditarVenta,onEliminarCliente,onNoEstaCliente,recordatorios,onGuardarRecordatorio,onConfirmarRecordatorio}) {
+function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onEditar,onEliminarVenta,onEditarVenta,onEliminarCliente,onNoEstaCliente,recordatorios,onGuardarRecordatorio,onConfirmarRecordatorio,onCobrarSaldo}) {
   const [editandoCliente,setEditandoCliente] = useState(false);
   const [editandoVentaId,setEditandoVentaId] = useState(null);
   const [tabDetalle,setTabDetalle] = useState("historial");
@@ -1938,6 +1956,7 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
   const [tipoSaldoEdit,setTipoSaldoEdit] = useState("");
   const [montoSaldoEdit,setMontoSaldoEdit] = useState("");
   const [mostrarRecordatorio,setMostrarRecordatorio] = useState(false);
+  const [mostrarPagoSaldo,setMostrarPagoSaldo] = useState(false);
   const recActivos = (recordatorios||[]).filter(r=>r.clienteId===cliente.id&&!r.confirmado);
   const historial = [...ventas].reverse();
   const ventaHoy  = fecha ? ventas.find(v=>v.fechaKey===fecha) : null;
@@ -1960,6 +1979,18 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
           </button>
         </div>
       </div>
+      {mostrarPagoSaldo&&(
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.7)",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <PagoSaldoPanel
+            saldo={cliente.saldo}
+            onCobrar={(monto,pago)=>{
+              onCobrarSaldo&&onCobrarSaldo(monto,pago);
+              setMostrarPagoSaldo(false);
+            }}
+            onCerrar={()=>setMostrarPagoSaldo(false)}
+          />
+        </div>
+      )}
       {mostrarRecordatorio&&(
         <RecordatorioModal
           cliente={cliente}
@@ -2031,7 +2062,15 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
                   <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>{cliente.saldo<0?"Saldo pendiente":cliente.saldo>0?"Saldo a favor":"Sin saldo"}</div>
                   <div style={{fontSize:20,fontWeight:500,color:cliente.saldo<0?"var(--color-text-danger)":cliente.saldo>0?"#4dd9a0":"var(--color-text-tertiary)"}}>{fmt(Math.abs(cliente.saldo))}</div>
                 </div>
-                <button style={{...s.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>setEditandoSaldo(true)}>Ajustar saldo</button>
+                <div style={{display:"flex",gap:6}}>
+                  {cliente.saldo<0&&(
+                    <button style={{background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:500,cursor:"pointer"}}
+                      onClick={()=>setMostrarPagoSaldo(true)}>
+                      💰 Cobrar
+                    </button>
+                  )}
+                  <button style={{...s.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>setEditandoSaldo(true)}>Ajustar</button>
+                </div>
               </div>
             ):(
               <div>
@@ -2324,6 +2363,41 @@ function RecordatorioModal({cliente,onGuardar,onCerrar}) {
             onGuardar({fecha,hora,motivo:motivo.trim()});
           }}>Guardar recordatorio</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function PagoSaldoPanel({saldo,onCobrar,onCerrar}) {
+  const deuda = Math.abs(saldo||0);
+  const [monto,setMonto] = React.useState(String(deuda));
+  const [pago,setPago]   = React.useState("contado");
+  return (
+    <div style={{background:"var(--color-background-secondary)",borderRadius:16,padding:20,width:"100%",maxWidth:400,boxShadow:"0 8px 32px rgba(0,0,0,0.4)"}}>
+      <div style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)",marginBottom:4}}>💰 Cobrar deuda</div>
+      <div style={{fontSize:13,color:"var(--color-text-danger)",marginBottom:16}}>Total pendiente: {fmt(deuda)}</div>
+      <div style={{display:"flex",gap:6,marginBottom:12}}>
+        {[["contado","Efectivo"],["transferencia","Transferencia"]].map(([v,l])=>(
+          <button key={v} style={{...s.btn,flex:1,fontSize:14,padding:"10px 4px",background:pago===v?"#185FA5":undefined,color:pago===v?"#fff":undefined,border:pago===v?"none":undefined}}
+            onClick={()=>setPago(v)}>{l}</button>
+        ))}
+      </div>
+      <div style={{marginBottom:16}}>
+        <label style={s.label}>Monto cobrado</label>
+        <input style={s.input} type="number" value={monto} onChange={e=>setMonto(e.target.value)} placeholder={String(deuda)}/>
+        {Number(monto)<deuda&&Number(monto)>0&&(
+          <div style={{fontSize:12,color:"var(--color-text-warning)",marginTop:4}}>
+            Pago parcial · Queda pendiente: {fmt(deuda-Number(monto))}
+          </div>
+        )}
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <button style={{...s.btn,flex:1}} onClick={onCerrar}>Cancelar</button>
+        <button style={{...s.btnPrimary,flex:2,fontSize:15}} onClick={()=>{
+          const m=Number(monto)||deuda;
+          if(m<=0){alert("Ingresá el monto");return;}
+          onCobrar(m,pago);
+        }}>Confirmar cobro</button>
       </div>
     </div>
   );
