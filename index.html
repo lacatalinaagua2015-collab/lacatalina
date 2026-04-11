@@ -11,7 +11,7 @@
   <title>La Catalina · Reparto</title>
   <script>
     if('serviceWorker' in navigator){
-      const CACHE = 'lc-v12';
+      const CACHE = 'lc-v14';
       const ASSETS = [
         'https://unpkg.com/react@18/umd/react.production.min.js',
         'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -1963,6 +1963,28 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
           </div>
         )}
       </div>
+      {fotoOpen&&(
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.92)",zIndex:2000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20}} onClick={e=>{e.stopPropagation();setFotoOpen(false);}}>
+          {c.foto
+            ? <img src={c.foto} alt="Domicilio" style={{maxWidth:"100%",maxHeight:"60vh",borderRadius:10,objectFit:"contain",marginBottom:16}} />
+            : <div style={{color:"#aaa",fontSize:14,marginBottom:20}}>Sin foto · {c.nombre}</div>
+          }
+          <div style={{display:"flex",gap:12}} onClick={e=>e.stopPropagation()}>
+            <label style={{background:"#185FA5",color:"#e2eaf4",padding:"10px 18px",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer",textAlign:"center"}}>
+              📷 Cámara
+              <input type="file" accept="image/*" capture="environment" style={{display:"none"}}
+                onChange={async e=>{const f=e.target.files[0];if(!f)return;const b64=await comprimirFoto(f);onReordenar(clientes.map(x=>x.id===c.id?{...x,foto:b64}:x));setFotoOpen(false);}} />
+            </label>
+            <label style={{background:"#2a3a4a",color:"#e2eaf4",padding:"10px 18px",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer",textAlign:"center"}}>
+              🖼 Galería
+              <input type="file" accept="image/*" style={{display:"none"}}
+                onChange={async e=>{const f=e.target.files[0];if(!f)return;const b64=await comprimirFoto(f);onReordenar(clientes.map(x=>x.id===c.id?{...x,foto:b64}:x));setFotoOpen(false);}} />
+            </label>
+            {c.foto&&<button style={{background:"#3a2020",color:"#e05c5c",padding:"10px 14px",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer",border:"none"}} onClick={()=>{onReordenar(clientes.map(x=>x.id===c.id?{...x,foto:""}:x));setFotoOpen(false);}}>🗑</button>}
+          </div>
+          <span style={{color:"#aaa",fontSize:11,marginTop:14}}>Tocá fuera para cerrar</span>
+        </div>
+      )}
     );
   };
 
@@ -3704,6 +3726,8 @@ function PromoComodato({prospecto:p,onGuardar,onVolver}) {
 
 
 function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReordenarTodo}) {
+  const [fotoClienteId,setFotoClienteId] = React.useState(null);
+  const fotoCliente = fotoClienteId ? clientes.find(c=>c.id===fotoClienteId) : null;
   const [busqueda,setBusqueda]   = useState("");
   const [filtroDia,setFiltroDia] = useState("todos");
   const [modoNuevo,setModoNuevo] = useState(false);
@@ -3803,26 +3827,7 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
                     {c.dia} · {c.calle?`${c.calle} ${c.nro||""}`:c.manzana?`Mz ${c.manzana} L ${c.lote}`:""}{c.barrio?` · ${c.barrio}`:""}
                   </div>
                   {c.notas&&<div style={{fontSize:11,color:"var(--color-text-warning)",marginTop:2}}>📝 {c.notas}</div>}
-                  {fotoOpen&&(
-                    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.92)",zIndex:2000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20}} onClick={e=>{e.stopPropagation();setFotoOpen(false);}}>
-                      {c.foto&&<img src={c.foto} alt="Domicilio" style={{maxWidth:"100%",maxHeight:"60vh",borderRadius:10,objectFit:"contain",marginBottom:16}} />}
-                      {!c.foto&&<div style={{color:"#aaa",fontSize:14,marginBottom:20}}>Sin foto aún</div>}
-                      <div style={{display:"flex",gap:12}} onClick={e=>e.stopPropagation()}>
-                        <label style={{background:"#185FA5",color:"#e2eaf4",padding:"10px 18px",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer",textAlign:"center"}}>
-                          📷 Cámara
-                          <input type="file" accept="image/*" capture="environment" style={{display:"none"}}
-                            onChange={async e=>{const f=e.target.files[0];if(!f)return;const b64=await comprimirFoto(f);onReordenar(clientes.map(x=>x.id===c.id?{...x,foto:b64}:x));setFotoOpen(false);}} />
-                        </label>
-                        <label style={{background:"#2a3a4a",color:"#e2eaf4",padding:"10px 18px",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer",textAlign:"center"}}>
-                          🖼 Galería
-                          <input type="file" accept="image/*" style={{display:"none"}}
-                            onChange={async e=>{const f=e.target.files[0];if(!f)return;const b64=await comprimirFoto(f);onReordenar(clientes.map(x=>x.id===c.id?{...x,foto:b64}:x));setFotoOpen(false);}} />
-                        </label>
-                        {c.foto&&<button style={{background:"#3a2020",color:"#e05c5c",padding:"10px 14px",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer",border:"none"}} onClick={()=>{onReordenar(clientes.map(x=>x.id===c.id?{...x,foto:""}:x));setFotoOpen(false);}}>🗑 Quitar</button>}
-                      </div>
-                      <span style={{color:"#aaa",fontSize:11,marginTop:14}}>Tocá fuera para cerrar</span>
-                    </div>
-                  )}
+
                   <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>
                     {c.sifon>0    && <span style={s.tag}>Sifón×{c.sifon}</span>}
                     {c.bidon10>0  && <span style={s.tag}>10L×{c.bidon10}</span>}
@@ -3833,9 +3838,10 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
                     {c.saldo>0   && <span style={s.badge("success")}>A favor {fmt(c.saldo)}</span>}
                   </div>
                 </div>
-                <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
+                <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0,alignItems:"center"}}>
                   {c.maps     && <a href={c.maps} target="_blank" rel="noreferrer" style={{fontSize:18,textDecoration:"none"}}>📍</a>}
                   {c.telefono && <a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:18,textDecoration:"none"}}>💬</a>}
+                  <span style={{fontSize:18,cursor:"pointer",lineHeight:1}} onClick={e=>{e.stopPropagation();setFotoClienteId(fotoClienteId===c.id?null:c.id);}}>📷</span>
                 </div>
               </div>
               <div style={{...s.row,justifyContent:"flex-end",gap:6,marginTop:8}}>
@@ -3853,6 +3859,29 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
         </div>
       )}
     </div>
+    {/* Modal foto domicilio */}
+    {fotoClienteId&&(
+      <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.92)",zIndex:2000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setFotoClienteId(null)}>
+        {fotoCliente&&fotoCliente.foto
+          ? <img src={fotoCliente.foto} alt="Domicilio" style={{maxWidth:"100%",maxHeight:"60vh",borderRadius:10,objectFit:"contain",marginBottom:16}} />
+          : <div style={{color:"#aaa",fontSize:14,marginBottom:20}}>Sin foto aún · {fotoCliente&&fotoCliente.nombre}</div>
+        }
+        <div style={{display:"flex",gap:12}} onClick={e=>e.stopPropagation()}>
+          <label style={{background:"#185FA5",color:"#e2eaf4",padding:"12px 20px",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer",textAlign:"center"}}>
+            📷 Cámara
+            <input type="file" accept="image/*" capture="environment" style={{display:"none"}}
+              onChange={async e=>{const f=e.target.files[0];if(!f)return;const b64=await comprimirFoto(f);onEditar(fotoClienteId,{foto:b64});setFotoClienteId(null);}} />
+          </label>
+          <label style={{background:"#2a3a4a",color:"#e2eaf4",padding:"12px 20px",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer",textAlign:"center"}}>
+            🖼 Galería
+            <input type="file" accept="image/*" style={{display:"none"}}
+              onChange={async e=>{const f=e.target.files[0];if(!f)return;const b64=await comprimirFoto(f);onEditar(fotoClienteId,{foto:b64});setFotoClienteId(null);}} />
+          </label>
+          {fotoCliente&&fotoCliente.foto&&<button style={{background:"#3a2020",color:"#e05c5c",padding:"12px 14px",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer",border:"none"}} onClick={()=>{onEditar(fotoClienteId,{foto:""});setFotoClienteId(null);}}>🗑</button>}
+        </div>
+        <span style={{color:"#aaa",fontSize:11,marginTop:14}}>Tocá fuera para cerrar</span>
+      </div>
+    )}
   );
 }
 
@@ -4246,6 +4275,9 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
   const [tab,setTab]=useState("precios");
   const [editandoId,setEditandoId]=useState(null);
   const [importando,setImportando]=useState(false);
+  const [mantVeh,setMantVeh] = React.useState(()=>{try{return JSON.parse(localStorage.getItem("cat_mant_vehiculo_v1")||"[]");}catch{return [];}});
+  const [mostrarNuevoMant,setMostrarNuevoMant] = React.useState(false);
+  const saveMantVeh = (lista) => {setMantVeh(lista);localStorage.setItem("cat_mant_vehiculo_v1",JSON.stringify(lista));};
   const prestados={sifon:clientes.reduce((a,c)=>a+(c.sifon||0),0),bidon10:clientes.reduce((a,c)=>a+(c.bidon10||0),0),bidon20:clientes.reduce((a,c)=>a+(c.bidon20||0),0)};
   const stockKeys={"Sifón 1.5L":"sifon","Bidón 10L":"bidon10","Bidón 20L":"bidon20","Dispenser":"dispenser"};
   return (
@@ -4570,7 +4602,7 @@ root.render(<ErrorBoundary><App /></ErrorBoundary>);
   <title>La Catalina · Reparto</title>
   <script>
     if('serviceWorker' in navigator){
-      const CACHE = 'lc-v12';
+      const CACHE = 'lc-v14';
       const ASSETS = [
         'https://unpkg.com/react@18/umd/react.production.min.js',
         'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
