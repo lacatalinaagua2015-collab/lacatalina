@@ -175,6 +175,30 @@ self.addEventListener('fetch',e=>{
     }
     body { background: #080f17; }
   </style>
+  <link rel="manifest" id="pwa-manifest">
+  <meta name="theme-color" content="#0f1923">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="La Catalina">
+  <script>
+    // Inline PWA manifest
+    const manifest = {
+      name: "La Catalina · Reparto",
+      short_name: "La Catalina",
+      description: "App de reparto de agua y soda",
+      start_url: "/lacatalina/",
+      display: "standalone",
+      background_color: "#0f1923",
+      theme_color: "#0f1923",
+      orientation: "portrait",
+      icons: [
+        {src:"https://lacatalinaagua2015-collab.github.io/lacatalina/icon-192.png",sizes:"192x192",type:"image/png"},
+        {src:"https://lacatalinaagua2015-collab.github.io/lacatalina/icon-512.png",sizes:"512x512",type:"image/png"}
+      ]
+    };
+    const blob = new Blob([JSON.stringify(manifest)],{type:"application/json"});
+    document.getElementById("pwa-manifest").href = URL.createObjectURL(blob);
+  </script>
 </head>
 <body>
 <div id="root"></div>
@@ -608,6 +632,28 @@ function App() {
   const estadoRef = React.useRef({clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios});
   React.useEffect(()=>{ estadoRef.current={clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios}; });
 
+  // Auto backup semanal a localStorage
+  React.useEffect(()=>{
+    const ultimoBackup = localStorage.getItem("lc_ultimo_backup");
+    const hoy = new Date().toISOString().slice(0,10);
+    if(ultimoBackup===hoy) return;
+    // Check if it's been 7+ days
+    if(ultimoBackup){
+      const dias = Math.floor((new Date()-new Date(ultimoBackup))/86400000);
+      if(dias<7) return;
+    }
+    // Save snapshot to localStorage
+    try {
+      const snap = {fecha:hoy, clientes:clientes.length, ventas:ventas.length};
+      localStorage.setItem("lc_backup_"+hoy, JSON.stringify({clientes,ventas,planillas}));
+      localStorage.setItem("lc_ultimo_backup", hoy);
+      // Keep only last 4 backups
+      const keys = Object.keys(localStorage).filter(k=>k.startsWith("lc_backup_")).sort().reverse();
+      keys.slice(4).forEach(k=>localStorage.removeItem(k));
+      console.log("Auto-backup guardado:", hoy);
+    } catch(e){ console.warn("Auto-backup falló:", e); }
+  },[]);
+
   const syncData = (overrides={}) => {
     if(!window.db) return;
     setSyncStatus("saving");
@@ -620,7 +666,14 @@ function App() {
   const saveVentas   = (v) => { setVentasRaw(v);   syncData({ventas:v}); };
   const savePlanillasCloud = (v) => { setPlanillas(v); syncData({planillas:v}); };
   const saveStock    = (v) => { setStock(v);    syncData({stock:v}); };
-  const saveProductos= (v) => { setProductos(v); syncData({productos:v}); };
+  const saveProductos= (v) => {
+    // Registrar cambio de precio en historial
+    const hoy = new Date().toISOString().slice(0,16);
+    const histPrecios = JSON.parse(localStorage.getItem("lc_hist_precios")||"[]");
+    histPrecios.push({fecha:hoy, productos:v.map(p=>({nombre:p.nombre,precio:p.precio,costo:p.costo}))});
+    localStorage.setItem("lc_hist_precios", JSON.stringify(histPrecios.slice(-50)));
+    setProductos(v); syncData({productos:v});
+  };
   const [cargasDia, setCargasDia] = useLS("cat_cargas_dia_v1", CARGA_DIA_DEFAULT);
   const saveCargasDia = (v) => { setCargasDia(v); try{localStorage.setItem("cat_cargas_dia_v1",JSON.stringify(v));}catch{} };
   const saveNoVisitas= (v) => { setNoVisitas(v); try{localStorage.setItem("cat_novisitas_v1",JSON.stringify(v));}catch{} };
@@ -772,7 +825,7 @@ function App() {
     <div style={s.app}>
       <SyncBar status={syncStatus} />
       {pantalla==="portada"        && <Portada onIngresar={()=>irA("menu")} />}
-      {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onMensajes={()=>irA("mensajes")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)}
+      {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onMensajes={()=>irA("mensajes")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} clientes={clientes} ventas={ventas}
           recordatoriosActivos={recordatoriosActivos}
           onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
           transferenciasPendientes={DIAS.map(dia=>{
@@ -946,6 +999,11 @@ function Portada({onIngresar}) {
         <p style={{fontSize:15,color:"var(--color-text-secondary)"}}>Soda y Agua Tratada · Reparto</p>
       </div>
       <button style={{...s.btnPrimary,width:200,marginTop:8}} onClick={onIngresar}>Ingresar</button>
+      {typeof window!=="undefined"&&window.matchMedia&&!window.matchMedia("(display-mode: standalone)").matches&&(
+        <div style={{fontSize:12,color:"var(--color-text-tertiary)",textAlign:"center",lineHeight:1.6,marginTop:4,maxWidth:240}}>
+          💡 Instalá la app: menú del navegador → "Agregar a pantalla de inicio"
+        </div>
+      )}
     </div>
   );
 }
@@ -1173,7 +1231,7 @@ function SetupNube({onSetup}) {
   );
 }
 
-function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onMensajes,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio}) {
+function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onMensajes,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,clientes,ventas}) {
   return (
     <div style={s.screen}>
       <div style={s.header}>
@@ -1181,6 +1239,8 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
         <span style={s.headerTitle}>Reparto La Catalina</span>
         <button style={{...s.btn,padding:"5px 10px",fontSize:18,lineHeight:1}} onClick={onToggleDark}>{darkMode?"☀":"🌙"}</button>
       </div>
+      
+      
       {recordatoriosActivos&&recordatoriosActivos.length>0&&(
         <div style={{margin:"8px 14px 4px"}}>
           <div style={{fontSize:11,fontWeight:500,color:"#5daaff",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.05em"}}>🔔 Recordatorios pendientes</div>
@@ -1219,12 +1279,19 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
       )}
       <span style={s.sectionTitle}>Días de reparto</span>
       <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:8}}>
-        {dias.map(d=>(
+        {dias.map(d=>{
+          const deudas = (clientes||[]).filter(c=>c.dia===d&&c.saldo<0);
+          const totalDeuda = deudas.reduce((a,c)=>a+Math.abs(c.saldo),0);
+          return (
           <button key={d} style={{...s.card,margin:0,textAlign:"left",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px"}} onClick={()=>onDia(d)}>
-            <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>{d}</span>
+            <div>
+              <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>{d}</span>
+              {totalDeuda>0&&<div style={{fontSize:11,color:"var(--color-text-danger)",marginTop:2}}>⚠ {deudas.length} cliente{deudas.length>1?"s":""} deben {fmt(totalDeuda)}</div>}
+            </div>
             <span style={{color:"var(--color-text-tertiary)",fontSize:18}}>→</span>
           </button>
-        ))}
+        );
+      })}
         <div style={s.divider} />
         <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onGestionClientes}>
           <span>👥 Gestión de clientes</span><span style={{color:"var(--color-text-tertiary)"}}>→</span>
@@ -1967,6 +2034,12 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
   const ventaHoy  = fecha ? ventas.find(v=>v.fechaKey===fecha) : null;
   const initials  = cliente.nombre.split(" ").slice(0,2).map(w=>w[0]||"").join("").toUpperCase();
   const totalComprado = ventas.reduce((a,v)=>a+(v.neto||0),0);
+  const promedioVenta = ventas.length>0 ? Math.round(totalComprado/ventas.length) : 0;
+  const ventasUltimos30 = ventas.filter(v=>{
+    const fk=v.fechaKey||""; if(!fk) return false;
+    const d=new Date(fk); const hoy=new Date();
+    return (hoy-d)/86400000<=30;
+  }).length;
 
   return (
     <div style={s.screen}>
@@ -3443,6 +3516,7 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
                     {c.dia} · {c.calle?`${c.calle} ${c.nro||""}`:c.manzana?`Mz ${c.manzana} L ${c.lote}`:""}{c.barrio?` · ${c.barrio}`:""}
                   </div>
                   {c.notas&&<div style={{fontSize:11,color:"var(--color-text-warning)",marginTop:2}}>📝 {c.notas}</div>}
+                  {c.foto&&<a href={c.foto} target="_blank" rel="noreferrer" style={{fontSize:11,color:"#5daaff",marginTop:2,display:"block"}} onClick={e=>e.stopPropagation()}>📷 Ver foto domicilio</a>}
                   <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>
                     {c.sifon>0    && <span style={s.tag}>Sifón×{c.sifon}</span>}
                     {c.bidon10>0  && <span style={s.tag}>10L×{c.bidon10}</span>}
