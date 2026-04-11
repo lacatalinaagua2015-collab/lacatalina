@@ -175,30 +175,12 @@ self.addEventListener('fetch',e=>{
     }
     body { background: #080f17; }
   </style>
-  <link rel="manifest" id="pwa-manifest">
+  <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0f1923">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="La Catalina">
-  <script>
-    // Inline PWA manifest
-    const manifest = {
-      name: "La Catalina · Reparto",
-      short_name: "La Catalina",
-      description: "App de reparto de agua y soda",
-      start_url: "/lacatalina/",
-      display: "standalone",
-      background_color: "#0f1923",
-      theme_color: "#0f1923",
-      orientation: "portrait",
-      icons: [
-        {src:"https://lacatalinaagua2015-collab.github.io/lacatalina/icon-192.png",sizes:"192x192",type:"image/png"},
-        {src:"https://lacatalinaagua2015-collab.github.io/lacatalina/icon-512.png",sizes:"512x512",type:"image/png"}
-      ]
-    };
-    const blob = new Blob([JSON.stringify(manifest)],{type:"application/json"});
-    document.getElementById("pwa-manifest").href = URL.createObjectURL(blob);
-  </script>
+  <link rel="apple-touch-icon" href="icon-192.png">
 </head>
 <body>
 <div id="root"></div>
