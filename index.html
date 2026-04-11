@@ -473,7 +473,7 @@ function calcVenta(detalle, pago, montoPagado, saldoAplicado, productos) {
 function App() {
   const [pantalla, setPantalla]   = useState(()=>{
     const h = window.location.hash.slice(1)||"portada";
-    const needsDia = ["diaPrincipal","selectorFechaClientes","selectorFechaPlanilla","inicioReparto","clientes","detalleCliente","venta","planilla"];
+    const needsDia = ["diaPrincipal","selectorFechaClientes","selectorFechaPlanilla","inicioReparto","clientes","detalleCliente","venta","planilla"]; // historial does NOT need dia
     const savedDia = (() => { try { return JSON.parse(localStorage.getItem("cat_dia_actual")||'""'); } catch{ return ""; } })();
     if(needsDia.includes(h) && !savedDia) return "portada";
     return h;
@@ -681,7 +681,7 @@ function App() {
 
   const cliente = clientes.find(c=>c.id===clienteId)||null;
   const irA = (p) => {
-    const needsDia = ["diaPrincipal","selectorFechaClientes","selectorFechaPlanilla","inicioReparto","clientes","detalleCliente","venta","planilla"];
+    const needsDia = ["diaPrincipal","selectorFechaClientes","selectorFechaPlanilla","inicioReparto","clientes","detalleCliente","venta","planilla"]; // historial does NOT need dia
     if(needsDia.includes(p) && !diaActual) { setPantalla("menu"); window.history.pushState({pantalla:"menu"},'','#menu'); window.scrollTo(0,0); return; }
     setPantalla(p);
     window.scrollTo(0,0);
@@ -692,7 +692,7 @@ function App() {
   React.useEffect(()=>{
     const handler = (e)=>{
       const p = e.state?.pantalla || "portada";
-      const needsDia = ["diaPrincipal","selectorFechaClientes","selectorFechaPlanilla","inicioReparto","clientes","detalleCliente","venta","planilla"];
+      const needsDia = ["diaPrincipal","selectorFechaClientes","selectorFechaPlanilla","inicioReparto","clientes","detalleCliente","venta","planilla"]; // historial does NOT need dia
       if(needsDia.includes(p) && !diaActual) { setPantalla("menu"); return; }
       setPantalla(p);
       window.scrollTo(0,0);
@@ -942,7 +942,8 @@ function App() {
             .sort((a,b)=>DIAS.indexOf(a.dia)-DIAS.indexOf(b.dia)||(a.orden||9999)-(b.orden||9999));
           saveClientes(nc);irA("clientes");
         }} onVolver={()=>irA("clientes")} />}
-      {pantalla==="mensajes" && <MensajesMasivos clientes={clientes} onVolver={()=>irA("menu")} />}
+      {pantalla==="mensajes"  && <MensajesMasivos clientes={clientes} onVolver={()=>irA("menu")} />}
+      {pantalla==="historial" && <CargaHistorica clientes={clientes} productos={productos} onGuardar={(vts)=>{saveVentas([...ventas,...vts]);irA("menu");}} onVolver={()=>irA("menu")} />}
       {pantalla==="promocion"       && <Promocion prospectos={prospectos} clientes={clientes} onSave={saveProspectos} onConvertir={(p)=>{
         const nuevo={...p,id:Date.now(),saldo:0,sifon:0,bidon10:1,bidon20:0};
         saveClientes([...clientes,nuevo]);
@@ -965,7 +966,7 @@ function App() {
         saveClientes([...nuevos,{...datos,id:Date.now(),saldo:0,dispenser:datos.dispenser||0}].sort((a,b)=>DIAS.indexOf(a.dia)-DIAS.indexOf(b.dia)||(a.orden||9999)-(b.orden||9999)));
       }} onVolver={()=>irA("menu")} />}
       {pantalla==="resumen"        && <Resumen ventas={ventas} clientes={clientes} productos={productos} planillas={planillas} noVisitas={noVisitas||[]} onVolver={()=>irA("menu")} />}
-      {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stockNorm} setStock={(s)=>{const ns=normStock(s);setStockRaw(ns);syncData({stock:ns});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} onVolver={()=>irA("menu")} />}
+      {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stockNorm} setStock={(s)=>{const ns=normStock(s);setStockRaw(ns);syncData({stock:ns});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} syncData={syncData} onVolver={()=>irA("menu")} />}
     </div>
   );
 }
@@ -1302,6 +1303,7 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
         <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onMensajes}>
           <span>💬 Mensajes masivos</span><span style={{color:"var(--color-text-tertiary)"}}>→</span>
         </button>
+
         <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onResumen}>
           <span>📊 Resumen general</span><span style={{color:"var(--color-text-tertiary)"}}>→</span>
         </button>
@@ -2769,6 +2771,184 @@ function NuevoCliente({diaActual,onGuardar,onVolver}) {
 
 // ─── MÓDULO PROMOCIÓN ────────────────────────────────────────────────────────
 
+function CargaHistorica({clientes,productos,onGuardar,onVolver,enConfig}) {
+  const DIAS_REP = ["Martes","Miércoles","Jueves","Viernes"];
+  const [fecha,setFecha]   = React.useState("2026-01-06");
+  const [dia,setDia]       = React.useState("Martes");
+  const [filas,setFilas]   = React.useState([]);
+  const [guardando,setGuardando] = React.useState(false);
+  const [guardados,setGuardados] = React.useState(0);
+
+  // Clientes del día seleccionado
+  const clientesDia = clientes.filter(c=>c.dia===dia).sort((a,b)=>(a.orden||999)-(b.orden||999));
+
+  // Al cambiar la fecha, auto-detectar el día
+  const onFechaChange = (f) => {
+    setFecha(f);
+    const d = new Date(f+'T12:00:00');
+    const dias = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+    const nombreDia = dias[d.getDay()];
+    if(DIAS_REP.includes(nombreDia)) setDia(nombreDia);
+  };
+
+  // Fila vacía
+  const filaVacia = (clienteId="") => ({
+    clienteId, cantidad_sifon:0, cantidad_b10:0, cantidad_b20:0,
+    pago:"contado", monto:"", obs:""
+  });
+
+  // Cargar clientes del día como filas
+  const cargarClientes = () => {
+    setFilas(clientesDia.map(c=>filaVacia(c.id)));
+  };
+
+  const setFila = (i,campo,val) => setFilas(fs=>fs.map((f,j)=>j===i?{...f,[campo]:val}:f));
+
+  const filasConVenta = filas.filter(f=>f.clienteId&&(f.cantidad_sifon>0||f.cantidad_b10>0||f.cantidad_b20>0||Number(f.monto)>0));
+
+  const guardar = () => {
+    if(!filasConVenta.length){alert("No hay ventas para guardar");return;}
+    const nuevasVentas = [];
+    const fechaKey = fecha;
+    filasConVenta.forEach(f=>{
+      const c = clientes.find(x=>x.id===f.clienteId);
+      if(!c) return;
+      const ps = productos||[];
+      const detalle = [];
+      const getSifon = ps.find(p=>p.nombre==="Sifón 1.5L");
+      const getB10   = ps.find(p=>p.nombre==="Bidón 10L");
+      const getB20   = ps.find(p=>p.nombre==="Bidón 20L");
+      if(f.cantidad_sifon>0&&getSifon) detalle.push({nombre:getSifon.nombre,cantidad:Number(f.cantidad_sifon),precio:getSifon.precio,total:Number(f.cantidad_sifon)*getSifon.precio});
+      if(f.cantidad_b10>0&&getB10)     detalle.push({nombre:getB10.nombre,  cantidad:Number(f.cantidad_b10),  precio:getB10.precio,  total:Number(f.cantidad_b10)*getB10.precio});
+      if(f.cantidad_b20>0&&getB20)     detalle.push({nombre:getB20.nombre,  cantidad:Number(f.cantidad_b20),  precio:getB20.precio,  total:Number(f.cantidad_b20)*getB20.precio});
+      if(!detalle.length&&Number(f.monto)>0) detalle.push({nombre:"Venta histórica",cantidad:1,precio:Number(f.monto),total:Number(f.monto)});
+      const bruto = detalle.reduce((a,d)=>a+d.total,0);
+      const pagadoNum = Number(f.monto)||bruto;
+      const saldoDelta = f.pago==="fiado"?-bruto:pagadoNum-bruto;
+      nuevasVentas.push({
+        id: Date.now()+nuevasVentas.length,
+        clienteId:c.id, cliente:c.nombre,
+        dia, fechaKey, fecha: `${fecha} (historial)`,
+        detalle, pago:f.pago, obs:f.obs||"Carga histórica",
+        bruto, desc:0, neto:bruto, costo:0, ganancia:bruto,
+        pagadoNum, saldoAplicado:0, saldoDelta,
+        envPrest:[], envDev:[],
+      });
+    });
+    setGuardando(true);
+    onGuardar(nuevasVentas);
+    setGuardados(g=>g+nuevasVentas.length);
+    setFilas([]);
+    setGuardando(false);
+    alert(`✅ ${nuevasVentas.length} ventas guardadas para el ${fecha}`);
+  };
+
+  return (
+    <div style={s.screen}>
+      {!enConfig&&<div style={s.header}>
+        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
+        <span style={s.headerTitle}>Carga histórica</span>
+        {guardados>0&&<span style={{fontSize:12,color:"#4dd9a0"}}>{guardados} guardadas</span>}
+      </div>}
+      {enConfig&&guardados>0&&<div style={{padding:"4px 16px",fontSize:12,color:"#4dd9a0"}}>✓ {guardados} ventas guardadas</div>}
+      <div style={{padding:16}}>
+
+        {/* Selector fecha y día */}
+        <div style={{...s.card,marginBottom:12}}>
+          <div style={{display:"flex",gap:8,marginBottom:10}}>
+            <div style={{flex:2}}>
+              <label style={s.label}>Fecha del reparto</label>
+              <input type="date" style={s.input} value={fecha}
+                min="2026-01-01" max="2026-03-31"
+                onChange={e=>onFechaChange(e.target.value)}/>
+            </div>
+            <div style={{flex:1}}>
+              <label style={s.label}>Día</label>
+              <select style={s.select} value={dia} onChange={e=>setDia(e.target.value)}>
+                {DIAS_REP.map(d=><option key={d}>{d}</option>)}
+              </select>
+            </div>
+          </div>
+          <button style={{...s.btnPrimary,width:"100%",padding:"12px",fontSize:14}}
+            onClick={cargarClientes}>
+            📋 Cargar clientes del {dia} ({clientesDia.length} clientes)
+          </button>
+        </div>
+
+        {/* Tabla de carga */}
+        {filas.length>0&&(
+          <>
+            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:8}}>
+              Dejá en 0 los que no compraron ese día. Solo se guardan los que tienen cantidad o monto.
+            </div>
+            {filas.map((f,i)=>{
+              const c = clientes.find(x=>x.id===f.clienteId);
+              if(!c) return null;
+              const tieneVenta = f.cantidad_sifon>0||f.cantidad_b10>0||f.cantidad_b20>0||Number(f.monto)>0;
+              return (
+                <div key={i} style={{...s.card,margin:"0 0 8px",borderLeft:tieneVenta?"3px solid #4dd9a0":"0.5px solid var(--color-border-tertiary)"}}>
+                  <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:8}}>
+                    {c.orden&&<span style={{color:"var(--color-text-tertiary)",fontSize:12,marginRight:6}}>#{c.orden}</span>}
+                    {c.nombre}
+                    {c.sifon>0&&<span style={{fontSize:11,color:"var(--color-text-tertiary)",marginLeft:6}}>hab: S×{c.sifon}{c.bidon10>0?` B10×${c.bidon10}`:""}{c.bidon20>0?` B20×${c.bidon20}`:""}</span>}
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:8}}>
+                    {[["cantidad_sifon","Sifón"],["cantidad_b10","Bidón 10L"],["cantidad_b20","Bidón 20L"]].map(([k,l])=>(
+                      <div key={k}>
+                        <label style={{...s.label,fontSize:10}}>{l}</label>
+                        <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0}
+                          value={f[k]||""} placeholder="0"
+                          onChange={e=>setFila(i,k,Number(e.target.value)||0)}/>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                    <div>
+                      <label style={{...s.label,fontSize:10}}>Pago</label>
+                      <select style={{...s.select,fontSize:12}} value={f.pago} onChange={e=>setFila(i,"pago",e.target.value)}>
+                        {[["contado","Contado"],["transferencia","Transfer."],["fiado","Fiado"]].map(([v,l])=><option key={v} value={v}>{l}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{...s.label,fontSize:10}}>Monto cobrado $</label>
+                      <input style={{...s.inputNum,textAlign:"right"}} type="number" min={0}
+                        value={f.monto} placeholder="auto"
+                        onChange={e=>setFila(i,"monto",e.target.value)}/>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Resumen */}
+            <div style={{...s.card,margin:"8px 0",background:"var(--color-background-secondary)"}}>
+              <div style={{fontSize:13,color:"var(--color-text-secondary)"}}>
+                {filasConVenta.length} ventas a guardar del {fecha}
+              </div>
+            </div>
+
+            <button style={{...s.btnPrimary,width:"100%",padding:"14px",fontSize:15,borderRadius:12,opacity:filasConVenta.length===0?0.5:1}}
+              disabled={filasConVenta.length===0}
+              onClick={guardar}>
+              💾 Guardar {filasConVenta.length} ventas del {fecha}
+            </button>
+            <button style={{...s.btn,width:"100%",padding:"10px",fontSize:13,marginTop:8}}
+              onClick={()=>setFilas([])}>
+              Limpiar y cargar otro día
+            </button>
+          </>
+        )}
+
+        {filas.length===0&&(
+          <div style={{textAlign:"center",padding:"40px 20px",color:"var(--color-text-tertiary)",fontSize:14,lineHeight:1.8}}>
+            Seleccioná una fecha y tocá{"\n"}"Cargar clientes del día"{"\n"}para empezar la carga.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MensajesMasivos({clientes,onVolver}) {
   const DIAS_REP = ["Martes","Miércoles","Jueves","Viernes"];
   const PLANTILLAS = [
@@ -3936,7 +4116,7 @@ function importarBackup(file,setClientes,setVentas,setPlanillas){
   reader.readAsArrayBuffer(file);
 }
 
-function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,planillas,setPlanillas,stock,setStock,cargasDia,setCargasDia,onVolver}) {
+function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,planillas,setPlanillas,stock,setStock,cargasDia,setCargasDia,syncData,onVolver}) {
   const [tab,setTab]=useState("precios");
   const [editandoId,setEditandoId]=useState(null);
   const [importando,setImportando]=useState(false);
@@ -3949,6 +4129,7 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
         <button style={s.tab(tab==="precios")} onClick={()=>setTab("precios")}>Precios</button>
         <button style={s.tab(tab==="stock")} onClick={()=>setTab("stock")}>Stock</button>
         <button style={s.tab(tab==="cargas")} onClick={()=>setTab("cargas")}>Cargas</button>
+        <button style={s.tab(tab==="historial")} onClick={()=>setTab("historial")}>Historial</button>
         <button style={s.tab(tab==="backup")} onClick={()=>setTab("backup")}>Backup</button>
       </div>
       {tab==="precios"&&<div style={{padding:16}}>{productos.map(p=>(<div key={p.id} style={{...s.card,margin:"0 0 10px"}}><div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:15,fontWeight:500,color:"var(--color-text-primary)"}}>{p.nombre}</span><button style={{...s.btn,fontSize:12,padding:"4px 12px"}} onClick={()=>setEditandoId(editandoId===p.id?null:p.id)}>{editandoId===p.id?"Cancelar":"Editar"}</button></div>{editandoId!==p.id&&<div style={{fontSize:13,color:"var(--color-text-secondary)",marginTop:6}}>Venta: {fmt(p.precio)} · Costo: {fmt(p.costo)} · Ganancia: {fmt(p.precio-p.costo)}</div>}{editandoId===p.id&&(<div style={{display:"flex",flexDirection:"column",gap:8,marginTop:10}}><div><label style={s.label}>Precio de venta</label><input style={s.input} type="number" defaultValue={p.precio} id={`pr-${p.id}`} /></div><div><label style={s.label}>Costo de llenado</label><input style={s.input} type="number" defaultValue={p.costo} id={`co-${p.id}`} /></div><button style={s.btnPrimary} onClick={()=>{const pr=Number(document.getElementById(`pr-${p.id}`).value),co=Number(document.getElementById(`co-${p.id}`).value);setProductos(productos.map(x=>x.id===p.id?{...x,precio:pr,costo:co}:x));setEditandoId(null);}}>Guardar precio</button></div>)}</div>))}</div>}
@@ -4107,6 +4288,15 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
             ))}
             <button style={s.btnPrimary} onClick={()=>{syncData({stock});alert("Stock guardado");}}>Guardar stock</button>
           </div>
+        )}
+        {tab==="historial"&&(
+          <CargaHistorica
+            clientes={clientes}
+            productos={productos}
+            onGuardar={(vts)=>{const nv=[...(ventas||[]),...vts];setVentas(nv);if(syncData)syncData({ventas:nv});}}
+            onVolver={null}
+            enConfig={true}
+          />
         )}
         {tab==="backup"&&(
         <div style={{padding:16,display:"flex",flexDirection:"column",gap:12}}>
