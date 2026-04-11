@@ -11,7 +11,7 @@
   <title>La Catalina · Reparto</title>
   <script>
     if('serviceWorker' in navigator){
-      const CACHE = 'lc-v8';
+      const CACHE = 'lc-v9';
       const ASSETS = [
         'https://unpkg.com/react@18/umd/react.production.min.js',
         'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -868,6 +868,9 @@ function App() {
           recordatorios={recordatorios}
           onGuardarRecordatorio={(r)=>saveRecordatorios([...(recordatorios||[]),r])}
           onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
+          onGuardarMantenimiento={(clienteId,mantenimiento)=>{
+            updateCliente(clienteId,{mantenimiento});
+          }}
           onCobrarSaldo={(monto,pago)=>{
             const c=cliente;
             const det=[{nombre:"Cobro de deuda",cantidad:1,precio:0,total:0}];
@@ -1861,6 +1864,7 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
   };
 
   const Card=({c})=>{
+    const [fotoOpen,setFotoOpen] = React.useState(false);
     const atendido=atendidos.has(c.id), est=noVMap[c.id];
     const bc=atendido?"#1D9E75":est==="noesta"?"#EF9F27":(est==="noesta2"||est==="noquiso")?"#E24B4A":"var(--color-border-tertiary)";
     return (
@@ -1913,9 +1917,10 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
               {c.saldo>0   && <span style={s.badge("success")}>A favor {fmt(c.saldo)}</span>}
             </div>
           </div>
-          <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0}}>
+          <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0,alignItems:"center"}}>
             {c.maps     && <a href={c.maps} target="_blank" rel="noreferrer" style={{fontSize:20,textDecoration:"none"}}>📍</a>}
             {c.telefono && <a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:20,textDecoration:"none"}}>💬</a>}
+            <span style={{fontSize:20,cursor:"pointer",lineHeight:1}} title="Mantenimiento" onClick={e=>{e.stopPropagation();onSeleccionar(c);}}>🔧</span>
           </div>
         </div>
         {(!visitados.has(c.id)||est==="noesta")&&!atendido&&(
@@ -2004,7 +2009,7 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
   );
 }
 
-function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onEditar,onEliminarVenta,onEditarVenta,onEliminarCliente,onNoEstaCliente,recordatorios,onGuardarRecordatorio,onConfirmarRecordatorio,onCobrarSaldo}) {
+function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onEditar,onEliminarVenta,onEditarVenta,onEliminarCliente,onNoEstaCliente,recordatorios,onGuardarRecordatorio,onConfirmarRecordatorio,onCobrarSaldo,onGuardarMantenimiento}) {
   const [editandoCliente,setEditandoCliente] = useState(false);
   const [editandoVentaId,setEditandoVentaId] = useState(null);
   const [tabDetalle,setTabDetalle] = useState("historial");
@@ -2013,6 +2018,8 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
   const [montoSaldoEdit,setMontoSaldoEdit] = useState("");
   const [mostrarRecordatorio,setMostrarRecordatorio] = useState(false);
   const [mostrarPagoSaldo,setMostrarPagoSaldo] = useState(false);
+  const [mostrarMant,setMostrarMant] = useState(false);
+  const [mostrarFotoGrande,setMostrarFotoGrande] = useState(false);
   const recActivos = (recordatorios||[]).filter(r=>r.clienteId===cliente.id&&!r.confirmado);
   const historial = [...ventas].reverse();
   const ventaHoy  = fecha ? ventas.find(v=>v.fechaKey===fecha) : null;
@@ -2063,6 +2070,26 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
           onCerrar={()=>setMostrarRecordatorio(false)}
         />
       )}
+      {mostrarMant&&(
+        <MantenimientoModal
+          cliente={cliente}
+          onGuardar={(reg)=>{
+            const mantActual=cliente.mantenimiento||[];
+            onGuardarMantenimiento&&onGuardarMantenimiento(cliente.id,[...mantActual,reg]);
+            setMostrarMant(false);
+          }}
+          onCerrar={()=>setMostrarMant(false)}
+        />
+      )}
+      {mostrarFotoGrande&&cliente.foto&&(
+        <div
+          style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.92)",zIndex:2000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:16}}
+          onClick={()=>setMostrarFotoGrande(false)}
+        >
+          <img src={cliente.foto} alt="Domicilio" style={{maxWidth:"100%",maxHeight:"85vh",borderRadius:10,objectFit:"contain"}} />
+          <span style={{color:"#fff",fontSize:12,marginTop:10,opacity:0.6}}>Tocá para cerrar</span>
+        </div>
+      )}
       <div style={{padding:16}}>
         {recActivos.length>0&&!editandoCliente&&(
           <div style={{marginBottom:10}}>
@@ -2085,7 +2112,7 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
           {/* Header cliente */}
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
             {cliente.foto
-              ? <img src={cliente.foto} alt="" style={{width:52,height:52,borderRadius:10,objectFit:"cover",flexShrink:0,border:"0.5px solid var(--color-border-tertiary)"}} />
+              ? <img src={cliente.foto} alt="" onClick={()=>setMostrarFotoGrande(true)} title="Ver foto grande" style={{width:52,height:52,borderRadius:10,objectFit:"cover",flexShrink:0,border:"0.5px solid var(--color-border-tertiary)",cursor:"zoom-in"}} />
               : <div style={{width:52,height:52,borderRadius:10,background:"var(--color-background-info)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:500,fontSize:18,color:"var(--color-text-info)",flexShrink:0}}>{initials}</div>
             }
             <div style={{flex:1}}>
@@ -2096,9 +2123,10 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
               </div>
               {cliente.notas&&<div style={{fontSize:12,color:"var(--color-text-warning)",marginTop:3}}>📝 {cliente.notas}</div>}
             </div>
-            <div style={{display:"flex",gap:10}}>
+            <div style={{display:"flex",gap:10,alignItems:"center"}}>
               {cliente.maps     && <a href={cliente.maps} target="_blank" rel="noreferrer" style={{fontSize:26,textDecoration:"none"}}>📍</a>}
               {cliente.telefono && <a href={`https://wa.me/54${cliente.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:26,textDecoration:"none"}}>💬</a>}
+              <span style={{fontSize:26,cursor:"pointer"}} onClick={()=>setMostrarMant(true)} title="Mantenimiento vehículo">🔧</span>
             </div>
           </div>
 
@@ -2190,6 +2218,7 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
           <div style={s.tabBar}>
             <button style={s.tab(tabDetalle==="historial")} onClick={()=>setTabDetalle("historial")}>Historial</button>
             <button style={s.tab(tabDetalle==="envases")} onClick={()=>setTabDetalle("envases")}>Envases</button>
+            <button style={s.tab(tabDetalle==="mant")} onClick={()=>setTabDetalle("mant")}>🔧 Vehículo</button>
           </div>
           {tabDetalle==="historial"&&<>
           <div style={s.divider} />
@@ -2254,6 +2283,37 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
             </div>
           )}
 
+          {tabDetalle==="mant"&&(
+            <div style={{marginTop:8}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-secondary)"}}>Historial mantenimiento</span>
+                <button style={{...s.btn,fontSize:12,padding:"5px 12px"}} onClick={()=>setMostrarMant(true)}>+ Registrar</button>
+              </div>
+              {(cliente.mantenimiento||[]).length===0&&(
+                <div style={{textAlign:"center",padding:"24px 0",color:"var(--color-text-tertiary)",fontSize:13}}>
+                  <div style={{fontSize:32,marginBottom:8}}>🔧</div>
+                  Sin registros aún
+                </div>
+              )}
+              {[...(cliente.mantenimiento||[])].reverse().map((m,i)=>(<div key={i} style={{...s.card,margin:"0 0 8px",borderLeft:`3px solid ${m.tipo==="aceite"?"#f5b942":m.tipo==="preventivo"?"#4dd9a0":m.tipo==="embrague"?"#e05c5c":m.tipo==="reparacion"?"#5daaff":"#a0aec0"}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-primary)"}}>
+                      {m.tipo==="aceite"?"🛢 Cambio de aceite":m.tipo==="preventivo"?"🔩 Mantenimiento preventivo":m.tipo==="embrague"?"⚙️ Cambio de embrague":m.tipo==="reparacion"?"🛠 Reparación":"📋 "+m.tipo}
+                    </div>
+                    {m.descripcion&&<div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:3}}>{m.descripcion}</div>}
+                    {m.km&&<div style={{fontSize:12,color:"var(--color-text-tertiary)",marginTop:2}}>📊 Km: {Number(m.km).toLocaleString("es-AR")}</div>}
+                    {m.costo&&<div style={{fontSize:12,color:"var(--color-text-tertiary)",marginTop:2}}>💰 ${Number(m.costo).toLocaleString("es-AR")}</div>}
+                  </div>
+                  <div style={{fontSize:11,color:"var(--color-text-tertiary)",textAlign:"right",flexShrink:0,marginLeft:8}}>
+                    {m.fecha}
+                  </div>
+                </div>
+                {m.proximo&&<div style={{fontSize:11,color:"#f5b942",marginTop:4,borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:4}}>⏰ Próximo: {m.proximo}</div>}
+              </div>))}
+            </div>
+          )}
+
           <div style={{...s.divider,marginTop:12}}/>
           <details style={{marginTop:4}}>
             <summary style={{fontSize:12,color:"var(--color-text-tertiary)",cursor:"pointer",padding:"4px 0",listStyle:"none",display:"flex",alignItems:"center",gap:4}}>
@@ -2305,7 +2365,10 @@ function EditCliente({cliente,onGuardar,onEliminarCliente}) {
         </div>
       </div>
       <div><label style={s.label}>Saldo (corrección manual)</label><input style={s.input} type="number" value={datos.saldo||0} onChange={e=>set("saldo",Number(e.target.value))} /></div>
-      {datos.foto&&<img src={datos.foto} alt="Domicilio" style={{width:"100%",borderRadius:8,maxHeight:160,objectFit:"cover"}} />}
+      {datos.foto&&<div style={{position:"relative",cursor:"zoom-in"}} onClick={()=>setMostrarFotoGrande(true)}>
+        <img src={datos.foto} alt="Domicilio" style={{width:"100%",borderRadius:8,maxHeight:160,objectFit:"cover"}} />
+        <div style={{position:"absolute",bottom:6,right:8,background:"rgba(0,0,0,0.55)",color:"#fff",fontSize:11,borderRadius:6,padding:"2px 8px"}}>🔍 Ampliar</div>
+      </div>}
       <button style={s.btnPrimary} onClick={()=>onGuardar(datos)}>Guardar cambios</button>
       <div style={{marginTop:16,paddingTop:12,borderTop:"0.5px solid var(--color-border-tertiary)"}}>
         <button style={{...s.btnDanger,width:"100%",padding:"10px",fontSize:13}}
@@ -2389,6 +2452,87 @@ function EditVenta({venta,productos,onGuardar,onCancelar}) { // onGuardar(detall
             onGuardar(detalle,pago,pago==="fiado"?"":monto,venta.saldoAplicado||0,obs);
           }
         }}>Guardar</button>
+      </div>
+    </div>
+  );
+}
+
+function MantenimientoModal({cliente,onGuardar,onCerrar}) {
+  const [tipo,setTipo] = React.useState("aceite");
+  const [descripcion,setDescripcion] = React.useState("");
+  const [km,setKm] = React.useState("");
+  const [costo,setCosto] = React.useState("");
+  const [proximo,setProximo] = React.useState("");
+  const fecha = new Date().toLocaleDateString("es-AR");
+  const s = estilos();
+  const tipos = [
+    {id:"aceite",   label:"🛢 Cambio de aceite",        color:"#f5b942"},
+    {id:"preventivo",label:"🔩 Mantenimiento preventivo",color:"#4dd9a0"},
+    {id:"embrague", label:"⚙️ Cambio de embrague",      color:"#e05c5c"},
+    {id:"reparacion",label:"🛠 Reparación",              color:"#5daaff"},
+    {id:"otro",     label:"📋 Otro",                     color:"#a0aec0"},
+  ];
+  const guardar = () => {
+    if(!tipo) return;
+    onGuardar({tipo,descripcion,km,costo,proximo,fecha});
+  };
+  return (
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.75)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+      <div style={{background:"var(--color-background-secondary)",borderRadius:"16px 16px 0 0",padding:"20px 16px 32px",width:"100%",maxWidth:480,maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <span style={{fontSize:16,fontWeight:600,color:"var(--color-text-primary)"}}>🔧 Registrar mantenimiento</span>
+          <button style={{background:"none",border:"none",fontSize:22,color:"var(--color-text-secondary)",cursor:"pointer"}} onClick={onCerrar}>✕</button>
+        </div>
+        <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginBottom:10}}>{cliente.nombre} · {fecha}</div>
+
+        {/* Tipo */}
+        <div style={{marginBottom:14}}>
+          <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:6}}>Tipo de mantenimiento</label>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {tipos.map(t=>(
+              <button key={t.id} onClick={()=>setTipo(t.id)} style={{padding:"7px 12px",borderRadius:8,border:`2px solid ${tipo===t.id?t.color:"var(--color-border-tertiary)"}`,background:tipo===t.id?t.color+"22":"transparent",color:tipo===t.id?t.color:"var(--color-text-secondary)",fontSize:12,cursor:"pointer",fontWeight:tipo===t.id?600:400}}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Descripcion */}
+        <div style={{marginBottom:10}}>
+          <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:4}}>Descripción / detalle</label>
+          <textarea
+            style={{width:"100%",background:"var(--color-background-tertiary)",border:"1px solid var(--color-border-secondary)",borderRadius:8,padding:"8px 10px",color:"var(--color-text-primary)",fontSize:13,resize:"none",boxSizing:"border-box",minHeight:60}}
+            placeholder="Ej: Cambio aceite 10W-40, filtro nuevo..."
+            value={descripcion} onChange={e=>setDescripcion(e.target.value)}
+          />
+        </div>
+
+        {/* Km y costo en fila */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+          <div>
+            <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:4}}>Km actuales</label>
+            <input type="number" style={{width:"100%",background:"var(--color-background-tertiary)",border:"1px solid var(--color-border-secondary)",borderRadius:8,padding:"8px 10px",color:"var(--color-text-primary)",fontSize:13,boxSizing:"border-box"}}
+              placeholder="Ej: 125000" value={km} onChange={e=>setKm(e.target.value)} />
+          </div>
+          <div>
+            <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:4}}>Costo ($)</label>
+            <input type="number" style={{width:"100%",background:"var(--color-background-tertiary)",border:"1px solid var(--color-border-secondary)",borderRadius:8,padding:"8px 10px",color:"var(--color-text-primary)",fontSize:13,boxSizing:"border-box"}}
+              placeholder="Ej: 85000" value={costo} onChange={e=>setCosto(e.target.value)} />
+          </div>
+        </div>
+
+        {/* Próximo */}
+        <div style={{marginBottom:18}}>
+          <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:4}}>Próximo mantenimiento</label>
+          <input style={{width:"100%",background:"var(--color-background-tertiary)",border:"1px solid var(--color-border-secondary)",borderRadius:8,padding:"8px 10px",color:"var(--color-text-primary)",fontSize:13,boxSizing:"border-box"}}
+            placeholder="Ej: 135.000 km / junio 2026" value={proximo} onChange={e=>setProximo(e.target.value)} />
+        </div>
+
+        <button
+          style={{width:"100%",padding:"13px",borderRadius:10,border:"none",background:"#185FA5",color:"#e2eaf4",fontSize:15,fontWeight:600,cursor:"pointer"}}
+          onClick={guardar}>
+          Guardar registro
+        </button>
       </div>
     </div>
   );
@@ -3678,7 +3822,13 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
                     {c.dia} · {c.calle?`${c.calle} ${c.nro||""}`:c.manzana?`Mz ${c.manzana} L ${c.lote}`:""}{c.barrio?` · ${c.barrio}`:""}
                   </div>
                   {c.notas&&<div style={{fontSize:11,color:"var(--color-text-warning)",marginTop:2}}>📝 {c.notas}</div>}
-                  {c.foto&&<a href={c.foto} target="_blank" rel="noreferrer" style={{fontSize:11,color:"#5daaff",marginTop:2,display:"block"}} onClick={e=>e.stopPropagation()}>📷 Ver foto domicilio</a>}
+                  {c.foto&&<>
+                    <span style={{fontSize:11,color:"#5daaff",marginTop:2,display:"block",cursor:"pointer",textDecoration:"none"}} onClick={e=>{e.stopPropagation();setFotoOpen(true);}}>📷 Ver foto</span>
+                    {fotoOpen&&<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.92)",zIndex:2000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:16}} onClick={e=>{e.stopPropagation();setFotoOpen(false);}}>
+                      <img src={c.foto} alt="Domicilio" style={{maxWidth:"100%",maxHeight:"85vh",borderRadius:10,objectFit:"contain"}} />
+                      <span style={{color:"#fff",fontSize:12,marginTop:10,opacity:0.6}}>Tocá para cerrar</span>
+                    </div>}
+                  </>}
                   <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>
                     {c.sifon>0    && <span style={s.tag}>Sifón×{c.sifon}</span>}
                     {c.bidon10>0  && <span style={s.tag}>10L×{c.bidon10}</span>}
@@ -4355,7 +4505,7 @@ root.render(<ErrorBoundary><App /></ErrorBoundary>);
   <title>La Catalina · Reparto</title>
   <script>
     if('serviceWorker' in navigator){
-      const CACHE = 'lc-v8';
+      const CACHE = 'lc-v9';
       const ASSETS = [
         'https://unpkg.com/react@18/umd/react.production.min.js',
         'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
