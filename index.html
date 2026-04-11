@@ -1887,6 +1887,7 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
     const atendido=atendidos.has(c.id), est=noVMap[c.id];
     const bc=atendido?"#1D9E75":est==="noesta"?"#EF9F27":(est==="noesta2"||est==="noquiso")?"#E24B4A":"var(--color-border-tertiary)";
     return (
+      <>
       <div style={{...s.card,borderLeft:`3px solid ${bc}`,opacity:(visitados.has(c.id))?0.65:est==="noesta"?0.85:1}}>
         <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
           <div style={{flexShrink:0,paddingTop:2}} onClick={()=>{if(!atendido){setEditandoOrden(c.id);setOrdenTemp(String(c.orden||""));}}}>
@@ -1985,6 +1986,7 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
           <span style={{color:"#aaa",fontSize:11,marginTop:14}}>Tocá fuera para cerrar</span>
         </div>
       )}
+      </>
     );
   };
 
