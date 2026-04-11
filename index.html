@@ -2697,34 +2697,33 @@ function NuevoCliente({diaActual,onGuardar,onVolver}) {
 // ─── MÓDULO PROMOCIÓN ────────────────────────────────────────────────────────
 
 function MensajesMasivos({clientes,onVolver}) {
-  const [filtroDia,setFiltroDia]   = useState("todos");
-  const [mensaje,setMensaje]       = useState("");
-  const [enviados,setEnviados]     = useState({});
-  const [modoEnvio,setModoEnvio]   = useState("individual"); // individual | lista
+  const DIAS_REP = ["Martes","Miércoles","Jueves","Viernes"];
+  const PLANTILLAS = [
+    {label:"Cambio de precio 💰",  texto:"Hola! Les avisamos que a partir de la próxima semana habrá un ajuste en los precios. Cualquier consulta estamos a disposición. Gracias! 🙏 — La Catalina"},
+    {label:"Demora en reparto ⏰", texto:"Hola! Les avisamos que hoy el reparto tiene una demora. Pasamos en el transcurso del día. Disculpen el inconveniente! — La Catalina"},
+    {label:"Cambio de día 📅",     texto:"Hola! Esta semana el reparto se realiza el {dia2}. Gracias por su comprensión! — La Catalina"},
+    {label:"Feriado 🎉",           texto:"Hola! El próximo reparto no se realizará por feriado. Retomamos la semana siguiente. Gracias! — La Catalina"},
+    {label:"Texto libre ✏️",       texto:""},
+  ];
 
-  const conTel = clientes.filter(c=>c.telefono&&(filtroDia==="todos"||c.dia===filtroDia));
-  const sinTel = clientes.filter(c=>!c.telefono&&(filtroDia==="todos"||c.dia===filtroDia));
+  const [plantilla,setPlantilla] = React.useState(0);
+  const [mensaje,setMensaje]     = React.useState(PLANTILLAS[0].texto);
+  const [dia2,setDia2]           = React.useState("Miércoles");
+  const [copiado,setCopiado]     = React.useState(false);
 
-  const abrirWhatsApp = (c) => {
-    const texto = mensaje.replace("{nombre}",c.nombre).replace("{dia}",c.dia);
-    const url = `https://wa.me/54${c.telefono}${texto?`?text=${encodeURIComponent(texto)}`:""}`;
-    window.open(url,"_blank");
-    setEnviados(e=>({...e,[c.id]:true}));
-  };
-
-  const abrirTodos = () => {
-    conTel.forEach((c,i)=>{
-      setTimeout(()=>abrirWhatsApp(c), i*800);
+  const copiar = () => {
+    const txt = mensaje.replace(/{dia2}/g, dia2);
+    navigator.clipboard.writeText(txt).catch(()=>{
+      const el=document.createElement("textarea");
+      el.value=txt; document.body.appendChild(el);
+      el.select(); document.execCommand("copy");
+      document.body.removeChild(el);
     });
+    setCopiado(true);
+    setTimeout(()=>setCopiado(false), 2500);
   };
 
-  const copiarNumeros = () => {
-    const nums = conTel.map(c=>`54${c.telefono}`).join('\n');
-    navigator.clipboard.writeText(nums).then(()=>alert(`✅ ${conTel.length} números copiados al portapapeles`));
-  };
-
-  const pendientes = conTel.filter(c=>!enviados[c.id]);
-  const yaEnviados = conTel.filter(c=>enviados[c.id]);
+  const abrirWhatsApp = () => window.open("https://wa.me/","_blank");
 
   return (
     <div style={s.screen}>
@@ -2732,143 +2731,56 @@ function MensajesMasivos({clientes,onVolver}) {
         <button style={s.backBtn} onClick={onVolver}>← Volver</button>
         <span style={s.headerTitle}>Mensajes masivos</span>
       </div>
-      <div style={{padding:14}}>
+      <div style={{padding:16,display:"flex",flexDirection:"column",gap:12}}>
 
-        {/* Filtro por día */}
-        <div style={{marginBottom:12}}>
-          <label style={s.label}>Destinatarios</label>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            {["todos",...DIAS].map(d=>(
-              <button key={d} style={{...s.btn,fontSize:12,padding:"5px 12px",
-                background:filtroDia===d?"#185FA5":"var(--color-background-tertiary)",
-                color:filtroDia===d?"#e2eaf4":"var(--color-text-secondary)",
-                border:filtroDia===d?"none":"0.5px solid var(--color-border-secondary)"}}
-                onClick={()=>{setFiltroDia(d);setEnviados({});}}>
-                {d==="todos"?"Todos los días":d}
+        {/* Plantillas */}
+        <div style={s.card}>
+          <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Plantilla</div>
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            {PLANTILLAS.map((p,i)=>(
+              <button key={i} style={{textAlign:"left",padding:"10px 12px",borderRadius:8,border:`0.5px solid ${plantilla===i?"#5daaff":"var(--color-border-secondary)"}`,background:plantilla===i?"var(--color-background-info)":"var(--color-background-secondary)",color:plantilla===i?"#5daaff":"var(--color-text-secondary)",fontSize:13,cursor:"pointer"}}
+                onClick={()=>{setPlantilla(i);if(p.texto)setMensaje(p.texto.replace(/{dia2}/g,dia2));}}>
+                {p.label}
               </button>
             ))}
           </div>
-        </div>
-
-        {/* Resumen */}
-        <div style={{...s.grid2,marginBottom:12,gap:8}}>
-          <div style={s.metricCard}>
-            <div style={s.metricLabel}>Con WhatsApp</div>
-            <div style={{...s.metricVal,color:"#4dd9a0"}}>{conTel.length}</div>
-          </div>
-          <div style={s.metricCard}>
-            <div style={s.metricLabel}>Sin teléfono</div>
-            <div style={{...s.metricVal,color:"var(--color-text-tertiary)"}}>{sinTel.length}</div>
-          </div>
-        </div>
-
-        {/* Mensaje */}
-        <div style={{marginBottom:12}}>
-          <label style={s.label}>Mensaje (podés usar {"{nombre}"} y {"{dia}"})</label>
-          <textarea
-            style={{...s.input,minHeight:90,resize:"vertical",lineHeight:1.6}}
-            placeholder={`Ej: Hola {nombre}, le avisamos que mañana {dia} pasamos por su domicilio con el reparto de La Catalina. Consultas al 381-XXXXXXX`}
-            value={mensaje}
-            onChange={e=>setMensaje(e.target.value)}
-          />
-          {mensaje&&(
-            <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:4}}>
-              Vista previa: {mensaje.replace("{nombre}","[Nombre]").replace("{dia}","[Día]")}
+          {plantilla===2&&(
+            <div style={{marginTop:10}}>
+              <label style={s.label}>Nuevo día</label>
+              <select style={s.select} value={dia2} onChange={e=>{setDia2(e.target.value);setMensaje(PLANTILLAS[2].texto.replace(/{dia2}/g,e.target.value));}}>
+                {DIAS_REP.map(d=><option key={d}>{d}</option>)}
+              </select>
             </div>
           )}
         </div>
 
-        {/* Acciones principales */}
-        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
-
-          {/* Copiar números */}
-          <button style={{...s.btn,padding:"12px",fontSize:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}
-            onClick={copiarNumeros}>
-            <div>
-              <div style={{fontWeight:500,color:"var(--color-text-primary)"}}>📋 Copiar todos los números</div>
-              <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:2}}>
-                Para pegar en lista de difusión de WhatsApp ({conTel.length} números)
-              </div>
-            </div>
-            <span style={{color:"var(--color-text-tertiary)"}}>→</span>
-          </button>
-
-          {/* Enviar uno por uno */}
-          <button
-            style={{...s.btn,padding:"12px",fontSize:14,display:"flex",justifyContent:"space-between",alignItems:"center",
-              background:modoEnvio==="individual"&&pendientes.length>0?"var(--color-background-success)":undefined,
-              border:modoEnvio==="individual"&&pendientes.length>0?"0.5px solid var(--color-border-success)":undefined}}
-            onClick={()=>setModoEnvio(modoEnvio==="individual"?"cerrar":"individual")}>
-            <div>
-              <div style={{fontWeight:500,color:modoEnvio==="individual"&&pendientes.length>0?"var(--color-text-success)":"var(--color-text-primary)"}}>
-                💬 Enviar uno por uno
-              </div>
-              <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:2}}>
-                {yaEnviados.length>0?`${yaEnviados.length}/${conTel.length} enviados`:`Abre WhatsApp para cada cliente`}
-              </div>
-            </div>
-            <span style={{color:"var(--color-text-tertiary)"}}>{modoEnvio==="individual"?"▲":"▼"}</span>
-          </button>
+        {/* Mensaje */}
+        <div style={s.card}>
+          <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Mensaje</div>
+          <textarea style={{...s.input,minHeight:130,resize:"vertical",fontSize:14,lineHeight:1.6}}
+            value={mensaje} onChange={e=>setMensaje(e.target.value)}
+            placeholder="Escribí tu mensaje..." />
+          <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:4}}>{mensaje.length} caracteres</div>
         </div>
 
-        {/* Lista de clientes para envío individual */}
-        {modoEnvio==="individual"&&(
-          <>
-            {pendientes.length>0&&(
-              <>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                  <span style={s.sectionTitle}>Pendientes ({pendientes.length})</span>
-                </div>
-                {pendientes.map(c=>(
-                  <div key={c.id} style={{...s.card,margin:"0 0 6px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>{c.nombre}</div>
-                      <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>{c.dia} · {c.telefono}</div>
-                    </div>
-                    <button
-                      style={{background:"#1D9E75",color:"#fff",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:500,cursor:"pointer",whiteSpace:"nowrap"}}
-                      onClick={()=>abrirWhatsApp(c)}>
-                      Enviar 💬
-                    </button>
-                  </div>
-                ))}
-              </>
-            )}
-            {yaEnviados.length>0&&(
-              <>
-                <span style={{...s.sectionTitle,color:"#4dd9a0"}}>Enviados ({yaEnviados.length})</span>
-                {yaEnviados.map(c=>(
-                  <div key={c.id} style={{...s.card,margin:"0 0 6px",opacity:0.6,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <div>
-                      <div style={{fontSize:13,color:"var(--color-text-primary)"}}>{c.nombre}</div>
-                      <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>{c.telefono}</div>
-                    </div>
-                    <span style={s.badge("success")}>✓ Enviado</span>
-                  </div>
-                ))}
-              </>
-            )}
-          </>
-        )}
+        {/* Botones */}
+        <button style={{...s.btnPrimary,padding:"14px",fontSize:15,borderRadius:12,opacity:!mensaje.trim()?0.5:1,background:copiado?"#4dd9a0":undefined,color:copiado?"#0a2e1f":undefined}}
+          disabled={!mensaje.trim()} onClick={copiar}>
+          {copiado?"✓ ¡Mensaje copiado!":"📋 Copiar mensaje"}
+        </button>
 
-        {/* Clientes sin teléfono */}
-        {sinTel.length>0&&(
-          <>
-            <span style={{...s.sectionTitle,color:"var(--color-text-tertiary)"}}>Sin teléfono ({sinTel.length})</span>
-            <div style={{...s.card,background:"var(--color-background-tertiary)"}}>
-              {sinTel.map((c,i)=>(
-                <div key={c.id} style={{fontSize:12,color:"var(--color-text-tertiary)",padding:"3px 0",borderBottom:i<sinTel.length-1?"0.5px solid var(--color-border-tertiary)":"none"}}>
-                  {c.nombre} · {c.dia}
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+        <button style={{...s.btn,padding:"14px",fontSize:15,borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:"#25D366",color:"#fff",border:"none"}}
+          onClick={abrirWhatsApp}>
+          💬 Abrir WhatsApp
+        </button>
+
+        <div style={{fontSize:12,color:"var(--color-text-tertiary)",textAlign:"center",lineHeight:1.6}}>
+          Copiá el mensaje → abrí WhatsApp → buscá tu lista de difusión → pegá y enviá
+        </div>
       </div>
     </div>
   );
 }
-
 
 function Promocion({prospectos,onSave,onConvertir,onVolver}) {
   const [diaActivo,setDiaActivo] = useState("");
