@@ -11,7 +11,7 @@
   <title>La Catalina · Reparto</title>
   <script>
     if('serviceWorker' in navigator){
-      const CACHE = 'lc-v9';
+      const CACHE = 'lc-v12';
       const ASSETS = [
         'https://unpkg.com/react@18/umd/react.production.min.js',
         'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -452,6 +452,28 @@ function calcVenta(detalle, pago, montoPagado, saldoAplicado, productos) {
   return { bruto, desc, neto, aPagar, pagadoNum, saldoDelta, costo, ganancia:neto-costo };
 }
 
+// Comprime imagen a max 800px y calidad 0.75 antes de guardar
+function comprimirFoto(file, maxW=800, quality=0.75) {
+  return new Promise(resolve => {
+    const r = new FileReader();
+    r.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const ratio = Math.min(1, maxW / img.width);
+        const w = Math.round(img.width * ratio);
+        const h = Math.round(img.height * ratio);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = ev.target.result;
+    };
+    r.readAsDataURL(file);
+  });
+}
+
 function App() {
   const [pantalla, setPantalla]   = useState(()=>{
     const h = window.location.hash.slice(1)||"portada";
@@ -868,9 +890,6 @@ function App() {
           recordatorios={recordatorios}
           onGuardarRecordatorio={(r)=>saveRecordatorios([...(recordatorios||[]),r])}
           onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
-          onGuardarMantenimiento={(clienteId,mantenimiento)=>{
-            updateCliente(clienteId,{mantenimiento});
-          }}
           onCobrarSaldo={(monto,pago)=>{
             const c=cliente;
             const det=[{nombre:"Cobro de deuda",cantidad:1,precio:0,total:0}];
@@ -1884,7 +1903,10 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
           </div>
           <div style={{flex:1,cursor:"pointer",minWidth:0}} onClick={()=>onSeleccionar(c)}>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <div style={{fontWeight:500,fontSize:15,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nombre}</div>
+              <div style={{fontWeight:500,fontSize:15,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5}}>
+                {c.nombre}
+                {c.foto&&<span style={{fontSize:10,color:"#4dd9a0",flexShrink:0,marginLeft:3}}>📷</span>}
+              </div>
               {(recordatorios||[]).some(r=>r.clienteId===c.id&&!r.confirmado)&&(
                 <span style={{fontSize:13,flexShrink:0}} title="Recordatorio pendiente">🔔</span>
               )}
@@ -1920,7 +1942,7 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
           <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0,alignItems:"center"}}>
             {c.maps     && <a href={c.maps} target="_blank" rel="noreferrer" style={{fontSize:20,textDecoration:"none"}}>📍</a>}
             {c.telefono && <a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:20,textDecoration:"none"}}>💬</a>}
-            <span style={{fontSize:20,cursor:"pointer",lineHeight:1}} title="Mantenimiento" onClick={e=>{e.stopPropagation();onSeleccionar(c);}}>🔧</span>
+            <span style={{fontSize:20,cursor:"pointer",lineHeight:1}} title="Foto domicilio" onClick={e=>{e.stopPropagation();setFotoOpen(true);}}>📷</span>
           </div>
         </div>
         {(!visitados.has(c.id)||est==="noesta")&&!atendido&&(
@@ -2009,7 +2031,7 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
   );
 }
 
-function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onEditar,onEliminarVenta,onEditarVenta,onEliminarCliente,onNoEstaCliente,recordatorios,onGuardarRecordatorio,onConfirmarRecordatorio,onCobrarSaldo,onGuardarMantenimiento}) {
+function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onEditar,onEliminarVenta,onEditarVenta,onEliminarCliente,onNoEstaCliente,recordatorios,onGuardarRecordatorio,onConfirmarRecordatorio,onCobrarSaldo}) {
   const [editandoCliente,setEditandoCliente] = useState(false);
   const [editandoVentaId,setEditandoVentaId] = useState(null);
   const [tabDetalle,setTabDetalle] = useState("historial");
@@ -2018,7 +2040,6 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
   const [montoSaldoEdit,setMontoSaldoEdit] = useState("");
   const [mostrarRecordatorio,setMostrarRecordatorio] = useState(false);
   const [mostrarPagoSaldo,setMostrarPagoSaldo] = useState(false);
-  const [mostrarMant,setMostrarMant] = useState(false);
   const [mostrarFotoGrande,setMostrarFotoGrande] = useState(false);
   const recActivos = (recordatorios||[]).filter(r=>r.clienteId===cliente.id&&!r.confirmado);
   const historial = [...ventas].reverse();
@@ -2070,24 +2091,27 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
           onCerrar={()=>setMostrarRecordatorio(false)}
         />
       )}
-      {mostrarMant&&(
-        <MantenimientoModal
-          cliente={cliente}
-          onGuardar={(reg)=>{
-            const mantActual=cliente.mantenimiento||[];
-            onGuardarMantenimiento&&onGuardarMantenimiento(cliente.id,[...mantActual,reg]);
-            setMostrarMant(false);
-          }}
-          onCerrar={()=>setMostrarMant(false)}
-        />
-      )}
-      {mostrarFotoGrande&&cliente.foto&&(
-        <div
-          style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.92)",zIndex:2000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:16}}
-          onClick={()=>setMostrarFotoGrande(false)}
-        >
-          <img src={cliente.foto} alt="Domicilio" style={{maxWidth:"100%",maxHeight:"85vh",borderRadius:10,objectFit:"contain"}} />
-          <span style={{color:"#fff",fontSize:12,marginTop:10,opacity:0.6}}>Tocá para cerrar</span>
+
+      {mostrarFotoGrande&&(
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.92)",zIndex:2000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setMostrarFotoGrande(false)}>
+          {cliente.foto
+            ? <img src={cliente.foto} alt="Domicilio" style={{maxWidth:"100%",maxHeight:"60vh",borderRadius:10,objectFit:"contain",marginBottom:16}} />
+            : <div style={{color:"#aaa",fontSize:14,marginBottom:20}}>Sin foto aún · {cliente.nombre}</div>
+          }
+          <div style={{display:"flex",gap:12}} onClick={e=>e.stopPropagation()}>
+            <label style={{background:"#185FA5",color:"#e2eaf4",padding:"12px 20px",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer",textAlign:"center"}}>
+              📷 Cámara
+              <input type="file" accept="image/*" capture="environment" style={{display:"none"}}
+                onChange={async e=>{const f=e.target.files[0];if(!f)return;const b64=await comprimirFoto(f);onEditar({foto:b64});setMostrarFotoGrande(false);}} />
+            </label>
+            <label style={{background:"#2a3a4a",color:"#e2eaf4",padding:"12px 20px",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer",textAlign:"center"}}>
+              🖼 Galería
+              <input type="file" accept="image/*" style={{display:"none"}}
+                onChange={async e=>{const f=e.target.files[0];if(!f)return;const b64=await comprimirFoto(f);onEditar({foto:b64});setMostrarFotoGrande(false);}} />
+            </label>
+            {cliente.foto&&<button style={{background:"#3a2020",color:"#e05c5c",padding:"12px 14px",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer",border:"none"}} onClick={()=>{onEditar({foto:""});setMostrarFotoGrande(false);}}>🗑</button>}
+          </div>
+          <span style={{color:"#aaa",fontSize:11,marginTop:14}}>Tocá fuera para cerrar</span>
         </div>
       )}
       <div style={{padding:16}}>
@@ -2126,9 +2150,19 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
             <div style={{display:"flex",gap:10,alignItems:"center"}}>
               {cliente.maps     && <a href={cliente.maps} target="_blank" rel="noreferrer" style={{fontSize:26,textDecoration:"none"}}>📍</a>}
               {cliente.telefono && <a href={`https://wa.me/54${cliente.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:26,textDecoration:"none"}}>💬</a>}
-              <span style={{fontSize:26,cursor:"pointer"}} onClick={()=>setMostrarMant(true)} title="Mantenimiento vehículo">🔧</span>
+
             </div>
           </div>
+
+          {/* Foto domicilio si existe - clickable */}
+          {cliente.foto&&!editandoCliente&&(
+            <div style={{marginBottom:10,cursor:"zoom-in",borderRadius:10,overflow:"hidden",maxHeight:140,position:"relative"}} onClick={()=>setMostrarFotoGrande(true)}>
+              <img src={cliente.foto} alt="Domicilio" style={{width:"100%",maxHeight:140,objectFit:"cover",display:"block"}} />
+              <div style={{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(transparent,rgba(0,0,0,0.5))",padding:"6px 10px",fontSize:11,color:"#fff"}}>
+                📷 Domicilio · tocá para ampliar
+              </div>
+            </div>
+          )}
 
           {/* Métricas */}
           <div style={{...s.grid2,marginBottom:12}}>
@@ -2218,7 +2252,6 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
           <div style={s.tabBar}>
             <button style={s.tab(tabDetalle==="historial")} onClick={()=>setTabDetalle("historial")}>Historial</button>
             <button style={s.tab(tabDetalle==="envases")} onClick={()=>setTabDetalle("envases")}>Envases</button>
-            <button style={s.tab(tabDetalle==="mant")} onClick={()=>setTabDetalle("mant")}>🔧 Vehículo</button>
           </div>
           {tabDetalle==="historial"&&<>
           <div style={s.divider} />
@@ -2283,36 +2316,6 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
             </div>
           )}
 
-          {tabDetalle==="mant"&&(
-            <div style={{marginTop:8}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-secondary)"}}>Historial mantenimiento</span>
-                <button style={{...s.btn,fontSize:12,padding:"5px 12px"}} onClick={()=>setMostrarMant(true)}>+ Registrar</button>
-              </div>
-              {(cliente.mantenimiento||[]).length===0&&(
-                <div style={{textAlign:"center",padding:"24px 0",color:"var(--color-text-tertiary)",fontSize:13}}>
-                  <div style={{fontSize:32,marginBottom:8}}>🔧</div>
-                  Sin registros aún
-                </div>
-              )}
-              {[...(cliente.mantenimiento||[])].reverse().map((m,i)=>(<div key={i} style={{...s.card,margin:"0 0 8px",borderLeft:`3px solid ${m.tipo==="aceite"?"#f5b942":m.tipo==="preventivo"?"#4dd9a0":m.tipo==="embrague"?"#e05c5c":m.tipo==="reparacion"?"#5daaff":"#a0aec0"}`}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                  <div>
-                    <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-primary)"}}>
-                      {m.tipo==="aceite"?"🛢 Cambio de aceite":m.tipo==="preventivo"?"🔩 Mantenimiento preventivo":m.tipo==="embrague"?"⚙️ Cambio de embrague":m.tipo==="reparacion"?"🛠 Reparación":"📋 "+m.tipo}
-                    </div>
-                    {m.descripcion&&<div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:3}}>{m.descripcion}</div>}
-                    {m.km&&<div style={{fontSize:12,color:"var(--color-text-tertiary)",marginTop:2}}>📊 Km: {Number(m.km).toLocaleString("es-AR")}</div>}
-                    {m.costo&&<div style={{fontSize:12,color:"var(--color-text-tertiary)",marginTop:2}}>💰 ${Number(m.costo).toLocaleString("es-AR")}</div>}
-                  </div>
-                  <div style={{fontSize:11,color:"var(--color-text-tertiary)",textAlign:"right",flexShrink:0,marginLeft:8}}>
-                    {m.fecha}
-                  </div>
-                </div>
-                {m.proximo&&<div style={{fontSize:11,color:"#f5b942",marginTop:4,borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:4}}>⏰ Próximo: {m.proximo}</div>}
-              </div>))}
-            </div>
-          )}
 
           <div style={{...s.divider,marginTop:12}}/>
           <details style={{marginTop:4}}>
@@ -2457,7 +2460,7 @@ function EditVenta({venta,productos,onGuardar,onCancelar}) { // onGuardar(detall
   );
 }
 
-function MantenimientoModal({cliente,onGuardar,onCerrar}) {
+function VehiculoMantModal({onGuardar,onCerrar}) {
   const [tipo,setTipo] = React.useState("aceite");
   const [descripcion,setDescripcion] = React.useState("");
   const [km,setKm] = React.useState("");
@@ -2466,28 +2469,22 @@ function MantenimientoModal({cliente,onGuardar,onCerrar}) {
   const fecha = new Date().toLocaleDateString("es-AR");
   const s = estilos();
   const tipos = [
-    {id:"aceite",   label:"🛢 Cambio de aceite",        color:"#f5b942"},
-    {id:"preventivo",label:"🔩 Mantenimiento preventivo",color:"#4dd9a0"},
-    {id:"embrague", label:"⚙️ Cambio de embrague",      color:"#e05c5c"},
-    {id:"reparacion",label:"🛠 Reparación",              color:"#5daaff"},
-    {id:"otro",     label:"📋 Otro",                     color:"#a0aec0"},
+    {id:"aceite",    label:"🛢 Cambio de aceite",           color:"#f5b942"},
+    {id:"preventivo",label:"🔩 Mantenimiento preventivo",   color:"#4dd9a0"},
+    {id:"embrague",  label:"⚙️ Cambio de embrague",        color:"#e05c5c"},
+    {id:"reparacion",label:"🛠 Reparación",                 color:"#5daaff"},
+    {id:"otro",      label:"📋 Otro",                       color:"#a0aec0"},
   ];
-  const guardar = () => {
-    if(!tipo) return;
-    onGuardar({tipo,descripcion,km,costo,proximo,fecha});
-  };
   return (
     <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.75)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
       <div style={{background:"var(--color-background-secondary)",borderRadius:"16px 16px 0 0",padding:"20px 16px 32px",width:"100%",maxWidth:480,maxHeight:"90vh",overflowY:"auto"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
           <span style={{fontSize:16,fontWeight:600,color:"var(--color-text-primary)"}}>🔧 Registrar mantenimiento</span>
           <button style={{background:"none",border:"none",fontSize:22,color:"var(--color-text-secondary)",cursor:"pointer"}} onClick={onCerrar}>✕</button>
         </div>
-        <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginBottom:10}}>{cliente.nombre} · {fecha}</div>
-
-        {/* Tipo */}
+        <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginBottom:12}}>Vehículo de reparto · {fecha}</div>
         <div style={{marginBottom:14}}>
-          <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:6}}>Tipo de mantenimiento</label>
+          <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:6}}>Tipo</label>
           <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
             {tipos.map(t=>(
               <button key={t.id} onClick={()=>setTipo(t.id)} style={{padding:"7px 12px",borderRadius:8,border:`2px solid ${tipo===t.id?t.color:"var(--color-border-tertiary)"}`,background:tipo===t.id?t.color+"22":"transparent",color:tipo===t.id?t.color:"var(--color-text-secondary)",fontSize:12,cursor:"pointer",fontWeight:tipo===t.id?600:400}}>
@@ -2496,41 +2493,25 @@ function MantenimientoModal({cliente,onGuardar,onCerrar}) {
             ))}
           </div>
         </div>
-
-        {/* Descripcion */}
         <div style={{marginBottom:10}}>
           <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:4}}>Descripción / detalle</label>
-          <textarea
-            style={{width:"100%",background:"var(--color-background-tertiary)",border:"1px solid var(--color-border-secondary)",borderRadius:8,padding:"8px 10px",color:"var(--color-text-primary)",fontSize:13,resize:"none",boxSizing:"border-box",minHeight:60}}
-            placeholder="Ej: Cambio aceite 10W-40, filtro nuevo..."
-            value={descripcion} onChange={e=>setDescripcion(e.target.value)}
-          />
+          <textarea style={{width:"100%",background:"var(--color-background-tertiary)",border:"1px solid var(--color-border-secondary)",borderRadius:8,padding:"8px 10px",color:"var(--color-text-primary)",fontSize:13,resize:"none",boxSizing:"border-box",minHeight:60}} placeholder="Ej: Cambio aceite 10W-40 + filtro..." value={descripcion} onChange={e=>setDescripcion(e.target.value)} />
         </div>
-
-        {/* Km y costo en fila */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
           <div>
             <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:4}}>Km actuales</label>
-            <input type="number" style={{width:"100%",background:"var(--color-background-tertiary)",border:"1px solid var(--color-border-secondary)",borderRadius:8,padding:"8px 10px",color:"var(--color-text-primary)",fontSize:13,boxSizing:"border-box"}}
-              placeholder="Ej: 125000" value={km} onChange={e=>setKm(e.target.value)} />
+            <input type="number" style={{width:"100%",background:"var(--color-background-tertiary)",border:"1px solid var(--color-border-secondary)",borderRadius:8,padding:"8px 10px",color:"var(--color-text-primary)",fontSize:13,boxSizing:"border-box"}} placeholder="Ej: 125000" value={km} onChange={e=>setKm(e.target.value)} />
           </div>
           <div>
             <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:4}}>Costo ($)</label>
-            <input type="number" style={{width:"100%",background:"var(--color-background-tertiary)",border:"1px solid var(--color-border-secondary)",borderRadius:8,padding:"8px 10px",color:"var(--color-text-primary)",fontSize:13,boxSizing:"border-box"}}
-              placeholder="Ej: 85000" value={costo} onChange={e=>setCosto(e.target.value)} />
+            <input type="number" style={{width:"100%",background:"var(--color-background-tertiary)",border:"1px solid var(--color-border-secondary)",borderRadius:8,padding:"8px 10px",color:"var(--color-text-primary)",fontSize:13,boxSizing:"border-box"}} placeholder="Ej: 85000" value={costo} onChange={e=>setCosto(e.target.value)} />
           </div>
         </div>
-
-        {/* Próximo */}
         <div style={{marginBottom:18}}>
           <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:4}}>Próximo mantenimiento</label>
-          <input style={{width:"100%",background:"var(--color-background-tertiary)",border:"1px solid var(--color-border-secondary)",borderRadius:8,padding:"8px 10px",color:"var(--color-text-primary)",fontSize:13,boxSizing:"border-box"}}
-            placeholder="Ej: 135.000 km / junio 2026" value={proximo} onChange={e=>setProximo(e.target.value)} />
+          <input style={{width:"100%",background:"var(--color-background-tertiary)",border:"1px solid var(--color-border-secondary)",borderRadius:8,padding:"8px 10px",color:"var(--color-text-primary)",fontSize:13,boxSizing:"border-box"}} placeholder="Ej: 135.000 km / junio 2026" value={proximo} onChange={e=>setProximo(e.target.value)} />
         </div>
-
-        <button
-          style={{width:"100%",padding:"13px",borderRadius:10,border:"none",background:"#185FA5",color:"#e2eaf4",fontSize:15,fontWeight:600,cursor:"pointer"}}
-          onClick={guardar}>
+        <button style={{width:"100%",padding:"13px",borderRadius:10,border:"none",background:"#185FA5",color:"#e2eaf4",fontSize:15,fontWeight:600,cursor:"pointer"}} onClick={()=>{if(!tipo)return;onGuardar({tipo,descripcion,km,costo,proximo,fecha});}}>
           Guardar registro
         </button>
       </div>
@@ -3822,13 +3803,26 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
                     {c.dia} · {c.calle?`${c.calle} ${c.nro||""}`:c.manzana?`Mz ${c.manzana} L ${c.lote}`:""}{c.barrio?` · ${c.barrio}`:""}
                   </div>
                   {c.notas&&<div style={{fontSize:11,color:"var(--color-text-warning)",marginTop:2}}>📝 {c.notas}</div>}
-                  {c.foto&&<>
-                    <span style={{fontSize:11,color:"#5daaff",marginTop:2,display:"block",cursor:"pointer",textDecoration:"none"}} onClick={e=>{e.stopPropagation();setFotoOpen(true);}}>📷 Ver foto</span>
-                    {fotoOpen&&<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.92)",zIndex:2000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:16}} onClick={e=>{e.stopPropagation();setFotoOpen(false);}}>
-                      <img src={c.foto} alt="Domicilio" style={{maxWidth:"100%",maxHeight:"85vh",borderRadius:10,objectFit:"contain"}} />
-                      <span style={{color:"#fff",fontSize:12,marginTop:10,opacity:0.6}}>Tocá para cerrar</span>
-                    </div>}
-                  </>}
+                  {fotoOpen&&(
+                    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.92)",zIndex:2000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20}} onClick={e=>{e.stopPropagation();setFotoOpen(false);}}>
+                      {c.foto&&<img src={c.foto} alt="Domicilio" style={{maxWidth:"100%",maxHeight:"60vh",borderRadius:10,objectFit:"contain",marginBottom:16}} />}
+                      {!c.foto&&<div style={{color:"#aaa",fontSize:14,marginBottom:20}}>Sin foto aún</div>}
+                      <div style={{display:"flex",gap:12}} onClick={e=>e.stopPropagation()}>
+                        <label style={{background:"#185FA5",color:"#e2eaf4",padding:"10px 18px",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer",textAlign:"center"}}>
+                          📷 Cámara
+                          <input type="file" accept="image/*" capture="environment" style={{display:"none"}}
+                            onChange={async e=>{const f=e.target.files[0];if(!f)return;const b64=await comprimirFoto(f);onReordenar(clientes.map(x=>x.id===c.id?{...x,foto:b64}:x));setFotoOpen(false);}} />
+                        </label>
+                        <label style={{background:"#2a3a4a",color:"#e2eaf4",padding:"10px 18px",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer",textAlign:"center"}}>
+                          🖼 Galería
+                          <input type="file" accept="image/*" style={{display:"none"}}
+                            onChange={async e=>{const f=e.target.files[0];if(!f)return;const b64=await comprimirFoto(f);onReordenar(clientes.map(x=>x.id===c.id?{...x,foto:b64}:x));setFotoOpen(false);}} />
+                        </label>
+                        {c.foto&&<button style={{background:"#3a2020",color:"#e05c5c",padding:"10px 14px",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer",border:"none"}} onClick={()=>{onReordenar(clientes.map(x=>x.id===c.id?{...x,foto:""}:x));setFotoOpen(false);}}>🗑 Quitar</button>}
+                      </div>
+                      <span style={{color:"#aaa",fontSize:11,marginTop:14}}>Tocá fuera para cerrar</span>
+                    </div>
+                  )}
                   <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>
                     {c.sifon>0    && <span style={s.tag}>Sifón×{c.sifon}</span>}
                     {c.bidon10>0  && <span style={s.tag}>10L×{c.bidon10}</span>}
@@ -4263,6 +4257,7 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
         <button style={s.tab(tab==="cargas")} onClick={()=>setTab("cargas")}>Cargas</button>
         <button style={s.tab(tab==="historial")} onClick={()=>setTab("historial")}>Historial</button>
         <button style={s.tab(tab==="backup")} onClick={()=>setTab("backup")}>Backup</button>
+        <button style={s.tab(tab==="vehiculo")} onClick={()=>setTab("vehiculo")}>🚐 Vehículo</button>
       </div>
       {tab==="precios"&&<div style={{padding:16}}>{productos.map(p=>(<div key={p.id} style={{...s.card,margin:"0 0 10px"}}><div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:15,fontWeight:500,color:"var(--color-text-primary)"}}>{p.nombre}</span><button style={{...s.btn,fontSize:12,padding:"4px 12px"}} onClick={()=>setEditandoId(editandoId===p.id?null:p.id)}>{editandoId===p.id?"Cancelar":"Editar"}</button></div>{editandoId!==p.id&&<div style={{fontSize:13,color:"var(--color-text-secondary)",marginTop:6}}>Venta: {fmt(p.precio)} · Costo: {fmt(p.costo)} · Ganancia: {fmt(p.precio-p.costo)}</div>}{editandoId===p.id&&(<div style={{display:"flex",flexDirection:"column",gap:8,marginTop:10}}><div><label style={s.label}>Precio de venta</label><input style={s.input} type="number" defaultValue={p.precio} id={`pr-${p.id}`} /></div><div><label style={s.label}>Costo de llenado</label><input style={s.input} type="number" defaultValue={p.costo} id={`co-${p.id}`} /></div><button style={s.btnPrimary} onClick={()=>{const pr=Number(document.getElementById(`pr-${p.id}`).value),co=Number(document.getElementById(`co-${p.id}`).value);setProductos(productos.map(x=>x.id===p.id?{...x,precio:pr,costo:co}:x));setEditandoId(null);}}>Guardar precio</button></div>)}</div>))}</div>}
       {tab==="envases"&&(
@@ -4436,6 +4431,30 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
             <div style={{fontSize:13,color:"var(--color-text-secondary)",lineHeight:1.7}}>Los datos se guardan en el teléfono. Hacé un backup periódico para no perderlos si cambiás de dispositivo o borrás el navegador.</div>
           </div>
           <div style={{...s.card,margin:0}}>
+            <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:8}}>💾 Espacio utilizado</div>
+            {(()=>{
+              let total=0;
+              try{for(let k in localStorage){if(localStorage.hasOwnProperty(k)){total+=((localStorage[k]||'').length*2);}}}catch(e){}
+              const kb=Math.round(total/1024);
+              const pct=Math.min(100,Math.round(kb/5120*100));
+              const color=pct>80?"#e05c5c":pct>50?"#f5b942":"#4dd9a0";
+              const fotos=clientes.filter(c=>c.foto&&c.foto.startsWith('data:')).length;
+              return (
+                <div>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                    <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>{kb} KB de ~5.000 KB</span>
+                    <span style={{fontSize:13,fontWeight:600,color}}>{pct}%</span>
+                  </div>
+                  <div style={{height:8,background:"var(--color-background-tertiary)",borderRadius:4,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:pct+"%",background:color,borderRadius:4,transition:"width 0.3s"}} />
+                  </div>
+                  {fotos>0&&<div style={{fontSize:12,color:"var(--color-text-tertiary)",marginTop:6}}>📷 {fotos} fotos de domicilios guardadas</div>}
+                  {pct>70&&<div style={{fontSize:12,color:"#e05c5c",marginTop:8}}>⚠️ Espacio alto. Eliminá fotos si la app deja de funcionar.</div>}
+                </div>
+              );
+            })()}
+          </div>
+          <div style={{...s.card,margin:0}}>
             <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:4}}>📥 Exportar backup</div>
             <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:10}}>Descarga un Excel con clientes, ventas, planillas y saldos.</div>
             <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginBottom:12}}>Clientes: {clientes.length} · Ventas: {ventas.length} · Planillas: {Object.keys(planillas).length}</div>
@@ -4463,6 +4482,52 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
               </div>
             }
           </div>
+        </div>
+      )}
+      {tab==="vehiculo"&&(
+        <div style={{padding:16}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+            <div>
+              <div style={{fontSize:15,fontWeight:600,color:"var(--color-text-primary)"}}>🔧 Mantenimiento del vehículo</div>
+              <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginTop:2}}>Historial de service y reparaciones</div>
+            </div>
+            <button style={{...s.btnPrimary,padding:"8px 14px",fontSize:13}} onClick={()=>setMostrarNuevoMant(true)}>+ Registrar</button>
+          </div>
+          {mantVeh.length===0&&(
+            <div style={{textAlign:"center",padding:"40px 20px",color:"var(--color-text-tertiary)"}}>
+              <div style={{fontSize:40,marginBottom:10}}>🚐</div>
+              <div style={{fontSize:14}}>Sin registros aún</div>
+              <div style={{fontSize:12,marginTop:6}}>Registrá cambios de aceite, service y reparaciones</div>
+            </div>
+          )}
+          {[...mantVeh].reverse().map((m,i)=>(
+            <div key={i} style={{...s.card,margin:"0 0 10px",borderLeft:`3px solid ${m.tipo==="aceite"?"#f5b942":m.tipo==="preventivo"?"#4dd9a0":m.tipo==="embrague"?"#e05c5c":m.tipo==="reparacion"?"#5daaff":"#a0aec0"}`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)"}}>
+                    {m.tipo==="aceite"?"🛢 Cambio de aceite":m.tipo==="preventivo"?"🔩 Mantenimiento preventivo":m.tipo==="embrague"?"⚙️ Cambio de embrague":m.tipo==="reparacion"?"🛠 Reparación":"📋 "+m.tipo}
+                  </div>
+                  {m.descripcion&&<div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:4}}>{m.descripcion}</div>}
+                  <div style={{display:"flex",gap:12,marginTop:6,flexWrap:"wrap"}}>
+                    {m.km&&<span style={{fontSize:12,color:"var(--color-text-tertiary)"}}>📊 {Number(m.km).toLocaleString("es-AR")} km</span>}
+                    {m.costo&&<span style={{fontSize:12,color:"var(--color-text-tertiary)"}}>💰 ${Number(m.costo).toLocaleString("es-AR")}</span>}
+                  </div>
+                  {m.proximo&&<div style={{fontSize:12,color:"#f5b942",marginTop:4,borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:4}}>⏰ Próximo: {m.proximo}</div>}
+                </div>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6,marginLeft:10,flexShrink:0}}>
+                  <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{m.fecha}</span>
+                  <button style={{background:"#3a2020",color:"#e05c5c",border:"none",borderRadius:6,padding:"3px 8px",fontSize:11,cursor:"pointer"}}
+                    onClick={()=>saveMantVeh(mantVeh.filter((_,j)=>mantVeh.length-1-j!==i))}>Borrar</button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {mostrarNuevoMant&&(
+            <VehiculoMantModal
+              onGuardar={(reg)=>{saveMantVeh([...mantVeh,reg]);setMostrarNuevoMant(false);}}
+              onCerrar={()=>setMostrarNuevoMant(false)}
+            />
+          )}
         </div>
       )}
     </div>
@@ -4505,7 +4570,7 @@ root.render(<ErrorBoundary><App /></ErrorBoundary>);
   <title>La Catalina · Reparto</title>
   <script>
     if('serviceWorker' in navigator){
-      const CACHE = 'lc-v9';
+      const CACHE = 'lc-v12';
       const ASSETS = [
         'https://unpkg.com/react@18/umd/react.production.min.js',
         'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
