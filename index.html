@@ -11,7 +11,7 @@
   <title>La Catalina · Reparto</title>
   <script>
     if('serviceWorker' in navigator){
-      const CACHE = 'lc-v14';
+      const CACHE = 'lc-v15';
       const ASSETS = [
         'https://unpkg.com/react@18/umd/react.production.min.js',
         'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -883,9 +883,7 @@ function App() {
           irA("clientes");
         }} onVolver={()=>irA("selectorFechaClientes")} />}
       {pantalla==="clientes"       && <ListaClientes clientes={clientes.filter(c=>c.dia===diaActual)} dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual)} noVisitas={(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual)} onSeleccionar={c=>{setClienteId(c.id);irA("detalleCliente");}} onNuevoCliente={()=>irA("nuevoCliente")} onVolver={()=>irA("selectorFechaClientes")} onReordenar={lista=>{
-          const otros=clientes.filter(c=>c.dia!==diaActual);
-          const ordenados=[...lista].sort((a,b)=>(a.orden||9999)-(b.orden||9999));
-          saveClientes([...otros,...ordenados]);
+          saveClientes(lista);
         }} onRegistrarNoVisita={(clienteId,motivo)=>{const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo}];saveNoVisitas(nv);}} onQuitarNoVisita={(clienteId)=>{const nv=(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual));saveNoVisitas(nv);}}
         onConfirmarTransfer={(clienteId,ventaId)=>{
           const nv=ventas.map(v=>v.id===ventaId?{...v,transConfirmada:!v.transConfirmada}:v);
@@ -988,7 +986,7 @@ function App() {
           nuevos = clientes.map(c=>c.dia===datos.dia&&(c.orden||0)>=orden?{...c,orden:(c.orden||0)+1}:c);
         } else { nuevos = [...clientes]; }
         saveClientes([...nuevos,{...datos,id:Date.now(),saldo:0,dispenser:datos.dispenser||0}].sort((a,b)=>DIAS.indexOf(a.dia)-DIAS.indexOf(b.dia)||(a.orden||9999)-(b.orden||9999)));
-      }} onVolver={()=>irA("menu")} />}
+      }} onVolver={()=>irA("menu")} onRegistrarVenta={(c)=>{setClienteId(c.id);irA("venta");}} />}
       {pantalla==="resumen"        && <Resumen ventas={ventas} clientes={clientes} productos={productos} planillas={planillas} noVisitas={noVisitas||[]} onVolver={()=>irA("menu")} />}
       {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stockNorm} setStock={(s)=>{const ns=normStock(s);setStockRaw(ns);syncData({stock:ns});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} syncData={syncData} onVolver={()=>irA("menu")} />}
     </div>
@@ -1873,15 +1871,13 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
 
   const marcarNoVisita = (id,motivo) => {
     const prev = noVMap[id];
-    if(motivo==="noesta"&&prev==="noesta") onRegistrarNoVisita(id,"noesta2"); // 2da vez → visitado como "no estaba"
+    if(motivo==="noesta"&&prev==="noesta") onRegistrarNoVisita(id,"noesta2");
     else if(prev===motivo) onQuitarNoVisita(id);
     else onRegistrarNoVisita(id,motivo);
   };
 
   const clientesOrdenados = [...clientes].sort((a,b)=>(a.orden||9999)-(b.orden||9999));
   const filtrados  = clientesOrdenados.filter(c=>c.nombre.toLowerCase().includes(busqueda.toLowerCase()));
-  // noesta 1ra vez = volver al final, por eso va separado
-  // volverAlFinal: solo clientes con noesta que NO fueron atendidos todavía
   const pendientesNormales = filtrados.filter(c=>!visitados.has(c.id)&&noVMap[c.id]!=="noesta");
   const volverAlFinal      = filtrados.filter(c=>noVMap[c.id]==="noesta"&&!atendidos.has(c.id));
   const pendientes         = [...pendientesNormales, ...volverAlFinal];
@@ -2027,7 +2023,7 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
         </div>
         <p style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:6}}>Tocá el # para editar el número de orden del cliente</p>
       </div>
-      {clientes.length===0&&<div style={{textAlign:"center",padding:"40px 20px",color:"var(--color-text-tertiary)",fontSize:14}}>No hay clientes para {dia}.</div>}
+      {filtrados.length===0&&<div style={{textAlign:"center",padding:"40px 20px",color:"var(--color-text-tertiary)",fontSize:14}}>No hay clientes para {dia}.</div>}
       {pendientesNormales.length>0&&<><span style={s.sectionTitle}>Pendientes ({pendientesNormales.length})</span>{pendientesNormales.map(c=><Card key={c.id} c={c}/>)}</>}
       {listos.length>0&&<><span style={s.sectionTitle}>Entregado ({listos.length})</span>{listos.map(c=><Card key={c.id} c={c}/>)}</>}
       {sinEntrega.length>0&&<><span style={s.sectionTitle}>Sin entrega ({sinEntrega.length})</span>{sinEntrega.map(c=><Card key={c.id} c={c}/>)}</>}
@@ -2078,7 +2074,6 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
 function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onEditar,onEliminarVenta,onEditarVenta,onEliminarCliente,onNoEstaCliente,recordatorios,onGuardarRecordatorio,onConfirmarRecordatorio,onCobrarSaldo}) {
   const [editandoCliente,setEditandoCliente] = useState(false);
   const [editandoVentaId,setEditandoVentaId] = useState(null);
-  const [tabDetalle,setTabDetalle] = useState("historial");
   const [editandoSaldo,setEditandoSaldo] = useState(false);
   const [tipoSaldoEdit,setTipoSaldoEdit] = useState("");
   const [montoSaldoEdit,setMontoSaldoEdit] = useState("");
@@ -2292,14 +2287,13 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
               </div>
           }
 
-          {/* Tabs */}
-          <div style={s.tabBar}>
-            <button style={s.tab(tabDetalle==="historial")} onClick={()=>setTabDetalle("historial")}>Historial</button>
-            <button style={s.tab(tabDetalle==="envases")} onClick={()=>setTabDetalle("envases")}>Envases</button>
-          </div>
-          {tabDetalle==="historial"&&<>
-          <div style={s.divider} />
-          <span style={{...s.sectionTitle,padding:"0 0 8px"}}>Historial ({ventas.length} compras · {fmt(totalComprado)})</span>
+          {/* Historial colapsable */}
+          <details style={{marginTop:4}} open>
+            <summary style={{cursor:"pointer",listStyle:"none",display:"flex",alignItems:"center",justifyContent:"space-between",background:"var(--color-background-tertiary)",borderRadius:8,padding:"10px 14px",marginBottom:4}}>
+              <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>📋 Historial ({ventas.length} compras · {fmt(totalComprado)})</span>
+              <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>▾</span>
+            </summary>
+          <div style={{marginTop:4}}>
           {historial.length===0&&<p style={{fontSize:13,color:"var(--color-text-tertiary)",padding:"4px 0"}}>Sin registros aún</p>}
           {historial.map(v=>(
             <div key={v.id} style={{marginBottom:8}}>
@@ -2322,10 +2316,16 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
               }
             </div>
           ))}
-          </>}
+          </div>
+          </details>
 
-          {tabDetalle==="envases"&&(
-            <div style={{marginTop:8}}>
+          {/* Envases colapsable */}
+          <details style={{marginTop:6}}>
+            <summary style={{cursor:"pointer",listStyle:"none",display:"flex",alignItems:"center",justifyContent:"space-between",background:"var(--color-background-tertiary)",borderRadius:8,padding:"10px 14px",marginBottom:4}}>
+              <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>🫧 Envases</span>
+              <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>▾</span>
+            </summary>
+            <div style={{marginTop:4}}>
               <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-tertiary)"}}>
                 <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8}}>Envases habituales asignados</div>
                 <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -2358,7 +2358,7 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
                 </div>
               ))}
             </div>
-          )}
+          </details>
 
 
           <div style={{...s.divider,marginTop:12}}/>
@@ -2510,7 +2510,8 @@ function VehiculoMantModal({onGuardar,onCerrar}) {
   const [km,setKm] = React.useState("");
   const [costo,setCosto] = React.useState("");
   const [proximo,setProximo] = React.useState("");
-  const fecha = new Date().toLocaleDateString("es-AR");
+  const [fechaISO,setFechaISO] = React.useState(new Date().toISOString().slice(0,10));
+  const fechaDisplay = fechaISO ? new Date(fechaISO+'T12:00:00').toLocaleDateString("es-AR") : "";
   const tipos = [
     {id:"aceite",    label:"🛢 Cambio de aceite",           color:"#f5b942"},
     {id:"preventivo",label:"🔩 Mantenimiento preventivo",   color:"#4dd9a0"},
@@ -2525,7 +2526,10 @@ function VehiculoMantModal({onGuardar,onCerrar}) {
           <span style={{fontSize:16,fontWeight:600,color:"var(--color-text-primary)"}}>🔧 Registrar mantenimiento</span>
           <button style={{background:"none",border:"none",fontSize:22,color:"var(--color-text-secondary)",cursor:"pointer"}} onClick={onCerrar}>✕</button>
         </div>
-        <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginBottom:12}}>Vehículo de reparto · {fecha}</div>
+        <div style={{marginBottom:14}}>
+          <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:4}}>📅 Fecha del mantenimiento</label>
+          <input type="date" style={{width:"100%",background:"var(--color-background-tertiary)",border:"1px solid var(--color-border-secondary)",borderRadius:8,padding:"8px 10px",color:"var(--color-text-primary)",fontSize:13,boxSizing:"border-box"}} value={fechaISO} onChange={e=>setFechaISO(e.target.value)} />
+        </div>
         <div style={{marginBottom:14}}>
           <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:6}}>Tipo</label>
           <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
@@ -2554,7 +2558,7 @@ function VehiculoMantModal({onGuardar,onCerrar}) {
           <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:4}}>Próximo mantenimiento</label>
           <input style={{width:"100%",background:"var(--color-background-tertiary)",border:"1px solid var(--color-border-secondary)",borderRadius:8,padding:"8px 10px",color:"var(--color-text-primary)",fontSize:13,boxSizing:"border-box"}} placeholder="Ej: 135.000 km / junio 2026" value={proximo} onChange={e=>setProximo(e.target.value)} />
         </div>
-        <button style={{width:"100%",padding:"13px",borderRadius:10,border:"none",background:"#185FA5",color:"#e2eaf4",fontSize:15,fontWeight:600,cursor:"pointer"}} onClick={()=>{if(!tipo)return;onGuardar({tipo,descripcion,km,costo,proximo,fecha});}}>
+        <button style={{width:"100%",padding:"13px",borderRadius:10,border:"none",background:"#185FA5",color:"#e2eaf4",fontSize:15,fontWeight:600,cursor:"pointer"}} onClick={()=>{if(!tipo)return;onGuardar({tipo,descripcion,km,costo,proximo,fecha:fechaDisplay,fechaISO});}}>
           Guardar registro
         </button>
       </div>
@@ -3746,7 +3750,7 @@ function PromoComodato({prospecto:p,onGuardar,onVolver}) {
 }
 
 
-function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReordenarTodo}) {
+function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReordenarTodo,onRegistrarVenta}) {
   const [fotoClienteId,setFotoClienteId] = React.useState(null);
   const fotoCliente = fotoClienteId ? clientes.find(c=>c.id===fotoClienteId) : null;
   const [busqueda,setBusqueda]   = useState("");
@@ -3867,6 +3871,7 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
                 </div>
               </div>
               <div style={{...s.row,justifyContent:"flex-end",gap:6,marginTop:8}}>
+                {onRegistrarVenta&&<button style={{...s.btn,fontSize:11,padding:"4px 12px",background:"#185FA5",color:"#e2eaf4",border:"none"}} onClick={()=>onRegistrarVenta(c)}>📦 Venta</button>}
                 <button style={{...s.btn,fontSize:11,padding:"4px 12px"}} onClick={()=>setEditandoId(c.id)}>Editar</button>
                 <button style={{...s.btnDanger,fontSize:11,padding:"4px 10px"}} onClick={()=>onEliminar(c.id)}>Eliminar</button>
               </div>
