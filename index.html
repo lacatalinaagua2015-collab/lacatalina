@@ -11,7 +11,7 @@
   <title>La Catalina · Reparto</title>
   <script>
     if('serviceWorker' in navigator){
-      const CACHE = 'lc-v15';
+      const CACHE = 'lc-v16';
       const ASSETS = [
         'https://unpkg.com/react@18/umd/react.production.min.js',
         'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -852,12 +852,19 @@ function App() {
       {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onMensajes={()=>irA("mensajes")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} clientes={clientes} ventas={ventas}
           recordatoriosActivos={recordatoriosActivos}
           onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
+          onVerConfirmaciones={(dia)=>{setDiaActual(dia);irA("confirmacionesDia");}}
           transferenciasPendientes={DIAS.map(dia=>{
             const vts = ventas.filter(v=>v.dia===dia&&v.pago==="transferencia"&&!v.transConfirmada);
             if(!vts.length) return null;
             const fechas = [...new Set(vts.map(v=>v.fechaKey))].sort().reverse();
             return {dia, fecha:fechas[0]||"", count:vts.length, monto:vts.reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0), ventas:vts};
           }).filter(Boolean)} />}
+      {pantalla==="confirmacionesDia" && <ConfirmacionesDia
+          dia={diaActual}
+          ventas={ventas.filter(v=>v.dia===diaActual&&v.pago==="transferencia"&&!v.transConfirmada)}
+          clientes={clientes}
+          onConfirmar={(ventaId)=>{const nv=ventas.map(v=>v.id===ventaId?{...v,transConfirmada:true}:v);saveVentas(nv);}}
+          onVolver={()=>irA("menu")} />}
       {pantalla==="diaPrincipal"   && <DiaPrincipal dia={diaActual} onIrClientes={()=>irA("selectorFechaClientes")} onIrPlanilla={()=>irA("selectorFechaPlanilla")} onVolver={()=>irA("menu")} ventasPendientesTransfer={ventas.filter(v=>v.dia===diaActual&&v.fechaKey===fechaActual&&v.pago==="transferencia"&&!v.transConfirmada).length} />}
       {pantalla==="selectorFechaPlanilla" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("planilla");}} onVolver={()=>irA("diaPrincipal")} />}
       {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.dia===diaActual&&v.fechaKey===fechaActual)} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);irA("selectorFechaPlanilla");}} onVolver={()=>irA("selectorFechaPlanilla")} />}
@@ -883,7 +890,8 @@ function App() {
           irA("clientes");
         }} onVolver={()=>irA("selectorFechaClientes")} />}
       {pantalla==="clientes"       && <ListaClientes clientes={clientes.filter(c=>c.dia===diaActual)} dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual)} noVisitas={(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual)} onSeleccionar={c=>{setClienteId(c.id);irA("detalleCliente");}} onNuevoCliente={()=>irA("nuevoCliente")} onVolver={()=>irA("selectorFechaClientes")} onReordenar={lista=>{
-          saveClientes(lista);
+          const otros=clientes.filter(c=>c.dia!==diaActual);
+          saveClientes([...otros,...lista]);
         }} onRegistrarNoVisita={(clienteId,motivo)=>{const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo}];saveNoVisitas(nv);}} onQuitarNoVisita={(clienteId)=>{const nv=(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual));saveNoVisitas(nv);}}
         onConfirmarTransfer={(clienteId,ventaId)=>{
           const nv=ventas.map(v=>v.id===ventaId?{...v,transConfirmada:!v.transConfirmada}:v);
@@ -905,6 +913,7 @@ function App() {
         />}
       {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>irA("venta")} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
           onNoEstaCliente={()=>{const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noesta"}];saveNoVisitas(nv);}}
+          onNoQuiereCliente={()=>{const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noquiso"}];saveNoVisitas(nv);}}
           recordatorios={recordatorios}
           onGuardarRecordatorio={(r)=>saveRecordatorios([...(recordatorios||[]),r])}
           onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
@@ -927,7 +936,7 @@ function App() {
           const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo}];
           saveNoVisitas(nv);
           const clientesDia=clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
-          const visitadosIds=new Set([...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual).map(v=>v.clienteId),...(nv).filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2")).map(v=>v.clienteId)]);
+          const visitadosIds=new Set([...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual).map(v=>v.clienteId),...(nv).filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2"||v.motivo==="noesta")).map(v=>v.clienteId)]);
           visitadosIds.add(clienteId);
           const siguiente=clientesDia.find(c=>!visitadosIds.has(c.id)&&c.id!==clienteId);
           if(siguiente){setClienteId(siguiente.id);irA("detalleCliente");}else irA("clientes");
@@ -936,18 +945,18 @@ function App() {
           const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo:"noquiso"}];
           saveNoVisitas(nv);
           const clientesDia=clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
-          const visitadosIds=new Set([...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual).map(v=>v.clienteId),...nv.filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2")).map(v=>v.clienteId)]);
+          const visitadosIds=new Set([...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual).map(v=>v.clienteId),...nv.filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2"||v.motivo==="noesta")).map(v=>v.clienteId)]);
           visitadosIds.add(clienteId);
           const siguiente=clientesDia.find(c=>!visitadosIds.has(c.id)&&c.id!==clienteId);
           if(siguiente){setClienteId(siguiente.id);irA("detalleCliente");}else irA("clientes");
         }}
         onGuardar={(d,p,m,sa,ep,ed,obs,op)=>{
   registrarVenta(d,p,m,sa,ep,ed,obs,op);
-  // Auto-advance to next pending client
+  // Auto-advance to next pending client (noesta = volver al final, no saltar a ellos)
   const clientesDia = clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
   const visitadosIds = new Set([
     ...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual).map(v=>v.clienteId),
-    ...(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2")).map(v=>v.clienteId)
+    ...(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2"||v.motivo==="noesta")).map(v=>v.clienteId)
   ]);
   visitadosIds.add(clienteId);
   const siguiente = clientesDia.find(c=>!visitadosIds.has(c.id)&&c.id!==clienteId);
@@ -1254,7 +1263,63 @@ function SetupNube({onSetup}) {
   );
 }
 
-function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onMensajes,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,clientes,ventas}) {
+function ConfirmacionesDia({dia,ventas,clientes,onConfirmar,onVolver}) {
+  // Agrupar por cliente
+  const porCliente = {};
+  ventas.forEach(v=>{
+    if(!porCliente[v.clienteId]) porCliente[v.clienteId]={cliente:clientes.find(c=>c.id===v.clienteId),ventas:[]};
+    porCliente[v.clienteId].ventas.push(v);
+  });
+  const grupos = Object.values(porCliente);
+  const totalPendiente = ventas.reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
+
+  return (
+    <div style={s.screen}>
+      <div style={s.header}>
+        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
+        <span style={s.headerTitle}>Transferencias · {dia}</span>
+      </div>
+      <div style={{padding:"10px 14px 4px"}}>
+        <div style={{...s.card,background:"#1e3a5f",border:"1px solid #f5b942",marginBottom:8,padding:"10px 14px"}}>
+          <div style={{fontSize:11,color:"#f5b942",fontWeight:500,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>🔴 Pendientes de confirmar</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+            <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>{ventas.length} transferencia{ventas.length!==1?"s":""} · {grupos.length} cliente{grupos.length!==1?"s":""}</span>
+            <span style={{fontSize:18,fontWeight:500,color:"#f5b942"}}>{fmt(totalPendiente)}</span>
+          </div>
+        </div>
+        {grupos.length===0&&<p style={{textAlign:"center",padding:"40px 0",color:"var(--color-text-tertiary)",fontSize:14}}>✓ No hay transferencias pendientes para {dia}</p>}
+        {grupos.map(({cliente:c,ventas:vts})=>(
+          <div key={c?.id||Math.random()} style={{...s.card,marginBottom:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+              <div>
+                <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>{c?.nombre||"Cliente desconocido"}</div>
+                <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:2}}>{c?.calle?`${c.calle} ${c.nro||""}`:c?.manzana?`Mz ${c.manzana} L ${c.lote}`:""}{c?.barrio?` · ${c.barrio}`:""}</div>
+              </div>
+              {c?.telefono&&<a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:20,textDecoration:"none"}}>💬</a>}
+            </div>
+            {vts.map(v=>(
+              <div key={v.id} style={{...s.card,margin:"0 0 6px",background:"var(--color-background-tertiary)",padding:"10px 12px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                  <div>
+                    <div style={{fontSize:12,color:"var(--color-text-tertiary)"}}>{v.fechaKey} · {v.fecha?.slice(-8)||""}</div>
+                    <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:2}}>{(v.detalle||[]).map(d=>`${d.nombre}×${d.cantidad}`).join(" · ")}</div>
+                  </div>
+                  <span style={{fontSize:16,fontWeight:500,color:"#f5b942"}}>{fmt(v.pagadoNum||v.neto||0)}</span>
+                </div>
+                <button style={{width:"100%",padding:"9px",borderRadius:8,border:"none",background:"#185FA5",color:"#e2eaf4",fontSize:13,fontWeight:500,cursor:"pointer"}}
+                  onClick={()=>onConfirmar(v.id)}>
+                  ✓ Confirmar transferencia
+                </button>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onMensajes,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,onVerConfirmaciones,clientes,ventas}) {
   return (
     <div style={s.screen}>
       <div style={s.header}>
@@ -1286,7 +1351,7 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
           <div style={{fontSize:11,fontWeight:500,color:"#f5b942",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.05em"}}>🔴 Transferencias sin confirmar</div>
           {transferenciasPendientes.map(({dia,fecha,count,monto,ventas:vts})=>(
             <button key={dia+fecha} style={{...s.card,width:"100%",margin:"0 0 6px",background:"#1e3a5f",border:"1px solid #f5b942",display:"flex",alignItems:"center",gap:10,cursor:"pointer",textAlign:"left"}}
-              onClick={()=>onDia(dia)}>
+              onClick={()=>onVerConfirmaciones&&onVerConfirmaciones(dia)}>
               <span style={{fontSize:18}}>🔴</span>
               <div style={{flex:1}}>
                 <div style={{fontSize:13,fontWeight:500,color:"#f5b942"}}>{dia} · {count} transfer. sin confirmar</div>
@@ -1501,21 +1566,44 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,productos,stock,setStock,sync
         {/* Gastos extras */}
         <div style={s.divider} />
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-          <span style={{fontSize:11,color:"var(--color-text-secondary)",fontWeight:500,textTransform:"uppercase",letterSpacing:"0.06em"}}>Gastos extras</span>
+          <span style={{fontSize:11,color:"var(--color-text-secondary)",fontWeight:500,textTransform:"uppercase",letterSpacing:"0.06em"}}>Gastos extras (efectivo)</span>
           <button style={{...s.btn,fontSize:12,padding:"4px 12px"}} onClick={addGasto}>+ Agregar</button>
         </div>
         {(datos.gastos||[]).length===0&&<p style={{fontSize:13,color:"var(--color-text-tertiary)",marginBottom:8}}>Sin gastos extras</p>}
         {(datos.gastos||[]).map((g,i)=>(
-          <div key={i} style={{...s.row,marginBottom:8,gap:6}}>
-            <select style={{...s.select,flex:2}} value={g.cat} onChange={e=>setGasto(i,"cat",e.target.value)}>
-              {GASTOS_CATEGORIAS.map(c=><option key={c} value={c}>{c.charAt(0).toUpperCase()+c.slice(1)}</option>)}
-            </select>
-            <input style={{...s.inputNum,flex:1}} type="number" placeholder="Monto" value={g.monto||""} onChange={e=>setGasto(i,"monto",e.target.value)} />
-            <button style={s.btnDanger} onClick={()=>delGasto(i)}>✕</button>
-          </div>
+          g.confirmado
+          ? <div key={i} style={{...s.card,margin:"0 0 6px",background:"var(--color-background-tertiary)",borderLeft:"3px solid #4dd9a0",padding:"10px 12px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>{g.cat.charAt(0).toUpperCase()+g.cat.slice(1)}{g.desc?` · ${g.desc}`:""}</div>
+                  <div style={{fontSize:12,color:"var(--color-text-danger)",marginTop:2}}>−{fmt(num(g.monto))}</div>
+                </div>
+                <div style={{display:"flex",gap:6}}>
+                  <button style={{...s.btn,fontSize:11,padding:"3px 10px"}} onClick={()=>setGasto(i,"confirmado",false)}>Editar</button>
+                  <button style={s.btnDanger} onClick={()=>delGasto(i)}>✕</button>
+                </div>
+              </div>
+            </div>
+          : <div key={i} style={{...s.card,margin:"0 0 6px",padding:"10px 12px"}}>
+              <div style={{display:"flex",gap:6,marginBottom:6}}>
+                <select style={{...s.select,flex:1}} value={g.cat} onChange={e=>setGasto(i,"cat",e.target.value)}>
+                  {GASTOS_CATEGORIAS.map(c=><option key={c} value={c}>{c.charAt(0).toUpperCase()+c.slice(1)}</option>)}
+                </select>
+                <input style={{...s.inputNum,flex:1}} type="number" placeholder="Monto $" value={g.monto||""} onChange={e=>setGasto(i,"monto",e.target.value)} />
+              </div>
+              <input style={{...s.input,marginBottom:6}} placeholder="Descripción (opcional)" value={g.desc||""} onChange={e=>setGasto(i,"desc",e.target.value)} />
+              <div style={{display:"flex",gap:6}}>
+                <button style={{flex:1,padding:"7px",borderRadius:8,border:"none",background:"#0a2e1f",color:"#4dd9a0",fontSize:12,fontWeight:500,cursor:"pointer",opacity:!g.monto?0.5:1}}
+                  disabled={!g.monto}
+                  onClick={()=>{setGasto(i,"confirmado",true);setTimeout(()=>onGuardar({...datos,gastos:datos.gastos.map((x,j)=>j===i?{...x,confirmado:true}:x)}),50);}}>
+                  ✓ Confirmar y guardar
+                </button>
+                <button style={s.btnDanger} onClick={()=>delGasto(i)}>✕</button>
+              </div>
+            </div>
         ))}
         {totalGastos>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderTop:"0.5px solid var(--color-border-tertiary)",marginBottom:8}}>
-          <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Total gastos</span>
+          <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Total gastos extras</span>
           <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-danger)"}}>−{fmt(totalGastos)}</span>
         </div>}
 
@@ -1612,9 +1700,13 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,productos,stock,setStock,sync
             <span style={{fontSize:13,color:"var(--color-text-danger)"}}>− Llenado de envases</span>
             <span style={{fontSize:13,color:"var(--color-text-danger)"}}>{fmt(totalVentaLlenar)}</span>
           </div>
+          {totalGastos>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+            <span style={{fontSize:13,color:"var(--color-text-danger)"}}>− Gastos extras</span>
+            <span style={{fontSize:13,color:"var(--color-text-danger)"}}>{fmt(totalGastos)}</span>
+          </div>}
           <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0 2px"}}>
             <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Efectivo en mano</span>
-            <span style={{fontSize:18,fontWeight:500,color:"var(--color-text-success)"}}>{fmt(cobEfectivo-totalVentaLlenar)}</span>
+            <span style={{fontSize:18,fontWeight:500,color:(cobEfectivo-totalVentaLlenar-totalGastos)>=0?"var(--color-text-success)":"var(--color-text-danger)"}}>{fmt(cobEfectivo-totalVentaLlenar-totalGastos)}</span>
           </div>
         </div>
 
@@ -1949,7 +2041,7 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
               {c.bidon20>0  && <span style={s.tag}>20L×{c.bidon20}</span>}
               {c.dispenser>0 && <span style={{...s.tag,color:"#5daaff"}}>Disp×{c.dispenser}</span>}
               {atendido    && <span style={s.badge("success")}>✓ Listo</span>}
-              {est==="noesta"   && <span style={s.badge("warning")}>🔄 Volver al final</span>}
+              {est==="noesta" && !atendido  && <span style={s.badge("warning")}>🔄 No estaba aún</span>}
               {est==="noesta2"  && <span style={s.badge("warning")}>No estaba</span>}
               {est==="noquiso"  && <span style={s.badge("danger")}>No quiso</span>}
               {c.saldo<0   && <span style={s.badge("danger")}>Debe {fmt(Math.abs(c.saldo))}</span>}
@@ -2071,7 +2163,7 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
   );
 }
 
-function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onEditar,onEliminarVenta,onEditarVenta,onEliminarCliente,onNoEstaCliente,recordatorios,onGuardarRecordatorio,onConfirmarRecordatorio,onCobrarSaldo}) {
+function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onEditar,onEliminarVenta,onEditarVenta,onEliminarCliente,onNoEstaCliente,onNoQuiereCliente,recordatorios,onGuardarRecordatorio,onConfirmarRecordatorio,onCobrarSaldo}) {
   const [editandoCliente,setEditandoCliente] = useState(false);
   const [editandoVentaId,setEditandoVentaId] = useState(null);
   const [editandoSaldo,setEditandoSaldo] = useState(false);
@@ -2276,12 +2368,16 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
                   {ventaHoy.detalle.map(d=>`${d.nombre} ×${d.cantidad}`).join(" · ")} · {ventaHoy.pago}
                 </div>
               </div>
-            : <div style={{display:"flex",gap:8,marginBottom:12}}>
-                <button style={{background:"var(--color-background-warning)",color:"var(--color-text-warning)",border:"1px solid var(--color-border-warning)",borderRadius:10,padding:"12px 0",fontSize:14,cursor:"pointer",fontWeight:500,flex:1}}
+            : <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+                <button style={{background:"var(--color-background-warning)",color:"var(--color-text-warning)",border:"1px solid var(--color-border-warning)",borderRadius:10,padding:"12px 0",fontSize:13,cursor:"pointer",fontWeight:500,flex:1,minWidth:90}}
                   onClick={()=>{onNoEstaCliente&&onNoEstaCliente();onVolver();}}>
                   🔄 No está
                 </button>
-                <button style={{...s.btnPrimary,padding:"12px 0",fontSize:15,borderRadius:10,flex:2}} onClick={onVenta}>
+                <button style={{background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"1px solid var(--color-border-danger)",borderRadius:10,padding:"12px 0",fontSize:13,cursor:"pointer",fontWeight:500,flex:1,minWidth:90}}
+                  onClick={()=>{onNoQuiereCliente&&onNoQuiereCliente();onVolver();}}>
+                  🚫 No quiere
+                </button>
+                <button style={{...s.btnPrimary,padding:"12px 0",fontSize:15,borderRadius:10,flex:2,minWidth:120}} onClick={onVenta}>
                   📦 Registrar entrega
                 </button>
               </div>
@@ -2686,7 +2782,7 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
       });
     } catch(e){}
   };
-  const [cantidades,setCantidades]=useState(()=>{const m={};productos.forEach(p=>{const k=p.nombre==="Sifón 1.5L"?"sifon":p.nombre==="Bidón 10L"?"bidon10":"bidon20";m[p.nombre]=cliente[k]||0;});return m;});
+  const [cantidades,setCantidades]=useState(()=>{const m={};productos.forEach(p=>{m[p.nombre]=0;});return m;});
   const [pago,setPago]=useState("contado");
   const [monto,setMonto]=useState("");
   const [montoEfec,setMontoEfec]=useState(""); // pago mixto: parte efectivo
@@ -2720,6 +2816,8 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
         <span style={s.headerTitle}>Entrega · {cliente.nombre}</span>
       </div>
       <div style={{padding:16}}>
+        {/* Envases habituales del cliente */}
+        {(()=>{const tags=[];if(cliente.sifon>0)tags.push(`Sifón×${cliente.sifon}`);if(cliente.bidon10>0)tags.push(`10L×${cliente.bidon10}`);if(cliente.bidon20>0)tags.push(`20L×${cliente.bidon20}`);return tags.length>0?(<div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>{tags.map(t=><span key={t} style={{...s.tag,background:"#1e3a5f",color:"var(--color-text-info)",border:"0.5px solid var(--color-border-info)",fontSize:11}}>🧴 {t}</span>)}</div>):null;})()}
         <span style={{...s.sectionTitle,padding:"0 0 10px"}}>Cantidades entregadas</span>
         {productos.map(p=>(
           <div key={p.id} style={{...s.card,margin:"0 0 8px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -2816,16 +2914,7 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
           </div>
         )}
         <div style={s.divider} />
-        <label style={{...s.label,fontSize:13,marginBottom:6}}>Envases prestados al cliente</label>
-        {envPrest.map((_,i)=><ER key={i} list={envPrest} setList={setEnvPrest} i={i} />)}
-        <button style={{...s.btn,fontSize:12,padding:"4px 12px",marginBottom:12}} onClick={()=>setEnvPrest([...envPrest,{prod:"",cant:""}])}>+ Fila</button>
-        <label style={{...s.label,fontSize:13,marginBottom:6}}>Envases devueltos por el cliente</label>
-        {envDev.map((_,i)=><ER key={i} list={envDev} setList={setEnvDev} i={i} />)}
-        <button style={{...s.btn,fontSize:12,padding:"4px 12px",marginBottom:12}} onClick={()=>setEnvDev([...envDev,{prod:"",cant:""}])}>+ Fila</button>
-        <div style={s.divider} />
-        <label style={s.label}>Observaciones</label>
-        <textarea style={{...s.input,minHeight:60,resize:"vertical",marginBottom:14}} value={obs} onChange={e=>setObs(e.target.value)} placeholder="Notas opcionales..." />
-        <div style={{...s.card,margin:"0 0 16px",background:"var(--color-background-secondary)"}}>
+        <div style={{...s.card,margin:"0 0 12px",background:"var(--color-background-secondary)"}}>
           {bruto>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Subtotal</span><span style={{fontSize:13,color:"var(--color-text-primary)"}}>{fmt(bruto)}</span></div>}
           {desc>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Descuento 2.5%</span><span style={{fontSize:13,color:"var(--color-text-danger)"}}>−{fmt(desc)}</span></div>}
           {saldoApl>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Saldo a favor</span><span style={{fontSize:13,color:"var(--color-text-success)"}}>−{fmt(saldoApl)}</span></div>}
@@ -2834,28 +2923,11 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
             <span style={{fontSize:26,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(aPagar)}</span>
           </div>
         </div>
-        <div style={{display:"flex",gap:8,marginBottom:10}}>
-          <button style={{flex:1,background:"var(--color-background-warning)",color:"var(--color-text-warning)",border:"0.5px solid var(--color-border-warning)",borderRadius:8,padding:"11px 8px",fontSize:13,fontWeight:500,cursor:"pointer"}}
-            onClick={onNoEsta}>
-            No está
-          </button>
-          <button style={{flex:1,background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"0.5px solid var(--color-border-danger)",borderRadius:8,padding:"11px 8px",fontSize:13,fontWeight:500,cursor:"pointer"}}
-            onClick={onNoQuiere}>
-            No quiere
-          </button>
-        </div>
-        {/* Cobrar deuda sin entrega */}
-        {cliente.saldo<0&&(
-          <CobroDeudaPanel saldo={cliente.saldo} onCobrar={(mCobro,pCobro)=>{
-            onGuardar([{nombre:"Cobro de deuda",cantidad:1,precio:0,total:0}],pCobro,String(mCobro),0,[],[],`Cobro de deuda $${mCobro.toLocaleString("es-AR")} (${pCobro})`,"cobro_deuda");
-          }} />
-        )}
-        <button style={{...s.btnPrimary,opacity:detalle.length===0?0.45:1}} disabled={detalle.length===0} onClick={()=>{
+        <button style={{...s.btnPrimary,marginBottom:10,opacity:detalle.length===0?0.45:1}} disabled={detalle.length===0} onClick={()=>{
           if(pago==="mixto"){
-            // Pago mixto: guardamos 2 ventas separadas (efectivo + transferencia)
             const ef=Number(montoEfec||0), tr=Number(montoTrans||0);
             const totalPagado=ef+tr;
-            const saldoDelta=totalPagado-aPagar; // positivo=a favor, negativo=deuda
+            const saldoDelta=totalPagado-aPagar;
             if(ef>0) onGuardar(detalle,"contado",String(ef),saldoApl,envPrest,envDev,obs,"mixto_ef",tr,saldoDelta);
             else if(tr>0) onGuardar(detalle,"transferencia",String(tr),saldoApl,envPrest,envDev,obs,"mixto_tr",ef,saldoDelta);
           } else {
@@ -2865,8 +2937,34 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
             onGuardar(detalle,pago,montoFinal,saldoApl,envPrest,envDev,obs,opcionSaldo);
           }
         }}>
-          Guardar venta
+          ✓ Registrar entrega
         </button>
+        <div style={{display:"flex",gap:8,marginBottom:10}}>
+          <button style={{flex:1,background:"var(--color-background-warning)",color:"var(--color-text-warning)",border:"0.5px solid var(--color-border-warning)",borderRadius:8,padding:"11px 8px",fontSize:13,fontWeight:500,cursor:"pointer"}}
+            onClick={onNoEsta}>
+            🔄 No está
+          </button>
+          <button style={{flex:1,background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"0.5px solid var(--color-border-danger)",borderRadius:8,padding:"11px 8px",fontSize:13,fontWeight:500,cursor:"pointer"}}
+            onClick={onNoQuiere}>
+            🚫 No quiere
+          </button>
+        </div>
+        {/* Cobrar deuda sin entrega */}
+        {cliente.saldo<0&&(
+          <CobroDeudaPanel saldo={cliente.saldo} onCobrar={(mCobro,pCobro)=>{
+            onGuardar([{nombre:"Cobro de deuda",cantidad:1,precio:0,total:0}],pCobro,String(mCobro),0,[],[],`Cobro de deuda $${mCobro.toLocaleString("es-AR")} (${pCobro})`,"cobro_deuda");
+          }} />
+        )}
+        <div style={s.divider} />
+        <label style={{...s.label,fontSize:13,marginBottom:6}}>Envases prestados al cliente</label>
+        {envPrest.map((_,i)=><ER key={i} list={envPrest} setList={setEnvPrest} i={i} />)}
+        <button style={{...s.btn,fontSize:12,padding:"4px 12px",marginBottom:12}} onClick={()=>setEnvPrest([...envPrest,{prod:"",cant:""}])}>+ Fila</button>
+        <label style={{...s.label,fontSize:13,marginBottom:6}}>Envases devueltos por el cliente</label>
+        {envDev.map((_,i)=><ER key={i} list={envDev} setList={setEnvDev} i={i} />)}
+        <button style={{...s.btn,fontSize:12,padding:"4px 12px",marginBottom:12}} onClick={()=>setEnvDev([...envDev,{prod:"",cant:""}])}>+ Fila</button>
+        <div style={s.divider} />
+        <label style={s.label}>Observaciones</label>
+        <textarea style={{...s.input,minHeight:60,resize:"vertical",marginBottom:14}} value={obs} onChange={e=>setObs(e.target.value)} placeholder="Notas opcionales..." />
       </div>
     </div>
   );
