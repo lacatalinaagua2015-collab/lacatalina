@@ -11,7 +11,7 @@
   <title>La Catalina · Reparto</title>
   <script>
     if('serviceWorker' in navigator){
-      const CACHE = 'lc-v16';
+      const CACHE = 'lc-v19';
       const ASSETS = [
         'https://unpkg.com/react@18/umd/react.production.min.js',
         'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -849,7 +849,7 @@ function App() {
     <div style={s.app}>
       <SyncBar status={syncStatus} />
       {pantalla==="portada"        && <Portada onIngresar={()=>irA("menu")} />}
-      {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onMensajes={()=>irA("mensajes")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} clientes={clientes} ventas={ventas}
+      {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onMensajes={()=>irA("mensajes")} onStock={()=>irA("stock")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} clientes={clientes} ventas={ventas} stock={stockNorm}
           recordatoriosActivos={recordatoriosActivos}
           onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
           onVerConfirmaciones={(dia)=>{setDiaActual(dia);irA("confirmacionesDia");}}
@@ -996,6 +996,7 @@ function App() {
         } else { nuevos = [...clientes]; }
         saveClientes([...nuevos,{...datos,id:Date.now(),saldo:0,dispenser:datos.dispenser||0}].sort((a,b)=>DIAS.indexOf(a.dia)-DIAS.indexOf(b.dia)||(a.orden||9999)-(b.orden||9999)));
       }} onVolver={()=>irA("menu")} onRegistrarVenta={(c)=>{setClienteId(c.id);irA("venta");}} />}
+      {pantalla==="stock"          && <StockGeneral stock={stockNorm} setStock={(ns)=>{setStock(ns);syncData({stock:ns});}} clientes={clientes} ventas={ventas} productos={productos} onVolver={()=>irA("menu")} />}
       {pantalla==="resumen"        && <Resumen ventas={ventas} clientes={clientes} productos={productos} planillas={planillas} noVisitas={noVisitas||[]} onVolver={()=>irA("menu")} />}
       {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stockNorm} setStock={(s)=>{const ns=normStock(s);setStockRaw(ns);syncData({stock:ns});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} syncData={syncData} onVolver={()=>irA("menu")} />}
     </div>
@@ -1263,6 +1264,216 @@ function SetupNube({onSetup}) {
   );
 }
 
+function StockGeneral({stock,setStock,clientes,ventas,productos,onVolver}) {
+  const CAJON = 6;
+  const fmt = n => n?.toLocaleString("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}) || "$0";
+  const s2 = {
+    card: {...s.card},
+    input: {...s.input, textAlign:"center"},
+    label: {...s.label, textAlign:"center", fontSize:11},
+  };
+  const lugares = [
+    {key:"soderia", icon:"🏭", titulo:"Sodería", desc:"Stock disponible para cargar"},
+    {key:"casa",    icon:"🏠", titulo:"Casa / Depósito", desc:"Stock en el depósito"},
+  ];
+  // Edicion local
+  const [local, setLocal] = React.useState(()=>({
+    soderia:{...stock?.soderia||{sifon:0,bidon10:0,bidon20:0}},
+    casa:   {...stock?.casa   ||{sifon:0,bidon10:0,bidon20:0}},
+    camion: {...stock?.camion ||{sifon:0,bidon10:0,bidon20:0}},
+  }));
+  const set = (lugar,key,val) => setLocal(l=>({...l,[lugar]:{...l[lugar],[key]:Number(val)||0}}));
+
+  // Totales por producto
+  const total = key => (local.soderia[key]||0)+(local.casa[key]||0)+(local.camion[key]||0);
+
+  // Envases en poder de clientes: habitual + extra prestado - devuelto
+  const envClientes = React.useMemo(()=>{
+    const resumen = {sifon:0, bidon10:0, bidon20:0};
+    clientes.forEach(c=>{
+      resumen.sifon   += (c.sifon||0);
+      resumen.bidon10 += (c.bidon10||0);
+      resumen.bidon20 += (c.bidon20||0);
+    });
+    // Sumar prestados extra y restar devueltos de historial de ventas
+    ventas.forEach(v=>{
+      (v.envPrest||[]).forEach(e=>{
+        const k = e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;
+        if(k) resumen[k] += Number(e.cant)||0;
+      });
+      (v.envDev||[]).forEach(e=>{
+        const k = e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;
+        if(k) resumen[k] -= Number(e.cant)||0;
+      });
+    });
+    return resumen;
+  }, [clientes, ventas]);
+
+  const [tab, setTab] = React.useState("stock");
+  const [guardado, setGuardado] = React.useState(false);
+
+  const guardar = () => {
+    setStock(local);
+    setGuardado(true);
+    setTimeout(()=>setGuardado(false), 2000);
+  };
+
+  return (
+    <div style={s.screen}>
+      <div style={s.header}>
+        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
+        <span style={s.headerTitle}>📦 Stock</span>
+      </div>
+
+      {/* Tabs */}
+      <div style={{display:"flex",gap:6,padding:"10px 14px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+        {[["stock","📦 Inventario"],["clientes","👥 Clientes"]].map(([t,l])=>(
+          <button key={t} style={{...s.btn,flex:1,padding:"8px 4px",fontSize:13,fontWeight:tab===t?600:400,background:tab===t?"var(--color-background-secondary)":"transparent",borderBottom:tab===t?"2px solid #185FA5":"none",borderRadius:tab===t?"8px 8px 0 0":"8px",color:tab===t?"var(--color-text-primary)":"var(--color-text-secondary)"}}
+            onClick={()=>setTab(t)}>{l}</button>
+        ))}
+      </div>
+
+      <div style={{padding:14,overflowY:"auto"}}>
+      {tab==="stock"&&(<>
+        {/* Resumen total */}
+        <div style={{...s.card,margin:"0 0 12px",background:"var(--color-background-secondary)"}}>
+          <div style={{fontSize:11,fontWeight:500,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:10}}>Total en stock (todos los lugares)</div>
+          <div style={{display:"flex",gap:8}}>
+            {[
+              ["Cajones soda", Math.floor(total("sifon")/CAJON), total("sifon")%CAJON>0?`+${total("sifon")%CAJON} sif`:null, total("sifon")<18?"danger":total("sifon")<42?"warning":"success"],
+              ["Bidón 10L",    total("bidon10"), null, total("bidon10")<5?"danger":total("bidon10")<15?"warning":"success"],
+              ["Bidón 20L",    total("bidon20"), null, total("bidon20")<3?"danger":total("bidon20")<8?"warning":"success"],
+            ].map(([l,v,sub,color])=>(
+              <div key={l} style={{flex:1,background:"var(--color-background-tertiary)",borderRadius:10,padding:"10px 8px",textAlign:"center",border:`1px solid var(--color-border-${color})`}}>
+                <div style={{fontSize:22,fontWeight:700,color:`var(--color-text-${color})`}}>{v}</div>
+                {sub&&<div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>{sub}</div>}
+                <div style={{fontSize:10,color:"var(--color-text-secondary)",marginTop:2}}>{l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Por lugar */}
+        {lugares.map(({key,icon,titulo,desc})=>(
+          <div key={key} style={{...s.card,margin:"0 0 12px"}}>
+            <div style={{marginBottom:10}}>
+              <div style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)"}}>{icon} {titulo}</div>
+              <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>{desc}</div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+              {/* Cajones de soda */}
+              <div>
+                <label style={{...s.label,textAlign:"center",fontSize:11}}>Cajones soda</label>
+                <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0}
+                  value={Math.floor((local[key]?.sifon||0)/CAJON)}
+                  onChange={e=>{
+                    const caj=Number(e.target.value)||0;
+                    const sifSueltos=(local[key]?.sifon||0)%CAJON;
+                    set(key,"sifon",caj*CAJON+sifSueltos);
+                  }} />
+                <div style={{fontSize:10,color:"var(--color-text-tertiary)",textAlign:"center",marginTop:2}}>{local[key]?.sifon||0} sifones</div>
+              </div>
+              <div>
+                <label style={{...s.label,textAlign:"center",fontSize:11}}>Bidón 10L</label>
+                <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0}
+                  value={local[key]?.bidon10||0}
+                  onChange={e=>set(key,"bidon10",e.target.value)} />
+              </div>
+              <div>
+                <label style={{...s.label,textAlign:"center",fontSize:11}}>Bidón 20L</label>
+                <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0}
+                  value={local[key]?.bidon20||0}
+                  onChange={e=>set(key,"bidon20",e.target.value)} />
+              </div>
+            </div>
+          </div>
+        ))}
+
+        <button style={{...s.btnPrimary,background:guardado?"#0F6E56":undefined}} onClick={guardar}>
+          {guardado?"✓ Guardado":"Guardar stock"}
+        </button>
+      </>)}
+
+      {tab==="clientes"&&(<>
+        {/* Resumen envases en clientes */}
+        <div style={{...s.card,margin:"0 0 12px",background:"var(--color-background-secondary)"}}>
+          <div style={{fontSize:11,fontWeight:500,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:10}}>Total envases en poder de clientes</div>
+          <div style={{display:"flex",gap:8}}>
+            {[
+              ["Cajones soda", Math.floor(envClientes.sifon/CAJON), `${envClientes.sifon} sif`],
+              ["Bidón 10L",    envClientes.bidon10, null],
+              ["Bidón 20L",    envClientes.bidon20, null],
+            ].map(([l,v,sub])=>(
+              <div key={l} style={{flex:1,background:"var(--color-background-tertiary)",borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
+                <div style={{fontSize:22,fontWeight:700,color:"var(--color-text-info)"}}>{v}</div>
+                {sub&&<div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>{sub}</div>}
+                <div style={{fontSize:10,color:"var(--color-text-secondary)",marginTop:2}}>{l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Lista por cliente */}
+        {clientes.filter(c=>{
+          // Solo clientes que tienen envases extras prestados (por encima del habitual)
+          const ventasC = ventas.filter(v=>v.clienteId===c.id);
+          const extra = {sifon:0,bidon10:0,bidon20:0};
+          ventasC.forEach(v=>{
+            (v.envPrest||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)extra[k]+=Number(e.cant)||0;});
+            (v.envDev||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)extra[k]-=Number(e.cant)||0;});
+          });
+          return extra.sifon>0||extra.bidon10>0||extra.bidon20>0;
+        }).sort((a,b)=>{
+          const da=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"].indexOf(a.dia);
+          const db=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"].indexOf(b.dia);
+          return da!==db?da-db:(a.orden||9999)-(b.orden||9999);
+        }).map(c=>{
+          // Calcular extras de ventas
+          const ventasC = ventas.filter(v=>v.clienteId===c.id);
+          const extra = {sifon:0,bidon10:0,bidon20:0};
+          ventasC.forEach(v=>{
+            (v.envPrest||[]).forEach(e=>{
+              const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;
+              if(k) extra[k]+=Number(e.cant)||0;
+            });
+            (v.envDev||[]).forEach(e=>{
+              const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;
+              if(k) extra[k]-=Number(e.cant)||0;
+            });
+          });
+          const tieneExtra = extra.sifon!==0||extra.bidon10!==0||extra.bidon20!==0;
+          return (
+            <div key={c.id} style={{...s.card,margin:"0 0 8px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>{c.nombre}</div>
+                  <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{c.dia}</div>
+                </div>
+                <div style={{display:"flex",gap:4,flexWrap:"wrap",justifyContent:"flex-end"}}>
+                  {c.sifon>0&&<span style={s.tag}>Sifón×{c.sifon+(extra.sifon||0)}</span>}
+                  {c.bidon10>0&&<span style={s.tag}>10L×{c.bidon10+(extra.bidon10||0)}</span>}
+                  {c.bidon20>0&&<span style={s.tag}>20L×{c.bidon20+(extra.bidon20||0)}</span>}
+                </div>
+              </div>
+              {tieneExtra&&(
+                <div style={{fontSize:11,color:"var(--color-text-secondary)",borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:4,marginTop:2}}>
+                  Habitual: {c.sifon>0?`Sifón×${c.sifon} `:""}{ c.bidon10>0?`10L×${c.bidon10} `:""}{ c.bidon20>0?`20L×${c.bidon20} `:""}
+                  {extra.sifon>0?<span style={{color:"var(--color-text-warning)"}}> +{extra.sifon} sif prest.</span>:extra.sifon<0?<span style={{color:"var(--color-text-success)"}}> {extra.sifon} sif dev.</span>:null}
+                  {extra.bidon10>0?<span style={{color:"var(--color-text-warning)"}}> +{extra.bidon10} 10L prest.</span>:extra.bidon10<0?<span style={{color:"var(--color-text-success)"}}> {Math.abs(extra.bidon10)} 10L dev.</span>:null}
+                  {extra.bidon20>0?<span style={{color:"var(--color-text-warning)"}}> +{extra.bidon20} 20L prest.</span>:extra.bidon20<0?<span style={{color:"var(--color-text-success)"}}> {Math.abs(extra.bidon20)} 20L dev.</span>:null}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {clientes.filter(c=>{const vC=ventas.filter(v=>v.clienteId===c.id);const ex={sifon:0,bidon10:0,bidon20:0};vC.forEach(v=>{(v.envPrest||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)ex[k]+=Number(e.cant)||0;});(v.envDev||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)ex[k]-=Number(e.cant)||0;});});return ex.sifon>0||ex.bidon10>0||ex.bidon20>0;}).length===0&&
+          <p style={{textAlign:"center",color:"var(--color-text-tertiary)",padding:"30px 0",fontSize:14}}>No hay clientes con envases prestados extra</p>}
+      </>)}
+      </div>
+    </div>
+  );
+}
+
 function ConfirmacionesDia({dia,ventas,clientes,onConfirmar,onVolver}) {
   // Agrupar por cliente
   const porCliente = {};
@@ -1319,7 +1530,7 @@ function ConfirmacionesDia({dia,ventas,clientes,onConfirmar,onVolver}) {
   );
 }
 
-function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onMensajes,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,onVerConfirmaciones,clientes,ventas}) {
+function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onMensajes,onStock,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,onVerConfirmaciones,clientes,ventas,stock}) {
   return (
     <div style={s.screen}>
       <div style={s.header}>
@@ -1367,22 +1578,80 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
       )}
       <span style={s.sectionTitle}>Días de reparto</span>
       <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:8}}>
-        {dias.map(d=>{
+        {dias.map((d,idx)=>{
           const deudas = (clientes||[]).filter(c=>c.dia===d&&c.saldo<0);
           const totalDeuda = deudas.reduce((a,c)=>a+Math.abs(c.saldo),0);
-          return (
-          <button key={d} style={{...s.card,margin:0,textAlign:"left",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px"}} onClick={()=>onDia(d)}>
+          return (<React.Fragment key={d}>
+          <button style={{...s.card,margin:0,textAlign:"left",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px"}} onClick={()=>onDia(d)}>
             <div>
               <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>{d}</span>
               {totalDeuda>0&&<div style={{fontSize:11,color:"var(--color-text-danger)",marginTop:2}}>⚠ {deudas.length} cliente{deudas.length>1?"s":""} deben {fmt(totalDeuda)}</div>}
             </div>
             <span style={{color:"var(--color-text-tertiary)",fontSize:18}}>→</span>
           </button>
-        );
-      })}
+          {idx===dias.length-1&&stock&&(
+            (()=>{
+              const CAJON=6;
+              const sCaj=Math.floor((stock.soderia?.sifon||0)/CAJON);
+              const cCaj=Math.floor((stock.casa?.sifon||0)/CAJON);
+              const sB10=stock.soderia?.bidon10||0, cB10=stock.casa?.bidon10||0;
+              const sB20=stock.soderia?.bidon20||0, cB20=stock.casa?.bidon20||0;
+              const envC={sifon:0,bidon10:0,bidon20:0};
+              (clientes||[]).forEach(c=>{envC.sifon+=(c.sifon||0);envC.bidon10+=(c.bidon10||0);envC.bidon20+=(c.bidon20||0);});
+              (ventas||[]).forEach(v=>{
+                (v.envPrest||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)envC[k]+=Number(e.cant)||0;});
+                (v.envDev||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)envC[k]-=Number(e.cant)||0;});
+              });
+              const envCCaj=Math.floor(envC.sifon/CAJON);
+              const totCaj=sCaj+cCaj+envCCaj, totB10=sB10+cB10+envC.bidon10, totB20=sB20+cB20+envC.bidon20;
+              const StockCard = ()=>{
+                const [open,setOpen]=React.useState(false);
+                return (
+                  <div style={{...s.card,margin:"4px 0 0",background:"var(--color-background-secondary)",border:"0.5px solid var(--color-border-secondary)"}}>
+                    {/* Header siempre visible — toca para desplegar */}
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}} onClick={()=>setOpen(o=>!o)}>
+                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                        <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>📦 Stock</span>
+                        {/* Resumen compacto siempre visible */}
+                        <div style={{display:"flex",gap:6}}>
+                          {[[totCaj,"caj"],[totB10,"10L"],[totB20,"20L"]].map(([v,u],i)=>(
+                            <span key={i} style={{fontSize:12,fontWeight:600,color:Number(v)<3?"var(--color-text-danger)":Number(v)<8?"var(--color-text-warning)":"var(--color-text-info)"}}>{v}<span style={{fontSize:10,fontWeight:400,color:"var(--color-text-tertiary)",marginLeft:1}}>{u}</span></span>
+                          ))}
+                        </div>
+                      </div>
+                      <span style={{fontSize:13,color:"var(--color-text-tertiary)",transition:"transform 0.2s",display:"inline-block",transform:open?"rotate(180deg)":"rotate(0deg)"}}>▾</span>
+                    </div>
+                    {/* Detalle desplegable */}
+                    {open&&<div style={{marginTop:12}}>
+                      {[["🏭 Sodería",[sCaj,sB10,sB20],"primary"],["👥 En clientes",[envCCaj,envC.bidon10,envC.bidon20],"info"],["📦 Total general",[totCaj,totB10,totB20],"info"]].map(([titulo,vals,color],gi)=>(
+                        <div key={gi} style={{marginBottom:gi<2?10:0}}>
+                          <div style={{fontSize:10,color:"var(--color-text-tertiary)",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.05em"}}>{titulo}</div>
+                          <div style={{display:"flex",gap:6}}>
+                            {vals.map((v,i)=>(
+                              <div key={i} style={{textAlign:"center",flex:1,background:gi===2?"#1e3a5f":"var(--color-background-tertiary)",borderRadius:8,padding:"6px 4px",border:gi===2?"0.5px solid var(--color-border-info)":"none"}}>
+                                <div style={{fontSize:18,fontWeight:gi===2?700:600,color:gi===0?(Number(v)<3?"var(--color-text-danger)":Number(v)<8?"var(--color-text-warning)":"var(--color-text-primary)"):`var(--color-text-${color})`}}>{v}</div>
+                                <div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>{["caj","10L","20L"][i]}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      <button style={{...s.btn,width:"100%",marginTop:10,fontSize:12,padding:"7px"}} onClick={e=>{e.stopPropagation();onStock();}}>Editar stock →</button>
+                    </div>}
+                  </div>
+                );
+              };
+              return <StockCard/>;
+            })()
+          )}
+          </React.Fragment>);
+        })}
         <div style={s.divider} />
         <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onGestionClientes}>
           <span>👥 Gestión de clientes</span><span style={{color:"var(--color-text-tertiary)"}}>→</span>
+        </button>
+        <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onStock}>
+          <span>📦 Stock</span><span style={{color:"var(--color-text-tertiary)"}}>→</span>
         </button>
         <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onPromocion}>
           <span>🚀 Promoción</span><span style={{color:"var(--color-text-tertiary)"}}>→</span>
@@ -2416,23 +2685,46 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
           </details>
 
           {/* Envases colapsable */}
-          <details style={{marginTop:6}}>
+          <details style={{marginTop:6}}> 
             <summary style={{cursor:"pointer",listStyle:"none",display:"flex",alignItems:"center",justifyContent:"space-between",background:"var(--color-background-tertiary)",borderRadius:8,padding:"10px 14px",marginBottom:4}}>
               <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>🫧 Envases</span>
               <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>▾</span>
             </summary>
             <div style={{marginTop:4}}>
-              <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-tertiary)"}}>
-                <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8}}>Envases habituales asignados</div>
-                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                  {cliente.sifon>0    && <div style={s.metricCard}><div style={s.metricLabel}>Sifón</div><div style={s.metricVal}>{cliente.sifon}</div></div>}
-                  {cliente.bidon10>0  && <div style={s.metricCard}><div style={s.metricLabel}>10L</div><div style={s.metricVal}>{cliente.bidon10}</div></div>}
-                  {cliente.bidon20>0  && <div style={s.metricCard}><div style={s.metricLabel}>20L</div><div style={s.metricVal}>{cliente.bidon20}</div></div>}
-                  {cliente.dispenser>0 && <div style={s.metricCard}><div style={s.metricLabel}>Dispenser</div><div style={s.metricVal}>{cliente.dispenser}</div></div>}
-                  {!cliente.sifon&&!cliente.bidon10&&!cliente.bidon20&&!cliente.dispenser&&
-                    <span style={{fontSize:13,color:"var(--color-text-tertiary)"}}>Sin envases asignados</span>}
-                </div>
-              </div>
+              {(()=>{
+                const CAJON=6;
+                const extra={sifon:0,bidon10:0,bidon20:0};
+                historial.forEach(v=>{
+                  (v.envPrest||[]).forEach(e=>{
+                    const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;
+                    if(k) extra[k]+=Number(e.cant)||0;
+                  });
+                  (v.envDev||[]).forEach(e=>{
+                    const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;
+                    if(k) extra[k]-=Number(e.cant)||0;
+                  });
+                });
+                const total={sifon:(cliente.sifon||0)+extra.sifon, bidon10:(cliente.bidon10||0)+extra.bidon10, bidon20:(cliente.bidon20||0)+extra.bidon20};
+                const tieneExtra=extra.sifon!==0||extra.bidon10!==0||extra.bidon20!==0;
+                return (<>
+                  <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-tertiary)"}}>
+                    <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8}}>📦 En poder del cliente ahora</div>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      {total.sifon>0&&<div style={s.metricCard}><div style={s.metricLabel}>Sifón</div><div style={{...s.metricVal,color:extra.sifon>0?"var(--color-text-warning)":extra.sifon<0?"var(--color-text-success)":"var(--color-text-primary)"}}>{total.sifon}</div></div>}
+                      {total.bidon10>0&&<div style={s.metricCard}><div style={s.metricLabel}>10L</div><div style={{...s.metricVal,color:extra.bidon10>0?"var(--color-text-warning)":extra.bidon10<0?"var(--color-text-success)":"var(--color-text-primary)"}}>{total.bidon10}</div></div>}
+                      {total.bidon20>0&&<div style={s.metricCard}><div style={s.metricLabel}>20L</div><div style={{...s.metricVal,color:extra.bidon20>0?"var(--color-text-warning)":extra.bidon20<0?"var(--color-text-success)":"var(--color-text-primary)"}}>{total.bidon20}</div></div>}
+                      {cliente.dispenser>0&&<div style={s.metricCard}><div style={s.metricLabel}>Dispenser</div><div style={s.metricVal}>{cliente.dispenser}</div></div>}
+                      {!total.sifon&&!total.bidon10&&!total.bidon20&&!cliente.dispenser&&<span style={{fontSize:13,color:"var(--color-text-tertiary)"}}>Sin envases</span>}
+                    </div>
+                    {tieneExtra&&<div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:8,borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:6}}>
+                      Habitual: {cliente.sifon>0?`Sifón×${cliente.sifon} `:""}{ cliente.bidon10>0?`10L×${cliente.bidon10} `:""}{ cliente.bidon20>0?`20L×${cliente.bidon20}`:""}
+                      {extra.sifon!==0&&<span style={{color:extra.sifon>0?"var(--color-text-warning)":"var(--color-text-success)"}}>{extra.sifon>0?` +${extra.sifon} sif. prest.`:` ${Math.abs(extra.sifon)} sif. dev.`}</span>}
+                      {extra.bidon10!==0&&<span style={{color:extra.bidon10>0?"var(--color-text-warning)":"var(--color-text-success)"}}>{extra.bidon10>0?` +${extra.bidon10} 10L prest.`:` ${Math.abs(extra.bidon10)} 10L dev.`}</span>}
+                      {extra.bidon20!==0&&<span style={{color:extra.bidon20>0?"var(--color-text-warning)":"var(--color-text-success)"}}>{extra.bidon20>0?` +${extra.bidon20} 20L prest.`:` ${Math.abs(extra.bidon20)} 20L dev.`}</span>}
+                    </div>}
+                  </div>
+                </>);
+              })()}
               <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",margin:"10px 0 6px"}}>Movimientos registrados</div>
               {historial.filter(v=>(v.envPrest||[]).length>0||(v.envDev||[]).length>0).length===0&&
                 <p style={{fontSize:13,color:"var(--color-text-tertiary)"}}>Sin movimientos de envases registrados</p>}
