@@ -11,7 +11,7 @@
   <title>La Catalina · Reparto</title>
   <script>
     if('serviceWorker' in navigator){
-      const CACHE = 'lc-v22';
+      const CACHE = 'lc-v24';
       const ASSETS = [
         'https://unpkg.com/react@18/umd/react.production.min.js',
         'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -895,7 +895,7 @@ function App() {
     <div style={{...s.app, zoom: SCALES[scaleIdx]}}>
       <SyncBar status={syncStatus} />
       {pantalla==="portada"        && <Portada onIngresar={()=>irA("menu")} />}
-      {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onMensajes={()=>irA("mensajes")} onStock={()=>irA("stock")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} clientes={clientes} ventas={ventas} stock={stockNorm}
+      {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onStock={()=>irA("stock")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} clientes={clientes} ventas={ventas} stock={stockNorm}
           recordatoriosActivos={recordatoriosActivos}
           onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
           onVerConfirmaciones={(dia)=>{setDiaActual(dia);irA("confirmacionesDia");}}
@@ -1019,7 +1019,6 @@ function App() {
             .sort((a,b)=>DIAS.indexOf(a.dia)-DIAS.indexOf(b.dia)||(a.orden||9999)-(b.orden||9999));
           saveClientes(nc);irA("clientes");
         }} onVolver={()=>irA("clientes")} />}
-      {pantalla==="mensajes"  && <MensajesMasivos clientes={clientes} onVolver={()=>irA("menu")} />}
       {pantalla==="historial" && <CargaHistorica clientes={clientes} productos={productos} onGuardar={(vts)=>{saveVentas([...ventas,...vts]);irA("menu");}} onVolver={()=>irA("menu")} />}
       {pantalla==="promocion"       && <Promocion prospectos={prospectos} clientes={clientes} onSave={saveProspectos} onConvertir={(p)=>{
         const nuevo={...p,id:Date.now(),saldo:0,sifon:0,bidon10:1,bidon20:0};
@@ -1593,7 +1592,7 @@ function ConfirmacionesDia({dia,ventas,clientes,onConfirmar,onVolver}) {
   );
 }
 
-function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onMensajes,onStock,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,onVerConfirmaciones,clientes,ventas,stock}) {
+function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onStock,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,onVerConfirmaciones,clientes,ventas,stock}) {
   return (
     <div style={s.screen}>
       <div style={s.header}>
@@ -1718,9 +1717,6 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
         </button>
         <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onPromocion}>
           <span>🚀 Promoción</span><span style={{color:"var(--color-text-tertiary)"}}>→</span>
-        </button>
-        <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onMensajes}>
-          <span>💬 Mensajes masivos</span><span style={{color:"var(--color-text-tertiary)"}}>→</span>
         </button>
 
         <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onResumen}>
@@ -3510,91 +3506,6 @@ function CargaHistorica({clientes,productos,onGuardar,onVolver,enConfig}) {
   );
 }
 
-function MensajesMasivos({clientes,onVolver}) {
-  const DIAS_REP = ["Martes","Miércoles","Jueves","Viernes"];
-  const PLANTILLAS = [
-    {label:"Cambio de precio 💰",  texto:"Hola! Les avisamos que a partir de la próxima semana habrá un ajuste en los precios. Cualquier consulta estamos a disposición. Gracias! 🙏 — La Catalina"},
-    {label:"Demora en reparto ⏰", texto:"Hola! Les avisamos que hoy el reparto tiene una demora. Pasamos en el transcurso del día. Disculpen el inconveniente! — La Catalina"},
-    {label:"Cambio de día 📅",     texto:"Hola! Esta semana el reparto se realiza el {dia2}. Gracias por su comprensión! — La Catalina"},
-    {label:"Feriado 🎉",           texto:"Hola! El próximo reparto no se realizará por feriado. Retomamos la semana siguiente. Gracias! — La Catalina"},
-    {label:"Texto libre ✏️",       texto:""},
-  ];
-
-  const [plantilla,setPlantilla] = React.useState(0);
-  const [mensaje,setMensaje]     = React.useState(PLANTILLAS[0].texto);
-  const [dia2,setDia2]           = React.useState("Miércoles");
-  const [copiado,setCopiado]     = React.useState(false);
-
-  const copiar = () => {
-    const txt = mensaje.replace(/{dia2}/g, dia2);
-    navigator.clipboard.writeText(txt).catch(()=>{
-      const el=document.createElement("textarea");
-      el.value=txt; document.body.appendChild(el);
-      el.select(); document.execCommand("copy");
-      document.body.removeChild(el);
-    });
-    setCopiado(true);
-    setTimeout(()=>setCopiado(false), 2500);
-  };
-
-  const abrirWhatsApp = () => window.open("https://wa.me/","_blank");
-
-  return (
-    <div style={s.screen}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>Mensajes masivos</span>
-      </div>
-      <div style={{padding:16,display:"flex",flexDirection:"column",gap:12}}>
-
-        {/* Plantillas */}
-        <div style={s.card}>
-          <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Plantilla</div>
-          <div style={{display:"flex",flexDirection:"column",gap:4}}>
-            {PLANTILLAS.map((p,i)=>(
-              <button key={i} style={{textAlign:"left",padding:"10px 12px",borderRadius:8,border:`0.5px solid ${plantilla===i?"#5daaff":"var(--color-border-secondary)"}`,background:plantilla===i?"var(--color-background-info)":"var(--color-background-secondary)",color:plantilla===i?"#5daaff":"var(--color-text-secondary)",fontSize:13,cursor:"pointer"}}
-                onClick={()=>{setPlantilla(i);if(p.texto)setMensaje(p.texto.replace(/{dia2}/g,dia2));}}>
-                {p.label}
-              </button>
-            ))}
-          </div>
-          {plantilla===2&&(
-            <div style={{marginTop:10}}>
-              <label style={s.label}>Nuevo día</label>
-              <select style={s.select} value={dia2} onChange={e=>{setDia2(e.target.value);setMensaje(PLANTILLAS[2].texto.replace(/{dia2}/g,e.target.value));}}>
-                {DIAS_REP.map(d=><option key={d}>{d}</option>)}
-              </select>
-            </div>
-          )}
-        </div>
-
-        {/* Mensaje */}
-        <div style={s.card}>
-          <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Mensaje</div>
-          <textarea style={{...s.input,minHeight:130,resize:"vertical",fontSize:14,lineHeight:1.6}}
-            value={mensaje} onChange={e=>setMensaje(e.target.value)}
-            placeholder="Escribí tu mensaje..." />
-          <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:4}}>{mensaje.length} caracteres</div>
-        </div>
-
-        {/* Botones */}
-        <button style={{...s.btnPrimary,padding:"14px",fontSize:15,borderRadius:12,opacity:!mensaje.trim()?0.5:1,background:copiado?"#4dd9a0":undefined,color:copiado?"#0a2e1f":undefined}}
-          disabled={!mensaje.trim()} onClick={copiar}>
-          {copiado?"✓ ¡Mensaje copiado!":"📋 Copiar mensaje"}
-        </button>
-
-        <button style={{...s.btn,padding:"14px",fontSize:15,borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:"#25D366",color:"#fff",border:"none"}}
-          onClick={abrirWhatsApp}>
-          💬 Abrir WhatsApp
-        </button>
-
-        <div style={{fontSize:12,color:"var(--color-text-tertiary)",textAlign:"center",lineHeight:1.6}}>
-          Copiá el mensaje → abrí WhatsApp → buscá tu lista de difusión → pegá y enviá
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function Promocion({prospectos,onSave,onConvertir,onVolver}) {
   const [diaActivo,setDiaActivo] = useState("");
