@@ -356,6 +356,7 @@ function App() {
   const [fechaObj, setFechaObj]   = useState(null);
   const [clienteId, setClienteId] = useState(null);
   const [ventaLibreFecha, setVentaLibreFecha] = useState(()=>new Date().toISOString().slice(0,10));
+  const [diaConfirmaciones, setDiaConfirmaciones] = useState(null);
   const [noVisitas, setNoVisitas] = useLS("cat_novisitas_v1", []);
   const [prospectos, setProspectos] = useLS("cat_prospectos_v1", []);
   const [recordatorios, setRecordatorios] = useLS("cat_recordatorios_v1", []);
@@ -759,7 +760,15 @@ function App() {
     <div style={{...s.app, fontSize:escalaVal[escala]}}>
       <SyncBar status={syncStatus} />
       {pantalla==="portada"        && <Portada onIngresar={()=>irA("menu")} />}
-      {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onMensajes={()=>irA("mensajes")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} clientes={clientes} ventas={ventas} stock={stockNorm} onStock={()=>irA("config")}
+      {pantalla==="confirmaciones" && <ConfirmacionesDia
+        dia={diaConfirmaciones||""}
+        ventas={ventas}
+        onConfirmarTransfer={(clienteId,ventaId)=>{
+          saveVentas(ventas.map(v=>v.id===ventaId?{...v,transConfirmada:!v.transConfirmada}:v));
+        }}
+        onVolver={()=>irA("menu")}
+      />}
+      {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onMensajes={()=>irA("mensajes")} onVolver={()=>irA("portada")} onVerConfirmaciones={(dia)=>{setDiaConfirmaciones(dia);irA("confirmaciones");}} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} clientes={clientes} ventas={ventas} stock={stockNorm} onStock={()=>irA("config")}
           recordatoriosActivos={recordatoriosActivos}
           onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
           transferenciasPendientes={DIAS.map(dia=>{
@@ -792,7 +801,7 @@ function App() {
           }
           irA("clientes");
         }} onVolver={()=>irA("selectorFechaClientes")} />}
-      {pantalla==="clientes"       && <ListaClientes clientes={clientes.filter(c=>c.dia===diaActual)} dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual)} noVisitas={(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual)} onSeleccionar={c=>{setClienteId(c.id);irA("venta");}} onNuevoCliente={()=>irA("nuevoCliente")} onVolver={()=>irA("selectorFechaClientes")} onReordenar={lista=>{
+      {pantalla==="clientes"       && <ListaClientes clientes={clientes.filter(c=>c.dia===diaActual)} dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual)} noVisitas={(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual)} onSeleccionar={c=>{setClienteId(c.id);irA("detalleCliente");}} onNuevoCliente={()=>irA("nuevoCliente")} onVolver={()=>irA("selectorFechaClientes")} onReordenar={lista=>{
           const otros=clientes.filter(c=>c.dia!==diaActual);
           const ordenados=[...lista].sort((a,b)=>(a.orden||9999)-(b.orden||9999));
           saveClientes([...otros,...ordenados]);
@@ -801,6 +810,7 @@ function App() {
           const nv=ventas.map(v=>v.id===ventaId?{...v,transConfirmada:!v.transConfirmada}:v);
           saveVentas(nv);
         }}
+        onVerConfirmaciones={(dia)=>{setDiaConfirmaciones(dia);irA("confirmaciones");}}
         prospectos={(prospectos||[]).filter(p=>p.dia===diaActual&&p.estado==="activo")}
         recordatorios={recordatorios}
         onVentaProspecto={(p)=>{
@@ -1382,7 +1392,54 @@ function StockGeneral({stock, clientes, ventas, onEditar}) {
   );
 }
 
-function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onMensajes,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,clientes,ventas,stock,onStock}) {
+
+function ConfirmacionesDia({dia, ventas, onConfirmarTransfer, onVolver}) {
+  const pendientes = ventas.filter(v=>v.dia===dia&&v.pago==="transferencia"&&!v.transConfirmada);
+  const porCliente = {};
+  pendientes.forEach(v=>{
+    if(!porCliente[v.clienteId]) porCliente[v.clienteId]={nombre:v.cliente,ventas:[]};
+    porCliente[v.clienteId].ventas.push(v);
+  });
+  const grupos = Object.values(porCliente);
+  return (
+    <div style={s.screen}>
+      <div style={s.header}>
+        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
+        <span style={s.headerTitle}>🔴 Transferencias · {dia}</span>
+      </div>
+      <div style={{padding:16}}>
+        {grupos.length===0&&(
+          <div style={{textAlign:"center",padding:"40px 20px",color:"var(--color-text-tertiary)"}}>
+            <div style={{fontSize:32,marginBottom:10}}>✅</div>
+            <div style={{fontSize:14}}>Sin transferencias pendientes</div>
+          </div>
+        )}
+        {grupos.map(g=>(
+          <div key={g.nombre} style={{...s.card,margin:"0 0 12px"}}>
+            <div style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)",marginBottom:10}}>{g.nombre}</div>
+            {g.ventas.map(v=>(
+              <div key={v.id} style={{borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:8,marginTop:8}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                  <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>{v.fechaKey}</span>
+                  <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(v.neto)}</span>
+                </div>
+                <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:8}}>
+                  {v.detalle.map(d=>`${d.nombre} ×${d.cantidad}`).join(" · ")}
+                </div>
+                <button style={{width:"100%",padding:"10px",borderRadius:8,border:"none",background:"#185FA5",color:"#e2eaf4",fontSize:13,fontWeight:600,cursor:"pointer"}}
+                  onClick={()=>onConfirmarTransfer(v.clienteId, v.id)}>
+                  ✓ Confirmar transferencia
+                </button>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onMensajes,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,clientes,ventas,stock,onStock,onVerConfirmaciones}) {
   return (
     <div style={s.screen}>
       <div style={s.header}>
@@ -1414,7 +1471,7 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
           <div style={{fontSize:11,fontWeight:500,color:"#f5b942",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.05em"}}>🔴 Transferencias sin confirmar</div>
           {transferenciasPendientes.map(({dia,fecha,count,monto,ventas:vts})=>(
             <button key={dia+fecha} style={{...s.card,width:"100%",margin:"0 0 6px",background:"#1e3a5f",border:"1px solid #f5b942",display:"flex",alignItems:"center",gap:10,cursor:"pointer",textAlign:"left"}}
-              onClick={()=>onDia(dia)}>
+              onClick={()=>onVerConfirmaciones?onVerConfirmaciones(dia):onDia(dia)}>
               <span style={{fontSize:18}}>🔴</span>
               <div style={{flex:1}}>
                 <div style={{fontSize:13,fontWeight:500,color:"#f5b942"}}>{dia} · {count} transfer. sin confirmar</div>
@@ -1995,7 +2052,7 @@ function InicioReparto({dia,fecha,planilla,productos,cargasDia,stock,onGuardar,o
   );
 }
 
-function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onConfirmarTransfer}) {
+function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onConfirmarTransfer,onVerConfirmaciones}) {
   const [busqueda,setBusqueda] = useState("");
   const [editandoOrden,setEditandoOrden] = useState(null);
   const [ordenTemp,setOrdenTemp] = useState("");
@@ -2063,7 +2120,7 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
                 </div>
             }
           </div>
-          <div style={{flex:1,cursor:"pointer",minWidth:0}} onClick={()=>onSeleccionar(c)}>
+          <div style={{flex:1,cursor:"pointer",minWidth:0}} onClick={(e)=>{if(e.defaultPrevented) return; onSeleccionar(c);}}>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
               <div style={{fontWeight:600,fontSize:16,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5}}>
                 {c.nombre}
@@ -2075,8 +2132,9 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
               {(()=>{const vt=ventas.find(v=>v.clienteId===c.id&&v.fechaKey===fecha&&v.pago==="transferencia");
                 if(!vt) return null;
                 return (
-                  <button style={{background:"none",border:"none",cursor:"pointer",padding:"2px 4px",lineHeight:1,flexShrink:0,display:"flex",alignItems:"center",gap:3,borderRadius:6,background:vt.transConfirmada?"transparent":"rgba(245,185,66,0.15)"}}
-                    onClick={e=>{e.stopPropagation();onConfirmarTransfer&&onConfirmarTransfer(c.id,vt.id);}}
+                  <button style={{background:"none",border:"none",cursor:"pointer",padding:"6px 8px",lineHeight:1,flexShrink:0,display:"flex",alignItems:"center",gap:3,borderRadius:6,background:vt.transConfirmada?"transparent":"rgba(245,185,66,0.15)"}}
+                    onClick={e=>{e.stopPropagation();e.preventDefault();onVerConfirmaciones&&onVerConfirmaciones(c.dia);}}
+                    onTouchEnd={e=>{e.stopPropagation();e.preventDefault();onVerConfirmaciones&&onVerConfirmaciones(c.dia);}}
                     title={vt.transConfirmada?"Transfer. confirmada — tocá para desmarcar":"Tocá para confirmar transferencia"}>
                     <span style={{fontSize:15}}>{vt.transConfirmada?"🟢":"🔴"}</span>
                     {!vt.transConfirmada&&<span style={{fontSize:11,fontWeight:500,color:"#f5b942"}}>{fmt(vt.pagadoNum||vt.neto||0)}</span>}
