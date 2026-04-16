@@ -11,7 +11,7 @@
   <title>La Catalina · Reparto</title>
   <script>
     if('serviceWorker' in navigator){
-      const CACHE = 'lc-v24';
+      const CACHE = 'lc-v14';
       const ASSETS = [
         'https://unpkg.com/react@18/umd/react.production.min.js',
         'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -54,6 +54,7 @@ self.addEventListener('fetch',e=>{
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   
   <script>
     var firebaseConfig = {
@@ -68,12 +69,18 @@ self.addEventListener('fetch',e=>{
       if(!firebase.apps || !firebase.apps.length) {
         firebase.initializeApp(firebaseConfig);
       }
-      window.db = firebase.firestore();
-    } catch(e) { console.error("Firebase init error:", e); window.db = null; }
+      window.db   = firebase.firestore();
+      window.auth = firebase.auth();
+    } catch(e) { console.error("Firebase init error:", e); window.db = null; window.auth = null; }
 
-    function cloudSave(data) {
-      if(!window.db) return Promise.resolve(false);
-      var col = window.db.collection("lc2");
+    // Colección por usuario — cada cuenta tiene su propio espacio
+    function userCol(uid) {
+      return window.db.collection("users").doc(uid).collection("datos");
+    }
+
+    function cloudSave(data, uid) {
+      if(!window.db || !uid) return Promise.resolve(false);
+      var col = userCol(uid);
       var saves = [
         col.doc("config").set({
           planillas: data.planillas || {},
@@ -82,32 +89,30 @@ self.addEventListener('fetch',e=>{
           noVisitas: data.noVisitas || [],
           cargasDia: data.cargasDia || {},
           recordatorios: data.recordatorios || [],
-          prospectos: data.prospectos || []
+          prospectos: data.prospectos || [],
+          negocio: data.negocio || {}
         })
       ];
-      // clientes en chunks de 50
       var cl = data.clientes || [];
       var nc = Math.ceil(cl.length/50)||1;
       saves.push(col.doc("clientes_meta").set({n:nc,total:cl.length}));
       for(var i=0;i<nc;i++){
         saves.push(col.doc("cl_"+i).set({d:cl.slice(i*50,i*50+50)}));
       }
-      // ventas en chunks de 80
       var vt = data.ventas || [];
       var nv = Math.ceil(vt.length/80)||1;
       saves.push(col.doc("ventas_meta").set({n:nv,total:vt.length}));
       for(var j=0;j<nv;j++){
         saves.push(col.doc("vt_"+j).set({d:vt.slice(j*80,j*80+80)}));
       }
-      // prospectos
       var pr = data.prospectos || [];
       saves.push(col.doc("prospectos").set({d:pr}));
       return Promise.all(saves).then(function(){return true;}).catch(function(e){console.error("Save err",e);return false;});
     }
 
-    function cloudLoad() {
-      if(!window.db) return Promise.resolve(null);
-      var col = window.db.collection("lc2");
+    function cloudLoad(uid) {
+      if(!window.db || !uid) return Promise.resolve(null);
+      var col = userCol(uid);
       return Promise.all([
         col.doc("config").get(),
         col.doc("clientes_meta").get(),
@@ -118,8 +123,8 @@ self.addEventListener('fetch',e=>{
         if(!cfg.exists) return null;
         var data = cfg.data();
         if(!data.recordatorios) data.recordatorios = [];
-        if(!data.prospectos) data.prospectos = [];
-        // load clientes
+        if(!data.prospectos)    data.prospectos = [];
+        if(!data.negocio)       data.negocio = {};
         var nc = cMeta.exists ? (cMeta.data().n||0) : 0;
         var vn = vMeta.exists ? (vMeta.data().n||0) : 0;
         var cFetches = [];
@@ -129,8 +134,8 @@ self.addEventListener('fetch',e=>{
         return Promise.all(cFetches.concat(vFetches)).then(function(docs) {
           var cDocs = docs.slice(0,nc);
           var vDocs = docs.slice(nc);
-          data.clientes = cDocs.reduce(function(a,d){return a.concat(d.exists?d.data().d:[]);}, []);
-          data.ventas   = vDocs.reduce(function(a,d){return a.concat(d.exists?d.data().d:[]);}, []);
+          data.clientes   = cDocs.reduce(function(a,d){return a.concat(d.exists?d.data().d:[]);}, []);
+          data.ventas     = vDocs.reduce(function(a,d){return a.concat(d.exists?d.data().d:[]);}, []);
           data.prospectos = prDoc.exists ? (prDoc.data().d||[]) : [];
           return data;
         });
@@ -224,171 +229,8 @@ const PRODUCTOS_CONFIG = [
 ];
 const GASTOS_CATEGORIAS = ["propina","mercado","gnc","gaseosa","uber","inflado","frutas","otro"];
 
-const CLIENTES_INICIALES = [
-  // ── Lunes (sin clientes aún) ──
-  // ── Martes (40 clientes) ──
-  {id:300,nombre:'Hidraulica jujuy',dia:'Martes',barrio:'Martes',manzana:'',lote:'',sector:'',calle:'jujuy',nro:'956',telefono:'3815748555',maps:'https://maps.app.goo.gl/rGaYqoACFgBKrjKEA',notas:'',sifon:0,bidon10:0,bidon20:2,orden:1,saldo:0},
-  {id:301,nombre:'Mz I L 1',dia:'Martes',barrio:'policial 3',manzana:'I',lote:'1',sector:'',telefono:'',maps:'https://maps.app.goo.gl/CQD1tC2Q43m74pNj6',notas:'',sifon:6,bidon10:0,bidon20:0,orden:2,saldo:0},
-  {id:302,nombre:'Mz I L 1',dia:'Martes',barrio:'policial 3',manzana:'I',lote:'1',sector:'',telefono:'3816849982',maps:'https://maps.app.goo.gl/CQD1tC2Q43m74pNj6',notas:'',sifon:6,bidon10:0,bidon20:0,orden:3,saldo:0},
-  {id:303,nombre:'Mz F L 28',dia:'Martes',barrio:'policial 3',manzana:'F',lote:'28',sector:'',telefono:'',maps:'https://maps.app.goo.gl/LBDnf1ZzwbqpFAXHA',notas:'',sifon:0,bidon10:1,bidon20:0,orden:4,saldo:0},
-  {id:304,nombre:'Mz B L 26',dia:'Martes',barrio:'policial 3',manzana:'B',lote:'26',sector:'',telefono:'',maps:'https://maps.app.goo.gl/bAEyfv52Ce1XDy9KA',notas:'',sifon:6,bidon10:0,bidon20:0,orden:5,saldo:0},
-  {id:305,nombre:'Centeno',dia:'Martes',barrio:'policial 3',manzana:'D',lote:'1',sector:'',telefono:'3813649985',maps:'https://maps.app.goo.gl/zFEjwUadd4r5EkQo9',notas:'',sifon:6,bidon10:2,bidon20:0,orden:6,saldo:0},
-  {id:306,nombre:'Juarez Analia',dia:'Martes',barrio:'lomas de tafi',manzana:'3',lote:'1',sector:'14',telefono:'3816660116',maps:'https://maps.app.goo.gl/Sp2e3YG3yUvwvc5A6',notas:'',sifon:0,bidon10:2,bidon20:0,orden:7,saldo:0},
-  {id:307,nombre:'Ditotto',dia:'Martes',barrio:'lomas 600',manzana:'16',lote:'33',sector:'',telefono:'3815460182',maps:'https://maps.app.goo.gl/yY3Z94oNducKALGa6',notas:'',sifon:6,bidon10:0,bidon20:0,orden:8,saldo:0},
-  {id:308,nombre:'Rodriguez',dia:'Martes',barrio:'lomas 600',manzana:'16',lote:'9',sector:'',telefono:'',maps:'https://maps.app.goo.gl/o8TGKVFQAMc3A1zp6',notas:'',sifon:0,bidon10:2,bidon20:0,orden:9,saldo:0},
-  {id:309,nombre:'Buggione',dia:'Martes',barrio:'lomas 600',manzana:'34',lote:'6',sector:'',telefono:'',maps:'https://maps.app.goo.gl/oWVS2fitmY1zUY6F6',notas:'',sifon:4,bidon10:3,bidon20:0,orden:10,saldo:0},
-  {id:310,nombre:'Mz 36 L 14',dia:'Martes',barrio:'Lomas 600',manzana:'36',lote:'14',sector:'',telefono:'3816142859',maps:'https://maps.app.goo.gl/C77rZ2i4EbXLLJKd6',notas:'',sifon:6,bidon10:5,bidon20:0,orden:11,saldo:0},
-  {id:311,nombre:'Zelaya',dia:'Martes',barrio:'Lomas 600',manzana:'35',lote:'24',sector:'',telefono:'3815264217',maps:'https://maps.app.goo.gl/KH7nq8dYjXeFaf8V8',notas:'',sifon:6,bidon10:0,bidon20:0,orden:12,saldo:0},
-  {id:312,nombre:'Tula',dia:'Martes',barrio:'Lomas 600',manzana:'29',lote:'28',sector:'',telefono:'3815869020',maps:'https://maps.app.goo.gl/Yr9zeDBD49BnnoSVA',notas:'',sifon:0,bidon10:2,bidon20:0,orden:13,saldo:0},
-  {id:313,nombre:'Morales',dia:'Martes',barrio:'Lomas 600',manzana:'30',lote:'26',sector:'',telefono:'3814496552',maps:'https://maps.app.goo.gl/FJeYKydi9M6rx8nEA',notas:'',sifon:6,bidon10:4,bidon20:0,orden:14,saldo:0},
-  {id:314,nombre:'Dallara',dia:'Martes',barrio:'Lomas 600',manzana:'32',lote:'2',sector:'',telefono:'3813025343',maps:'https://maps.app.goo.gl/MUb5Q3mAcgR8Xw3y8',notas:'',sifon:6,bidon10:3,bidon20:0,orden:15,saldo:0},
-  {id:315,nombre:'Ferreyra',dia:'Martes',barrio:'Lomas 600',manzana:'32',lote:'28',sector:'',telefono:'',maps:'https://maps.app.goo.gl/LBaY7PEa793NGEb77',notas:'',sifon:6,bidon10:2,bidon20:0,orden:16,saldo:0},
-  {id:316,nombre:'Mz 4 L 2 S14',dia:'Martes',barrio:'lomas de tafi',manzana:'4',lote:'2',sector:'14',telefono:'',maps:'https://maps.app.goo.gl/5V5nU4RVQnccsWtB9',notas:'',sifon:6,bidon10:0,bidon20:0,orden:17,saldo:0},
-  {id:317,nombre:'Olibera',dia:'Martes',barrio:'lomas de tafi',manzana:'4',lote:'2',sector:'14',telefono:'3814094412',maps:'https://maps.app.goo.gl/5V5nU4RVQnccsWtB9',notas:'',sifon:10,bidon10:0,bidon20:0,orden:18,saldo:0},
-  {id:318,nombre:'Parajon',dia:'Martes',barrio:'lomas de tafi',manzana:'4',lote:'2',sector:'14',telefono:'3816407303',maps:'https://maps.app.goo.gl/5V5nU4RVQnccsWtB9',notas:'',sifon:6,bidon10:4,bidon20:0,orden:19,saldo:0},
-  {id:319,nombre:'Betancur',dia:'Martes',barrio:'lomas 600',manzana:'32',lote:'11',sector:'',telefono:'3814950093',maps:'https://maps.app.goo.gl/Xjut38tbq13BF3ut8',notas:'',sifon:0,bidon10:0,bidon20:2,orden:20,saldo:0},
-  {id:320,nombre:'Moyano Maria Mercedes perritos',dia:'Martes',barrio:'lomas de tafi',manzana:'8',lote:'2',sector:'14',telefono:'3816289740',maps:'https://maps.app.goo.gl/4G1vTUc7L3kMFsgy5',notas:'',sifon:10,bidon10:2,bidon20:0,orden:21,saldo:0},
-  {id:321,nombre:'morocha policia',dia:'Martes',barrio:'lomas 600',manzana:'30',lote:'14',sector:'',telefono:'3815296950',maps:'https://maps.app.goo.gl/cedDWTZPT7ng4BVK9',notas:'',sifon:4,bidon10:2,bidon20:0,orden:22,saldo:0},
-  {id:322,nombre:'mo',dia:'Martes',barrio:'Lomas 600',manzana:'19',lote:'13',sector:'',telefono:'',maps:'https://maps.app.goo.gl/PTnSvXgX587TiNh4A',notas:'',sifon:0,bidon10:3,bidon20:0,orden:23,saldo:0},
-  {id:323,nombre:'Castaño Valeria',dia:'Martes',barrio:'Lomas 600',manzana:'19',lote:'2',sector:'',telefono:'3812032368',maps:'https://maps.app.goo.gl/hpZEt5hLfWmdaf3DA',notas:'',sifon:4,bidon10:2,bidon20:0,orden:24,saldo:0},
-  {id:324,nombre:'Montes de Oca',dia:'Martes',barrio:'Lomas 600',manzana:'38',lote:'20',sector:'',telefono:'3815729379',maps:'https://maps.app.goo.gl/yB7MNa2saymB1d3V8',notas:'',sifon:2,bidon10:0,bidon20:2,orden:25,saldo:0},
-  {id:325,nombre:'frente',dia:'Martes',barrio:'Lomas 600',manzana:'2',lote:'32',sector:'',telefono:'',maps:'https://maps.app.goo.gl/9btkJtAcqDGYA3xc9',notas:'',sifon:6,bidon10:0,bidon20:0,orden:26,saldo:0},
-  {id:326,nombre:'fondo',dia:'Martes',barrio:'Lomas 600',manzana:'2',lote:'32',sector:'',telefono:'',maps:'https://maps.app.goo.gl/9btkJtAcqDGYA3xc9',notas:'',sifon:6,bidon10:1,bidon20:0,orden:27,saldo:0},
-  {id:327,nombre:'Mz 2 L 33 Sfrente',dia:'Martes',barrio:'ampliacion lomas 600',manzana:'2',lote:'33',sector:'frente',telefono:'',maps:'https://maps.app.goo.gl/vbRX3HmC2MnqnEJ39',notas:'',sifon:4,bidon10:0,bidon20:0,orden:28,saldo:0},
-  {id:328,nombre:'Correnti',dia:'Martes',barrio:'Lomas 600',manzana:'24',lote:'16',sector:'',telefono:'3815549212',maps:'https://maps.app.goo.gl/X2Rx84Tfpgah8DSA9',notas:'',sifon:0,bidon10:5,bidon20:0,orden:29,saldo:0},
-  {id:329,nombre:'Molina',dia:'Martes',barrio:'Lomas 600',manzana:'24',lote:'15',sector:'',telefono:'',maps:'https://maps.app.goo.gl/jsT1vX8W4vqkXzxBA',notas:'',sifon:2,bidon10:3,bidon20:0,orden:30,saldo:0},
-  {id:330,nombre:'Mz 2 L 12 S10',dia:'Martes',barrio:'Lomas de tafi',manzana:'2',lote:'12',sector:'10',telefono:'',maps:'https://maps.app.goo.gl/vNnKrStReokrsamB7',notas:'',sifon:0,bidon10:0,bidon20:0,orden:31,saldo:0},
-  {id:331,nombre:'Paez',dia:'Martes',barrio:'Lomas 600',manzana:'25',lote:'12',sector:'',telefono:'3816761847',maps:'https://maps.app.goo.gl/XQ6Vxp7dH7LCHAU37',notas:'',sifon:0,bidon10:5,bidon20:0,orden:32,saldo:0},
-  {id:332,nombre:'Kocsis',dia:'Martes',barrio:'Lomas de tafi',manzana:'3',lote:'3',sector:'10',telefono:'3814013969',maps:'https://maps.app.goo.gl/5Vjk1gAPj7FbLUCW9',notas:'',sifon:0,bidon10:4,bidon20:0,orden:33,saldo:0},
-  {id:333,nombre:'Ayen',dia:'Martes',barrio:'Lomas de tafi',manzana:'7',lote:'17',sector:'10',telefono:'',maps:'https://maps.app.goo.gl/yXyV6cKkWfKhFDjRA',notas:'',sifon:0,bidon10:1,bidon20:0,orden:34,saldo:0},
-  {id:334,nombre:'Pajon',dia:'Martes',barrio:'Lomas de tafi',manzana:'5',lote:'2',sector:'9',telefono:'',maps:'https://maps.app.goo.gl/T4frXMNG7sw6uVDP9',notas:'',sifon:6,bidon10:0,bidon20:0,orden:35,saldo:0},
-  {id:335,nombre:'Maza',dia:'Martes',barrio:'Lomas de tafi',manzana:'7',lote:'8',sector:'9',telefono:'',maps:'https://maps.app.goo.gl/Rhtn3JzLWsK3FBn37',notas:'',sifon:6,bidon10:0,bidon20:0,orden:36,saldo:0},
-  {id:336,nombre:'gordita',dia:'Martes',barrio:'Lomas de tafi',manzana:'4',lote:'55',sector:'11',telefono:'3814643161',maps:'https://maps.app.goo.gl/mwbZ3yKcAKPWqWHi7',notas:'',sifon:0,bidon10:4,bidon20:0,orden:37,saldo:0},
-  {id:337,nombre:'Mz 4 L 45 S11',dia:'Martes',barrio:'Lomas de tafi',manzana:'4',lote:'45',sector:'11',telefono:'3814751905',maps:'https://maps.app.goo.gl/LpgTAnVsm5jMr1ED6',notas:'',sifon:4,bidon10:0,bidon20:1,orden:38,saldo:0},
-  {id:338,nombre:'Ayunta',dia:'Martes',barrio:'lomas de tafi',manzana:'9',lote:'7',sector:'10',telefono:'3815210786',maps:'https://maps.app.goo.gl/5SAhTpcDm2xkjrCZ6',notas:'',sifon:0,bidon10:5,bidon20:0,orden:39,saldo:0},
-  {id:339,nombre:'Salinas policia',dia:'Martes',barrio:'Lomas de tafi',manzana:'1',lote:'7',sector:'12',telefono:'3815815024',maps:'https://maps.app.goo.gl/kZLGy8PJCQUxF3be8',notas:'',sifon:0,bidon10:0,bidon20:3,orden:40,saldo:0},
-  // ── Miércoles (32 clientes) ──
-  {id:400,nombre:'Blanquez Nancy',dia:'Miércoles',barrio:'villa 9 de julio',manzana:'',lote:'',sector:'',calle:'diego de villarroel',nro:'4',telefono:'3813044048',maps:'https://maps.app.goo.gl/Y6zDDe6euHZPpen46',notas:'',sifon:0,bidon10:4,bidon20:0,orden:1,saldo:0},
-  {id:401,nombre:'Dani tec service',dia:'Miércoles',barrio:'villa 9 de julio',manzana:'',lote:'',sector:'',calle:'diego de villarroel',nro:'25',telefono:'3814631525',maps:'https://maps.app.goo.gl/74S8Yi8tKvcadxpG6',notas:'',sifon:0,bidon10:4,bidon20:0,orden:2,saldo:0},
-  {id:402,nombre:'Vazque torres Florencia',dia:'Miércoles',barrio:'villa 9 de julio',manzana:'',lote:'',sector:'',calle:'Juramento',nro:'59',telefono:'3816292382',maps:'https://maps.app.goo.gl/2SJ3V8MqeNPAqQJy6',notas:'',sifon:4,bidon10:3,bidon20:0,orden:3,saldo:0},
-  {id:403,nombre:'Sanchez',dia:'Miércoles',barrio:'villa 9 de julio',manzana:'',lote:'',sector:'',calle:'psj 1 de mayo',nro:'73',telefono:'',maps:'https://maps.app.goo.gl/Yerc2ssKGZNqAbU29',notas:'',sifon:6,bidon10:2,bidon20:0,orden:4,saldo:0},
-  {id:404,nombre:'Torres',dia:'Miércoles',barrio:'villa 9 de julio',manzana:'',lote:'',sector:'',calle:'salas y valdez',nro:'1230',telefono:'3814733611',maps:'https://maps.app.goo.gl/C2s4WdiShHCwPrFcA',notas:'',sifon:0,bidon10:4,bidon20:0,orden:5,saldo:0},
-  {id:405,nombre:'Lopez',dia:'Miércoles',barrio:'villa 9 de julio',manzana:'',lote:'',sector:'',calle:'psj 1 de mayo',nro:'869',telefono:'',maps:'https://maps.app.goo.gl/3TYepVvDkZq6xCFK9',notas:'',sifon:6,bidon10:0,bidon20:0,orden:6,saldo:0},
-  {id:406,nombre:'Rodriguez',dia:'Miércoles',barrio:'villa 9 de julio',manzana:'',lote:'',sector:'',calle:'Juramento',nro:'964',telefono:'',maps:'https://maps.app.goo.gl/ER7zj8CagWWBmXLw9',notas:'',sifon:6,bidon10:0,bidon20:0,orden:7,saldo:0},
-  {id:407,nombre:'psj oncativo 884',dia:'Miércoles',barrio:'villa 9 de julio',manzana:'',lote:'',sector:'',calle:'psj oncativo',nro:'884',telefono:'3814015909',maps:'https://maps.app.goo.gl/qxmQT25ngmsJMDnS8',notas:'',sifon:0,bidon10:4,bidon20:0,orden:8,saldo:0},
-  {id:408,nombre:'Ruiz Gabriela',dia:'Miércoles',barrio:'villa 9 de julio',manzana:'',lote:'',sector:'',calle:'psj oncativo',nro:'876',telefono:'3814723586',maps:'https://maps.app.goo.gl/9yMFGpiFmqj5vfwj6',notas:'',sifon:0,bidon10:0,bidon20:3,orden:9,saldo:0},
-  {id:409,nombre:'Raul colombres 266',dia:'Miércoles',barrio:'villa 9 de julio',manzana:'',lote:'',sector:'',calle:'Raul colombres',nro:'266',telefono:'',maps:'https://maps.app.goo.gl/SojR4Ff7WWKs2ayT6',notas:'',sifon:0,bidon10:1,bidon20:0,orden:10,saldo:0},
-  {id:410,nombre:'Verduleria',dia:'Miércoles',barrio:'villa Urquiza',manzana:'',lote:'',sector:'',calle:'Muñecas',nro:'1771',telefono:'',maps:'https://maps.app.goo.gl/jdbcRvpH5aJFaqwz7',notas:'',sifon:0,bidon10:2,bidon20:0,orden:11,saldo:0},
-  {id:411,nombre:'Zamorano',dia:'Miércoles',barrio:'villa Urquiza',manzana:'',lote:'',sector:'',calle:'Jose colombres',nro:'1699',telefono:'3815315037',maps:'https://maps.app.goo.gl/UjvCsrofzFLMJSK49',notas:'',sifon:0,bidon10:3,bidon20:0,orden:12,saldo:0},
-  {id:412,nombre:'Conegliano Enzo',dia:'Miércoles',barrio:'villa Urquiza',manzana:'',lote:'',sector:'',calle:'Jose colombres',nro:'1671',telefono:'3815803752',maps:'https://maps.app.goo.gl/skoydKWzsPCv1yct7',notas:'',sifon:0,bidon10:0,bidon20:1,orden:13,saldo:0},
-  {id:413,nombre:'Cheli',dia:'Miércoles',barrio:'villa Urquiza',manzana:'',lote:'',sector:'',calle:'Jose colombres',nro:'1649',telefono:'',maps:'https://maps.app.goo.gl/xCCmSxjNjtm2ZHsdA',notas:'',sifon:0,bidon10:5,bidon20:0,orden:14,saldo:0},
-  {id:414,nombre:'taller Juarez',dia:'Miércoles',barrio:'villa 9 de julio',manzana:'',lote:'',sector:'',calle:'alvarez condarco',nro:'49',telefono:'',maps:'https://maps.app.goo.gl/nY3E9pLt5wLKoBEp8',notas:'',sifon:10,bidon10:2,bidon20:0,orden:15,saldo:0},
-  {id:415,nombre:'Jimenez',dia:'Miércoles',barrio:'villa 9 de julio',manzana:'',lote:'',sector:'',calle:'psj gardel',nro:'1186',telefono:'',maps:'https://maps.app.goo.gl/E3pooti2cyJCW7XZ7',notas:'',sifon:8,bidon10:0,bidon20:0,orden:16,saldo:0},
-  {id:416,nombre:'Albornoz',dia:'Miércoles',barrio:'villa 9 de julio',manzana:'',lote:'',sector:'',calle:'lopez y planes',nro:'1274',telefono:'',maps:'https://maps.app.goo.gl/e43tGp4g4qKrZ1WXA',notas:'',sifon:0,bidon10:0,bidon20:2,orden:17,saldo:0},
-  {id:417,nombre:'Barraza Almacen',dia:'Miércoles',barrio:'villa 9 de julio',manzana:'',lote:'',sector:'',calle:'psj mario brvo',nro:'2444',telefono:'',maps:'https://maps.app.goo.gl/joG8YEYF226jrRJFA',notas:'',sifon:6,bidon10:0,bidon20:0,orden:18,saldo:0},
-  {id:418,nombre:'Cabrera',dia:'Miércoles',barrio:'ampliacion viluco',manzana:'bajo la autopista',lote:'',sector:'',calle:'colectora',nro:'',telefono:'',maps:'https://maps.app.goo.gl/EoVS6SPpwXdbUHXX8',notas:'',sifon:6,bidon10:0,bidon20:1,orden:19,saldo:0},
-  {id:419,nombre:'Abregu',dia:'Miércoles',barrio:'ampliacion viluco',manzana:'A',lote:'15',sector:'',calle:'colectora',nro:'',telefono:'3813337578',maps:'https://maps.app.goo.gl/Kv1vPqRSb3RUML3WA',notas:'',sifon:2,bidon10:4,bidon20:0,orden:20,saldo:0},
-  {id:420,nombre:'Britos',dia:'Miércoles',barrio:'ampliacion viluco',manzana:'fondo',lote:'',sector:'',calle:'lopez y planes',nro:'1550',telefono:'3815185483',maps:'https://maps.app.goo.gl/1najCL5ZBzK5W2BK7',notas:'',sifon:0,bidon10:0,bidon20:2,orden:21,saldo:0},
-  {id:421,nombre:'Taller Ledesma',dia:'Miércoles',barrio:'ampliacion viluco',manzana:'B',lote:'14',sector:'',telefono:'',maps:'https://maps.app.goo.gl/VrsrvpsBvh5zAH4H6',notas:'',sifon:0,bidon10:0,bidon20:2,orden:22,saldo:0},
-  {id:422,nombre:'Gimenez',dia:'Miércoles',barrio:'Viluco',manzana:'H',lote:'23',sector:'',calle:'Raul colombres',nro:'1500',telefono:'',maps:'https://maps.app.goo.gl/nWsqbyZXWKWWLtF26',notas:'',sifon:2,bidon10:1,bidon20:0,orden:23,saldo:0},
-  {id:423,nombre:'Ortega Claudia',dia:'Miércoles',barrio:'ampliacion viluco',manzana:'edificio',lote:'',sector:'',calle:'Raul colombres',nro:'1574',telefono:'3855770903',maps:'https://maps.app.goo.gl/BEL5zkz9Yc5LRuPm6',notas:'',sifon:0,bidon10:0,bidon20:1,orden:24,saldo:0},
-  {id:424,nombre:'Gorosito Santiagueña',dia:'Miércoles',barrio:'ampliacion viluco',manzana:'',lote:'F',sector:'',telefono:'3813361688',maps:'https://maps.app.goo.gl/TFJWpE3DKntecRZk9',notas:'',sifon:0,bidon10:0,bidon20:1,orden:25,saldo:0},
-  {id:425,nombre:'Viejita',dia:'Miércoles',barrio:'ampliacion viluco',manzana:'',lote:'F',sector:'',telefono:'',maps:'https://maps.app.goo.gl/AE13sec5pDv6bkGL6',notas:'',sifon:0,bidon10:1,bidon20:0,orden:26,saldo:0},
-  {id:426,nombre:'Antolini',dia:'Miércoles',barrio:'Viluco',manzana:'',lote:'H',sector:'',telefono:'3816662778',maps:'https://maps.app.goo.gl/Z2iLA7EHLFhC3pvV7',notas:'',sifon:0,bidon10:3,bidon20:0,orden:27,saldo:0},
-  {id:427,nombre:'Soria',dia:'Miércoles',barrio:'Viluco',manzana:'',lote:'G',sector:'',telefono:'',maps:'https://maps.app.goo.gl/AJWgmGXj2Jorbxdx5',notas:'',sifon:0,bidon10:0,bidon20:1,orden:28,saldo:0},
-  {id:428,nombre:'Moreno',dia:'Miércoles',barrio:'Viluco',manzana:'',lote:'H',sector:'',telefono:'',maps:'https://maps.app.goo.gl/8qAWsC6D1LSWzgSb8',notas:'',sifon:10,bidon10:1,bidon20:1,orden:29,saldo:0},
-  {id:429,nombre:'Figueria',dia:'Miércoles',barrio:'Viluco',manzana:'',lote:'F',sector:'',telefono:'3814178895',maps:'https://maps.app.goo.gl/kkw8vkRKg8t2vRk6A',notas:'',sifon:8,bidon10:0,bidon20:0,orden:30,saldo:0},
-  {id:430,nombre:'Cliente Mi 31',dia:'Miércoles',barrio:'rivera del sali',manzana:'',lote:'',sector:'',telefono:'',maps:'https://maps.app.goo.gl/p8haYj3x8JaZ2Ds4A',notas:'',sifon:0,bidon10:1,bidon20:0,orden:31,saldo:0},
-  {id:431,nombre:'Cliente Mi 32',dia:'Miércoles',barrio:'rivera del sali',manzana:'',lote:'',sector:'',telefono:'',maps:'https://maps.app.goo.gl/YLjwfvzjpHnodMW46',notas:'',sifon:4,bidon10:2,bidon20:0,orden:32,saldo:0},
-  // ── Jueves (51 clientes) ──
-  {id:500,nombre:'Albertus',dia:'Jueves',barrio:'Jueves',manzana:'',lote:'',sector:'',calle:'larrea',nro:'379',telefono:'3815552666',maps:'https://maps.app.goo.gl/SWVZJeyAfsk3mN1x6',notas:'',sifon:0,bidon10:5,bidon20:0,orden:1,saldo:0},
-  {id:501,nombre:'Barrionuevo nena',dia:'Jueves',barrio:'Diza',manzana:'',lote:'',sector:'',calle:'ayacucho',nro:'2732',telefono:'',maps:'https://maps.app.goo.gl/qZxE4VACN1D9dbyx6',notas:'',sifon:4,bidon10:1,bidon20:0,orden:2,saldo:0},
-  {id:502,nombre:'av democracia 800 (block 8 depto 2 pb)',dia:'Jueves',barrio:'grafico',manzana:'',lote:'',sector:'',calle:'av democracia',nro:'800',aclaracion:'block 8 depto 2 pb',telefono:'3812183515',maps:'https://maps.app.goo.gl/WNcxBTpsBp7r3vZk7',notas:'',sifon:0,bidon10:0,bidon20:3,orden:3,saldo:0},
-  {id:503,nombre:'av democrcia 800 (block 4 depto 5 pb)',dia:'Jueves',barrio:'grafico',manzana:'',lote:'',sector:'',calle:'av democrcia',nro:'800',aclaracion:'block 4 depto 5 pb',telefono:'3816120204',maps:'https://maps.app.goo.gl/XJ3JGRZxi4TQ4vjTA',notas:'',sifon:6,bidon10:1,bidon20:0,orden:4,saldo:0},
-  {id:504,nombre:'Gutierrez',dia:'Jueves',barrio:'Jueves',manzana:'',lote:'',sector:'',calle:'av democracia',nro:'858',telefono:'3814640573',maps:'https://maps.app.goo.gl/XPG9j38MGTuzKs2cA',notas:'',sifon:0,bidon10:4,bidon20:0,orden:5,saldo:0},
-  {id:505,nombre:'Bazan de laguna 1100 (3° casa de rejas)',dia:'Jueves',barrio:'Jueves',manzana:'',lote:'',sector:'',calle:'Bazan de laguna',nro:'1100',aclaracion:'3° casa de rejas',telefono:'',maps:'https://maps.app.goo.gl/xMpnXzobQ2f1C4sNA',notas:'',sifon:0,bidon10:0,bidon20:1,orden:6,saldo:0},
-  {id:506,nombre:'Bustos',dia:'Jueves',barrio:'nonato',manzana:'',lote:'',sector:'',calle:'Ayacucho',nro:'3750',aclaracion:'casa esquina',telefono:'3815638501',maps:'https://maps.app.goo.gl/jUMcon1wG9YJP5FZ7',notas:'',sifon:0,bidon10:0,bidon20:2,orden:7,saldo:0},
-  {id:507,nombre:'Galvan',dia:'Jueves',barrio:'nonato',manzana:'',lote:'',sector:'',calle:'Buenos Aires',nro:'3750',aclaracion:'prton negr',telefono:'3816858571',maps:'https://maps.app.goo.gl/smP13V2EqfypHFqg8',notas:'',sifon:6,bidon10:3,bidon20:0,orden:8,saldo:0},
-  {id:508,nombre:'Alvarez',dia:'Jueves',barrio:'nonato',manzana:'H',lote:'',sector:'',aclaracion:'casa esquina',telefono:'',maps:'https://maps.app.goo.gl/XaW5LsWi8PzQ5nTMA',notas:'',sifon:6,bidon10:2,bidon20:0,orden:9,saldo:0},
-  {id:509,nombre:'Argañaraz',dia:'Jueves',barrio:'nonato',manzana:'G',lote:'',sector:'',telefono:'',maps:'https://maps.app.goo.gl/B1iSkiSGvFjPmy5J7',notas:'',sifon:6,bidon10:3,bidon20:0,orden:10,saldo:0},
-  {id:510,nombre:'Cliente Ju 11',dia:'Jueves',barrio:'nonato',manzana:'H',lote:'',sector:'',aclaracion:'Kiosco',telefono:'',maps:'https://maps.app.goo.gl/zZ6V1gMsNiBMjUF4A',notas:'',sifon:6,bidon10:1,bidon20:0,orden:11,saldo:0},
-  {id:511,nombre:'Luna',dia:'Jueves',barrio:'nonato',manzana:'D',lote:'',sector:'',telefono:'3815743212',maps:'https://maps.app.goo.gl/qeZoXQcjoELtxCo38',notas:'',sifon:0,bidon10:3,bidon20:0,orden:12,saldo:0},
-  {id:512,nombre:'Cliente Ju 13',dia:'Jueves',barrio:'nonato',manzana:'F',lote:'',sector:'',telefono:'',maps:'https://maps.app.goo.gl/gX8FbRhUUST9Wo797',notas:'',sifon:6,bidon10:0,bidon20:0,orden:13,saldo:0},
-  {id:513,nombre:'Calvo mama de sil',dia:'Jueves',barrio:'Jueves',manzana:'',lote:'',sector:'',calle:'Toedoro Combes',nro:'1120',telefono:'',maps:'https://maps.app.goo.gl/dofxJ53NfHkpfLLf9',notas:'',sifon:0,bidon10:0,bidon20:1,orden:14,saldo:0},
-  {id:514,nombre:'Barrera raul',dia:'Jueves',barrio:'lapacho sur',manzana:'L',lote:'',sector:'',calle:'frente a la via',nro:'',aclaracion:'porton negro',telefono:'3814186945',maps:'https://maps.app.goo.gl/aDQvv5cHHPctb3fE6',notas:'',sifon:6,bidon10:3,bidon20:0,orden:15,saldo:0},
-  {id:515,nombre:'señora rubia',dia:'Jueves',barrio:'lapacho sur',manzana:'L',lote:'',sector:'',calle:'frente a la via',nro:'',aclaracion:'señora rubia',telefono:'3814432064',maps:'https://maps.app.goo.gl/pGnKarLGzGU5HR3m8',notas:'',sifon:0,bidon10:0,bidon20:1,orden:16,saldo:0},
-  {id:516,nombre:'Bermudez',dia:'Jueves',barrio:'lapacho sur',manzana:'I',lote:'',sector:'',telefono:'',maps:'https://maps.app.goo.gl/owgDAsRX4a5UT4pF8',notas:'',sifon:12,bidon10:2,bidon20:0,orden:17,saldo:0},
-  {id:517,nombre:'Robles',dia:'Jueves',barrio:'lapacho sur',manzana:'H',lote:'',sector:'',telefono:'',maps:'https://maps.app.goo.gl/7Kau4VkkQA1UTaBC6',notas:'',sifon:6,bidon10:2,bidon20:0,orden:18,saldo:0},
-  {id:518,nombre:'Colima',dia:'Jueves',barrio:'lapacho sur',manzana:'I',lote:'',sector:'',calle:'ayacucho',nro:'3900',telefono:'3874069323',maps:'https://maps.app.goo.gl/CrZ8oGFn3hizEmkb7',notas:'',sifon:12,bidon10:3,bidon20:0,orden:19,saldo:0},
-  {id:519,nombre:'Mecanica dental',dia:'Jueves',barrio:'lapacho sur',manzana:'',lote:'',sector:'',calle:'Buenos Aires',nro:'3900',aclaracion:'piecita',telefono:'',maps:'https://maps.app.goo.gl/g94ptzFmzbxPgRnJA',notas:'',sifon:0,bidon10:2,bidon20:0,orden:20,saldo:0},
-  {id:520,nombre:'Orellana',dia:'Jueves',barrio:'lapacho sur',manzana:'E',lote:'',sector:'',calle:'Buenos Aires',nro:'4100',telefono:'3815118596',maps:'https://maps.app.goo.gl/FBPefzyvGrufSobV9',notas:'',sifon:12,bidon10:2,bidon20:0,orden:21,saldo:0},
-  {id:521,nombre:'Lazarte',dia:'Jueves',barrio:'lapacho sur',manzana:'C',lote:'',sector:'',telefono:'',maps:'https://maps.app.goo.gl/rGw9YHPuLtLWK4Mr9',notas:'',sifon:0,bidon10:2,bidon20:0,orden:22,saldo:0},
-  {id:522,nombre:'Barrionuevo calvo',dia:'Jueves',barrio:'lapacho sur',manzana:'C',lote:'',sector:'',telefono:'3814436824',maps:'https://maps.app.goo.gl/TYxs5jGB7Z4d6gtX9',notas:'',sifon:0,bidon10:0,bidon20:2,orden:23,saldo:0},
-  {id:523,nombre:'Vilca',dia:'Jueves',barrio:'lapacho sur',manzana:'',lote:'',sector:'',calle:'Ramon araujo',nro:'564',telefono:'',maps:'https://maps.app.goo.gl/h7wS9crLJY8TyhK8A',notas:'',sifon:0,bidon10:2,bidon20:0,orden:24,saldo:0},
-  {id:524,nombre:'Viejita',dia:'Jueves',barrio:'Jueves',manzana:'',lote:'',sector:'',calle:'Gral Savio',nro:'498',telefono:'',maps:'https://maps.app.goo.gl/q4NTvH9HFYbPjzmr5',notas:'',sifon:0,bidon10:2,bidon20:0,orden:25,saldo:0},
-  {id:525,nombre:'Gomez almacen',dia:'Jueves',barrio:'Jueves',manzana:'',lote:'',sector:'',calle:'congreso',nro:'4300',aclaracion:'frente a al via',telefono:'38132511219',maps:'https://maps.app.goo.gl/tivpPXDmYfhiqPgt7',notas:'',sifon:0,bidon10:1,bidon20:0,orden:26,saldo:0},
-  {id:526,nombre:'Navarro',dia:'Jueves',barrio:'Jueves',manzana:'',lote:'',sector:'',calle:'Entre rios',nro:'4300',aclaracion:'frente de block comedor',telefono:'',maps:'https://maps.app.goo.gl/88Zd7ie5VrmAY3vj6',notas:'',sifon:0,bidon10:0,bidon20:1,orden:27,saldo:0},
-  {id:527,nombre:'Altamiranda',dia:'Jueves',barrio:'360 viviendas',manzana:'Q',lote:'',sector:'',aclaracion:'casa esquina',telefono:'',maps:'https://maps.app.goo.gl/HXcZ2Eegh6FCSxVi9',notas:'',sifon:6,bidon10:0,bidon20:0,orden:28,saldo:0},
-  {id:528,nombre:'Romano',dia:'Jueves',barrio:'361 viviendas',manzana:'O',lote:'',sector:'',telefono:'',maps:'https://maps.app.goo.gl/BiV1KWSmtnRYQWqi8',notas:'',sifon:8,bidon10:0,bidon20:0,orden:29,saldo:0},
-  {id:529,nombre:'Polleria rufina nadia',dia:'Jueves',barrio:'Jueves',manzana:'',lote:'',sector:'',calle:'Gaspar lazalle',nro:'856',aclaracion:'Polleria rufina',telefono:'3815460457',maps:'https://maps.app.goo.gl/HzcHyaiEU7c7x8zo8',notas:'',sifon:0,bidon10:3,bidon20:0,orden:30,saldo:0},
-  {id:530,nombre:'Carrion',dia:'Jueves',barrio:'Jueves',manzana:'',lote:'',sector:'',calle:'Ramon araujo',nro:'612',telefono:'3813279223',maps:'https://maps.app.goo.gl/xjC3thq5WmWtxwee8',notas:'',sifon:0,bidon10:0,bidon20:1,orden:31,saldo:0},
-  {id:531,nombre:'Marrades',dia:'Jueves',barrio:'Blasco',manzana:'D',lote:'',sector:'',aclaracion:'disfraces',telefono:'3816455106',maps:'https://maps.app.goo.gl/KTrmXEiJxrcLckUQA',notas:'',sifon:0,bidon10:5,bidon20:0,orden:32,saldo:0},
-  {id:532,nombre:'librería merceria',dia:'Jueves',barrio:'CGT',manzana:'D',lote:'',sector:'',telefono:'',maps:'https://maps.app.goo.gl/EUmprW9JeZTcCTwd9',notas:'',sifon:0,bidon10:1,bidon20:0,orden:33,saldo:0},
-  {id:533,nombre:'Fernandez',dia:'Jueves',barrio:'Blasco',manzana:'B',lote:'',sector:'',telefono:'',maps:'https://maps.app.goo.gl/5LzvScbTLxnKa2We9',notas:'',sifon:0,bidon10:1,bidon20:0,orden:34,saldo:0},
-  {id:534,nombre:'Figueredo',dia:'Jueves',barrio:'Blasco',manzana:'C',lote:'',sector:'',telefono:'3816389764',maps:'https://maps.app.goo.gl/Lgx56FfUy6nbjwCC6',notas:'',sifon:0,bidon10:0,bidon20:2,orden:35,saldo:0},
-  {id:535,nombre:'Felichichi',dia:'Jueves',barrio:'Blasco',manzana:'C',lote:'',sector:'',telefono:'',maps:'https://maps.app.goo.gl/72Jy56tbR21tsvRW9',notas:'',sifon:6,bidon10:1,bidon20:0,orden:36,saldo:0},
-  {id:536,nombre:'Luna',dia:'Jueves',barrio:'Blasco',manzana:'B',lote:'',sector:'',aclaracion:'tortas',telefono:'3815409984',maps:'https://maps.app.goo.gl/tmVqnZLTbdLv8Yda8',notas:'',sifon:2,bidon10:0,bidon20:5,orden:37,saldo:0},
-  {id:537,nombre:'Ledesma',dia:'Jueves',barrio:'parque sur',manzana:'',lote:'',sector:'',calle:'Savio',nro:'735',telefono:'3816242088',maps:'https://maps.app.goo.gl/RnEjCS4GhTmcNfnY8',notas:'',sifon:4,bidon10:3,bidon20:0,orden:38,saldo:0},
-  {id:538,nombre:'sra mocha',dia:'Jueves',barrio:'parque sur',manzana:'',lote:'',sector:'',calle:'Carlos Maria Torres',nro:'790',aclaracion:'casa garnde',telefono:'3816518309',maps:'https://maps.app.goo.gl/8ESKMNvvMcr3e9Yx5',notas:'',sifon:0,bidon10:2,bidon20:0,orden:39,saldo:0},
-  {id:539,nombre:'verdulero',dia:'Jueves',barrio:'parque sur',manzana:'',lote:'',sector:'',calle:'Gaspar Lazalle',nro:'826',aclaracion:'gomero',telefono:'',maps:'https://maps.app.goo.gl/FhHZjAH6FQsMTTft7',notas:'',sifon:0,bidon10:1,bidon20:0,orden:40,saldo:0},
-  {id:540,nombre:'Dardo Molina 836 (fondo)',dia:'Jueves',barrio:'parque sur',manzana:'',lote:'',sector:'',calle:'Dardo Molina',nro:'836',aclaracion:'fondo',telefono:'3815005884',maps:'https://maps.app.goo.gl/YinE6JQsun92Pbkw6',notas:'',sifon:6,bidon10:0,bidon20:0,orden:41,saldo:0},
-  {id:541,nombre:'Heit',dia:'Jueves',barrio:'parque sur',manzana:'',lote:'',sector:'',calle:'Dardo Molina',nro:'868',aclaracion:'fondo 3',telefono:'3816605906',maps:'https://maps.app.goo.gl/dxUXW9RHxTGCej457',notas:'',sifon:6,bidon10:0,bidon20:1,orden:42,saldo:0},
-  {id:542,nombre:'Avila',dia:'Jueves',barrio:'parque sur',manzana:'',lote:'',sector:'',calle:'Dardo Molina',nro:'869',telefono:'3816703801',maps:'https://maps.app.goo.gl/TpXy2ijEnirJTDL99',notas:'',sifon:6,bidon10:0,bidon20:0,orden:43,saldo:0},
-  {id:543,nombre:'Nadia Rufina',dia:'Jueves',barrio:'los aguirrez',manzana:'',lote:'',sector:'',calle:'Ruta 157',nro:'',aclaracion:'entrada der 100 m 1 pasaje izq',telefono:'3815460457',maps:'https://maps.app.goo.gl/iuLL4SjAn95eyeTYA',notas:'',sifon:0,bidon10:0,bidon20:0,orden:44,saldo:0},
-  {id:544,nombre:'Rocio',dia:'Jueves',barrio:'los aguirrez',manzana:'',lote:'',sector:'',calle:'Ruta 157',nro:'',aclaracion:'entrada der 100 m 1 pasaje izq',telefono:'3815402513',maps:'https://maps.app.goo.gl/5C63wB2r1JV6sa936',notas:'',sifon:0,bidon10:0,bidon20:0,orden:45,saldo:0},
-  {id:545,nombre:'Ibañez',dia:'Jueves',barrio:'parque sur',manzana:'L',lote:'',sector:'',aclaracion:'juliana',telefono:'3816638921',maps:'https://maps.app.goo.gl/KDuEJgwwitDohd8b6',notas:'',sifon:6,bidon10:3,bidon20:0,orden:46,saldo:0},
-  {id:546,nombre:'Leiva maria',dia:'Jueves',barrio:'Jueves',manzana:'',lote:'',sector:'',calle:'Bazan de laguna 600',nro:'',telefono:'3815784042',maps:'https://maps.app.goo.gl/y9cPqg65wppMjoeq7',notas:'',sifon:0,bidon10:0,bidon20:2,orden:47,saldo:0},
-  {id:547,nombre:'Bazan de laguna 600',dia:'Jueves',barrio:'Jueves',manzana:'',lote:'',sector:'',calle:'Bazan de laguna 600',nro:'',telefono:'',maps:'https://maps.app.goo.gl/bh1Vmj3ExC6vyF7C6',notas:'',sifon:6,bidon10:0,bidon20:0,orden:48,saldo:0},
-  {id:548,nombre:'Gordita',dia:'Jueves',barrio:'Diza',manzana:'',lote:'',sector:'',calle:'Ayacucho',nro:'2662',aclaracion:'esquina',telefono:'3815564625',maps:'https://maps.app.goo.gl/mmqVkUjd7hZy8LyR8',notas:'',sifon:2,bidon10:0,bidon20:1,orden:49,saldo:0},
-  {id:549,nombre:'heladeria  Faty',dia:'Jueves',barrio:'Diza',manzana:'',lote:'',sector:'',calle:'Lopez Mañana',nro:'',aclaracion:'heladeria almacen',telefono:'3815867808',maps:'https://maps.app.goo.gl/UoRzyyGnrLYjyt5B7',notas:'',sifon:0,bidon10:2,bidon20:0,orden:50,saldo:0},
-  {id:550,nombre:'Gerez Osvaldo',dia:'Jueves',barrio:'el salvador',manzana:'',lote:'',sector:'',calle:'paj einstein',nro:'90',telefono:'3815030510',maps:'https://maps.app.goo.gl/TumGasaDtZ3HwVWj8',notas:'',sifon:8,bidon10:2,bidon20:0,orden:51,saldo:0},
-  // ── Viernes (29 clientes) ──
-  {id:600,nombre:'Bueno Lucia',dia:'Viernes',barrio:'country villago',manzana:'C',lote:'113',sector:'',telefono:'3816505887',maps:'https://maps.app.goo.gl/HrkuuEMGbQnnygk48',notas:'',sifon:10,bidon10:4,bidon20:0,orden:1,saldo:0},
-  {id:601,nombre:'Martin',dia:'Viernes',barrio:'country villago',manzana:'C',lote:'115',sector:'',telefono:'3816434006',maps:'https://maps.app.goo.gl/y5bEP1fDjnWeGkyC8',notas:'',sifon:6,bidon10:0,bidon20:0,orden:2,saldo:0},
-  {id:602,nombre:'Jorrat Adriana',dia:'Viernes',barrio:'country villago',manzana:'',lote:'64',sector:'',telefono:'3813008312',maps:'https://maps.app.goo.gl/L8DaB716WEaHaUrg7',notas:'',sifon:0,bidon10:0,bidon20:2,orden:3,saldo:0},
-  {id:603,nombre:'Ferreri Dante',dia:'Viernes',barrio:'country villago',manzana:'',lote:'',sector:'',telefono:'3816336694',maps:'https://maps.app.goo.gl/SKb9vaht9By5KyvX9',notas:'',sifon:6,bidon10:4,bidon20:0,orden:4,saldo:0},
-  {id:604,nombre:'Gomes Muñoz',dia:'Viernes',barrio:'country villago',manzana:'Q',lote:'42',sector:'',telefono:'3815644712',maps:'https://maps.app.goo.gl/ntwMa1L815stM1FNA',notas:'',sifon:10,bidon10:0,bidon20:0,orden:5,saldo:0},
-  {id:605,nombre:'Galvan natalia',dia:'Viernes',barrio:'country villago',manzana:'Q',lote:'52',sector:'',telefono:'3814771284',maps:'https://maps.app.goo.gl/E3UoY7eeTqrA55eF8',notas:'',sifon:6,bidon10:2,bidon20:0,orden:6,saldo:0},
-  {id:606,nombre:'Toledo Mirna',dia:'Viernes',barrio:'country villago',manzana:'k',lote:'72',sector:'',telefono:'3814488400',maps:'https://maps.app.goo.gl/5QpRLo3R8xGjG4V3A',notas:'',sifon:0,bidon10:0,bidon20:3,orden:7,saldo:0},
-  {id:607,nombre:'Lopez Guillermo',dia:'Viernes',barrio:'country villago',manzana:'n3',lote:'c9',sector:'',telefono:'3815951027',maps:'https://maps.app.goo.gl/GoCs2qbxA9N5rvdK7',notas:'',sifon:8,bidon10:4,bidon20:0,orden:8,saldo:0},
-  {id:608,nombre:'Lazarte dominga',dia:'Viernes',barrio:'country villago',manzana:'O',lote:'12',sector:'',telefono:'3815245562',maps:'https://maps.app.goo.gl/yHUmShTTWbuw8ehLA',notas:'',sifon:0,bidon10:0,bidon20:2,orden:9,saldo:0},
-  {id:609,nombre:'Ruiz Victor',dia:'Viernes',barrio:'country villago',manzana:'O',lote:'12',sector:'',telefono:'3815872111',maps:'https://maps.app.goo.gl/ebaNWQ9cbdbp64BZA',notas:'',sifon:18,bidon10:3,bidon20:0,orden:10,saldo:0},
-  {id:610,nombre:'Lilian vecino victor',dia:'Viernes',barrio:'country villago',manzana:'O',lote:'12',sector:'',telefono:'3815440144',maps:'https://maps.app.goo.gl/UGqtuZZmPoazQDH89',notas:'',sifon:10,bidon10:0,bidon20:0,orden:11,saldo:0},
-  {id:611,nombre:'Mz P L 19',dia:'Viernes',barrio:'17 de marzo-tula',manzana:'P',lote:'19',sector:'',telefono:'',maps:'https://maps.app.goo.gl/PYd1EkUJ9KxvJu5t9',notas:'',sifon:2,bidon10:2,bidon20:0,orden:12,saldo:0},
-  {id:612,nombre:'Mz I L 5 Slos positos',dia:'Viernes',barrio:'17 de marzo-tula',manzana:'I',lote:'5',sector:'los positos',telefono:'3813522856',maps:'https://maps.app.goo.gl/Q8sY7SVLaSRnwFxT7',notas:'',sifon:12,bidon10:3,bidon20:0,orden:13,saldo:0},
-  {id:613,nombre:'Mz F L 20 Slos positos',dia:'Viernes',barrio:'17 de marzo-tula',manzana:'F',lote:'20',sector:'los positos',telefono:'3812515996',maps:'https://maps.app.goo.gl/wSoCDVn49886f6nT6',notas:'',sifon:3,bidon10:3,bidon20:0,orden:14,saldo:0},
-  {id:614,nombre:'juarez',dia:'Viernes',barrio:'Tula2',manzana:'',lote:'5',sector:'',telefono:'3815339291',maps:'https://maps.app.goo.gl/jU8MZR7moYxC47Sm9',notas:'',sifon:6,bidon10:2,bidon20:0,orden:15,saldo:0},
-  {id:615,nombre:'Molina',dia:'Viernes',barrio:'Uta',manzana:'H',lote:'19',sector:'',telefono:'',maps:'https://maps.app.goo.gl/uS77bvJhxVvRx2cU6',notas:'',sifon:0,bidon10:2,bidon20:0,orden:16,saldo:0},
-  {id:616,nombre:'Del canal',dia:'Viernes',barrio:'Uta',manzana:'M',lote:'12',sector:'',telefono:'3816589487',maps:'https://maps.app.goo.gl/UZJns6FaxsjPAALAA',notas:'',sifon:4,bidon10:0,bidon20:0,orden:17,saldo:0},
-  {id:617,nombre:'suegra',dia:'Viernes',barrio:'Uta',manzana:'M',lote:'12',sector:'',telefono:'',maps:'https://maps.app.goo.gl/ie49ioprfXWeKxUg8',notas:'',sifon:0,bidon10:1,bidon20:0,orden:18,saldo:0},
-  {id:618,nombre:'Roldan',dia:'Viernes',barrio:'Uta',manzana:'E',lote:'9',sector:'',telefono:'2345655130',maps:'https://maps.app.goo.gl/sF2ewwJF9nQxsPnn7',notas:'',sifon:2,bidon10:5,bidon20:0,orden:19,saldo:0},
-  {id:619,nombre:'viejito plaza',dia:'Viernes',barrio:'Uta',manzana:'plaza',lote:'palmera',sector:'frente',telefono:'',maps:'https://maps.app.goo.gl/hBcztwjzaJCcganLA',notas:'',sifon:0,bidon10:0,bidon20:1,orden:20,saldo:0},
-  {id:620,nombre:'Bartolome',dia:'Viernes',barrio:'Uta',manzana:'A',lote:'2',sector:'',telefono:'',maps:'https://maps.app.goo.gl/RSPArRhmvKhk4gNQ9',notas:'',sifon:0,bidon10:2,bidon20:0,orden:21,saldo:0},
-  {id:621,nombre:'Cliente Vi 22',dia:'Viernes',barrio:'130 VIviendas',manzana:'',lote:'',sector:'',telefono:'',maps:'https://maps.app.goo.gl/nMK3yG5aW5YfdiQY8',notas:'',sifon:0,bidon10:0,bidon20:0,orden:22,saldo:0},
-  {id:622,nombre:'Villa',dia:'Viernes',barrio:'130 VIviendas',manzana:'2',lote:'18',sector:'',telefono:'3813391089',maps:'https://maps.app.goo.gl/gg2HzNVTZCoCRY4E7',notas:'',sifon:0,bidon10:1,bidon20:0,orden:23,saldo:0},
-  {id:623,nombre:'Lazarte',dia:'Viernes',barrio:'130 VIviendas',manzana:'9',lote:'12',sector:'esquina',telefono:'',maps:'https://maps.app.goo.gl/N9NXcZbCSR4xhEkV7',notas:'',sifon:6,bidon10:1,bidon20:0,orden:24,saldo:0},
-  {id:624,nombre:'Alvarez',dia:'Viernes',barrio:'130 Viviendas',manzana:'8',lote:'6',sector:'',telefono:'',maps:'https://maps.app.goo.gl/ob2cDjR5KjPYea677',notas:'',sifon:6,bidon10:0,bidon20:0,orden:25,saldo:0},
-  {id:625,nombre:'Velazquez',dia:'Viernes',barrio:'130 VIviendas',manzana:'8',lote:'8',sector:'',telefono:'3816447084',maps:'https://maps.app.goo.gl/AEsouQwuDS4xMv5e7',notas:'',sifon:6,bidon10:1,bidon20:0,orden:26,saldo:0},
-  {id:626,nombre:'Gasero',dia:'Viernes',barrio:'130 VIviendas',manzana:'',lote:'',sector:'',telefono:'',maps:'https://maps.app.goo.gl/ya1rgLAF61gNVhtr6',notas:'',sifon:6,bidon10:0,bidon20:0,orden:27,saldo:0},
-  {id:627,nombre:'Cliente Vi 28',dia:'Viernes',barrio:'130 VIviendas',manzana:'',lote:'',sector:'',telefono:'',maps:'https://maps.app.goo.gl/rAAbZNPwNAb6d6oN9',notas:'',sifon:0,bidon10:1,bidon20:0,orden:28,saldo:0},
-  {id:628,nombre:'Cliente Vi 29',dia:'Viernes',barrio:'130 VIviendas',manzana:'',lote:'',sector:'',telefono:'',maps:'https://maps.app.goo.gl/rd5TVot6b1ZQXQVZ9',notas:'',sifon:2,bidon10:1,bidon20:0,orden:29,saldo:0},
-];
-
-const PRODUCTOS_INICIALES = [
-  { id:1, nombre:"Sifón 1.5L", precio:800,  costo:133.33 },
-  { id:2, nombre:"Bidón 10L",  precio:2500, costo:800 },
-  { id:3, nombre:"Bidón 20L",  precio:5000, costo:800 },
-];
+const PRODUCTOS_INICIALES = [];
+const CLIENTES_INICIALES  = [];
 
 const planillaDiaVacia = () => ({
   fecha:"", peso:"", bultos:"",
@@ -497,11 +339,13 @@ function comprimirFoto(file, maxW=800, quality=0.75) {
 function App() {
   const [pantalla, setPantalla]   = useState(()=>{
     const h = window.location.hash.slice(1)||"portada";
-    const needsDia = ["diaPrincipal","selectorFechaClientes","selectorFechaPlanilla","inicioReparto","clientes","detalleCliente","venta","planilla"]; // historial does NOT need dia
+    const needsDia = ["diaPrincipal","selectorFechaClientes","selectorFechaPlanilla","inicioReparto","clientes","detalleCliente","venta","planilla"];
     const savedDia = (() => { try { return JSON.parse(localStorage.getItem("cat_dia_actual")||'""'); } catch{ return ""; } })();
     if(needsDia.includes(h) && !savedDia) return "portada";
     return h;
   });
+  const [negocio, setNegocio]       = useState("");
+  const [onboarding, setOnboarding] = useState(false);
   const [diaActual, setDiaActual]   = useLS("cat_dia_actual", "");
   // Reset diaActual when it's invalid
   React.useEffect(()=>{
@@ -510,6 +354,7 @@ function App() {
   const [fechaActual, setFechaActual] = useLS("cat_fecha_actual", ""); // ISO date key YYYY-MM-DD
   const [fechaObj, setFechaObj]   = useState(null);
   const [clienteId, setClienteId] = useState(null);
+  const [ventaLibreFecha, setVentaLibreFecha] = useState(()=>new Date().toISOString().slice(0,10));
   const [noVisitas, setNoVisitas] = useLS("cat_novisitas_v1", []);
   const [prospectos, setProspectos] = useLS("cat_prospectos_v1", []);
   const [recordatorios, setRecordatorios] = useLS("cat_recordatorios_v1", []);
@@ -581,9 +426,6 @@ function App() {
   const [syncStatus, setSyncStatus] = useState("idle");
   const [cloudSetup, setCloudSetup] = useState(false);
   const [darkMode, setDarkMode]   = useLS("cat_darkmode", false);
-  const [scaleIdx, setScaleIdx]   = useLS("cat_scale_v1", 1); // 0=S 1=M 2=L 3=XL
-  const SCALES = [0.82, 1.0, 1.18, 1.36];
-  const SCALE_LABELS = ["S","M","L","XL"];
 
   // Apply dark/light mode toggle over base dark theme
   React.useEffect(()=>{
@@ -629,11 +471,15 @@ function App() {
   // Al iniciar, si hay credenciales guardadas, cargar datos de la nube
   const { useEffect } = React;
   useEffect(() => {
-    if (!apiKey || !binId) return;
-    setSyncStatus("saving");
+    if (!uid) return;
     setSyncStatus("loading");
-    cloudLoad().then(function(data) {
-      if(!data) { setSyncStatus("idle"); return; }
+    cloudLoad(uid).then(function(data) {
+      if(!data) {
+        // Usuario nuevo → mostrar onboarding
+        setOnboarding(true);
+        setSyncStatus("idle");
+        return;
+      }
       if (data.clientes?.length)   setClientes(data.clientes);
       if (data.ventas?.length)     setVentasRaw(data.ventas);
       if (data.planillas)          setPlanillas(data.planillas);
@@ -650,10 +496,11 @@ function App() {
       if (data.noVisitas?.length)  setNoVisitas(data.noVisitas);
       if (data.prospectos?.length) setProspectos(data.prospectos);
       if (data.recordatorios?.length) setRecordatorios(data.recordatorios);
+      if (data.negocio?.nombre)    setNegocio(data.negocio.nombre);
       setSyncStatus("saved");
       setTimeout(()=>setSyncStatus("idle"), 2000);
     });
-  }, []);
+  }, [uid]);
 
   // Ref siempre actualizado — evita datos viejos en el debounce
   const estadoRef = React.useRef({clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios});
@@ -682,11 +529,11 @@ function App() {
   },[]);
 
   const syncData = (overrides={}) => {
-    if(!window.db) return;
+    if(!window.db || !uid) return;
     setSyncStatus("saving");
-    const data = { ...estadoRef.current, ...overrides, noVisitas: estadoRef.current.noVisitas||[], prospectos: estadoRef.current.prospectos||[], recordatorios: estadoRef.current.recordatorios||[] };
+    const data = { ...estadoRef.current, ...overrides, noVisitas: estadoRef.current.noVisitas||[], prospectos: estadoRef.current.prospectos||[], recordatorios: estadoRef.current.recordatorios||[], negocio:{nombre:negocio} };
     estadoRef.current = data;
-    debounceSave(() => cloudSave(data).then(function(ok){setSyncStatus(ok?"saved":"error");}).catch(function(){setSyncStatus("error");}));
+    debounceSave(() => cloudSave(data, uid).then(function(ok){setSyncStatus(ok?"saved":"error");}).catch(function(){setSyncStatus("error");}));
   };
 
   const saveClientes = (v) => { setClientes(v); syncData({clientes:v}); };
@@ -738,50 +585,12 @@ function App() {
   };
   const getPlanilla = (dia) => planillas[dia]||planillaDiaVacia();
 
-  // Auto-guardado de planilla cuando todos los clientes del día tienen estado
-  React.useEffect(()=>{
-    if(!diaActual||!fechaActual) return;
-    const clientesDia = clientes.filter(c=>c.dia===diaActual);
-    if(clientesDia.length===0) return;
-    const ventasDia   = ventas.filter(v=>v.dia===diaActual&&v.fechaKey===fechaActual);
-    const noVisitasDia= (noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual);
-    const atendidos   = new Set(ventasDia.map(v=>v.clienteId));
-    const conEstado   = new Set([...atendidos,...noVisitasDia.map(v=>v.clienteId)]);
-    const todosVisitados = clientesDia.every(c=>conEstado.has(c.id));
-    if(!todosVisitados) return;
-    // Calcular valores automáticos para la planilla
-    const CAJON_SODA=6;
-    const getProdCosto=(nombre)=>{const p=(productos||[]).find(x=>x.nombre===nombre);return p?(p.costo||0):0;};
-    const costSifon=getProdCosto("Sifón 1.5L")||133.33;
-    const costB10=getProdCosto("Bidón 10L")||800;
-    const costB20=getProdCosto("Bidón 20L")||1100;
-    const tots={b10:{vacios:0},b20:{vacios:0},soda:{vacios:0}};
-    const prodKey={"Bidón 10L":"b10","Bidón 20L":"b20","Sifón 1.5L":"soda"};
-    ventasDia.forEach(v=>v.detalle.forEach(d=>{const k=prodKey[d.nombre];if(k)tots[k].vacios+=d.cantidad;}));
-    const sodaCajones=Math.floor(tots.soda.vacios/CAJON_SODA)||0;
-    const cobEfectivo=ventasDia.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
-    const cobFiado=ventasDia.filter(v=>v.pago==="fiado").reduce((a,v)=>a+(v.neto||0),0);
-    const cobTransBruto=ventasDia.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
-    const cobTransDesc=Math.round(cobTransBruto*0.025);
-    const planillaKey=`${diaActual}_${fechaActual}`;
-    const planillaActual=planillas[planillaKey]||planillaDiaVacia();
-    // Solo auto-completar campos vacíos, nunca pisar lo que el usuario editó
-    const nueva={
-      ...planillaActual,
-      fecha:planillaActual.fecha||fechaActual,
-      efectivo:planillaActual.efectivo||(cobEfectivo>0?String(Math.round(cobEfectivo)):""),
-      fiado:planillaActual.fiado||(cobFiado>0?String(Math.round(cobFiado)):""),
-      retenciones:planillaActual.retenciones||(cobTransDesc>0?String(cobTransDesc):""),
-      _autoGuardado:true,
-    };
-    // Solo guardar si cambió algo
-    if(JSON.stringify(nueva)!==JSON.stringify(planillaActual)){
-      savePlanilla(planillaKey, nueva);
-    }
-  }, [ventas, noVisitas, clientes, diaActual, fechaActual]);
-
-  if (!apiKey || !binId) {
-    return <SetupNube onSetup={(key,id)=>{ setApiKey(key); setBinId(id); setSyncStatus("saved"); }} />;
+  if(onboarding) {
+    return <Onboarding uid={uid} onCompleto={(data)=>{
+      if(data.productos?.length) setProductos(data.productos);
+      if(data.negocio?.nombre)   setNegocio(data.negocio.nombre);
+      setOnboarding(false);
+    }}/>;
   }
 
   const registrarVenta = (detalle, pago, montoPagado, saldoAplicado, envPrest, envDev, obs, opcionSaldo, montoTrans2, saldoDeltaMixto) => {
@@ -837,6 +646,39 @@ function App() {
   };
 
 
+  const registrarVentaLibre = (detalle, pago, montoPagado, saldoAplicado, envPrest, envDev, obs, opcionSaldo, montoTrans2, saldoDeltaMixto, fechaKl) => {
+    const c = cliente;
+    const pagoReal = opcionSaldo==="mixto_ef"?"contado":opcionSaldo==="mixto_tr"?"transferencia":pago;
+    const obsExtra = montoTrans2>0?` [Mixto: ef $${montoPagado} + tr $${montoTrans2}]`:"";
+    const calc = calcVenta(detalle, pagoReal, montoPagado, saldoAplicado, productos);
+    const fechaDisplay = new Date(fechaKl+"T12:00:00").toLocaleString("es-AR");
+    const nuevaVenta = {
+      id:Date.now(), clienteId:c.id, cliente:c.nombre,
+      dia:c.dia, fechaKey:fechaKl, fecha:fechaDisplay,
+      detalle, pago:pagoReal, obs:(obs||"")+obsExtra, saldoAplicado:saldoAplicado||0,
+      envPrest:(envPrest||[]).filter(e=>e.prod&&e.cant),
+      envDev:(envDev||[]).filter(e=>e.prod&&e.cant), ...calc,
+      montoTrans:montoTrans2||0, montoEfec:opcionSaldo==="mixto_ef"?Number(montoPagado):0,
+    };
+    let nuevasVentas = [...ventas, nuevaVenta];
+    let saldoExtra = calc.saldoDelta;
+    if(montoTrans2>0 && opcionSaldo==="mixto_ef") {
+      const ventaTr = {
+        id:Date.now()+2, clienteId:c.id, cliente:c.nombre,
+        dia:c.dia, fechaKey:fechaKl, fecha:fechaDisplay,
+        detalle:[{nombre:"Pago mixto · transferencia",cantidad:1,precio:montoTrans2,total:montoTrans2}],
+        pago:"transferencia", obs:"[Parte transfer. de pago mixto]", saldoAplicado:0,
+        neto:montoTrans2, bruto:montoTrans2, desc:0, costo:0, ganancia:montoTrans2,
+        pagadoNum:montoTrans2, saldoDelta:montoTrans2, envPrest:[], envDev:[],
+      };
+      nuevasVentas = [...nuevasVentas, ventaTr];
+      saldoExtra += montoTrans2;
+    }
+    saveVentas(nuevasVentas);
+    const nuevosClientes = clientes.map(c2=>c2.id===c.id?{...c2,saldo:c.saldo+saldoExtra}:c2);
+    saveClientes(nuevosClientes);
+  };
+
   const renumerarTrasEliminar = (lista, clienteEliminado) => {
     const { dia, orden } = clienteEliminado;
     if(!orden) return lista;
@@ -890,27 +732,41 @@ function App() {
     if(c){ const nc=clientes.map(x=>x.id===c.id?{...x,saldo:saldoExtra}:x); saveClientes(nc); }
   };
 
+  // Backup automático diario
+  React.useEffect(()=>{
+    try{
+      const hoy=new Date().toISOString().slice(0,10);
+      const lastBackup=localStorage.getItem("cat_last_backup_date")||"";
+      if(lastBackup!==hoy&&clientes.length>0){
+        localStorage.setItem("cat_backup_clientes_"+hoy,JSON.stringify(clientes));
+        localStorage.setItem("cat_last_backup_date",hoy);
+        const keys=Object.keys(localStorage).filter(k=>k.startsWith("cat_backup_clientes_")).sort();
+        if(keys.length>7) keys.slice(0,keys.length-7).forEach(k=>localStorage.removeItem(k));
+      }
+    }catch{}
+  },[clientes]);
+  const [escala, setEscala] = React.useState(()=>{ try{return localStorage.getItem("cat_escala")||"M";}catch{return "M";} });
+  const escalas = ["S","M","L","XL"];
+  const escalaVal = {"S":"82%","M":"100%","L":"118%","XL":"136%"};
+  const nextEscala = () => {
+    const i = escalas.indexOf(escala);
+    const next = escalas[(i+1)%escalas.length];
+    setEscala(next);
+    try{localStorage.setItem("cat_escala",next);}catch{}
+  };
   return (
-    <div style={{position:"relative"}}>
-    <div style={{...s.app, zoom: SCALES[scaleIdx]}}>
+    <div style={{...s.app, fontSize:escalaVal[escala]}}>
       <SyncBar status={syncStatus} />
       {pantalla==="portada"        && <Portada onIngresar={()=>irA("menu")} />}
-      {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onStock={()=>irA("stock")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} clientes={clientes} ventas={ventas} stock={stockNorm}
+      {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onMensajes={()=>irA("mensajes")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} clientes={clientes} ventas={ventas} stock={stockNorm} onStock={()=>irA("config")}
           recordatoriosActivos={recordatoriosActivos}
           onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
-          onVerConfirmaciones={(dia)=>{setDiaActual(dia);irA("confirmacionesDia");}}
           transferenciasPendientes={DIAS.map(dia=>{
             const vts = ventas.filter(v=>v.dia===dia&&v.pago==="transferencia"&&!v.transConfirmada);
             if(!vts.length) return null;
             const fechas = [...new Set(vts.map(v=>v.fechaKey))].sort().reverse();
             return {dia, fecha:fechas[0]||"", count:vts.length, monto:vts.reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0), ventas:vts};
           }).filter(Boolean)} />}
-      {pantalla==="confirmacionesDia" && <ConfirmacionesDia
-          dia={diaActual}
-          ventas={ventas.filter(v=>v.dia===diaActual&&v.pago==="transferencia"&&!v.transConfirmada)}
-          clientes={clientes}
-          onConfirmar={(ventaId)=>{const nv=ventas.map(v=>v.id===ventaId?{...v,transConfirmada:true}:v);saveVentas(nv);}}
-          onVolver={()=>irA("menu")} />}
       {pantalla==="diaPrincipal"   && <DiaPrincipal dia={diaActual} onIrClientes={()=>irA("selectorFechaClientes")} onIrPlanilla={()=>irA("selectorFechaPlanilla")} onVolver={()=>irA("menu")} ventasPendientesTransfer={ventas.filter(v=>v.dia===diaActual&&v.fechaKey===fechaActual&&v.pago==="transferencia"&&!v.transConfirmada).length} />}
       {pantalla==="selectorFechaPlanilla" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("planilla");}} onVolver={()=>irA("diaPrincipal")} />}
       {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.dia===diaActual&&v.fechaKey===fechaActual)} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);irA("selectorFechaPlanilla");}} onVolver={()=>irA("selectorFechaPlanilla")} />}
@@ -935,9 +791,10 @@ function App() {
           }
           irA("clientes");
         }} onVolver={()=>irA("selectorFechaClientes")} />}
-      {pantalla==="clientes"       && <ListaClientes clientes={clientes.filter(c=>c.dia===diaActual)} dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual)} noVisitas={(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual)} onSeleccionar={c=>{setClienteId(c.id);irA("detalleCliente");}} onNuevoCliente={()=>irA("nuevoCliente")} onVolver={()=>irA("selectorFechaClientes")} onReordenar={lista=>{
+      {pantalla==="clientes"       && <ListaClientes clientes={clientes.filter(c=>c.dia===diaActual)} dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual)} noVisitas={(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual)} onSeleccionar={c=>{setClienteId(c.id);irA("venta");}} onNuevoCliente={()=>irA("nuevoCliente")} onVolver={()=>irA("selectorFechaClientes")} onReordenar={lista=>{
           const otros=clientes.filter(c=>c.dia!==diaActual);
-          saveClientes([...otros,...lista]);
+          const ordenados=[...lista].sort((a,b)=>(a.orden||9999)-(b.orden||9999));
+          saveClientes([...otros,...ordenados]);
         }} onRegistrarNoVisita={(clienteId,motivo)=>{const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo}];saveNoVisitas(nv);}} onQuitarNoVisita={(clienteId)=>{const nv=(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual));saveNoVisitas(nv);}}
         onConfirmarTransfer={(clienteId,ventaId)=>{
           const nv=ventas.map(v=>v.id===ventaId?{...v,transConfirmada:!v.transConfirmada}:v);
@@ -957,9 +814,8 @@ function App() {
           saveNoVisitas(nv);
         }}
         />}
-      {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>irA("venta")} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
+      {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>irA("venta")} onVentaLibre={()=>{setVentaLibreFecha(new Date().toISOString().slice(0,10));irA("ventaLibre");}} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
           onNoEstaCliente={()=>{const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noesta"}];saveNoVisitas(nv);}}
-          onNoQuiereCliente={()=>{const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noquiso"}];saveNoVisitas(nv);}}
           recordatorios={recordatorios}
           onGuardarRecordatorio={(r)=>saveRecordatorios([...(recordatorios||[]),r])}
           onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
@@ -991,14 +847,14 @@ function App() {
           const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo:"noquiso"}];
           saveNoVisitas(nv);
           const clientesDia=clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
-          const visitadosIds=new Set([...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual).map(v=>v.clienteId),...nv.filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2"||v.motivo==="noesta")).map(v=>v.clienteId)]);
+          const visitadosIds=new Set([...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual).map(v=>v.clienteId),...nv.filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2")).map(v=>v.clienteId)]);
           visitadosIds.add(clienteId);
           const siguiente=clientesDia.find(c=>!visitadosIds.has(c.id)&&c.id!==clienteId);
           if(siguiente){setClienteId(siguiente.id);irA("detalleCliente");}else irA("clientes");
         }}
         onGuardar={(d,p,m,sa,ep,ed,obs,op)=>{
   registrarVenta(d,p,m,sa,ep,ed,obs,op);
-  // Auto-advance to next pending client (noesta = volver al final, no saltar a ellos)
+  // Auto-advance to next pending client
   const clientesDia = clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
   const visitadosIds = new Set([
     ...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual).map(v=>v.clienteId),
@@ -1009,6 +865,12 @@ function App() {
   if(siguiente){ setClienteId(siguiente.id); irA("detalleCliente"); }
   else irA("clientes");
 }} onVolver={()=>irA("detalleCliente")} />}
+      {pantalla==="ventaLibre" && cliente && <NuevaVentaLibre cliente={cliente} productos={productos} fechaInicial={ventaLibreFecha}
+        onGuardar={(d,p,m,sa,ep,ed,obs,op,mt2,fechaKl)=>{
+          registrarVentaLibre(d,p,m,sa,ep,ed,obs,op,mt2,0,fechaKl);
+          irA("detalleCliente");
+        }}
+        onVolver={()=>irA("detalleCliente")} />}
       {pantalla==="nuevoCliente"   && <NuevoCliente diaActual={diaActual} onGuardar={(datos)=>{
           const orden=datos.orden;
           let base=clientes;
@@ -1019,6 +881,7 @@ function App() {
             .sort((a,b)=>DIAS.indexOf(a.dia)-DIAS.indexOf(b.dia)||(a.orden||9999)-(b.orden||9999));
           saveClientes(nc);irA("clientes");
         }} onVolver={()=>irA("clientes")} />}
+      {pantalla==="mensajes"  && <MensajesMasivos clientes={clientes} onVolver={()=>irA("menu")} />}
       {pantalla==="historial" && <CargaHistorica clientes={clientes} productos={productos} onGuardar={(vts)=>{saveVentas([...ventas,...vts]);irA("menu");}} onVolver={()=>irA("menu")} />}
       {pantalla==="promocion"       && <Promocion prospectos={prospectos} clientes={clientes} onSave={saveProspectos} onConvertir={(p)=>{
         const nuevo={...p,id:Date.now(),saldo:0,sifon:0,bidon10:1,bidon20:0};
@@ -1040,27 +903,9 @@ function App() {
           nuevos = clientes.map(c=>c.dia===datos.dia&&(c.orden||0)>=orden?{...c,orden:(c.orden||0)+1}:c);
         } else { nuevos = [...clientes]; }
         saveClientes([...nuevos,{...datos,id:Date.now(),saldo:0,dispenser:datos.dispenser||0}].sort((a,b)=>DIAS.indexOf(a.dia)-DIAS.indexOf(b.dia)||(a.orden||9999)-(b.orden||9999)));
-      }} onVolver={()=>irA("menu")} onRegistrarVenta={(c)=>{setClienteId(c.id);irA("venta");}} />}
-      {pantalla==="stock"          && <StockGeneral stock={stockNorm} setStock={(ns)=>{setStock(ns);syncData({stock:ns});}} clientes={clientes} ventas={ventas} productos={productos} onVolver={()=>irA("menu")} />}
+      }} onVolver={()=>irA("menu")} />}
       {pantalla==="resumen"        && <Resumen ventas={ventas} clientes={clientes} productos={productos} planillas={planillas} noVisitas={noVisitas||[]} onVolver={()=>irA("menu")} />}
       {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stockNorm} setStock={(s)=>{const ns=normStock(s);setStockRaw(ns);syncData({stock:ns});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} syncData={syncData} onVolver={()=>irA("menu")} />}
-    </div>
-    {/* Botón flotante de escala — fuera del zoom para que no se afecte */}
-    <button
-      onClick={()=>setScaleIdx(i=>(i+1)%4)}
-      title={`Tamaño: ${SCALE_LABELS[scaleIdx]} — tocá para cambiar`}
-      style={{
-        position:"fixed", bottom:18, right:18, zIndex:9999,
-        width:38, height:38, borderRadius:"50%",
-        background:"#185FA5", color:"#e2eaf4",
-        border:"none", cursor:"pointer",
-        fontSize:12, fontWeight:700,
-        boxShadow:"0 2px 10px rgba(0,0,0,0.4)",
-        display:"flex", alignItems:"center", justifyContent:"center",
-        letterSpacing:"0.02em",
-      }}>
-      {SCALE_LABELS[scaleIdx]}
-    </button>
     </div>
   );
 }
@@ -1085,15 +930,17 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-function Portada({onIngresar}) {
+function Portada({onIngresar, negocio, email, onCerrarSesion}) {
   return (
     <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:20,padding:32,minHeight:"100vh"}}>
       <div style={{width:80,height:80,borderRadius:"50%",background:"var(--color-background-info)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:38}}>💧</div>
       <div style={{textAlign:"center"}}>
         <h1 style={{fontSize:24,fontWeight:500,color:"var(--color-text-primary)",marginBottom:6}}>La Catalina</h1>
-        <p style={{fontSize:15,color:"var(--color-text-secondary)"}}>Soda y Agua Tratada · Reparto</p>
+        <p style={{fontSize:15,color:"var(--color-text-secondary)"}}>Gestión de reparto y clientes</p>
+        {email&&<p style={{fontSize:12,color:"var(--color-text-tertiary)",marginTop:4}}>{email}</p>}
       </div>
       <button style={{...s.btnPrimary,width:200,marginTop:8}} onClick={onIngresar}>Ingresar</button>
+      <button onClick={onCerrarSesion} style={{background:"none",border:"none",color:"var(--color-text-tertiary)",fontSize:12,cursor:"pointer",textDecoration:"underline"}}>Cerrar sesión</button>
       {typeof window!=="undefined"&&window.matchMedia&&!window.matchMedia("(display-mode: standalone)").matches&&(
         <div style={{fontSize:12,color:"var(--color-text-tertiary)",textAlign:"center",lineHeight:1.6,marginTop:4,maxWidth:240}}>
           💡 Instalá la app: menú del navegador → "Agregar a pantalla de inicio"
@@ -1243,361 +1090,303 @@ function SyncBar({status}) {
   );
 }
 
-function SetupNube({onSetup}) {
-  const [paso, setPaso] = useState(1);
-  // No API config needed with Firebase
-  const [cargando, setCargando] = useState(false);
-  const [error, setError] = useState("");
+function Login({onLogin}) {
+  const [modo, setModo]         = React.useState("login"); // "login" | "registro"
+  const [email, setEmail]       = React.useState("");
+  const [pass, setPass]         = React.useState("");
+  const [error, setError]       = React.useState("");
+  const [cargando, setCargando] = React.useState(false);
 
-  const conectar = async () => {
-    if (!apiKey.trim()) { setError("Pegá tu API Key primero"); return; }
+  const manejarAuth = async () => {
+    if(!email.trim()||!pass.trim()){setError("Completá email y contraseña");return;}
     setCargando(true); setError("");
     try {
-      const binId = await cloudCreate(apiKey.trim());
-      localStorage.setItem("cat_apikey", JSON.stringify(apiKey.trim()));
-      localStorage.setItem("cat_binid",  JSON.stringify(binId));
-      onSetup(apiKey.trim(), binId);
+      if(modo==="login"){
+        await window.auth.signInWithEmailAndPassword(email.trim(), pass);
+      } else {
+        await window.auth.createUserWithEmailAndPassword(email.trim(), pass);
+      }
     } catch(e) {
-      setError("API Key incorrecta o sin conexión. Revisá la clave e intentá de nuevo.");
+      const msgs = {
+        "auth/user-not-found":"Email no registrado. ¿Querés crear una cuenta?",
+        "auth/wrong-password":"Contraseña incorrecta",
+        "auth/email-already-in-use":"Ese email ya tiene una cuenta. Iniciá sesión.",
+        "auth/weak-password":"La contraseña debe tener al menos 6 caracteres",
+        "auth/invalid-email":"Email inválido",
+        "auth/invalid-credential":"Email o contraseña incorrectos",
+      };
+      setError(msgs[e.code]||e.message);
+    }
+    setCargando(false);
+  };
+
+  const googleLogin = async () => {
+    setCargando(true); setError("");
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      await window.auth.signInWithPopup(provider);
+    } catch(e) {
+      setError("Error al iniciar con Google: " + e.message);
     }
     setCargando(false);
   };
 
   return (
-    <div style={{maxWidth:480,margin:"0 auto",minHeight:"100vh",background:"var(--color-background-primary)",padding:24,display:"flex",flexDirection:"column",gap:16}}>
-      <div style={{textAlign:"center",paddingTop:32,paddingBottom:8}}>
-        <div style={{fontSize:40,marginBottom:12}}>☁️</div>
-        <h1 style={{fontSize:20,fontWeight:500,color:"var(--color-text-primary)",marginBottom:6}}>Configurar guardado en la nube</h1>
-        <p style={{fontSize:14,color:"var(--color-text-secondary)",lineHeight:1.6}}>Necesitás hacer esto una sola vez. Después todo se guarda automáticamente.</p>
+    <div style={{maxWidth:420,margin:"0 auto",minHeight:"100vh",background:"var(--color-background-primary)",padding:"0 24px",display:"flex",flexDirection:"column",justifyContent:"center",gap:16}}>
+      <div style={{textAlign:"center",marginBottom:8}}>
+        <div style={{fontSize:48,marginBottom:12}}>💧</div>
+        <h1 style={{fontSize:22,fontWeight:500,color:"var(--color-text-primary)",margin:"0 0 6px"}}>La Catalina · Reparto</h1>
+        <p style={{fontSize:14,color:"var(--color-text-secondary)",margin:0}}>
+          {modo==="login"?"Ingresá a tu cuenta":"Creá tu cuenta gratuita"}
+        </p>
       </div>
 
-      <div style={{background:"var(--color-background-secondary)",borderRadius:12,padding:16,display:"flex",flexDirection:"column",gap:10}}>
-        <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
-          <div style={{width:24,height:24,borderRadius:"50%",background:"#185FA5",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:600,flexShrink:0}}>1</div>
-          <div>
-            <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Entrá a jsonbin.io</div>
-            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:2}}>Abrí una nueva pestaña y andá a jsonbin.io</div>
-            <a href="https://jsonbin.io" target="_blank" rel="noreferrer" style={{fontSize:13,color:"#185FA5",fontWeight:500}}>Abrir jsonbin.io →</a>
-          </div>
-        </div>
-        <div style={{borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:10,display:"flex",alignItems:"flex-start",gap:10}}>
-          <div style={{width:24,height:24,borderRadius:"50%",background:"#185FA5",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:600,flexShrink:0}}>2</div>
-          <div style={{fontSize:14,color:"var(--color-text-primary)"}}>
-            <span style={{fontWeight:500}}>Registrate gratis</span>
-            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:2,lineHeight:1.6}}>
-              Tocá <b>Sign Up</b> · Usá tu email · Confirmá el email si te pide
-            </div>
-          </div>
-        </div>
-        <div style={{borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:10,display:"flex",alignItems:"flex-start",gap:10}}>
-          <div style={{width:24,height:24,borderRadius:"50%",background:"#185FA5",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:600,flexShrink:0}}>3</div>
-          <div style={{fontSize:14,color:"var(--color-text-primary)"}}>
-            <span style={{fontWeight:500}}>Copiá tu API Key</span>
-            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:2,lineHeight:1.6}}>
-              Una vez adentro andá a <b>API Keys</b> en el menú → <b>+ Create Access Key</b> → nombrarla <b>lacatalina</b> → copiá la clave larga que aparece
-            </div>
-          </div>
-        </div>
+      <div style={{display:"flex",gap:0,background:"var(--color-background-secondary)",borderRadius:10,padding:4}}>
+        {["login","registro"].map(m=>(
+          <button key={m} onClick={()=>{setModo(m);setError("");}}
+            style={{flex:1,padding:"8px",border:"none",borderRadius:8,cursor:"pointer",fontSize:14,fontWeight:500,
+              background:modo===m?"var(--color-background-primary)":"transparent",
+              color:modo===m?"var(--color-text-primary)":"var(--color-text-secondary)"}}>
+            {m==="login"?"Ingresar":"Registrarse"}
+          </button>
+        ))}
       </div>
 
-      <div>
-        <label style={{fontSize:13,color:"var(--color-text-secondary)",marginBottom:6,display:"block"}}>Pegá tu API Key acá</label>
-        <textarea
-          style={{width:"100%",padding:"10px",border:"0.5px solid var(--color-border-secondary)",borderRadius:8,fontSize:13,background:"var(--color-background-secondary)",color:"var(--color-text-primary)",outline:"none",minHeight:70,resize:"none",boxSizing:"border-box",lineHeight:1.5}}
-          placeholder="$2b$10$xxxxxxxxxxxxxxxxxx..."
-          value={apiKey}
-          onChange={e=>setApiKey(e.target.value)}
-        />
-        {error && <div style={{fontSize:13,color:"var(--color-text-danger)",marginTop:6}}>{error}</div>}
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        <div>
+          <label style={{fontSize:13,color:"var(--color-text-secondary)",display:"block",marginBottom:4}}>Email</label>
+          <input style={s.input} type="email" placeholder="tu@email.com"
+            value={email} onChange={e=>setEmail(e.target.value)}
+            onKeyDown={e=>e.key==="Enter"&&manejarAuth()} />
+        </div>
+        <div>
+          <label style={{fontSize:13,color:"var(--color-text-secondary)",display:"block",marginBottom:4}}>Contraseña</label>
+          <input style={s.input} type="password" placeholder="Mínimo 6 caracteres"
+            value={pass} onChange={e=>setPass(e.target.value)}
+            onKeyDown={e=>e.key==="Enter"&&manejarAuth()} />
+        </div>
+        {error&&<div style={{fontSize:13,color:"var(--color-text-danger)",background:"var(--color-background-danger)",padding:"8px 12px",borderRadius:8}}>{error}</div>}
+        <button style={{...s.btnPrimary,marginTop:4}} onClick={manejarAuth} disabled={cargando}>
+          {cargando?"Procesando...":(modo==="login"?"Ingresar":"Crear cuenta")}
+        </button>
       </div>
 
-      <button
-        style={{background:"#185FA5",color:"#fff",border:"none",borderRadius:8,padding:"14px",fontSize:15,fontWeight:500,cursor:"pointer",opacity:cargando?0.7:1}}
-        onClick={conectar}
-        disabled={cargando}
-      >
-        {cargando ? "Conectando..." : "Conectar y comenzar"}
+      <div style={{display:"flex",alignItems:"center",gap:10,margin:"4px 0"}}>
+        <div style={{flex:1,height:"0.5px",background:"var(--color-border-secondary)"}}/>
+        <span style={{fontSize:12,color:"var(--color-text-tertiary)"}}>o</span>
+        <div style={{flex:1,height:"0.5px",background:"var(--color-border-secondary)"}}/>
+      </div>
+
+      <button onClick={googleLogin} disabled={cargando}
+        style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,padding:"12px",border:"0.5px solid var(--color-border-secondary)",borderRadius:10,background:"var(--color-background-secondary)",color:"var(--color-text-primary)",fontSize:14,cursor:"pointer",fontWeight:500}}>
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Continuar con Google
       </button>
 
-      <p style={{fontSize:12,color:"var(--color-text-tertiary)",textAlign:"center",lineHeight:1.6}}>
-        Tus datos se guardan en tu cuenta privada de JSONBin. Es gratis y seguro. Solo vos tenés acceso.
+      <p style={{fontSize:12,color:"var(--color-text-tertiary)",textAlign:"center",lineHeight:1.6,marginTop:8}}>
+        Tus datos son privados y solo accesibles con tu cuenta.
       </p>
     </div>
   );
 }
 
-function StockGeneral({stock,setStock,clientes,ventas,productos,onVolver}) {
-  const CAJON = 6;
-  const fmt = n => n?.toLocaleString("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}) || "$0";
-  const s2 = {
-    card: {...s.card},
-    input: {...s.input, textAlign:"center"},
-    label: {...s.label, textAlign:"center", fontSize:11},
+function Onboarding({uid, onCompleto}) {
+  const [paso, setPaso]         = React.useState(1);
+  const [negocio, setNegocio]   = React.useState("");
+  const [productos, setProductos] = React.useState([
+    {id:1,nombre:"Sifón 1.5L",precio:"",costo:""},
+    {id:2,nombre:"Bidón 10L", precio:"",costo:""},
+    {id:3,nombre:"Bidón 20L", precio:"",costo:""},
+  ]);
+  const [guardando, setGuardando] = React.useState(false);
+  const [error, setError]         = React.useState("");
+
+  const setProd = (i, campo, val) => {
+    setProductos(prev => prev.map((p,idx)=>idx===i?{...p,[campo]:val}:p));
   };
-  const lugares = [
-    {key:"soderia", icon:"🏭", titulo:"Sodería", desc:"Stock disponible para cargar"},
-    {key:"casa",    icon:"🏠", titulo:"Casa / Depósito", desc:"Stock en el depósito"},
-  ];
-  // Edicion local
-  const [local, setLocal] = React.useState(()=>({
-    soderia:{...stock?.soderia||{sifon:0,bidon10:0,bidon20:0}},
-    casa:   {...stock?.casa   ||{sifon:0,bidon10:0,bidon20:0}},
-    camion: {...stock?.camion ||{sifon:0,bidon10:0,bidon20:0}},
-  }));
-  const set = (lugar,key,val) => setLocal(l=>({...l,[lugar]:{...l[lugar],[key]:Number(val)||0}}));
 
-  // Totales por producto
-  const total = key => (local.soderia[key]||0)+(local.casa[key]||0)+(local.camion[key]||0);
-
-  // Envases en poder de clientes: habitual + extra prestado - devuelto
-  const envClientes = React.useMemo(()=>{
-    const resumen = {sifon:0, bidon10:0, bidon20:0};
-    clientes.forEach(c=>{
-      resumen.sifon   += (c.sifon||0);
-      resumen.bidon10 += (c.bidon10||0);
-      resumen.bidon20 += (c.bidon20||0);
-    });
-    // Sumar prestados extra y restar devueltos de historial de ventas
-    ventas.forEach(v=>{
-      (v.envPrest||[]).forEach(e=>{
-        const k = e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;
-        if(k) resumen[k] += Number(e.cant)||0;
-      });
-      (v.envDev||[]).forEach(e=>{
-        const k = e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;
-        if(k) resumen[k] -= Number(e.cant)||0;
-      });
-    });
-    return resumen;
-  }, [clientes, ventas]);
-
-  const [tab, setTab] = React.useState("stock");
-  const [guardado, setGuardado] = React.useState(false);
-
-  const guardar = () => {
-    setStock(local);
-    setGuardado(true);
-    setTimeout(()=>setGuardado(false), 2000);
+  const guardar = async () => {
+    if(!negocio.trim()){setError("Ingresá el nombre del negocio");return;}
+    setGuardando(true); setError("");
+    const prods = productos.map(p=>({...p,precio:Number(p.precio)||0,costo:Number(p.costo)||0}));
+    const data = {
+      negocio:{nombre:negocio.trim()},
+      productos:prods,
+      clientes:[],ventas:[],planillas:{},stock:{
+        soderia:{sifon:0,bidon10:0,bidon20:0},
+        casa:{sifon:0,bidon10:0,bidon20:0},
+        camion:{sifon:0,bidon10:0,bidon20:0}
+      },
+      noVisitas:[],recordatorios:[],prospectos:[],
+      cargasDia:{"Lunes":{soda:0,b10:0,b20:0},"Martes":{soda:0,b10:0,b20:0},"Miércoles":{soda:0,b10:0,b20:0},"Jueves":{soda:0,b10:0,b20:0},"Viernes":{soda:0,b10:0,b20:0}}
+    };
+    await cloudSave(data, uid);
+    onCompleto(data);
+    setGuardando(false);
   };
 
   return (
-    <div style={s.screen}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>📦 Stock</span>
+    <div style={{maxWidth:440,margin:"0 auto",minHeight:"100vh",background:"var(--color-background-primary)",padding:"24px 20px",display:"flex",flexDirection:"column",gap:20}}>
+      <div style={{textAlign:"center",paddingTop:16}}>
+        <div style={{fontSize:40,marginBottom:10}}>🚀</div>
+        <h1 style={{fontSize:20,fontWeight:500,color:"var(--color-text-primary)",margin:"0 0 6px"}}>Configurá tu negocio</h1>
+        <p style={{fontSize:14,color:"var(--color-text-secondary)",margin:0,lineHeight:1.5}}>Solo una vez. Después podés editar todo desde Configuración.</p>
       </div>
 
-      {/* Tabs */}
-      <div style={{display:"flex",gap:6,padding:"10px 14px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-        {[["stock","📦 Inventario"],["clientes","👥 Clientes"]].map(([t,l])=>(
-          <button key={t} style={{...s.btn,flex:1,padding:"8px 4px",fontSize:13,fontWeight:tab===t?600:400,background:tab===t?"var(--color-background-secondary)":"transparent",borderBottom:tab===t?"2px solid #185FA5":"none",borderRadius:tab===t?"8px 8px 0 0":"8px",color:tab===t?"var(--color-text-primary)":"var(--color-text-secondary)"}}
-            onClick={()=>setTab(t)}>{l}</button>
+      <div style={{display:"flex",gap:6,justifyContent:"center"}}>
+        {[1,2].map(p=>(
+          <div key={p} style={{width:36,height:4,borderRadius:2,background:paso>=p?"#185FA5":"var(--color-background-tertiary)"}}/>
         ))}
       </div>
 
-      <div style={{padding:14,overflowY:"auto"}}>
-      {tab==="stock"&&(<>
-        {/* Resumen total */}
-        <div style={{...s.card,margin:"0 0 12px",background:"var(--color-background-secondary)"}}>
-          <div style={{fontSize:11,fontWeight:500,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:10}}>Total en stock (todos los lugares)</div>
-          <div style={{display:"flex",gap:8}}>
-            {[
-              ["Cajones soda", Math.floor(total("sifon")/CAJON), total("sifon")%CAJON>0?`+${total("sifon")%CAJON} sif`:null, total("sifon")<18?"danger":total("sifon")<42?"warning":"success"],
-              ["Bidón 10L",    total("bidon10"), null, total("bidon10")<5?"danger":total("bidon10")<15?"warning":"success"],
-              ["Bidón 20L",    total("bidon20"), null, total("bidon20")<3?"danger":total("bidon20")<8?"warning":"success"],
-            ].map(([l,v,sub,color])=>(
-              <div key={l} style={{flex:1,background:"var(--color-background-tertiary)",borderRadius:10,padding:"10px 8px",textAlign:"center",border:`1px solid var(--color-border-${color})`}}>
-                <div style={{fontSize:22,fontWeight:700,color:`var(--color-text-${color})`}}>{v}</div>
-                {sub&&<div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>{sub}</div>}
-                <div style={{fontSize:10,color:"var(--color-text-secondary)",marginTop:2}}>{l}</div>
-              </div>
-            ))}
+      {paso===1&&(
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          <div style={{background:"var(--color-background-secondary)",borderRadius:12,padding:16}}>
+            <h2 style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)",margin:"0 0 14px"}}>¿Cómo se llama tu negocio?</h2>
+            <input style={s.input} placeholder="Ej: Sodería El Manantial"
+              value={negocio} onChange={e=>setNegocio(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&negocio.trim()&&setPaso(2)} />
           </div>
+          {error&&<div style={{fontSize:13,color:"var(--color-text-danger)"}}>{error}</div>}
+          <button style={s.btnPrimary} onClick={()=>{if(!negocio.trim()){setError("Ingresá el nombre");return;}setError("");setPaso(2);}}>
+            Continuar →
+          </button>
         </div>
+      )}
 
-        {/* Por lugar */}
-        {lugares.map(({key,icon,titulo,desc})=>(
-          <div key={key} style={{...s.card,margin:"0 0 12px"}}>
-            <div style={{marginBottom:10}}>
-              <div style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)"}}>{icon} {titulo}</div>
-              <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>{desc}</div>
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-              {/* Cajones de soda */}
-              <div>
-                <label style={{...s.label,textAlign:"center",fontSize:11}}>Cajones soda</label>
-                <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0}
-                  value={Math.floor((local[key]?.sifon||0)/CAJON)}
-                  onChange={e=>{
-                    const caj=Number(e.target.value)||0;
-                    const sifSueltos=(local[key]?.sifon||0)%CAJON;
-                    set(key,"sifon",caj*CAJON+sifSueltos);
-                  }} />
-                <div style={{fontSize:10,color:"var(--color-text-tertiary)",textAlign:"center",marginTop:2}}>{local[key]?.sifon||0} sifones</div>
-              </div>
-              <div>
-                <label style={{...s.label,textAlign:"center",fontSize:11}}>Bidón 10L</label>
-                <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0}
-                  value={local[key]?.bidon10||0}
-                  onChange={e=>set(key,"bidon10",e.target.value)} />
-              </div>
-              <div>
-                <label style={{...s.label,textAlign:"center",fontSize:11}}>Bidón 20L</label>
-                <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0}
-                  value={local[key]?.bidon20||0}
-                  onChange={e=>set(key,"bidon20",e.target.value)} />
-              </div>
-            </div>
-          </div>
-        ))}
-
-        <button style={{...s.btnPrimary,background:guardado?"#0F6E56":undefined}} onClick={guardar}>
-          {guardado?"✓ Guardado":"Guardar stock"}
-        </button>
-      </>)}
-
-      {tab==="clientes"&&(<>
-        {/* Resumen envases en clientes */}
-        <div style={{...s.card,margin:"0 0 12px",background:"var(--color-background-secondary)"}}>
-          <div style={{fontSize:11,fontWeight:500,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:10}}>Total envases en poder de clientes</div>
-          <div style={{display:"flex",gap:8}}>
-            {[
-              ["Cajones soda", Math.floor(envClientes.sifon/CAJON), `${envClientes.sifon} sif`],
-              ["Bidón 10L",    envClientes.bidon10, null],
-              ["Bidón 20L",    envClientes.bidon20, null],
-            ].map(([l,v,sub])=>(
-              <div key={l} style={{flex:1,background:"var(--color-background-tertiary)",borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
-                <div style={{fontSize:22,fontWeight:700,color:"var(--color-text-info)"}}>{v}</div>
-                {sub&&<div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>{sub}</div>}
-                <div style={{fontSize:10,color:"var(--color-text-secondary)",marginTop:2}}>{l}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Lista por cliente */}
-        {clientes.filter(c=>{
-          // Solo clientes que tienen envases extras prestados (por encima del habitual)
-          const ventasC = ventas.filter(v=>v.clienteId===c.id);
-          const extra = {sifon:0,bidon10:0,bidon20:0};
-          ventasC.forEach(v=>{
-            (v.envPrest||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)extra[k]+=Number(e.cant)||0;});
-            (v.envDev||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)extra[k]-=Number(e.cant)||0;});
-          });
-          return extra.sifon>0||extra.bidon10>0||extra.bidon20>0;
-        }).sort((a,b)=>{
-          const da=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"].indexOf(a.dia);
-          const db=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"].indexOf(b.dia);
-          return da!==db?da-db:(a.orden||9999)-(b.orden||9999);
-        }).map(c=>{
-          // Calcular extras de ventas
-          const ventasC = ventas.filter(v=>v.clienteId===c.id);
-          const extra = {sifon:0,bidon10:0,bidon20:0};
-          ventasC.forEach(v=>{
-            (v.envPrest||[]).forEach(e=>{
-              const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;
-              if(k) extra[k]+=Number(e.cant)||0;
-            });
-            (v.envDev||[]).forEach(e=>{
-              const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;
-              if(k) extra[k]-=Number(e.cant)||0;
-            });
-          });
-          const tieneExtra = extra.sifon!==0||extra.bidon10!==0||extra.bidon20!==0;
-          return (
-            <div key={c.id} style={{...s.card,margin:"0 0 8px"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
-                <div>
-                  <div style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>{c.nombre}</div>
-                  <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{c.dia}</div>
-                </div>
-                <div style={{display:"flex",gap:4,flexWrap:"wrap",justifyContent:"flex-end"}}>
-                  {c.sifon>0&&<span style={s.tag}>Sifón×{c.sifon+(extra.sifon||0)}</span>}
-                  {c.bidon10>0&&<span style={s.tag}>10L×{c.bidon10+(extra.bidon10||0)}</span>}
-                  {c.bidon20>0&&<span style={s.tag}>20L×{c.bidon20+(extra.bidon20||0)}</span>}
-                </div>
-              </div>
-              {tieneExtra&&(
-                <div style={{fontSize:11,color:"var(--color-text-secondary)",borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:4,marginTop:2}}>
-                  Habitual: {c.sifon>0?`Sifón×${c.sifon} `:""}{ c.bidon10>0?`10L×${c.bidon10} `:""}{ c.bidon20>0?`20L×${c.bidon20} `:""}
-                  {extra.sifon>0?<span style={{color:"var(--color-text-warning)"}}> +{extra.sifon} sif prest.</span>:extra.sifon<0?<span style={{color:"var(--color-text-success)"}}> {extra.sifon} sif dev.</span>:null}
-                  {extra.bidon10>0?<span style={{color:"var(--color-text-warning)"}}> +{extra.bidon10} 10L prest.</span>:extra.bidon10<0?<span style={{color:"var(--color-text-success)"}}> {Math.abs(extra.bidon10)} 10L dev.</span>:null}
-                  {extra.bidon20>0?<span style={{color:"var(--color-text-warning)"}}> +{extra.bidon20} 20L prest.</span>:extra.bidon20<0?<span style={{color:"var(--color-text-success)"}}> {Math.abs(extra.bidon20)} 20L dev.</span>:null}
-                </div>
-              )}
-            </div>
-          );
-        })}
-        {clientes.filter(c=>{const vC=ventas.filter(v=>v.clienteId===c.id);const ex={sifon:0,bidon10:0,bidon20:0};vC.forEach(v=>{(v.envPrest||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)ex[k]+=Number(e.cant)||0;});(v.envDev||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)ex[k]-=Number(e.cant)||0;});});return ex.sifon>0||ex.bidon10>0||ex.bidon20>0;}).length===0&&
-          <p style={{textAlign:"center",color:"var(--color-text-tertiary)",padding:"30px 0",fontSize:14}}>No hay clientes con envases prestados extra</p>}
-      </>)}
-      </div>
-    </div>
-  );
-}
-
-function ConfirmacionesDia({dia,ventas,clientes,onConfirmar,onVolver}) {
-  // Agrupar por cliente
-  const porCliente = {};
-  ventas.forEach(v=>{
-    if(!porCliente[v.clienteId]) porCliente[v.clienteId]={cliente:clientes.find(c=>c.id===v.clienteId),ventas:[]};
-    porCliente[v.clienteId].ventas.push(v);
-  });
-  const grupos = Object.values(porCliente);
-  const totalPendiente = ventas.reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
-
-  return (
-    <div style={s.screen}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>Transferencias · {dia}</span>
-      </div>
-      <div style={{padding:"10px 14px 4px"}}>
-        <div style={{...s.card,background:"#1e3a5f",border:"1px solid #f5b942",marginBottom:8,padding:"10px 14px"}}>
-          <div style={{fontSize:11,color:"#f5b942",fontWeight:500,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>🔴 Pendientes de confirmar</div>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
-            <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>{ventas.length} transferencia{ventas.length!==1?"s":""} · {grupos.length} cliente{grupos.length!==1?"s":""}</span>
-            <span style={{fontSize:18,fontWeight:500,color:"#f5b942"}}>{fmt(totalPendiente)}</span>
-          </div>
-        </div>
-        {grupos.length===0&&<p style={{textAlign:"center",padding:"40px 0",color:"var(--color-text-tertiary)",fontSize:14}}>✓ No hay transferencias pendientes para {dia}</p>}
-        {grupos.map(({cliente:c,ventas:vts})=>(
-          <div key={c?.id||Math.random()} style={{...s.card,marginBottom:8}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
-              <div>
-                <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>{c?.nombre||"Cliente desconocido"}</div>
-                <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:2}}>{c?.calle?`${c.calle} ${c.nro||""}`:c?.manzana?`Mz ${c.manzana} L ${c.lote}`:""}{c?.barrio?` · ${c.barrio}`:""}</div>
-              </div>
-              {c?.telefono&&<a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:20,textDecoration:"none"}}>💬</a>}
-            </div>
-            {vts.map(v=>(
-              <div key={v.id} style={{...s.card,margin:"0 0 6px",background:"var(--color-background-tertiary)",padding:"10px 12px"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+      {paso===2&&(
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          <div style={{background:"var(--color-background-secondary)",borderRadius:12,padding:16}}>
+            <h2 style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)",margin:"0 0 4px"}}>Tus productos y precios</h2>
+            <p style={{fontSize:13,color:"var(--color-text-secondary)",margin:"0 0 14px"}}>Podés editarlos después en Configuración.</p>
+            {productos.map((p,i)=>(
+              <div key={p.id} style={{marginBottom:14,borderBottom:"0.5px solid var(--color-border-tertiary)",paddingBottom:14}}>
+                <input style={{...s.input,marginBottom:6,fontWeight:500}} value={p.nombre}
+                  onChange={e=>setProd(i,"nombre",e.target.value)} placeholder="Nombre del producto" />
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                   <div>
-                    <div style={{fontSize:12,color:"var(--color-text-tertiary)"}}>{v.fechaKey} · {v.fecha?.slice(-8)||""}</div>
-                    <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:2}}>{(v.detalle||[]).map(d=>`${d.nombre}×${d.cantidad}`).join(" · ")}</div>
+                    <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:3}}>Precio venta ($)</label>
+                    <input style={s.input} type="number" placeholder="0" value={p.precio}
+                      onChange={e=>setProd(i,"precio",e.target.value)} />
                   </div>
-                  <span style={{fontSize:16,fontWeight:500,color:"#f5b942"}}>{fmt(v.pagadoNum||v.neto||0)}</span>
+                  <div>
+                    <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:3}}>Costo ($)</label>
+                    <input style={s.input} type="number" placeholder="0" value={p.costo}
+                      onChange={e=>setProd(i,"costo",e.target.value)} />
+                  </div>
                 </div>
-                <button style={{width:"100%",padding:"9px",borderRadius:8,border:"none",background:"#185FA5",color:"#e2eaf4",fontSize:13,fontWeight:500,cursor:"pointer"}}
-                  onClick={()=>onConfirmar(v.id)}>
-                  ✓ Confirmar transferencia
-                </button>
               </div>
             ))}
+            <button onClick={()=>setProductos(p=>[...p,{id:Date.now(),nombre:"",precio:"",costo:""}])}
+              style={{...s.btn,fontSize:13,width:"100%"}}>+ Agregar producto</button>
           </div>
-        ))}
-      </div>
+          {error&&<div style={{fontSize:13,color:"var(--color-text-danger)"}}>{error}</div>}
+          <div style={{display:"flex",gap:10}}>
+            <button style={{...s.btn,flex:1}} onClick={()=>setPaso(1)}>← Atrás</button>
+            <button style={{...s.btnPrimary,flex:2}} onClick={guardar} disabled={guardando}>
+              {guardando?"Guardando...":"Comenzar →"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onStock,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,onVerConfirmaciones,clientes,ventas,stock}) {
+
+function StockGeneral({stock, clientes, ventas, onEditar}) {
+  const [abierto, setAbierto] = React.useState(false);
+
+  // Calcular envases en poder de clientes (prestados - devueltos)
+  const enClientes = React.useMemo(()=>{
+    const totales = {sifon:0, bidon10:0, bidon20:0};
+    clientes.forEach(c=>{
+      const vsCli = ventas.filter(v=>v.clienteId===c.id);
+      let extraSifon=0, extraB10=0, extraB20=0;
+      vsCli.forEach(v=>{
+        (v.envPrest||[]).forEach(e=>{
+          if(e.prod==="Sifón 1.5L") extraSifon+=Number(e.cant)||0;
+          if(e.prod==="Bidón 10L")  extraB10+=Number(e.cant)||0;
+          if(e.prod==="Bidón 20L")  extraB20+=Number(e.cant)||0;
+        });
+        (v.envDev||[]).forEach(e=>{
+          if(e.prod==="Sifón 1.5L") extraSifon-=Number(e.cant)||0;
+          if(e.prod==="Bidón 10L")  extraB10-=Number(e.cant)||0;
+          if(e.prod==="Bidón 20L")  extraB20-=Number(e.cant)||0;
+        });
+      });
+      totales.sifon  += (c.sifon||0) + extraSifon;
+      totales.bidon10 += (c.bidon10||0) + extraB10;
+      totales.bidon20 += (c.bidon20||0) + extraB20;
+    });
+    return totales;
+  },[clientes, ventas]);
+
+  const sod = stock?.soderia||{};
+  const totalSifon  = (sod.sifon||0)  + enClientes.sifon;
+  const totalB10    = (sod.bidon10||0) + enClientes.bidon10;
+  const totalB20    = (sod.bidon20||0) + enClientes.bidon20;
+
+  const colorStock = (v) => v<=0?"#e05c5c":v<=5?"#f5b942":"var(--color-text-primary)";
+
+  return (
+    <div style={{margin:"0 16px 8px",borderRadius:10,overflow:"hidden",border:"0.5px solid var(--color-border-secondary)"}}>
+      <button style={{width:"100%",background:"var(--color-background-secondary)",border:"none",cursor:"pointer",padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}
+        onClick={()=>setAbierto(a=>!a)}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>📦 Stock</span>
+          <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>
+            Sifón: <b style={{color:colorStock(sod.sifon||0)}}>{sod.sifon||0}</b> · 10L: <b style={{color:colorStock(sod.bidon10||0)}}>{sod.bidon10||0}</b> · 20L: <b style={{color:colorStock(sod.bidon20||0)}}>{sod.bidon20||0}</b>
+          </span>
+        </div>
+        <span style={{fontSize:14,color:"var(--color-text-tertiary)",transform:abierto?"rotate(180deg)":"rotate(0deg)",display:"inline-block",transition:"transform 0.2s"}}>▾</span>
+      </button>
+      {abierto&&(
+        <div style={{background:"var(--color-background-tertiary)",padding:"12px 14px"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+            <div style={{...s.card,margin:0,background:"var(--color-background-secondary)"}}>
+              <div style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:6,fontWeight:500}}>🏭 Sodería</div>
+              {[["sifon","Sifón"],["bidon10","10L"],["bidon20","20L"]].map(([k,l])=>(
+                <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"2px 0"}}>
+                  <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>{l}</span>
+                  <span style={{fontSize:12,fontWeight:600,color:colorStock(sod[k]||0)}}>{sod[k]||0}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{...s.card,margin:0,background:"var(--color-background-secondary)"}}>
+              <div style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:6,fontWeight:500}}>👥 En clientes</div>
+              {[["sifon","Sifón"],["bidon10","10L"],["bidon20","20L"]].map(([k,l])=>(
+                <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"2px 0"}}>
+                  <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>{l}</span>
+                  <span style={{fontSize:12,fontWeight:600,color:"var(--color-text-primary)"}}>{enClientes[k]||0}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{...s.card,margin:"0 0 10px",background:"#1e3a5f",border:"0.5px solid #5daaff"}}>
+            <div style={{fontSize:11,color:"#5daaff",marginBottom:6,fontWeight:500}}>📊 Total general</div>
+            <div style={{display:"flex",gap:12}}>
+              {[["sifon","Sifón",totalSifon],["bidon10","10L",totalB10],["bidon20","20L",totalB20]].map(([k,l,t])=>(
+                <div key={k} style={{textAlign:"center"}}>
+                  <div style={{fontSize:11,color:"#5daaff"}}>{l}</div>
+                  <div style={{fontSize:18,fontWeight:600,color:"#e2eaf4"}}>{t}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <button style={{...s.btn,width:"100%",fontSize:13,padding:"8px"}} onClick={onEditar}>Editar stock →</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onMensajes,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,clientes,ventas,stock,onStock}) {
   return (
     <div style={s.screen}>
       <div style={s.header}>
         <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>Reparto La Catalina</span>
+        <span style={s.headerTitle}>La Catalina · Reparto</span>
         <button style={{...s.btn,padding:"5px 10px",fontSize:18,lineHeight:1}} onClick={onToggleDark}>{darkMode?"☀":"🌙"}</button>
       </div>
       
@@ -1624,7 +1413,7 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
           <div style={{fontSize:11,fontWeight:500,color:"#f5b942",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.05em"}}>🔴 Transferencias sin confirmar</div>
           {transferenciasPendientes.map(({dia,fecha,count,monto,ventas:vts})=>(
             <button key={dia+fecha} style={{...s.card,width:"100%",margin:"0 0 6px",background:"#1e3a5f",border:"1px solid #f5b942",display:"flex",alignItems:"center",gap:10,cursor:"pointer",textAlign:"left"}}
-              onClick={()=>onVerConfirmaciones&&onVerConfirmaciones(dia)}>
+              onClick={()=>onDia(dia)}>
               <span style={{fontSize:18}}>🔴</span>
               <div style={{flex:1}}>
                 <div style={{fontSize:13,fontWeight:500,color:"#f5b942"}}>{dia} · {count} transfer. sin confirmar</div>
@@ -1640,83 +1429,31 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
       )}
       <span style={s.sectionTitle}>Días de reparto</span>
       <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:8}}>
-        {dias.map((d,idx)=>{
+        {dias.map(d=>{
           const deudas = (clientes||[]).filter(c=>c.dia===d&&c.saldo<0);
           const totalDeuda = deudas.reduce((a,c)=>a+Math.abs(c.saldo),0);
-          return (<React.Fragment key={d}>
-          <button style={{...s.card,margin:0,textAlign:"left",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px"}} onClick={()=>onDia(d)}>
+          return (
+          <button key={d} style={{...s.card,margin:0,textAlign:"left",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px"}} onClick={()=>onDia(d)}>
             <div>
               <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>{d}</span>
               {totalDeuda>0&&<div style={{fontSize:11,color:"var(--color-text-danger)",marginTop:2}}>⚠ {deudas.length} cliente{deudas.length>1?"s":""} deben {fmt(totalDeuda)}</div>}
             </div>
             <span style={{color:"var(--color-text-tertiary)",fontSize:18}}>→</span>
           </button>
-          {idx===dias.length-1&&stock&&(
-            (()=>{
-              const CAJON=6;
-              const sCaj=Math.floor((stock.soderia?.sifon||0)/CAJON);
-              const cCaj=Math.floor((stock.casa?.sifon||0)/CAJON);
-              const sB10=stock.soderia?.bidon10||0, cB10=stock.casa?.bidon10||0;
-              const sB20=stock.soderia?.bidon20||0, cB20=stock.casa?.bidon20||0;
-              const envC={sifon:0,bidon10:0,bidon20:0};
-              (clientes||[]).forEach(c=>{envC.sifon+=(c.sifon||0);envC.bidon10+=(c.bidon10||0);envC.bidon20+=(c.bidon20||0);});
-              (ventas||[]).forEach(v=>{
-                (v.envPrest||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)envC[k]+=Number(e.cant)||0;});
-                (v.envDev||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)envC[k]-=Number(e.cant)||0;});
-              });
-              const envCCaj=Math.floor(envC.sifon/CAJON);
-              const totCaj=sCaj+cCaj+envCCaj, totB10=sB10+cB10+envC.bidon10, totB20=sB20+cB20+envC.bidon20;
-              const StockCard = ()=>{
-                const [open,setOpen]=React.useState(false);
-                return (
-                  <div style={{...s.card,margin:"4px 0 0",background:"var(--color-background-secondary)",border:"0.5px solid var(--color-border-secondary)"}}>
-                    {/* Header siempre visible — toca para desplegar */}
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}} onClick={()=>setOpen(o=>!o)}>
-                      <div style={{display:"flex",alignItems:"center",gap:10}}>
-                        <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>📦 Stock</span>
-                        {/* Resumen compacto siempre visible */}
-                        <div style={{display:"flex",gap:6}}>
-                          {[[totCaj,"caj"],[totB10,"10L"],[totB20,"20L"]].map(([v,u],i)=>(
-                            <span key={i} style={{fontSize:12,fontWeight:600,color:Number(v)<3?"var(--color-text-danger)":Number(v)<8?"var(--color-text-warning)":"var(--color-text-info)"}}>{v}<span style={{fontSize:10,fontWeight:400,color:"var(--color-text-tertiary)",marginLeft:1}}>{u}</span></span>
-                          ))}
-                        </div>
-                      </div>
-                      <span style={{fontSize:13,color:"var(--color-text-tertiary)",transition:"transform 0.2s",display:"inline-block",transform:open?"rotate(180deg)":"rotate(0deg)"}}>▾</span>
-                    </div>
-                    {/* Detalle desplegable */}
-                    {open&&<div style={{marginTop:12}}>
-                      {[["🏭 Sodería",[sCaj,sB10,sB20],"primary"],["👥 En clientes",[envCCaj,envC.bidon10,envC.bidon20],"info"],["📦 Total general",[totCaj,totB10,totB20],"info"]].map(([titulo,vals,color],gi)=>(
-                        <div key={gi} style={{marginBottom:gi<2?10:0}}>
-                          <div style={{fontSize:10,color:"var(--color-text-tertiary)",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.05em"}}>{titulo}</div>
-                          <div style={{display:"flex",gap:6}}>
-                            {vals.map((v,i)=>(
-                              <div key={i} style={{textAlign:"center",flex:1,background:gi===2?"#1e3a5f":"var(--color-background-tertiary)",borderRadius:8,padding:"6px 4px",border:gi===2?"0.5px solid var(--color-border-info)":"none"}}>
-                                <div style={{fontSize:18,fontWeight:gi===2?700:600,color:gi===0?(Number(v)<3?"var(--color-text-danger)":Number(v)<8?"var(--color-text-warning)":"var(--color-text-primary)"):`var(--color-text-${color})`}}>{v}</div>
-                                <div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>{["caj","10L","20L"][i]}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                      <button style={{...s.btn,width:"100%",marginTop:10,fontSize:12,padding:"7px"}} onClick={e=>{e.stopPropagation();onStock();}}>Editar stock →</button>
-                    </div>}
-                  </div>
-                );
-              };
-              return <StockCard/>;
-            })()
-          )}
-          </React.Fragment>);
-        })}
+        );
+      })}
+      </div>
+      <StockGeneral stock={stock} clientes={clientes||[]} ventas={ventas||[]} onEditar={onStock} />
+      <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:8}}>
         <div style={s.divider} />
         <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onGestionClientes}>
           <span>👥 Gestión de clientes</span><span style={{color:"var(--color-text-tertiary)"}}>→</span>
         </button>
-        <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onStock}>
-          <span>📦 Stock</span><span style={{color:"var(--color-text-tertiary)"}}>→</span>
-        </button>
         <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onPromocion}>
           <span>🚀 Promoción</span><span style={{color:"var(--color-text-tertiary)"}}>→</span>
+        </button>
+        <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onMensajes}>
+          <span>💬 Mensajes masivos</span><span style={{color:"var(--color-text-tertiary)"}}>→</span>
         </button>
 
         <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onResumen}>
@@ -1828,8 +1565,9 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,productos,stock,setStock,sync
   const set = (k,v) => setDatos(d=>({...d,[k]:v}));
   const setProd=(pid,campo,v)=>setDatos(d=>({...d,productos:{...d.productos,[pid]:{...d.productos[pid],[campo]:v}}}));
   const setGasto=(i,campo,v)=>{const g=[...(datos.gastos||[])];g[i]={...g[i],[campo]:v};setDatos(d=>({...d,gastos:g}));};
-  const addGasto=()=>setDatos(d=>({...d,gastos:[...(d.gastos||[]),{cat:"propina",monto:""}]}));
+  const addGasto=()=>setDatos(d=>({...d,gastos:[...(d.gastos||[]),{cat:"propina",monto:"",desc:"",confirmado:false}]}));
   const delGasto=(i)=>setDatos(d=>({...d,gastos:d.gastos.filter((_,j)=>j!==i)}));
+  const confirmarGasto=(i)=>setDatos(d=>{const g=[...(d.gastos||[])];g[i]={...g[i],confirmado:true};return({...d,gastos:g});});
 
   const totalGastos=(datos.gastos||[]).reduce((a,g)=>a+num(g.monto),0);
   const efectivo=num(datos.efectivo), fiado=num(datos.fiado), retenciones=num(datos.retenciones);
@@ -1842,10 +1580,7 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,productos,stock,setStock,sync
       <div style={s.header}>
         <button style={s.backBtn} onClick={onVolver}>← Volver</button>
         <span style={s.headerTitle}>Planilla · {dia}</span>
-        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2}}>
-          <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>{fecha}</span>
-          {planilla._autoGuardado&&<span style={{fontSize:10,color:"#4dd9a0",fontWeight:500}}>✓ Auto-guardado</span>}
-        </div>
+        <span style={{fontSize:12,color:'var(--color-text-secondary)',alignSelf:'center'}}>{fecha}</span>
       </div>
       <div style={{padding:16}}>
 
@@ -1897,44 +1632,32 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,productos,stock,setStock,sync
         {/* Gastos extras */}
         <div style={s.divider} />
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-          <span style={{fontSize:11,color:"var(--color-text-secondary)",fontWeight:500,textTransform:"uppercase",letterSpacing:"0.06em"}}>Gastos extras (efectivo)</span>
+          <span style={{fontSize:11,color:"var(--color-text-secondary)",fontWeight:500,textTransform:"uppercase",letterSpacing:"0.06em"}}>Gastos extras</span>
           <button style={{...s.btn,fontSize:12,padding:"4px 12px"}} onClick={addGasto}>+ Agregar</button>
         </div>
         {(datos.gastos||[]).length===0&&<p style={{fontSize:13,color:"var(--color-text-tertiary)",marginBottom:8}}>Sin gastos extras</p>}
         {(datos.gastos||[]).map((g,i)=>(
-          g.confirmado
-          ? <div key={i} style={{...s.card,margin:"0 0 6px",background:"var(--color-background-tertiary)",borderLeft:"3px solid #4dd9a0",padding:"10px 12px"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div>
-                  <div style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>{g.cat.charAt(0).toUpperCase()+g.cat.slice(1)}{g.desc?` · ${g.desc}`:""}</div>
-                  <div style={{fontSize:12,color:"var(--color-text-danger)",marginTop:2}}>−{fmt(num(g.monto))}</div>
-                </div>
-                <div style={{display:"flex",gap:6}}>
-                  <button style={{...s.btn,fontSize:11,padding:"3px 10px"}} onClick={()=>setGasto(i,"confirmado",false)}>Editar</button>
-                  <button style={s.btnDanger} onClick={()=>delGasto(i)}>✕</button>
-                </div>
-              </div>
+          <div key={i} style={{...s.card,margin:"0 0 8px",background:g.confirmado?"#0a2e1f":"var(--color-background-tertiary)",border:g.confirmado?"0.5px solid #4dd9a0":"0.5px solid var(--color-border-tertiary)"}}>
+            <div style={{display:"flex",gap:6,marginBottom:g.desc!==undefined&&!g.confirmado?6:0}}>
+              <select style={{...s.select,flex:2}} disabled={g.confirmado} value={g.cat} onChange={e=>setGasto(i,"cat",e.target.value)}>
+                {GASTOS_CATEGORIAS.map(c=><option key={c} value={c}>{c.charAt(0).toUpperCase()+c.slice(1)}</option>)}
+              </select>
+              <input style={{...s.inputNum,flex:1}} disabled={g.confirmado} type="number" placeholder="Monto" value={g.monto||""} onChange={e=>setGasto(i,"monto",e.target.value)} />
+              {g.confirmado
+                ? <button style={{...s.btn,fontSize:11,padding:"4px 8px",color:"#4dd9a0"}} onClick={()=>setGasto(i,"confirmado",false)}>Editar</button>
+                : <button style={s.btnDanger} onClick={()=>delGasto(i)}>✕</button>}
             </div>
-          : <div key={i} style={{...s.card,margin:"0 0 6px",padding:"10px 12px"}}>
-              <div style={{display:"flex",gap:6,marginBottom:6}}>
-                <select style={{...s.select,flex:1}} value={g.cat} onChange={e=>setGasto(i,"cat",e.target.value)}>
-                  {GASTOS_CATEGORIAS.map(c=><option key={c} value={c}>{c.charAt(0).toUpperCase()+c.slice(1)}</option>)}
-                </select>
-                <input style={{...s.inputNum,flex:1}} type="number" placeholder="Monto $" value={g.monto||""} onChange={e=>setGasto(i,"monto",e.target.value)} />
-              </div>
-              <input style={{...s.input,marginBottom:6}} placeholder="Descripción (opcional)" value={g.desc||""} onChange={e=>setGasto(i,"desc",e.target.value)} />
+            {!g.confirmado&&(
               <div style={{display:"flex",gap:6}}>
-                <button style={{flex:1,padding:"7px",borderRadius:8,border:"none",background:"#0a2e1f",color:"#4dd9a0",fontSize:12,fontWeight:500,cursor:"pointer",opacity:!g.monto?0.5:1}}
-                  disabled={!g.monto}
-                  onClick={()=>{setGasto(i,"confirmado",true);setTimeout(()=>onGuardar({...datos,gastos:datos.gastos.map((x,j)=>j===i?{...x,confirmado:true}:x)}),50);}}>
-                  ✓ Confirmar y guardar
-                </button>
-                <button style={s.btnDanger} onClick={()=>delGasto(i)}>✕</button>
+                <input style={{...s.input,flex:2,margin:0,fontSize:12}} placeholder="Descripción (opcional)" value={g.desc||""} onChange={e=>setGasto(i,"desc",e.target.value)} />
+                <button style={{...s.btn,flex:1,fontSize:12,padding:"6px",background:"#4dd9a0",color:"#0a2e1f",border:"none",fontWeight:600}} onClick={()=>confirmarGasto(i)}>✓ Confirmar</button>
               </div>
-            </div>
+            )}
+            {g.confirmado&&g.desc&&<div style={{fontSize:11,color:"#4dd9a0",marginTop:2}}>{g.desc}</div>}
+          </div>
         ))}
         {totalGastos>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderTop:"0.5px solid var(--color-border-tertiary)",marginBottom:8}}>
-          <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Total gastos extras</span>
+          <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Total gastos</span>
           <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-danger)"}}>−{fmt(totalGastos)}</span>
         </div>}
 
@@ -2031,13 +1754,9 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,productos,stock,setStock,sync
             <span style={{fontSize:13,color:"var(--color-text-danger)"}}>− Llenado de envases</span>
             <span style={{fontSize:13,color:"var(--color-text-danger)"}}>{fmt(totalVentaLlenar)}</span>
           </div>
-          {totalGastos>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-            <span style={{fontSize:13,color:"var(--color-text-danger)"}}>− Gastos extras</span>
-            <span style={{fontSize:13,color:"var(--color-text-danger)"}}>{fmt(totalGastos)}</span>
-          </div>}
           <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0 2px"}}>
             <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Efectivo en mano</span>
-            <span style={{fontSize:18,fontWeight:500,color:(cobEfectivo-totalVentaLlenar-totalGastos)>=0?"var(--color-text-success)":"var(--color-text-danger)"}}>{fmt(cobEfectivo-totalVentaLlenar-totalGastos)}</span>
+            <span style={{fontSize:18,fontWeight:500,color:"var(--color-text-success)"}}>{fmt(cobEfectivo-totalVentaLlenar)}</span>
           </div>
         </div>
 
@@ -2100,6 +1819,55 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,productos,stock,setStock,sync
             </div>
             <span style={{fontSize:22,fontWeight:500,color:ganancia>=0?"var(--color-text-success)":"var(--color-text-danger)"}}>{fmt(ganancia)}</span>
           </div>
+        </div>
+        {/* Cerrar día — devuelve sobrantes al stock de sodería */}
+        <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-tertiary)"}}>
+          <div style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)",marginBottom:6}}>🔒 Cerrar día de reparto</div>
+          <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:10,lineHeight:1.5}}>
+            Los llenos sobrantes del camión y los vacíos recuperados vuelven al stock de la sodería automáticamente.
+          </div>
+          {stock?.camion&&(
+            <div style={{display:"flex",gap:12,marginBottom:10}}>
+              {[["Sifón",stock?.camion?.sifon||0],["10L",stock?.camion?.bidon10||0],["20L",stock?.camion?.bidon20||0]].map(([l,v])=>(
+                <div key={l} style={{textAlign:"center"}}>
+                  <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>Camión {l}</div>
+                  <div style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>{v||0}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <button style={{...s.btn,width:"100%",padding:"12px",fontSize:14,borderRadius:10,background:"#0a2e1f",color:"#4dd9a0",border:"1px solid #4dd9a0"}}
+            onClick={()=>{
+              if(!window.confirm("¿Cerrar el día? Los sobrantes y vacíos del camión pasan a la sodería.")) return;
+              // llenos sobrantes = lo que cargaste - lo que vendiste
+              const llenSoda  = Number(datos.productos?.soda?.llenos||0) - totalesPorProd.soda.vacios;
+              const llenB10   = Number(datos.productos?.b10?.llenos||0)  - totalesPorProd.b10.vacios;
+              const llenB20   = Number(datos.productos?.b20?.llenos||0)  - totalesPorProd.b20.vacios;
+              // vacíos recuperados de clientes (de las ventas del día — los que devolvieron)
+              const vacSoda   = totalesPorProd.soda.vacios;
+              const vacB10    = totalesPorProd.b10.vacios;
+              const vacB20    = totalesPorProd.b20.vacios;
+              setStock(prev=>{
+                const s=JSON.parse(JSON.stringify(normStock(prev)));
+                // sobrantes llenos van a sodería
+                s.soderia.sifon   = (s.soderia.sifon||0)   + Math.max(0,llenSoda);
+                s.soderia.bidon10 = (s.soderia.bidon10||0) + Math.max(0,llenB10);
+                s.soderia.bidon20 = (s.soderia.bidon20||0) + Math.max(0,llenB20);
+                // vacíos recuperados también van a sodería (para rellenar)
+                s.soderia.sifon   += vacSoda;
+                s.soderia.bidon10 += vacB10;
+                s.soderia.bidon20 += vacB20;
+                // camión queda en cero
+                s.camion.sifon    = 0;
+                s.camion.bidon10  = 0;
+                s.camion.bidon20  = 0;
+                if(syncData) syncData({stock:s});
+                return s;
+              });
+              onGuardar({...datos, cerrado:true});
+            }}>
+            ✓ Cerrar día y actualizar stock
+          </button>
         </div>
         <button style={s.btnPrimary} onClick={()=>onGuardar(datos)}>Guardar planilla</button>
       </div>
@@ -2245,13 +2013,15 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
 
   const marcarNoVisita = (id,motivo) => {
     const prev = noVMap[id];
-    if(motivo==="noesta"&&prev==="noesta") onRegistrarNoVisita(id,"noesta2");
+    if(motivo==="noesta"&&prev==="noesta") onRegistrarNoVisita(id,"noesta2"); // 2da vez → visitado como "no estaba"
     else if(prev===motivo) onQuitarNoVisita(id);
     else onRegistrarNoVisita(id,motivo);
   };
 
   const clientesOrdenados = [...clientes].sort((a,b)=>(a.orden||9999)-(b.orden||9999));
   const filtrados  = clientesOrdenados.filter(c=>c.nombre.toLowerCase().includes(busqueda.toLowerCase()));
+  // noesta 1ra vez = volver al final, por eso va separado
+  // volverAlFinal: solo clientes con noesta que NO fueron atendidos todavía
   const pendientesNormales = filtrados.filter(c=>!visitados.has(c.id)&&noVMap[c.id]!=="noesta");
   const volverAlFinal      = filtrados.filter(c=>noVMap[c.id]==="noesta"&&!atendidos.has(c.id));
   const pendientes         = [...pendientesNormales, ...volverAlFinal];
@@ -2294,7 +2064,7 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
           </div>
           <div style={{flex:1,cursor:"pointer",minWidth:0}} onClick={()=>onSeleccionar(c)}>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <div style={{fontWeight:500,fontSize:15,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5}}>
+              <div style={{fontWeight:600,fontSize:16,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5}}>
                 {c.nombre}
                 {c.foto&&<span style={{fontSize:10,color:"#4dd9a0",flexShrink:0,marginLeft:3}}>📷</span>}
               </div>
@@ -2313,17 +2083,17 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
                 );
               })()}
             </div>
-            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:2}}>
+            <div style={{fontSize:13,color:"var(--color-text-primary)",marginTop:3,fontWeight:400}}>
               {c.calle?`${c.calle} ${c.nro||""}`:c.manzana?`Mz ${c.manzana} L ${c.lote}`:""}{c.barrio?` · ${c.barrio}`:""}
             </div>
             {c.notas&&<div style={{fontSize:12,color:"var(--color-text-warning)",marginTop:2}}>📝 {c.notas}</div>}
-            <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>
-              {c.sifon>0    && <span style={s.tag}>Sifón×{c.sifon}</span>}
-              {c.bidon10>0  && <span style={s.tag}>10L×{c.bidon10}</span>}
-              {c.bidon20>0  && <span style={s.tag}>20L×{c.bidon20}</span>}
-              {c.dispenser>0 && <span style={{...s.tag,color:"#5daaff"}}>Disp×{c.dispenser}</span>}
+            <div style={{display:"flex",flexWrap:"wrap",gap:5,marginTop:7}}>
+              {c.sifon>0    && <span style={{background:"#1e3a5f",color:"#5daaff",borderRadius:8,padding:"4px 10px",fontSize:13,fontWeight:600,border:"0.5px solid #5daaff"}}>🧴 {c.sifon}</span>}
+              {c.bidon10>0  && <span style={{background:"#1e3a5f",color:"#5daaff",borderRadius:8,padding:"4px 10px",fontSize:13,fontWeight:600,border:"0.5px solid #5daaff"}}>💧 10L×{c.bidon10}</span>}
+              {c.bidon20>0  && <span style={{background:"#1e3a5f",color:"#5daaff",borderRadius:8,padding:"4px 10px",fontSize:13,fontWeight:600,border:"0.5px solid #5daaff"}}>🪣 20L×{c.bidon20}</span>}
+              {c.dispenser>0 && <span style={{background:"#1e3a5f",color:"#5daaff",borderRadius:8,padding:"4px 10px",fontSize:13,fontWeight:600,border:"0.5px solid #5daaff"}}>🔵 Disp×{c.dispenser}</span>}
               {atendido    && <span style={s.badge("success")}>✓ Listo</span>}
-              {est==="noesta" && !atendido  && <span style={s.badge("warning")}>🔄 No estaba aún</span>}
+              {est==="noesta"&&!atendido && <span style={s.badge("warning")}>🔄 Volver al final</span>}
               {est==="noesta2"  && <span style={s.badge("warning")}>No estaba</span>}
               {est==="noquiso"  && <span style={s.badge("danger")}>No quiso</span>}
               {c.saldo<0   && <span style={s.badge("danger")}>Debe {fmt(Math.abs(c.saldo))}</span>}
@@ -2397,7 +2167,7 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
         </div>
         <p style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:6}}>Tocá el # para editar el número de orden del cliente</p>
       </div>
-      {filtrados.length===0&&<div style={{textAlign:"center",padding:"40px 20px",color:"var(--color-text-tertiary)",fontSize:14}}>No hay clientes para {dia}.</div>}
+      {clientes.length===0&&<div style={{textAlign:"center",padding:"40px 20px",color:"var(--color-text-tertiary)",fontSize:14}}>No hay clientes para {dia}.</div>}
       {pendientesNormales.length>0&&<><span style={s.sectionTitle}>Pendientes ({pendientesNormales.length})</span>{pendientesNormales.map(c=><Card key={c.id} c={c}/>)}</>}
       {listos.length>0&&<><span style={s.sectionTitle}>Entregado ({listos.length})</span>{listos.map(c=><Card key={c.id} c={c}/>)}</>}
       {sinEntrega.length>0&&<><span style={s.sectionTitle}>Sin entrega ({sinEntrega.length})</span>{sinEntrega.map(c=><Card key={c.id} c={c}/>)}</>}
@@ -2445,9 +2215,11 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
   );
 }
 
-function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onEditar,onEliminarVenta,onEditarVenta,onEliminarCliente,onNoEstaCliente,onNoQuiereCliente,recordatorios,onGuardarRecordatorio,onConfirmarRecordatorio,onCobrarSaldo}) {
+function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVentaLibre,onVolver,onEditar,onEliminarVenta,onEditarVenta,onEliminarCliente,onNoEstaCliente,recordatorios,onGuardarRecordatorio,onConfirmarRecordatorio,onCobrarSaldo}) {
   const [editandoCliente,setEditandoCliente] = useState(false);
   const [editandoVentaId,setEditandoVentaId] = useState(null);
+  const [histOpen,setHistOpen] = useState(false);
+  const [envOpen,setEnvOpen] = useState(false);
   const [editandoSaldo,setEditandoSaldo] = useState(false);
   const [tipoSaldoEdit,setTipoSaldoEdit] = useState("");
   const [montoSaldoEdit,setMontoSaldoEdit] = useState("");
@@ -2650,28 +2422,28 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
                   {ventaHoy.detalle.map(d=>`${d.nombre} ×${d.cantidad}`).join(" · ")} · {ventaHoy.pago}
                 </div>
               </div>
-            : <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
-                <button style={{background:"var(--color-background-warning)",color:"var(--color-text-warning)",border:"1px solid var(--color-border-warning)",borderRadius:10,padding:"12px 0",fontSize:13,cursor:"pointer",fontWeight:500,flex:1,minWidth:90}}
+            : <div style={{display:"flex",gap:8,marginBottom:12}}>
+                <button style={{background:"var(--color-background-warning)",color:"var(--color-text-warning)",border:"1px solid var(--color-border-warning)",borderRadius:10,padding:"12px 0",fontSize:14,cursor:"pointer",fontWeight:500,flex:1}}
                   onClick={()=>{onNoEstaCliente&&onNoEstaCliente();onVolver();}}>
                   🔄 No está
                 </button>
-                <button style={{background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"1px solid var(--color-border-danger)",borderRadius:10,padding:"12px 0",fontSize:13,cursor:"pointer",fontWeight:500,flex:1,minWidth:90}}
-                  onClick={()=>{onNoQuiereCliente&&onNoQuiereCliente();onVolver();}}>
-                  🚫 No quiere
-                </button>
-                <button style={{...s.btnPrimary,padding:"12px 0",fontSize:15,borderRadius:10,flex:2,minWidth:120}} onClick={onVenta}>
+                <button style={{...s.btnPrimary,padding:"12px 0",fontSize:15,borderRadius:10,flex:2}} onClick={onVenta}>
                   📦 Registrar entrega
                 </button>
               </div>
           }
+          {/* Botón venta en cualquier fecha */}
+          <button style={{...s.btn,width:"100%",padding:"10px",fontSize:13,marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center",gap:6}} onClick={onVentaLibre}>
+            🗓 Registrar venta en otra fecha
+          </button>
 
-          {/* Historial colapsable */}
-          <details style={{marginTop:4}} open>
-            <summary style={{cursor:"pointer",listStyle:"none",display:"flex",alignItems:"center",justifyContent:"space-between",background:"var(--color-background-tertiary)",borderRadius:8,padding:"10px 14px",marginBottom:4}}>
-              <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>📋 Historial ({ventas.length} compras · {fmt(totalComprado)})</span>
-              <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>▾</span>
-            </summary>
-          <div style={{marginTop:4}}>
+          {/* Acordeón Historial */}
+          <div style={s.divider} />
+          <button style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0"}} onClick={()=>setHistOpen(o=>!o)}>
+            <span style={{...s.sectionTitle,padding:0}}>📋 Historial ({ventas.length} compras · {fmt(totalComprado)})</span>
+            <span style={{fontSize:16,color:"var(--color-text-tertiary)",transition:"transform 0.2s",display:"inline-block",transform:histOpen?"rotate(180deg)":"rotate(0deg)"}}>▾</span>
+          </button>
+          {histOpen&&<>
           {historial.length===0&&<p style={{fontSize:13,color:"var(--color-text-tertiary)",padding:"4px 0"}}>Sin registros aún</p>}
           {historial.map(v=>(
             <div key={v.id} style={{marginBottom:8}}>
@@ -2694,50 +2466,27 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
               }
             </div>
           ))}
-          </div>
-          </details>
+          </>}
 
-          {/* Envases colapsable */}
-          <details style={{marginTop:6}}> 
-            <summary style={{cursor:"pointer",listStyle:"none",display:"flex",alignItems:"center",justifyContent:"space-between",background:"var(--color-background-tertiary)",borderRadius:8,padding:"10px 14px",marginBottom:4}}>
-              <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>🫧 Envases</span>
-              <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>▾</span>
-            </summary>
-            <div style={{marginTop:4}}>
-              {(()=>{
-                const CAJON=6;
-                const extra={sifon:0,bidon10:0,bidon20:0};
-                historial.forEach(v=>{
-                  (v.envPrest||[]).forEach(e=>{
-                    const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;
-                    if(k) extra[k]+=Number(e.cant)||0;
-                  });
-                  (v.envDev||[]).forEach(e=>{
-                    const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;
-                    if(k) extra[k]-=Number(e.cant)||0;
-                  });
-                });
-                const total={sifon:(cliente.sifon||0)+extra.sifon, bidon10:(cliente.bidon10||0)+extra.bidon10, bidon20:(cliente.bidon20||0)+extra.bidon20};
-                const tieneExtra=extra.sifon!==0||extra.bidon10!==0||extra.bidon20!==0;
-                return (<>
-                  <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-tertiary)"}}>
-                    <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8}}>📦 En poder del cliente ahora</div>
-                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                      {total.sifon>0&&<div style={s.metricCard}><div style={s.metricLabel}>Sifón</div><div style={{...s.metricVal,color:extra.sifon>0?"var(--color-text-warning)":extra.sifon<0?"var(--color-text-success)":"var(--color-text-primary)"}}>{total.sifon}</div></div>}
-                      {total.bidon10>0&&<div style={s.metricCard}><div style={s.metricLabel}>10L</div><div style={{...s.metricVal,color:extra.bidon10>0?"var(--color-text-warning)":extra.bidon10<0?"var(--color-text-success)":"var(--color-text-primary)"}}>{total.bidon10}</div></div>}
-                      {total.bidon20>0&&<div style={s.metricCard}><div style={s.metricLabel}>20L</div><div style={{...s.metricVal,color:extra.bidon20>0?"var(--color-text-warning)":extra.bidon20<0?"var(--color-text-success)":"var(--color-text-primary)"}}>{total.bidon20}</div></div>}
-                      {cliente.dispenser>0&&<div style={s.metricCard}><div style={s.metricLabel}>Dispenser</div><div style={s.metricVal}>{cliente.dispenser}</div></div>}
-                      {!total.sifon&&!total.bidon10&&!total.bidon20&&!cliente.dispenser&&<span style={{fontSize:13,color:"var(--color-text-tertiary)"}}>Sin envases</span>}
-                    </div>
-                    {tieneExtra&&<div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:8,borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:6}}>
-                      Habitual: {cliente.sifon>0?`Sifón×${cliente.sifon} `:""}{ cliente.bidon10>0?`10L×${cliente.bidon10} `:""}{ cliente.bidon20>0?`20L×${cliente.bidon20}`:""}
-                      {extra.sifon!==0&&<span style={{color:extra.sifon>0?"var(--color-text-warning)":"var(--color-text-success)"}}>{extra.sifon>0?` +${extra.sifon} sif. prest.`:` ${Math.abs(extra.sifon)} sif. dev.`}</span>}
-                      {extra.bidon10!==0&&<span style={{color:extra.bidon10>0?"var(--color-text-warning)":"var(--color-text-success)"}}>{extra.bidon10>0?` +${extra.bidon10} 10L prest.`:` ${Math.abs(extra.bidon10)} 10L dev.`}</span>}
-                      {extra.bidon20!==0&&<span style={{color:extra.bidon20>0?"var(--color-text-warning)":"var(--color-text-success)"}}>{extra.bidon20>0?` +${extra.bidon20} 20L prest.`:` ${Math.abs(extra.bidon20)} 20L dev.`}</span>}
-                    </div>}
-                  </div>
-                </>);
-              })()}
+          {/* Acordeón Envases */}
+          <div style={s.divider} />
+          <button style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0"}} onClick={()=>setEnvOpen(o=>!o)}>
+            <span style={{...s.sectionTitle,padding:0}}>📦 Envases</span>
+            <span style={{fontSize:16,color:"var(--color-text-tertiary)",transition:"transform 0.2s",display:"inline-block",transform:envOpen?"rotate(180deg)":"rotate(0deg)"}}>▾</span>
+          </button>
+          {envOpen&&(
+            <div style={{marginBottom:8}}>
+              <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-tertiary)"}}>
+                <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8}}>Envases habituales asignados</div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  {cliente.sifon>0    && <div style={s.metricCard}><div style={s.metricLabel}>Sifón</div><div style={s.metricVal}>{cliente.sifon}</div></div>}
+                  {cliente.bidon10>0  && <div style={s.metricCard}><div style={s.metricLabel}>10L</div><div style={s.metricVal}>{cliente.bidon10}</div></div>}
+                  {cliente.bidon20>0  && <div style={s.metricCard}><div style={s.metricLabel}>20L</div><div style={s.metricVal}>{cliente.bidon20}</div></div>}
+                  {cliente.dispenser>0 && <div style={s.metricCard}><div style={s.metricLabel}>Dispenser</div><div style={s.metricVal}>{cliente.dispenser}</div></div>}
+                  {!cliente.sifon&&!cliente.bidon10&&!cliente.bidon20&&!cliente.dispenser&&
+                    <span style={{fontSize:13,color:"var(--color-text-tertiary)"}}>Sin envases asignados</span>}
+                </div>
+              </div>
               <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",margin:"10px 0 6px"}}>Movimientos registrados</div>
               {historial.filter(v=>(v.envPrest||[]).length>0||(v.envDev||[]).length>0).length===0&&
                 <p style={{fontSize:13,color:"var(--color-text-tertiary)"}}>Sin movimientos de envases registrados</p>}
@@ -2759,7 +2508,7 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
                 </div>
               ))}
             </div>
-          </details>
+          )}
 
 
           <div style={{...s.divider,marginTop:12}}/>
@@ -2911,8 +2660,9 @@ function VehiculoMantModal({onGuardar,onCerrar}) {
   const [km,setKm] = React.useState("");
   const [costo,setCosto] = React.useState("");
   const [proximo,setProximo] = React.useState("");
-  const [fechaISO,setFechaISO] = React.useState(new Date().toISOString().slice(0,10));
-  const fechaDisplay = fechaISO ? new Date(fechaISO+'T12:00:00').toLocaleDateString("es-AR") : "";
+  const hoyISO = new Date().toISOString().slice(0,10);
+  const [fechaInput,setFechaInput] = React.useState(hoyISO);
+  const fecha = new Date(fechaInput+"T12:00:00").toLocaleDateString("es-AR");
   const tipos = [
     {id:"aceite",    label:"🛢 Cambio de aceite",           color:"#f5b942"},
     {id:"preventivo",label:"🔩 Mantenimiento preventivo",   color:"#4dd9a0"},
@@ -2927,9 +2677,9 @@ function VehiculoMantModal({onGuardar,onCerrar}) {
           <span style={{fontSize:16,fontWeight:600,color:"var(--color-text-primary)"}}>🔧 Registrar mantenimiento</span>
           <button style={{background:"none",border:"none",fontSize:22,color:"var(--color-text-secondary)",cursor:"pointer"}} onClick={onCerrar}>✕</button>
         </div>
-        <div style={{marginBottom:14}}>
-          <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:4}}>📅 Fecha del mantenimiento</label>
-          <input type="date" style={{width:"100%",background:"var(--color-background-tertiary)",border:"1px solid var(--color-border-secondary)",borderRadius:8,padding:"8px 10px",color:"var(--color-text-primary)",fontSize:13,boxSizing:"border-box"}} value={fechaISO} onChange={e=>setFechaISO(e.target.value)} />
+        <div style={{marginBottom:12}}>
+          <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:4}}>Fecha del mantenimiento</label>
+          <input type="date" style={{width:"100%",background:"var(--color-background-tertiary)",border:"1px solid var(--color-border-secondary)",borderRadius:8,padding:"8px 10px",color:"var(--color-text-primary)",fontSize:13,boxSizing:"border-box"}} value={fechaInput} onChange={e=>setFechaInput(e.target.value)} />
         </div>
         <div style={{marginBottom:14}}>
           <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:6}}>Tipo</label>
@@ -2959,7 +2709,7 @@ function VehiculoMantModal({onGuardar,onCerrar}) {
           <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:4}}>Próximo mantenimiento</label>
           <input style={{width:"100%",background:"var(--color-background-tertiary)",border:"1px solid var(--color-border-secondary)",borderRadius:8,padding:"8px 10px",color:"var(--color-text-primary)",fontSize:13,boxSizing:"border-box"}} placeholder="Ej: 135.000 km / junio 2026" value={proximo} onChange={e=>setProximo(e.target.value)} />
         </div>
-        <button style={{width:"100%",padding:"13px",borderRadius:10,border:"none",background:"#185FA5",color:"#e2eaf4",fontSize:15,fontWeight:600,cursor:"pointer"}} onClick={()=>{if(!tipo)return;onGuardar({tipo,descripcion,km,costo,proximo,fecha:fechaDisplay,fechaISO});}}>
+        <button style={{width:"100%",padding:"13px",borderRadius:10,border:"none",background:"#185FA5",color:"#e2eaf4",fontSize:15,fontWeight:600,cursor:"pointer"}} onClick={()=>{if(!tipo)return;onGuardar({tipo,descripcion,km,costo,proximo,fecha});}}>
           Guardar registro
         </button>
       </div>
@@ -3121,8 +2871,15 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
         <span style={s.headerTitle}>Entrega · {cliente.nombre}</span>
       </div>
       <div style={{padding:16}}>
-        {/* Envases habituales del cliente */}
-        {(()=>{const tags=[];if(cliente.sifon>0)tags.push(`Sifón×${cliente.sifon}`);if(cliente.bidon10>0)tags.push(`10L×${cliente.bidon10}`);if(cliente.bidon20>0)tags.push(`20L×${cliente.bidon20}`);return tags.length>0?(<div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>{tags.map(t=><span key={t} style={{...s.tag,background:"#1e3a5f",color:"var(--color-text-info)",border:"0.5px solid var(--color-border-info)",fontSize:11}}>🧴 {t}</span>)}</div>):null;})()}
+        {/* Tags envases habituales */}
+        {(cliente.sifon>0||cliente.bidon10>0||cliente.bidon20>0)&&(
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+            <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>Habitual:</span>
+            {cliente.sifon>0&&<span style={{background:"#1e3a5f",color:"#5daaff",borderRadius:6,padding:"3px 8px",fontSize:12,fontWeight:500}}>🧴 Sifón×{cliente.sifon}</span>}
+            {cliente.bidon10>0&&<span style={{background:"#1e3a5f",color:"#5daaff",borderRadius:6,padding:"3px 8px",fontSize:12,fontWeight:500}}>💧 10L×{cliente.bidon10}</span>}
+            {cliente.bidon20>0&&<span style={{background:"#1e3a5f",color:"#5daaff",borderRadius:6,padding:"3px 8px",fontSize:12,fontWeight:500}}>🪣 20L×{cliente.bidon20}</span>}
+          </div>
+        )}
         <span style={{...s.sectionTitle,padding:"0 0 10px"}}>Cantidades entregadas</span>
         {productos.map(p=>(
           <div key={p.id} style={{...s.card,margin:"0 0 8px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -3219,7 +2976,16 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
           </div>
         )}
         <div style={s.divider} />
-        <div style={{...s.card,margin:"0 0 12px",background:"var(--color-background-secondary)"}}>
+        <label style={{...s.label,fontSize:13,marginBottom:6}}>Envases prestados al cliente</label>
+        {envPrest.map((_,i)=><ER key={i} list={envPrest} setList={setEnvPrest} i={i} />)}
+        <button style={{...s.btn,fontSize:12,padding:"4px 12px",marginBottom:12}} onClick={()=>setEnvPrest([...envPrest,{prod:"",cant:""}])}>+ Fila</button>
+        <label style={{...s.label,fontSize:13,marginBottom:6}}>Envases devueltos por el cliente</label>
+        {envDev.map((_,i)=><ER key={i} list={envDev} setList={setEnvDev} i={i} />)}
+        <button style={{...s.btn,fontSize:12,padding:"4px 12px",marginBottom:12}} onClick={()=>setEnvDev([...envDev,{prod:"",cant:""}])}>+ Fila</button>
+        <div style={s.divider} />
+        <label style={s.label}>Observaciones</label>
+        <textarea style={{...s.input,minHeight:60,resize:"vertical",marginBottom:14}} value={obs} onChange={e=>setObs(e.target.value)} placeholder="Notas opcionales..." />
+        <div style={{...s.card,margin:"0 0 16px",background:"var(--color-background-secondary)"}}>
           {bruto>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Subtotal</span><span style={{fontSize:13,color:"var(--color-text-primary)"}}>{fmt(bruto)}</span></div>}
           {desc>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Descuento 2.5%</span><span style={{fontSize:13,color:"var(--color-text-danger)"}}>−{fmt(desc)}</span></div>}
           {saldoApl>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Saldo a favor</span><span style={{fontSize:13,color:"var(--color-text-success)"}}>−{fmt(saldoApl)}</span></div>}
@@ -3228,11 +2994,18 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
             <span style={{fontSize:26,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(aPagar)}</span>
           </div>
         </div>
-        <button style={{...s.btnPrimary,marginBottom:10,opacity:detalle.length===0?0.45:1}} disabled={detalle.length===0} onClick={()=>{
+        {/* Cobrar deuda sin entrega */}
+        {cliente.saldo<0&&(
+          <CobroDeudaPanel saldo={cliente.saldo} onCobrar={(mCobro,pCobro)=>{
+            onGuardar([{nombre:"Cobro de deuda",cantidad:1,precio:0,total:0}],pCobro,String(mCobro),0,[],[],`Cobro de deuda $${mCobro.toLocaleString("es-AR")} (${pCobro})`,"cobro_deuda");
+          }} />
+        )}
+        <button style={{...s.btnPrimary,opacity:detalle.length===0?0.45:1}} disabled={detalle.length===0} onClick={()=>{
           if(pago==="mixto"){
+            // Pago mixto: guardamos 2 ventas separadas (efectivo + transferencia)
             const ef=Number(montoEfec||0), tr=Number(montoTrans||0);
             const totalPagado=ef+tr;
-            const saldoDelta=totalPagado-aPagar;
+            const saldoDelta=totalPagado-aPagar; // positivo=a favor, negativo=deuda
             if(ef>0) onGuardar(detalle,"contado",String(ef),saldoApl,envPrest,envDev,obs,"mixto_ef",tr,saldoDelta);
             else if(tr>0) onGuardar(detalle,"transferencia",String(tr),saldoApl,envPrest,envDev,obs,"mixto_tr",ef,saldoDelta);
           } else {
@@ -3242,23 +3015,79 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
             onGuardar(detalle,pago,montoFinal,saldoApl,envPrest,envDev,obs,opcionSaldo);
           }
         }}>
-          ✓ Registrar entrega
+          Guardar venta
         </button>
-        <div style={{display:"flex",gap:8,marginBottom:10}}>
-          <button style={{flex:1,background:"var(--color-background-warning)",color:"var(--color-text-warning)",border:"0.5px solid var(--color-border-warning)",borderRadius:8,padding:"11px 8px",fontSize:13,fontWeight:500,cursor:"pointer"}}
-            onClick={onNoEsta}>
-            🔄 No está
-          </button>
-          <button style={{flex:1,background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"0.5px solid var(--color-border-danger)",borderRadius:8,padding:"11px 8px",fontSize:13,fontWeight:500,cursor:"pointer"}}
-            onClick={onNoQuiere}>
-            🚫 No quiere
-          </button>
+      </div>
+    </div>
+  );
+}
+
+function NuevaVentaLibre({cliente,productos,fechaInicial,onGuardar,onVolver}) {
+  const [fechaKl,setFechaKl] = React.useState(fechaInicial||new Date().toISOString().slice(0,10));
+  const [cantidades,setCantidades] = useState(()=>{const m={};productos.forEach(p=>{const k=p.nombre==="Sifón 1.5L"?"sifon":p.nombre==="Bidón 10L"?"bidon10":"bidon20";m[p.nombre]=cliente[k]||0;});return m;});
+  const [pago,setPago] = useState("contado");
+  const [monto,setMonto] = useState("");
+  const [usarSaldo,setUsarSaldo] = useState(false);
+  const [envPrest,setEnvPrest] = useState([{prod:"",cant:""}]);
+  const [envDev,setEnvDev] = useState([{prod:"",cant:""}]);
+  const [obs,setObs] = useState("");
+  const detalle = productos.map(p=>({nombre:p.nombre,cantidad:cantidades[p.nombre]||0,precio:p.precio,total:(cantidades[p.nombre]||0)*p.precio})).filter(d=>d.cantidad>0);
+  const bruto = detalle.reduce((a,d)=>a+d.total,0);
+  const neto = bruto;
+  const saldoDisp = cliente.saldo>0?cliente.saldo:0;
+  const saldoApl = (usarSaldo&&pago!=="fiado")?Math.min(saldoDisp,neto):0;
+  const aPagar = neto-saldoApl;
+  const ER=({list,setList,i})=>(
+    <div style={{...s.row,marginBottom:6}}>
+      <select style={{...s.select,flex:2}} value={list[i].prod} onChange={e=>{const n=[...list];n[i].prod=e.target.value;setList(n);}}>
+        <option value="">— Producto —</option>
+        {productos.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+      </select>
+      <input style={{...s.input,flex:1}} type="number" placeholder="Cant" value={list[i].cant} onChange={e=>{const n=[...list];n[i].cant=e.target.value;setList(n);}} />
+    </div>
+  );
+  return (
+    <div style={s.screen}>
+      <div style={s.header}>
+        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
+        <span style={s.headerTitle}>Venta · {cliente.nombre}</span>
+      </div>
+      <div style={{padding:16}}>
+        <div style={{...s.card,margin:"0 0 14px",background:"var(--color-background-tertiary)"}}>
+          <label style={{fontSize:12,color:"var(--color-text-secondary)",display:"block",marginBottom:6}}>📅 Fecha de la venta</label>
+          <input type="date" style={{...s.input,margin:0}} value={fechaKl} onChange={e=>setFechaKl(e.target.value)} />
         </div>
-        {/* Cobrar deuda sin entrega */}
-        {cliente.saldo<0&&(
-          <CobroDeudaPanel saldo={cliente.saldo} onCobrar={(mCobro,pCobro)=>{
-            onGuardar([{nombre:"Cobro de deuda",cantidad:1,precio:0,total:0}],pCobro,String(mCobro),0,[],[],`Cobro de deuda $${mCobro.toLocaleString("es-AR")} (${pCobro})`,"cobro_deuda");
-          }} />
+        <span style={{...s.sectionTitle,padding:"0 0 10px"}}>Cantidades entregadas</span>
+        {productos.map(p=>(
+          <div key={p.id} style={{...s.card,margin:"0 0 8px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div><div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>{p.nombre}</div><div style={{fontSize:12,color:"var(--color-text-secondary)"}}>{fmt(p.precio)} c/u</div></div>
+            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <button style={{...s.btn,padding:"5px 16px",fontSize:20,lineHeight:1}} onClick={()=>setCantidades(q=>({...q,[p.nombre]:Math.max(0,(q[p.nombre]||0)-1)}))}>−</button>
+              <span style={{fontSize:22,fontWeight:500,minWidth:32,textAlign:"center",color:"var(--color-text-primary)"}}>{cantidades[p.nombre]||0}</span>
+              <button style={{...s.btn,padding:"5px 16px",fontSize:20,lineHeight:1}} onClick={()=>setCantidades(q=>({...q,[p.nombre]:(q[p.nombre]||0)+1}))}>+</button>
+            </div>
+          </div>
+        ))}
+        <div style={s.divider} />
+        <label style={{...s.label,fontSize:13,marginBottom:8}}>Forma de pago</label>
+        <div style={{display:"flex",gap:8,marginBottom:12}}>
+          {[["contado","Contado"],["transferencia","Transfer."],["fiado","Fiado"]].map(([v,l])=>(
+            <button key={v} style={{...s.btn,flex:1,background:pago===v?"#185FA5":undefined,color:pago===v?"#fff":undefined,border:pago===v?"none":undefined,padding:"9px 4px",fontSize:13}} onClick={()=>setPago(v)}>{l}</button>
+          ))}
+        </div>
+        {saldoDisp>0&&pago!=="fiado"&&(
+          <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-success)",border:"0.5px solid var(--color-border-success)",cursor:"pointer"}} onClick={()=>setUsarSaldo(!usarSaldo)}>
+            <div style={{display:"flex",gap:10,alignItems:"center"}}>
+              <input type="checkbox" checked={usarSaldo} onChange={e=>setUsarSaldo(e.target.checked)} style={{width:18,height:18,cursor:"pointer",accentColor:"#0F6E56"}} />
+              <label style={{fontSize:14,color:"var(--color-text-success)",cursor:"pointer",fontWeight:500}}>Usar saldo a favor — {fmt(saldoDisp)}</label>
+            </div>
+          </div>
+        )}
+        {pago!=="fiado"&&(
+          <div style={{marginBottom:12}}>
+            <label style={s.label}>Monto cobrado (vacío = {fmt(aPagar)} exacto)</label>
+            <input style={s.input} type="number" placeholder={String(Math.round(aPagar))} value={monto} onChange={e=>setMonto(e.target.value)} />
+          </div>
         )}
         <div style={s.divider} />
         <label style={{...s.label,fontSize:13,marginBottom:6}}>Envases prestados al cliente</label>
@@ -3270,6 +3099,28 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
         <div style={s.divider} />
         <label style={s.label}>Observaciones</label>
         <textarea style={{...s.input,minHeight:60,resize:"vertical",marginBottom:14}} value={obs} onChange={e=>setObs(e.target.value)} placeholder="Notas opcionales..." />
+        <div style={{...s.card,margin:"0 0 16px",background:"var(--color-background-secondary)"}}>
+          <div style={{borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:10,marginTop:6,display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+            <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>A cobrar</span>
+            <span style={{fontSize:26,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(aPagar)}</span>
+          </div>
+        </div>
+        <button style={{...s.btnPrimary,opacity:detalle.length===0?0.45:1}} disabled={detalle.length===0} onClick={()=>{
+          if(!fechaKl){alert("Elegí una fecha");return;}
+          onGuardar(detalle,pago,monto,saldoApl,envPrest,envDev,obs,"compra",0,fechaKl);
+        }}>
+          Guardar venta
+        </button>
+        <div style={{display:"flex",gap:8,marginTop:8}}>
+          <button style={{flex:1,background:"var(--color-background-warning)",color:"var(--color-text-warning)",border:"0.5px solid var(--color-border-warning)",borderRadius:8,padding:"11px 8px",fontSize:13,fontWeight:500,cursor:"pointer"}}
+            onClick={onNoEsta}>
+            🔄 No está
+          </button>
+          <button style={{flex:1,background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"0.5px solid var(--color-border-danger)",borderRadius:8,padding:"11px 8px",fontSize:13,fontWeight:500,cursor:"pointer"}}
+            onClick={onNoQuiere}>
+            🚫 No quiere
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -3506,6 +3357,91 @@ function CargaHistorica({clientes,productos,onGuardar,onVolver,enConfig}) {
   );
 }
 
+function MensajesMasivos({clientes,onVolver}) {
+  const DIAS_REP = ["Martes","Miércoles","Jueves","Viernes"];
+  const PLANTILLAS = [
+    {label:"Cambio de precio 💰",  texto:"Hola! Les avisamos que a partir de la próxima semana habrá un ajuste en los precios. Cualquier consulta estamos a disposición. Gracias! 🙏 — La Catalina"},
+    {label:"Demora en reparto ⏰", texto:"Hola! Les avisamos que hoy el reparto tiene una demora. Pasamos en el transcurso del día. Disculpen el inconveniente! — La Catalina"},
+    {label:"Cambio de día 📅",     texto:"Hola! Esta semana el reparto se realiza el {dia2}. Gracias por su comprensión! — La Catalina"},
+    {label:"Feriado 🎉",           texto:"Hola! El próximo reparto no se realizará por feriado. Retomamos la semana siguiente. Gracias! — La Catalina"},
+    {label:"Texto libre ✏️",       texto:""},
+  ];
+
+  const [plantilla,setPlantilla] = React.useState(0);
+  const [mensaje,setMensaje]     = React.useState(PLANTILLAS[0].texto);
+  const [dia2,setDia2]           = React.useState("Miércoles");
+  const [copiado,setCopiado]     = React.useState(false);
+
+  const copiar = () => {
+    const txt = mensaje.replace(/{dia2}/g, dia2);
+    navigator.clipboard.writeText(txt).catch(()=>{
+      const el=document.createElement("textarea");
+      el.value=txt; document.body.appendChild(el);
+      el.select(); document.execCommand("copy");
+      document.body.removeChild(el);
+    });
+    setCopiado(true);
+    setTimeout(()=>setCopiado(false), 2500);
+  };
+
+  const abrirWhatsApp = () => window.open("https://wa.me/","_blank");
+
+  return (
+    <div style={s.screen}>
+      <div style={s.header}>
+        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
+        <span style={s.headerTitle}>Mensajes masivos</span>
+      </div>
+      <div style={{padding:16,display:"flex",flexDirection:"column",gap:12}}>
+
+        {/* Plantillas */}
+        <div style={s.card}>
+          <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Plantilla</div>
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            {PLANTILLAS.map((p,i)=>(
+              <button key={i} style={{textAlign:"left",padding:"10px 12px",borderRadius:8,border:`0.5px solid ${plantilla===i?"#5daaff":"var(--color-border-secondary)"}`,background:plantilla===i?"var(--color-background-info)":"var(--color-background-secondary)",color:plantilla===i?"#5daaff":"var(--color-text-secondary)",fontSize:13,cursor:"pointer"}}
+                onClick={()=>{setPlantilla(i);if(p.texto)setMensaje(p.texto.replace(/{dia2}/g,dia2));}}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+          {plantilla===2&&(
+            <div style={{marginTop:10}}>
+              <label style={s.label}>Nuevo día</label>
+              <select style={s.select} value={dia2} onChange={e=>{setDia2(e.target.value);setMensaje(PLANTILLAS[2].texto.replace(/{dia2}/g,e.target.value));}}>
+                {DIAS_REP.map(d=><option key={d}>{d}</option>)}
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* Mensaje */}
+        <div style={s.card}>
+          <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Mensaje</div>
+          <textarea style={{...s.input,minHeight:130,resize:"vertical",fontSize:14,lineHeight:1.6}}
+            value={mensaje} onChange={e=>setMensaje(e.target.value)}
+            placeholder="Escribí tu mensaje..." />
+          <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:4}}>{mensaje.length} caracteres</div>
+        </div>
+
+        {/* Botones */}
+        <button style={{...s.btnPrimary,padding:"14px",fontSize:15,borderRadius:12,opacity:!mensaje.trim()?0.5:1,background:copiado?"#4dd9a0":undefined,color:copiado?"#0a2e1f":undefined}}
+          disabled={!mensaje.trim()} onClick={copiar}>
+          {copiado?"✓ ¡Mensaje copiado!":"📋 Copiar mensaje"}
+        </button>
+
+        <button style={{...s.btn,padding:"14px",fontSize:15,borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:"#25D366",color:"#fff",border:"none"}}
+          onClick={abrirWhatsApp}>
+          💬 Abrir WhatsApp
+        </button>
+
+        <div style={{fontSize:12,color:"var(--color-text-tertiary)",textAlign:"center",lineHeight:1.6}}>
+          Copiá el mensaje → abrí WhatsApp → buscá tu lista de difusión → pegá y enviá
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function Promocion({prospectos,onSave,onConvertir,onVolver}) {
   const [diaActivo,setDiaActivo] = useState("");
@@ -4068,7 +4004,7 @@ function PromoComodato({prospecto:p,onGuardar,onVolver}) {
 }
 
 
-function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReordenarTodo,onRegistrarVenta}) {
+function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReordenarTodo}) {
   const [fotoClienteId,setFotoClienteId] = React.useState(null);
   const fotoCliente = fotoClienteId ? clientes.find(c=>c.id===fotoClienteId) : null;
   const [busqueda,setBusqueda]   = useState("");
@@ -4189,7 +4125,6 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
                 </div>
               </div>
               <div style={{...s.row,justifyContent:"flex-end",gap:6,marginTop:8}}>
-                {onRegistrarVenta&&<button style={{...s.btn,fontSize:11,padding:"4px 12px",background:"#185FA5",color:"#e2eaf4",border:"none"}} onClick={()=>onRegistrarVenta(c)}>📦 Venta</button>}
                 <button style={{...s.btn,fontSize:11,padding:"4px 12px"}} onClick={()=>setEditandoId(c.id)}>Editar</button>
                 <button style={{...s.btnDanger,fontSize:11,padding:"4px 10px"}} onClick={()=>onEliminar(c.id)}>Eliminar</button>
               </div>
@@ -4805,46 +4740,6 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
         )}
         {tab==="backup"&&(
         <div style={{padding:16,display:"flex",flexDirection:"column",gap:12}}>
-          {/* RECUPERACION DE EMERGENCIA */}
-          {(()=>{
-            const backupKeys = Object.keys(localStorage).filter(k=>k.startsWith("lc_backup_")).sort().reverse();
-            if(backupKeys.length===0) return null;
-            return (
-              <div style={{...s.card,margin:0,borderLeft:"3px solid #4dd9a0",background:"#0a2e1f"}}>
-                <div style={{fontSize:14,fontWeight:600,color:"#4dd9a0",marginBottom:4}}>🔄 Recuperar clientes desde backup local</div>
-                <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:10}}>Si perdiste clientes, podés restaurarlos desde un backup automático guardado en este dispositivo. <strong style={{color:"#f5b942"}}>Solo restaura los CLIENTES, sin tocar ventas ni planillas.</strong></div>
-                {backupKeys.map(key=>{
-                  let data=null;
-                  try{data=JSON.parse(localStorage.getItem(key));}catch(e){}
-                  if(!data) return null;
-                  const fecha=key.replace("lc_backup_","");
-                  const nClientes=(data.clientes||[]).length;
-                  const diasConClientes=[...new Set((data.clientes||[]).map(c=>c.dia))].join(", ");
-                  return (
-                    <div key={key} style={{...s.card,margin:"0 0 8px",background:"var(--color-background-tertiary)",padding:"10px 12px"}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
-                        <div>
-                          <div style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>📅 {fecha}</div>
-                          <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:2}}>{nClientes} clientes · {diasConClientes||"sin días"}</div>
-                        </div>
-                        <button
-                          style={{background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:8,padding:"6px 14px",fontSize:12,fontWeight:500,cursor:"pointer"}}
-                          onClick={()=>{
-                            if(window.confirm(`¿Restaurar ${nClientes} clientes desde el backup del ${fecha}?\n\nEsto reemplaza los clientes actuales (${clientes.length}) con los del backup.\nVentas y planillas NO se tocan.`)){
-                              setClientes(data.clientes||[]);
-                              syncData({clientes:data.clientes||[]});
-                              alert(`✅ ${nClientes} clientes restaurados desde ${fecha}`);
-                            }
-                          }}>
-                          Restaurar
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
           <div style={{...s.card,margin:0,background:"var(--color-background-secondary)"}}>
             <div style={{fontSize:13,color:"var(--color-text-secondary)",lineHeight:1.7}}>Los datos se guardan en el teléfono. Hacé un backup periódico para no perderlos si cambiás de dispositivo o borrás el navegador.</div>
           </div>
@@ -4877,6 +4772,37 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
             <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:10}}>Descarga un Excel con clientes, ventas, planillas y saldos.</div>
             <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginBottom:12}}>Clientes: {clientes.length} · Ventas: {ventas.length} · Planillas: {Object.keys(planillas).length}</div>
             <button style={s.btnPrimary} onClick={()=>exportarExcel(clientes,ventas,productos,planillas)}>Descargar Excel</button>
+          </div>
+          <div style={{...s.card,margin:0,background:"#0a2e1f",border:"0.5px solid #4dd9a0"}}>
+            <div style={{fontSize:14,fontWeight:500,color:"#4dd9a0",marginBottom:8}}>🔄 Recuperar clientes desde backup local</div>
+            {(()=>{
+              const backups=[];
+              try{
+                for(let k in localStorage){
+                  if(k.startsWith("cat_backup_clientes_")){
+                    const d=JSON.parse(localStorage[k]||"[]");
+                    backups.push({key:k,fecha:k.replace("cat_backup_clientes_",""),count:d.length,data:d});
+                  }
+                }
+              }catch{}
+              backups.sort((a,b)=>b.fecha.localeCompare(a.fecha));
+              if(backups.length===0) return <div style={{fontSize:12,color:"var(--color-text-tertiary)"}}>No hay backups locales disponibles en este dispositivo.</div>;
+              return backups.slice(0,5).map(b=>(
+                <div key={b.key} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <div>
+                    <div style={{fontSize:13,color:"var(--color-text-primary)"}}>{b.fecha}</div>
+                    <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>{b.count} clientes</div>
+                  </div>
+                  <button style={{...s.btn,fontSize:12,padding:"6px 12px",background:"#4dd9a0",color:"#0a2e1f",border:"none",fontWeight:600}} onClick={()=>{
+                    if(window.confirm(`¿Restaurar ${b.count} clientes desde ${b.fecha}? Esto reemplaza los clientes actuales.`)){
+                      setClientes(b.data);
+                      syncData&&syncData({clientes:b.data});
+                      alert("✅ Clientes restaurados. Revisá que estén todos.");
+                    }
+                  }}>Restaurar</button>
+                </div>
+              ));
+            })()}
           </div>
           <div style={{...s.card,margin:0,borderLeft:"3px solid #EF9F27"}}>
             <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:4}}>🔄 Forzar sincronización</div>
@@ -4948,6 +4874,10 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
           )}
         </div>
       )}
+      {/* Botón escala flotante */}
+      <button onClick={nextEscala} style={{position:"fixed",bottom:20,right:16,zIndex:9999,background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:"50%",width:42,height:42,fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 3px 10px rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+        {escala}
+      </button>
     </div>
   );
 }
