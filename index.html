@@ -768,7 +768,7 @@ function App() {
         }}
         onVolver={()=>irA("menu")}
       />}
-      {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onMensajes={()=>irA("mensajes")} onVolver={()=>irA("portada")} onVerConfirmaciones={(dia)=>{setDiaConfirmaciones(dia);irA("confirmaciones");}} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} clientes={clientes} ventas={ventas} stock={stockNorm} onStock={()=>irA("config")}
+      {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={()=>irA("config")} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onVolver={()=>irA("portada")} onVerConfirmaciones={(dia)=>{setDiaConfirmaciones(dia);irA("confirmaciones");}} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} clientes={clientes} ventas={ventas} stock={stockNorm} onStock={()=>irA("config")}
           recordatoriosActivos={recordatoriosActivos}
           onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
           transferenciasPendientes={DIAS.map(dia=>{
@@ -779,7 +779,26 @@ function App() {
           }).filter(Boolean)} />}
       {pantalla==="diaPrincipal"   && <DiaPrincipal dia={diaActual} onIrClientes={()=>irA("selectorFechaClientes")} onIrPlanilla={()=>irA("selectorFechaPlanilla")} onVolver={()=>irA("menu")} ventasPendientesTransfer={ventas.filter(v=>v.dia===diaActual&&v.fechaKey===fechaActual&&v.pago==="transferencia"&&!v.transConfirmada).length} />}
       {pantalla==="selectorFechaPlanilla" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("planilla");}} onVolver={()=>irA("diaPrincipal")} />}
-      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.dia===diaActual&&v.fechaKey===fechaActual)} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);irA("selectorFechaPlanilla");}} onVolver={()=>irA("selectorFechaPlanilla")} />}
+      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.dia===diaActual&&v.fechaKey===fechaActual)} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} onGuardar={d=>{
+              savePlanilla(`${diaActual}_${fechaActual}`,d);
+              // Actualizar stock automáticamente al guardar planilla
+              if(d.productos){
+                const llenSoda = Number(d.productos?.soda?.llenos||0) - Number(d.productos?.soda?.vacios||0);
+                const llenB10  = Number(d.productos?.b10?.llenos||0)  - Number(d.productos?.b10?.vacios||0);
+                const llenB20  = Number(d.productos?.b20?.llenos||0)  - Number(d.productos?.b20?.vacios||0);
+                setStock(prev=>{
+                  const ns=normStock(prev);
+                  const s=JSON.parse(JSON.stringify(ns));
+                  s.soderia.sifon   = (s.soderia.sifon||0)   + Math.max(0,llenSoda) + Number(d.productos?.soda?.vacios||0);
+                  s.soderia.bidon10 = (s.soderia.bidon10||0) + Math.max(0,llenB10)  + Number(d.productos?.b10?.vacios||0);
+                  s.soderia.bidon20 = (s.soderia.bidon20||0) + Math.max(0,llenB20)  + Number(d.productos?.b20?.vacios||0);
+                  s.camion.sifon=0; s.camion.bidon10=0; s.camion.bidon20=0;
+                  syncData({stock:s});
+                  return s;
+                });
+              }
+              irA("selectorFechaPlanilla");
+            }} onVolver={()=>irA("selectorFechaPlanilla")} />}
       {pantalla==="selectorFechaClientes" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("inicioReparto");}} onVolver={()=>irA("diaPrincipal")} />}
       {pantalla==="inicioReparto"  && <InicioReparto dia={diaActual} fecha={fechaActual} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} cargasDia={cargasDia} stock={stockNorm}
         onGuardar={(p,descontar)=>{
@@ -917,6 +936,9 @@ function App() {
       }} onVolver={()=>irA("menu")} />}
       {pantalla==="resumen"        && <Resumen ventas={ventas} clientes={clientes} productos={productos} planillas={planillas} noVisitas={noVisitas||[]} onVolver={()=>irA("menu")} />}
       {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stockNorm} setStock={(s)=>{const ns=normStock(s);setStockRaw(ns);syncData({stock:ns});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} syncData={syncData} onVolver={()=>irA("menu")} />}
+      <button onClick={nextEscala} style={{position:"fixed",bottom:20,right:16,zIndex:9999,background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:"50%",width:42,height:42,fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 3px 10px rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+        {escala}
+      </button>
     </div>
   );
 }
@@ -1439,7 +1461,7 @@ function ConfirmacionesDia({dia, ventas, onConfirmarTransfer, onVolver}) {
   );
 }
 
-function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onMensajes,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,clientes,ventas,stock,onStock,onVerConfirmaciones}) {
+function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,clientes,ventas,stock,onStock,onVerConfirmaciones}) {
   return (
     <div style={s.screen}>
       <div style={s.header}>
@@ -1509,9 +1531,6 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
         </button>
         <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onPromocion}>
           <span>🚀 Promoción</span><span style={{color:"var(--color-text-tertiary)"}}>→</span>
-        </button>
-        <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onMensajes}>
-          <span>💬 Mensajes masivos</span><span style={{color:"var(--color-text-tertiary)"}}>→</span>
         </button>
 
         <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onResumen}>
@@ -1878,22 +1897,7 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,productos,stock,setStock,sync
             <span style={{fontSize:22,fontWeight:500,color:ganancia>=0?"var(--color-text-success)":"var(--color-text-danger)"}}>{fmt(ganancia)}</span>
           </div>
         </div>
-        <button style={s.btnPrimary} onClick={()=>{
-            // Stock se actualiza automáticamente al guardar
-            const llenSoda = Number(datos.productos?.soda?.llenos||0) - totalesPorProd.soda.vacios;
-            const llenB10  = Number(datos.productos?.b10?.llenos||0)  - totalesPorProd.b10.vacios;
-            const llenB20  = Number(datos.productos?.b20?.llenos||0)  - totalesPorProd.b20.vacios;
-            setStock(prev=>{
-              const s=JSON.parse(JSON.stringify(normStock(prev)));
-              s.soderia.sifon   = (s.soderia.sifon||0)   + Math.max(0,llenSoda) + totalesPorProd.soda.vacios;
-              s.soderia.bidon10 = (s.soderia.bidon10||0) + Math.max(0,llenB10)  + totalesPorProd.b10.vacios;
-              s.soderia.bidon20 = (s.soderia.bidon20||0) + Math.max(0,llenB20)  + totalesPorProd.b20.vacios;
-              s.camion.sifon=0; s.camion.bidon10=0; s.camion.bidon20=0;
-              if(syncData) syncData({stock:s});
-              return s;
-            });
-            onGuardar(datos);
-          }}>Guardar planilla</button>
+        <button style={s.btnPrimary} onClick={()=>onGuardar(datos)}>Guardar planilla</button>
       </div>
     </div>
   );
@@ -4740,7 +4744,7 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
                       <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0}
                         value={stock?.[lugar]?.[k]??0}
                         onChange={e=>{
-                          const ns=JSON.parse(JSON.stringify(stock||{}));
+                          const ns=JSON.parse(JSON.stringify(stock||{soderia:{sifon:0,bidon10:0,bidon20:0},casa:{sifon:0,bidon10:0,bidon20:0},camion:{sifon:0,bidon10:0,bidon20:0}}));
                           if(!ns[lugar]) ns[lugar]={sifon:0,bidon10:0,bidon20:0};
                           ns[lugar][k]=Number(e.target.value)||0;
                           setStock(ns);
@@ -4751,7 +4755,7 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
                 </div>
               </div>
             ))}
-            <button style={s.btnPrimary} onClick={()=>{syncData({stock});alert("Stock guardado");}}>Guardar stock</button>
+            <button style={s.btnPrimary} onClick={()=>{setStock(stock);alert("✅ Stock guardado");}}>Guardar stock</button>
           </div>
         )}
         {tab==="historial"&&(
@@ -4899,10 +4903,6 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
           )}
         </div>
       )}
-      {/* Botón escala flotante */}
-      <button onClick={nextEscala} style={{position:"fixed",bottom:20,right:16,zIndex:9999,background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:"50%",width:42,height:42,fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 3px 10px rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-        {escala}
-      </button>
     </div>
   );
 }
