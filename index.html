@@ -337,6 +337,7 @@ function comprimirFoto(file, maxW=800, quality=0.75) {
 }
 
 function App() {
+  const uid = "lacatalina_user"; // app personal: usuario fijo, sin login
   const [pantalla, setPantalla]   = useState(()=>{
     const h = window.location.hash.slice(1)||"portada";
     const needsDia = ["diaPrincipal","selectorFechaClientes","selectorFechaPlanilla","inicioReparto","clientes","detalleCliente","venta","planilla"];
@@ -469,7 +470,6 @@ function App() {
   },[darkMode]);
 
   // Al iniciar, si hay credenciales guardadas, cargar datos de la nube
-  const uid = "lacatalina_user"; // app personal: usuario fijo
   const { useEffect } = React;
   useEffect(() => {
     setSyncStatus("loading");
