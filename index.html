@@ -469,9 +469,9 @@ function App() {
   },[darkMode]);
 
   // Al iniciar, si hay credenciales guardadas, cargar datos de la nube
+  const uid = "lacatalina_user"; // app personal: usuario fijo
   const { useEffect } = React;
   useEffect(() => {
-    if (!uid) return;
     setSyncStatus("loading");
     cloudLoad(uid).then(function(data) {
       if(!data) {
@@ -500,7 +500,7 @@ function App() {
       setSyncStatus("saved");
       setTimeout(()=>setSyncStatus("idle"), 2000);
     });
-  }, [uid]);
+  }, []);
 
   // Ref siempre actualizado — evita datos viejos en el debounce
   const estadoRef = React.useRef({clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios});
@@ -529,7 +529,7 @@ function App() {
   },[]);
 
   const syncData = (overrides={}) => {
-    if(!window.db || !uid) return;
+    if(!window.db) return;
     setSyncStatus("saving");
     const data = { ...estadoRef.current, ...overrides, noVisitas: estadoRef.current.noVisitas||[], prospectos: estadoRef.current.prospectos||[], recordatorios: estadoRef.current.recordatorios||[], negocio:{nombre:negocio} };
     estadoRef.current = data;
