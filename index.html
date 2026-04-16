@@ -1878,56 +1878,22 @@ function PlanillaDelDia({dia,fecha,ventas,planilla,productos,stock,setStock,sync
             <span style={{fontSize:22,fontWeight:500,color:ganancia>=0?"var(--color-text-success)":"var(--color-text-danger)"}}>{fmt(ganancia)}</span>
           </div>
         </div>
-        {/* Cerrar día — devuelve sobrantes al stock de sodería */}
-        <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-tertiary)"}}>
-          <div style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)",marginBottom:6}}>🔒 Cerrar día de reparto</div>
-          <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:10,lineHeight:1.5}}>
-            Los llenos sobrantes del camión y los vacíos recuperados vuelven al stock de la sodería automáticamente.
-          </div>
-          {stock?.camion&&(
-            <div style={{display:"flex",gap:12,marginBottom:10}}>
-              {[["Sifón",stock?.camion?.sifon||0],["10L",stock?.camion?.bidon10||0],["20L",stock?.camion?.bidon20||0]].map(([l,v])=>(
-                <div key={l} style={{textAlign:"center"}}>
-                  <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>Camión {l}</div>
-                  <div style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>{v||0}</div>
-                </div>
-              ))}
-            </div>
-          )}
-          <button style={{...s.btn,width:"100%",padding:"12px",fontSize:14,borderRadius:10,background:"#0a2e1f",color:"#4dd9a0",border:"1px solid #4dd9a0"}}
-            onClick={()=>{
-              if(!window.confirm("¿Cerrar el día? Los sobrantes y vacíos del camión pasan a la sodería.")) return;
-              // llenos sobrantes = lo que cargaste - lo que vendiste
-              const llenSoda  = Number(datos.productos?.soda?.llenos||0) - totalesPorProd.soda.vacios;
-              const llenB10   = Number(datos.productos?.b10?.llenos||0)  - totalesPorProd.b10.vacios;
-              const llenB20   = Number(datos.productos?.b20?.llenos||0)  - totalesPorProd.b20.vacios;
-              // vacíos recuperados de clientes (de las ventas del día — los que devolvieron)
-              const vacSoda   = totalesPorProd.soda.vacios;
-              const vacB10    = totalesPorProd.b10.vacios;
-              const vacB20    = totalesPorProd.b20.vacios;
-              setStock(prev=>{
-                const s=JSON.parse(JSON.stringify(normStock(prev)));
-                // sobrantes llenos van a sodería
-                s.soderia.sifon   = (s.soderia.sifon||0)   + Math.max(0,llenSoda);
-                s.soderia.bidon10 = (s.soderia.bidon10||0) + Math.max(0,llenB10);
-                s.soderia.bidon20 = (s.soderia.bidon20||0) + Math.max(0,llenB20);
-                // vacíos recuperados también van a sodería (para rellenar)
-                s.soderia.sifon   += vacSoda;
-                s.soderia.bidon10 += vacB10;
-                s.soderia.bidon20 += vacB20;
-                // camión queda en cero
-                s.camion.sifon    = 0;
-                s.camion.bidon10  = 0;
-                s.camion.bidon20  = 0;
-                if(syncData) syncData({stock:s});
-                return s;
-              });
-              onGuardar({...datos, cerrado:true});
-            }}>
-            ✓ Cerrar día y actualizar stock
-          </button>
-        </div>
-        <button style={s.btnPrimary} onClick={()=>onGuardar(datos)}>Guardar planilla</button>
+        <button style={s.btnPrimary} onClick={()=>{
+            // Stock se actualiza automáticamente al guardar
+            const llenSoda = Number(datos.productos?.soda?.llenos||0) - totalesPorProd.soda.vacios;
+            const llenB10  = Number(datos.productos?.b10?.llenos||0)  - totalesPorProd.b10.vacios;
+            const llenB20  = Number(datos.productos?.b20?.llenos||0)  - totalesPorProd.b20.vacios;
+            setStock(prev=>{
+              const s=JSON.parse(JSON.stringify(normStock(prev)));
+              s.soderia.sifon   = (s.soderia.sifon||0)   + Math.max(0,llenSoda) + totalesPorProd.soda.vacios;
+              s.soderia.bidon10 = (s.soderia.bidon10||0) + Math.max(0,llenB10)  + totalesPorProd.b10.vacios;
+              s.soderia.bidon20 = (s.soderia.bidon20||0) + Math.max(0,llenB20)  + totalesPorProd.b20.vacios;
+              s.camion.sifon=0; s.camion.bidon10=0; s.camion.bidon20=0;
+              if(syncData) syncData({stock:s});
+              return s;
+            });
+            onGuardar(datos);
+          }}>Guardar planilla</button>
       </div>
     </div>
   );
