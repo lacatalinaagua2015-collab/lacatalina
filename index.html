@@ -585,6 +585,29 @@ function App() {
   };
   const getPlanilla = (dia) => planillas[dia]||planillaDiaVacia();
 
+  // Backup automático diario
+  React.useEffect(()=>{
+    try{
+      const hoy=new Date().toISOString().slice(0,10);
+      const lastBackup=localStorage.getItem("cat_last_backup_date")||"";
+      if(lastBackup!==hoy&&clientes.length>0){
+        localStorage.setItem("cat_backup_clientes_"+hoy,JSON.stringify(clientes));
+        localStorage.setItem("cat_last_backup_date",hoy);
+        const keys=Object.keys(localStorage).filter(k=>k.startsWith("cat_backup_clientes_")).sort();
+        if(keys.length>7) keys.slice(0,keys.length-7).forEach(k=>localStorage.removeItem(k));
+      }
+    }catch{}
+  },[clientes]);
+  const [escala, setEscala] = React.useState(()=>{ try{return localStorage.getItem("cat_escala")||"M";}catch{return "M";} });
+  const escalas = ["S","M","L","XL"];
+  const escalaVal = {"S":"82%","M":"100%","L":"118%","XL":"136%"};
+  const nextEscala = () => {
+    const i = escalas.indexOf(escala);
+    const next = escalas[(i+1)%escalas.length];
+    setEscala(next);
+    try{localStorage.setItem("cat_escala",next);}catch{}
+  };
+
   if(onboarding) {
     return <Onboarding uid={uid} onCompleto={(data)=>{
       if(data.productos?.length) setProductos(data.productos);
@@ -732,28 +755,6 @@ function App() {
     if(c){ const nc=clientes.map(x=>x.id===c.id?{...x,saldo:saldoExtra}:x); saveClientes(nc); }
   };
 
-  // Backup automático diario
-  React.useEffect(()=>{
-    try{
-      const hoy=new Date().toISOString().slice(0,10);
-      const lastBackup=localStorage.getItem("cat_last_backup_date")||"";
-      if(lastBackup!==hoy&&clientes.length>0){
-        localStorage.setItem("cat_backup_clientes_"+hoy,JSON.stringify(clientes));
-        localStorage.setItem("cat_last_backup_date",hoy);
-        const keys=Object.keys(localStorage).filter(k=>k.startsWith("cat_backup_clientes_")).sort();
-        if(keys.length>7) keys.slice(0,keys.length-7).forEach(k=>localStorage.removeItem(k));
-      }
-    }catch{}
-  },[clientes]);
-  const [escala, setEscala] = React.useState(()=>{ try{return localStorage.getItem("cat_escala")||"M";}catch{return "M";} });
-  const escalas = ["S","M","L","XL"];
-  const escalaVal = {"S":"82%","M":"100%","L":"118%","XL":"136%"};
-  const nextEscala = () => {
-    const i = escalas.indexOf(escala);
-    const next = escalas[(i+1)%escalas.length];
-    setEscala(next);
-    try{localStorage.setItem("cat_escala",next);}catch{}
-  };
   return (
     <div style={{...s.app, fontSize:escalaVal[escala]}}>
       <SyncBar status={syncStatus} />
