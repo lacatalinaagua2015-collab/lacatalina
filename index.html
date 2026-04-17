@@ -11,7 +11,7 @@
   <title>Reparto App · Reparto</title>
   <script>
     if('serviceWorker' in navigator){
-      const CACHE = 'lc-v32';
+      const CACHE = 'lc-v37';
       const ASSETS = [
         'https://unpkg.com/react@18/umd/react.production.min.js',
         'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -673,7 +673,28 @@ function App() {
     }
 
     saveVentas(nuevasVentas);
-    const nuevosClientes = clientes.map(c2=>c2.id===c.id?{...c2,saldo:c.saldo+saldoExtra}:c2);
+
+    // Actualizar envases habituales del cliente según movimientos
+    const prodKeyEnv = {"Sifón 1.5L":"sifon","Bidón 10L":"bidon10","Bidón 20L":"bidon20"};
+    let cambiosEnv = {};
+    // Prestados: suman al habitual del cliente
+    envPrestFinal.forEach(e=>{
+      const k=prodKeyEnv[e.prod]; if(!k) return;
+      cambiosEnv[k] = (cambiosEnv[k]||0) + (Number(e.cant)||0);
+    });
+    // Devueltos: restan del habitual del cliente
+    (nuevaVenta.envDev||[]).forEach(e=>{
+      const k=prodKeyEnv[e.prod]; if(!k) return;
+      cambiosEnv[k] = (cambiosEnv[k]||0) - (Number(e.cant)||0);
+    });
+    const nuevosClientes = clientes.map(c2=>{
+      if(c2.id!==c.id) return c2;
+      const actualizado = {...c2, saldo:c.saldo+saldoExtra};
+      Object.entries(cambiosEnv).forEach(([k,delta])=>{
+        actualizado[k] = Math.max(0, (actualizado[k]||0) + delta);
+      });
+      return actualizado;
+    });
     saveClientes(nuevosClientes);
   };
 
@@ -889,7 +910,11 @@ function App() {
           // Si no hay diaActual, usar el día del cliente como fallback
           if(!diaActual) setDiaActual(c.dia);
           irA("venta");
-        }} />}
+        }} onVerDetalle={(c)=>{setClienteId(c.id);irA("detalleDesdeGestion");}} ventas={ventas} />}
+      {pantalla==="detalleDesdeGestion" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} dia={diaActual||cliente.dia} fecha={fechaActual} productos={productos} onVenta={()=>{setDiaActual(cliente.dia);const hoy=new Date().toISOString().slice(0,10);if(!fechaActual)setFechaActual(hoy);irA("venta");}} onVolver={()=>irA("gestionClientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>{eliminarCliente(cliente.id);irA("gestionClientes");}}
+          onNoEstaCliente={()=>{}} onNoQuiereCliente={()=>{}}
+          recordatorios={recordatorios} onGuardarRecordatorio={(r)=>saveRecordatorios([...(recordatorios||[]),r])} onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
+          onCobrarSaldo={(s)=>{if(cliente){const nc=clientes.map(x=>x.id===cliente.id?{...x,saldo:s}:x);saveClientes(nc);}}} />}
       {pantalla==="stock"          && <StockGeneral stock={stockNorm} setStock={(ns)=>{setStock(ns);syncData({stock:ns});}} clientes={clientes} ventas={ventas} productos={productos} planillas={planillas} onVolver={()=>irA("menu")} />}
       {pantalla==="resumen"        && <Resumen ventas={ventas} clientes={clientes} productos={productos} planillas={planillas} noVisitas={noVisitas||[]} onVolver={()=>irA("menu")} />}
       {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stockNorm} setStock={(s)=>{const ns=normStock(s);setStockRaw(ns);syncData({stock:ns});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} syncData={syncData} onVolver={()=>irA("menu")} />}
@@ -2356,7 +2381,7 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
   const [mostrarPagoSaldo,setMostrarPagoSaldo] = useState(false);
   const [mostrarFotoGrande,setMostrarFotoGrande] = useState(false);
   const recActivos = (recordatorios||[]).filter(r=>r.clienteId===cliente.id&&!r.confirmado);
-  const historial = [...ventas].reverse();
+  const historial = [...ventas].sort((a,b)=>(b.fechaKey||"").localeCompare(a.fechaKey||"")||(b.id||0)-(a.id||0));
   const ventaHoy  = fecha ? ventas.find(v=>v.fechaKey===fecha) : null;
   const initials  = cliente.nombre.split(" ").slice(0,2).map(w=>w[0]||"").join("").toUpperCase();
   const totalComprado = ventas.reduce((a,v)=>a+(v.neto||0),0);
@@ -3969,13 +3994,24 @@ function PromoComodato({prospecto:p,onGuardar,onVolver}) {
 }
 
 
-function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReordenarTodo,onRegistrarVenta}) {
+function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReordenarTodo,onRegistrarVenta,onVerDetalle,ventas}) {
   const [fotoClienteId,setFotoClienteId] = React.useState(null);
   const fotoCliente = fotoClienteId ? clientes.find(c=>c.id===fotoClienteId) : null;
   const [busqueda,setBusqueda]   = useState("");
   const [filtroDia,setFiltroDia] = useState("todos");
   const [modoNuevo,setModoNuevo] = useState(false);
   const [editandoId,setEditandoId] = useState(null);
+
+  // Calcular envases extra por cliente
+  const extraEnvases = React.useMemo(()=>{
+    const m={};
+    (ventas||[]).forEach(v=>{
+      if(!m[v.clienteId]) m[v.clienteId]={sifon:0,bidon10:0,bidon20:0};
+      (v.envPrest||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)m[v.clienteId][k]+=Number(e.cant)||0;});
+      (v.envDev||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)m[v.clienteId][k]-=Number(e.cant)||0;});
+    });
+    return m;
+  },[ventas]);
 
   const filtrados = clientes
     .filter(c=>filtroDia==="todos"||c.dia===filtroDia)
@@ -4058,10 +4094,31 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
                 inicial={c}
                 onGuardar={(datos)=>{onEditar(c.id,datos);setEditandoId(null);}}
               />
+              {/* Ajuste de envases EXTRA prestados (separado de los habituales) */}
+              {(()=>{
+                const ex = extraEnvases[c.id]||{sifon:0,bidon10:0,bidon20:0};
+                if(ex.sifon===0&&ex.bidon10===0&&ex.bidon20===0) return null;
+                return (
+                  <div style={{...s.card,margin:"4px 0",background:"var(--color-background-tertiary)",padding:"10px 12px",borderLeft:"3px solid var(--color-border-warning)"}}>
+                    <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-warning)",marginBottom:4}}>📦 Envases extra en poder del cliente</div>
+                    <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginBottom:8}}>Estos se calculan automáticamente desde los movimientos registrados en ventas. Para corregir, editá la venta correspondiente.</div>
+                    <div style={{display:"flex",gap:8}}>
+                      {[["sifon","Sifón"],["bidon10","10L"],["bidon20","20L"]].map(([k,l])=>ex[k]!==0?(
+                        <div key={k} style={{flex:1,background:"var(--color-background-secondary)",borderRadius:8,padding:"8px 6px",textAlign:"center",border:`1px solid ${ex[k]>0?"var(--color-border-warning)":"var(--color-border-success)"}`}}>
+                          <div style={{fontSize:18,fontWeight:700,color:ex[k]>0?"var(--color-text-warning)":"var(--color-text-success)"}}>{ex[k]>0?"+":""}{ex[k]}</div>
+                          <div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>{l}</div>
+                          <div style={{fontSize:9,color:"var(--color-text-tertiary)"}}>{ex[k]>0?"prestado":"devuelto"}</div>
+                        </div>
+                      ):null)}
+                    </div>
+                  </div>
+                );
+              })()}
             </>
           ) : (
             <>
-              <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+              <div style={{display:"flex",alignItems:"flex-start",gap:10,cursor:onVerDetalle?"pointer":"default"}}
+                onClick={()=>onVerDetalle&&onVerDetalle(c)}>
                 {/* Número de orden */}
                 <div style={{width:32,height:32,borderRadius:8,background:"var(--color-background-tertiary)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:600,color:"var(--color-text-tertiary)",flexShrink:0}}>
                   {c.orden||"#"}
@@ -4072,27 +4129,37 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
                     {c.dia} · {c.calle?`${c.calle} ${c.nro||""}`:c.manzana?`Mz ${c.manzana} L ${c.lote}`:""}{c.barrio?` · ${c.barrio}`:""}
                   </div>
                   {c.notas&&<div style={{fontSize:11,color:"var(--color-text-warning)",marginTop:2}}>📝 {c.notas}</div>}
-
                   <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>
-                    {c.sifon>0    && <span style={s.tag}>Sifón×{c.sifon}</span>}
-                    {c.bidon10>0  && <span style={s.tag}>10L×{c.bidon10}</span>}
-                    {c.bidon20>0  && <span style={s.tag}>20L×{c.bidon20}</span>}
-                    {c.dispenser>0 && <span style={{...s.tag,color:"#5daaff"}}>Disp×{c.dispenser}</span>}
-                    {c.telefono  && <a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{...s.tag,textDecoration:"none",cursor:"pointer"}}>💬 {c.telefono}</a>}
-                    {c.saldo<0   && <span style={s.badge("danger")}>Debe {fmt(Math.abs(c.saldo))}</span>}
-                    {c.saldo>0   && <span style={s.badge("success")}>A favor {fmt(c.saldo)}</span>}
+                    {/* Saldo */}
+                    {c.saldo<0&&<span style={s.badge("danger")}>Debe {fmt(Math.abs(c.saldo))}</span>}
+                    {c.saldo>0&&<span style={s.badge("success")}>A favor {fmt(c.saldo)}</span>}
+                    {/* Envases habituales */}
+                    {c.sifon>0&&<span style={s.tag}>Sifón×{c.sifon}</span>}
+                    {c.bidon10>0&&<span style={s.tag}>10L×{c.bidon10}</span>}
+                    {c.bidon20>0&&<span style={s.tag}>20L×{c.bidon20}</span>}
+                    {c.dispenser>0&&<span style={{...s.tag,color:"#5daaff"}}>Disp×{c.dispenser}</span>}
+                    {/* Envases extra prestados */}
+                    {(()=>{
+                      const ex=extraEnvases[c.id]||{};
+                      return (<>
+                        {ex.sifon>0&&<span style={{...s.tag,color:"var(--color-text-warning)",fontWeight:500}}>+{ex.sifon} sif extra</span>}
+                        {ex.bidon10>0&&<span style={{...s.tag,color:"var(--color-text-warning)",fontWeight:500}}>+{ex.bidon10} 10L extra</span>}
+                        {ex.bidon20>0&&<span style={{...s.tag,color:"var(--color-text-warning)",fontWeight:500}}>+{ex.bidon20} 20L extra</span>}
+                      </>);
+                    })()}
+                    {c.telefono&&<a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{...s.tag,textDecoration:"none",cursor:"pointer"}} onClick={e=>e.stopPropagation()}>💬 {c.telefono}</a>}
                   </div>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0,alignItems:"center"}}>
-                  {c.maps     && <a href={c.maps} target="_blank" rel="noreferrer" style={{fontSize:18,textDecoration:"none"}}>📍</a>}
-                  {c.telefono && <a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:18,textDecoration:"none"}}>💬</a>}
+                  {c.maps&&<a href={c.maps} target="_blank" rel="noreferrer" style={{fontSize:18,textDecoration:"none"}} onClick={e=>e.stopPropagation()}>📍</a>}
+                  {c.telefono&&<a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:18,textDecoration:"none"}} onClick={e=>e.stopPropagation()}>💬</a>}
                   <span style={{fontSize:18,cursor:"pointer",lineHeight:1}} onClick={e=>{e.stopPropagation();setFotoClienteId(fotoClienteId===c.id?null:c.id);}}>📷</span>
                 </div>
               </div>
               <div style={{...s.row,justifyContent:"flex-end",gap:6,marginTop:8}}>
-                {onRegistrarVenta&&<button style={{...s.btn,fontSize:11,padding:"4px 12px",background:"#185FA5",color:"#e2eaf4",border:"none"}} onClick={()=>onRegistrarVenta(c)}>📦 Venta</button>}
-                <button style={{...s.btn,fontSize:11,padding:"4px 12px"}} onClick={()=>setEditandoId(c.id)}>Editar</button>
-                <button style={{...s.btnDanger,fontSize:11,padding:"4px 10px"}} onClick={()=>onEliminar(c.id)}>Eliminar</button>
+                {onRegistrarVenta&&<button style={{...s.btn,fontSize:11,padding:"4px 12px",background:"#185FA5",color:"#e2eaf4",border:"none"}} onClick={e=>{e.stopPropagation();onRegistrarVenta(c);}}>📦 Venta</button>}
+                <button style={{...s.btn,fontSize:11,padding:"4px 12px"}} onClick={e=>{e.stopPropagation();setEditandoId(c.id);}}>Editar</button>
+                <button style={{...s.btnDanger,fontSize:11,padding:"4px 10px"}} onClick={e=>{e.stopPropagation();onEliminar(c.id);}}>Eliminar</button>
               </div>
             </>
           )}
@@ -4178,7 +4245,7 @@ function FormCliente({inicial,onGuardar}) {
         <label style={s.label}>Notas rápidas</label>
         <input style={s.input} placeholder="timbre roto, perro, cobrar deuda..." value={datos.notas||""} onChange={e=>set("notas",e.target.value)} />
       </div>
-      <label style={{...s.label,marginTop:4}}>Envases habituales</label>
+      <label style={{...s.label,marginTop:4}}>Envases habituales asignados</label>
       <div style={s.grid3}>
         {[["sifon","Sifón"],["bidon10","Bidón 10L"],["bidon20","Bidón 20L"]].map(([k,l])=>(
           <div key={k}>
