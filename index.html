@@ -11,7 +11,7 @@
   <title>Reparto App · Reparto</title>
   <script>
     if('serviceWorker' in navigator){
-      const CACHE = 'lc-v40';
+      const CACHE = 'lc-v41';
       const ASSETS = [
         'https://unpkg.com/react@18/umd/react.production.min.js',
         'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -4010,15 +4010,8 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
       (v.envPrest||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)m[v.clienteId][k]+=Number(e.cant)||0;});
       (v.envDev||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)m[v.clienteId][k]-=Number(e.cant)||0;});
     });
-    // Sumar ajustes manuales
-    clientes.forEach(c=>{
-      if(c.envAjuste){
-        if(!m[c.id]) m[c.id]={sifon:0,bidon10:0,bidon20:0};
-        ["sifon","bidon10","bidon20"].forEach(k=>{ m[c.id][k]+=(c.envAjuste[k]||0); });
-      }
-    });
     return m;
-  },[ventas,clientes]);
+  },[ventas]);
 
   const filtrados = clientes
     .filter(c=>filtroDia==="todos"||c.dia===filtroDia)
