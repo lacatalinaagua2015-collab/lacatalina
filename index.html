@@ -11,7 +11,7 @@
   <title>Reparto App · Reparto</title>
   <script>
     if('serviceWorker' in navigator){
-      const CACHE = 'lc-v37';
+      const CACHE = 'lc-v39';
       const ASSETS = [
         'https://unpkg.com/react@18/umd/react.production.min.js',
         'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -4010,8 +4010,15 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
       (v.envPrest||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)m[v.clienteId][k]+=Number(e.cant)||0;});
       (v.envDev||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)m[v.clienteId][k]-=Number(e.cant)||0;});
     });
+    // Sumar ajustes manuales
+    clientes.forEach(c=>{
+      if(c.envAjuste){
+        if(!m[c.id]) m[c.id]={sifon:0,bidon10:0,bidon20:0};
+        ["sifon","bidon10","bidon20"].forEach(k=>{ m[c.id][k]+=(c.envAjuste[k]||0); });
+      }
+    });
     return m;
-  },[ventas]);
+  },[ventas,clientes]);
 
   const filtrados = clientes
     .filter(c=>filtroDia==="todos"||c.dia===filtroDia)
@@ -4094,22 +4101,30 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
                 inicial={c}
                 onGuardar={(datos)=>{onEditar(c.id,datos);setEditandoId(null);}}
               />
-              {/* Ajuste de envases EXTRA prestados (separado de los habituales) */}
+              {/* Ajuste de envases EXTRA prestados (editable) */}
               {(()=>{
                 const ex = extraEnvases[c.id]||{sifon:0,bidon10:0,bidon20:0};
-                if(ex.sifon===0&&ex.bidon10===0&&ex.bidon20===0) return null;
+                const aj = c.envAjuste||{sifon:0,bidon10:0,bidon20:0};
+                const total = {sifon:ex.sifon+(aj.sifon||0),bidon10:ex.bidon10+(aj.bidon10||0),bidon20:ex.bidon20+(aj.bidon20||0)};
+                const ajustar=(k,delta)=>onEditar(c.id,{envAjuste:{...aj,[k]:(aj[k]||0)+delta}});
+                const resetear=(k)=>onEditar(c.id,{envAjuste:{...aj,[k]:-(ex[k]||0)}});
                 return (
                   <div style={{...s.card,margin:"4px 0",background:"var(--color-background-tertiary)",padding:"10px 12px",borderLeft:"3px solid var(--color-border-warning)"}}>
                     <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-warning)",marginBottom:4}}>📦 Envases extra en poder del cliente</div>
-                    <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginBottom:8}}>Estos se calculan automáticamente desde los movimientos registrados en ventas. Para corregir, editá la venta correspondiente.</div>
+                    <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginBottom:8}}>Ajustá con +/− si hay diferencias con el conteo real.</div>
                     <div style={{display:"flex",gap:8}}>
-                      {[["sifon","Sifón"],["bidon10","10L"],["bidon20","20L"]].map(([k,l])=>ex[k]!==0?(
-                        <div key={k} style={{flex:1,background:"var(--color-background-secondary)",borderRadius:8,padding:"8px 6px",textAlign:"center",border:`1px solid ${ex[k]>0?"var(--color-border-warning)":"var(--color-border-success)"}`}}>
-                          <div style={{fontSize:18,fontWeight:700,color:ex[k]>0?"var(--color-text-warning)":"var(--color-text-success)"}}>{ex[k]>0?"+":""}{ex[k]}</div>
-                          <div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>{l}</div>
-                          <div style={{fontSize:9,color:"var(--color-text-tertiary)"}}>{ex[k]>0?"prestado":"devuelto"}</div>
+                      {[["sifon","Sifón"],["bidon10","10L"],["bidon20","20L"]].map(([k,l])=>(
+                        <div key={k} style={{flex:1,background:"var(--color-background-secondary)",borderRadius:8,padding:"8px 6px",textAlign:"center"}}>
+                          <div style={{fontSize:10,color:"var(--color-text-tertiary)",marginBottom:4}}>{l}</div>
+                          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                            <button style={{...s.btn,padding:"2px 9px",fontSize:16,lineHeight:1}} onClick={()=>ajustar(k,-1)}>−</button>
+                            <span style={{fontSize:18,fontWeight:700,minWidth:24,textAlign:"center",color:total[k]>0?"var(--color-text-warning)":total[k]<0?"var(--color-text-success)":"var(--color-text-tertiary)"}}>{total[k]>0?"+":""}{total[k]}</span>
+                            <button style={{...s.btn,padding:"2px 9px",fontSize:16,lineHeight:1}} onClick={()=>ajustar(k,+1)}>+</button>
+                          </div>
+                          <div style={{fontSize:9,color:"var(--color-text-tertiary)",marginTop:3}}>{total[k]>0?"prestado":total[k]<0?"devuelto":"ok"}</div>
+                          {total[k]!==0&&<button style={{fontSize:9,color:"var(--color-text-tertiary)",background:"none",border:"none",cursor:"pointer",padding:"2px 0",textDecoration:"underline",marginTop:2}} onClick={()=>resetear(k)}>poner en 0</button>}
                         </div>
-                      ):null)}
+                      ))}
                     </div>
                   </div>
                 );
