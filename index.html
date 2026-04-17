@@ -11,7 +11,7 @@
   <title>Reparto App · Reparto</title>
   <script>
     if('serviceWorker' in navigator){
-      const CACHE = 'lc-v31';
+      const CACHE = 'lc-v32';
       const ASSETS = [
         'https://unpkg.com/react@18/umd/react.production.min.js',
         'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -4518,6 +4518,53 @@ function importarBackup(file,setClientes,setVentas,setPlanillas){
   reader.readAsArrayBuffer(file);
 }
 
+function CalculadoraCostoReal({productos,ventas}) {
+  const [gastoTraslado, setGastoTraslado] = React.useState("");
+  const [envsXDia, setEnvsXDia] = React.useState("");
+  const gastoNum = Number(gastoTraslado)||0;
+  const envsNum  = Number(envsXDia)||0;
+  const costoXEnvase = envsNum>0 && gastoNum>0 ? Math.round(gastoNum/envsNum) : 0;
+  return (
+    <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-tertiary)",borderLeft:"3px solid #5daaff"}}>
+      <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",marginBottom:8}}>🧮 Calculadora de costo real puesto en cliente</div>
+      <div style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:10,lineHeight:1.5}}>Calculá la ganancia real por artículo sumando el gasto de traslado.</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+        <div>
+          <label style={s.label}>Gasto de traslado por día $</label>
+          <input style={s.inputNum} type="number" placeholder="Ej: 5000" value={gastoTraslado} onChange={e=>setGastoTraslado(e.target.value)} />
+          <div style={{fontSize:10,color:"var(--color-text-tertiary)",marginTop:2}}>GNC, nafta, propina, etc.</div>
+        </div>
+        <div>
+          <label style={s.label}>Envases entregados ese día</label>
+          <input style={s.inputNum} type="number" placeholder="Ej: 80" value={envsXDia} onChange={e=>setEnvsXDia(e.target.value)} />
+          <div style={{fontSize:10,color:"var(--color-text-tertiary)",marginTop:2}}>Promedio de entregas por día</div>
+        </div>
+      </div>
+      {costoXEnvase>0&&(
+        <div style={{background:"var(--color-background-secondary)",borderRadius:8,padding:10}}>
+          <div style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:8}}>Traslado por unidad: <b style={{color:"var(--color-text-info)"}}>{fmt(costoXEnvase)}</b></div>
+          {productos.map(p=>{
+            const costoReal   = (p.costo||0) + costoXEnvase;
+            const gananciaReal= (p.precio||0) - costoReal;
+            const margenReal  = p.precio>0?Math.round((gananciaReal/p.precio)*100):0;
+            return (
+              <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+                <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{p.nombre}</span>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>Costo real: {fmt(costoReal)}</div>
+                  <div style={{fontSize:13,fontWeight:600,color:gananciaReal>0?"var(--color-text-success)":"var(--color-text-danger)"}}>
+                    {fmt(gananciaReal)} ({margenReal}%)
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,planillas,setPlanillas,stock,setStock,cargasDia,setCargasDia,syncData,onVolver}) {
   const [tab,setTab]=useState("precios");
   const [editandoId,setEditandoId]=useState(null);
@@ -4628,61 +4675,7 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
         )}
 
         {/* Calculadora de costo real */}
-        <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-tertiary)",borderLeft:"3px solid #5daaff"}}>
-          <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",marginBottom:10}}>🧮 Calculadora de costo real puesto en cliente</div>
-          <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:12,lineHeight:1.6}}>
-            Calculá el costo real de cada artículo considerando gastos de traslado, para saber tu ganancia real.
-          </div>
-          {(()=>{
-            const [gastoTraslado, setGastoTraslado] = React.useState("");
-            const [ventasDia, setVentasDia] = React.useState("");
-            const gastoNum = Number(gastoTraslado)||0;
-            const vtasNum  = Number(ventasDia)||0;
-            // Total sifones / bidones vendidos (de toda la historia para referencia)
-            const totVend = {sifon:0,bidon10:0,bidon20:0};
-            const prodKeyCalc = {"Sifón 1.5L":"sifon","Bidón 10L":"bidon10","Bidón 20L":"bidon20"};
-            ventas.forEach(v=>v.detalle.forEach(d=>{const k=prodKeyCalc[d.nombre];if(k)totVend[k]+=d.cantidad;}));
-            const totalEnvases = totVend.sifon + totVend.bidon10 + totVend.bidon20;
-            const costoXEnvase = vtasNum>0 && gastoNum>0 ? Math.round(gastoNum/vtasNum) : 0;
-            return (
-              <div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-                  <div>
-                    <label style={s.label}>Gasto de traslado por día $</label>
-                    <input style={s.inputNum} type="number" placeholder="Ej: 5000" value={gastoTraslado} onChange={e=>setGastoTraslado(e.target.value)} />
-                    <div style={{fontSize:10,color:"var(--color-text-tertiary)",marginTop:2}}>GNC, nafta, uber, etc.</div>
-                  </div>
-                  <div>
-                    <label style={s.label}>Envases entregados ese día</label>
-                    <input style={s.inputNum} type="number" placeholder="Ej: 80" value={ventasDia} onChange={e=>setVentasDia(e.target.value)} />
-                    <div style={{fontSize:10,color:"var(--color-text-tertiary)",marginTop:2}}>Promedio de tu día de reparto</div>
-                  </div>
-                </div>
-                {costoXEnvase>0&&(
-                  <div style={{background:"var(--color-background-secondary)",borderRadius:8,padding:10}}>
-                    <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8}}>Costo de traslado por unidad: <b style={{color:"var(--color-text-info)"}}>{fmt(costoXEnvase)}</b></div>
-                    {productos.map(p=>{
-                      const costoReal = (p.costo||0) + costoXEnvase;
-                      const gananciaReal = (p.precio||0) - costoReal;
-                      const margenReal = p.precio>0?Math.round((gananciaReal/p.precio)*100):0;
-                      return (
-                        <div key={p.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-                          <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{p.nombre}</span>
-                          <div style={{textAlign:"right"}}>
-                            <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>Costo real: {fmt(costoReal)}</div>
-                            <div style={{fontSize:13,fontWeight:500,color:gananciaReal>0?"var(--color-text-success)":"var(--color-text-danger)"}}>
-                              Gan. real: {fmt(gananciaReal)} ({margenReal}%)
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-        </div>
+        <CalculadoraCostoReal productos={productos} ventas={ventas} />
       </div>}
       {tab==="envases"&&(
   <div style={{padding:16}}>
