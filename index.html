@@ -11,7 +11,7 @@
   <title>Reparto App · Reparto</title>
   <script>
     if('serviceWorker' in navigator){
-      const CACHE = 'lc-v30';
+      const CACHE = 'lc-v31';
       const ASSETS = [
         'https://unpkg.com/react@18/umd/react.production.min.js',
         'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -4538,7 +4538,152 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
         <button style={s.tab(tab==="backup")} onClick={()=>setTab("backup")}>Backup</button>
         <button style={s.tab(tab==="vehiculo")} onClick={()=>setTab("vehiculo")}>🚐 Vehículo</button>
       </div>
-      {tab==="precios"&&<div style={{padding:16}}>{productos.map(p=>(<div key={p.id} style={{...s.card,margin:"0 0 10px"}}><div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:15,fontWeight:500,color:"var(--color-text-primary)"}}>{p.nombre}</span><button style={{...s.btn,fontSize:12,padding:"4px 12px"}} onClick={()=>setEditandoId(editandoId===p.id?null:p.id)}>{editandoId===p.id?"Cancelar":"Editar"}</button></div>{editandoId!==p.id&&<div style={{fontSize:13,color:"var(--color-text-secondary)",marginTop:6}}>Venta: {fmt(p.precio)} · Costo: {fmt(p.costo)} · Ganancia: {fmt(p.precio-p.costo)}</div>}{editandoId===p.id&&(<div style={{display:"flex",flexDirection:"column",gap:8,marginTop:10}}><div><label style={s.label}>Precio de venta</label><input style={s.input} type="number" defaultValue={p.precio} id={`pr-${p.id}`} /></div><div><label style={s.label}>Costo de llenado</label><input style={s.input} type="number" defaultValue={p.costo} id={`co-${p.id}`} /></div><button style={s.btnPrimary} onClick={()=>{const pr=Number(document.getElementById(`pr-${p.id}`).value),co=Number(document.getElementById(`co-${p.id}`).value);setProductos(productos.map(x=>x.id===p.id?{...x,precio:pr,costo:co}:x));setEditandoId(null);}}>Guardar precio</button></div>)}</div>))}</div>}
+      {tab==="precios"&&<div style={{padding:16}}>
+        {/* Lista de artículos */}
+        {productos.map(p=>{
+          const editing = editandoId===p.id;
+          const [pr,setPr] = [p.precio, v=>setProductos(productos.map(x=>x.id===p.id?{...x,precio:Number(v)||0}:x))];
+          const [co,setCo] = [p.costo, v=>setProductos(productos.map(x=>x.id===p.id?{...x,costo:Number(v)||0}:x))];
+          const margen = p.precio>0?Math.round(((p.precio-p.costo)/p.precio)*100):0;
+          return (
+            <div key={p.id} style={{...s.card,margin:"0 0 10px",borderLeft:editing?"3px solid #185FA5":"0.5px solid var(--color-border-tertiary)"}}>
+              {!editing?(
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                  <div>
+                    <div style={{fontSize:15,fontWeight:500,color:"var(--color-text-primary)"}}>{p.nombre}</div>
+                    <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:4}}>
+                      Venta: <b>{fmt(p.precio)}</b> · Costo: {fmt(p.costo)} · 
+                      <span style={{color:margen>40?"var(--color-text-success)":margen>20?"var(--color-text-warning)":"var(--color-text-danger)"}}> {margen}% margen</span>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:6}}>
+                    <button style={{...s.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>setEditandoId(p.id)}>Editar</button>
+                    <button style={s.btnDanger} onClick={()=>{if(window.confirm(`¿Eliminar "${p.nombre}"?`))setProductos(productos.filter(x=>x.id!==p.id));}}>✕</button>
+                  </div>
+                </div>
+              ):(
+                <div>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
+                    <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Editando: {p.nombre}</span>
+                    <button style={{...s.btn,fontSize:11,padding:"3px 10px"}} onClick={()=>setEditandoId(null)}>Cancelar</button>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                    <div>
+                      <label style={s.label}>Nombre</label>
+                      <input style={s.input} defaultValue={p.nombre} id={`nm-${p.id}`} />
+                    </div>
+                    <div>
+                      <label style={s.label}>Precio de venta $</label>
+                      <input style={s.inputNum} type="number" defaultValue={p.precio} id={`pr-${p.id}`} />
+                    </div>
+                    <div>
+                      <label style={s.label}>Costo de llenado $</label>
+                      <input style={s.inputNum} type="number" defaultValue={p.costo} id={`co-${p.id}`} />
+                    </div>
+                    <div>
+                      <label style={s.label}>Unidad (ej: 1.5L)</label>
+                      <input style={s.input} defaultValue={p.unidad||""} id={`un-${p.id}`} placeholder="opcional" />
+                    </div>
+                  </div>
+                  <button style={s.btnPrimary} onClick={()=>{
+                    const nm=document.getElementById(`nm-${p.id}`).value;
+                    const pr=Number(document.getElementById(`pr-${p.id}`).value);
+                    const co=Number(document.getElementById(`co-${p.id}`).value);
+                    const un=document.getElementById(`un-${p.id}`).value;
+                    setProductos(productos.map(x=>x.id===p.id?{...x,nombre:nm,precio:pr,costo:co,unidad:un}:x));
+                    setEditandoId(null);
+                  }}>Guardar</button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Agregar nuevo artículo */}
+        {editandoId==="nuevo"?(
+          <div style={{...s.card,margin:"0 0 12px",borderLeft:"3px solid #4dd9a0"}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
+              <span style={{fontSize:14,fontWeight:500,color:"#4dd9a0"}}>Nuevo artículo</span>
+              <button style={{...s.btn,fontSize:11,padding:"3px 10px"}} onClick={()=>setEditandoId(null)}>Cancelar</button>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+              <div><label style={s.label}>Nombre</label><input style={s.input} id="nm-nuevo" placeholder="Ej: Bidón 20L" /></div>
+              <div><label style={s.label}>Precio de venta $</label><input style={s.inputNum} type="number" id="pr-nuevo" placeholder="0" /></div>
+              <div><label style={s.label}>Costo de llenado $</label><input style={s.inputNum} type="number" id="co-nuevo" placeholder="0" /></div>
+              <div><label style={s.label}>Unidad</label><input style={s.input} id="un-nuevo" placeholder="ej: 20L" /></div>
+            </div>
+            <button style={{...s.btnPrimary,background:"#0F6E56"}} onClick={()=>{
+              const nm=document.getElementById("nm-nuevo").value.trim();
+              if(!nm) return;
+              const pr=Number(document.getElementById("pr-nuevo").value)||0;
+              const co=Number(document.getElementById("co-nuevo").value)||0;
+              const un=document.getElementById("un-nuevo").value;
+              setProductos([...productos,{id:Date.now(),nombre:nm,precio:pr,costo:co,unidad:un}]);
+              setEditandoId(null);
+            }}>+ Agregar artículo</button>
+          </div>
+        ):(
+          <button style={{...s.btn,width:"100%",padding:"10px",fontSize:13,marginBottom:16,borderStyle:"dashed"}}
+            onClick={()=>setEditandoId("nuevo")}>+ Agregar nuevo artículo</button>
+        )}
+
+        {/* Calculadora de costo real */}
+        <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-tertiary)",borderLeft:"3px solid #5daaff"}}>
+          <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",marginBottom:10}}>🧮 Calculadora de costo real puesto en cliente</div>
+          <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:12,lineHeight:1.6}}>
+            Calculá el costo real de cada artículo considerando gastos de traslado, para saber tu ganancia real.
+          </div>
+          {(()=>{
+            const [gastoTraslado, setGastoTraslado] = React.useState("");
+            const [ventasDia, setVentasDia] = React.useState("");
+            const gastoNum = Number(gastoTraslado)||0;
+            const vtasNum  = Number(ventasDia)||0;
+            // Total sifones / bidones vendidos (de toda la historia para referencia)
+            const totVend = {sifon:0,bidon10:0,bidon20:0};
+            const prodKeyCalc = {"Sifón 1.5L":"sifon","Bidón 10L":"bidon10","Bidón 20L":"bidon20"};
+            ventas.forEach(v=>v.detalle.forEach(d=>{const k=prodKeyCalc[d.nombre];if(k)totVend[k]+=d.cantidad;}));
+            const totalEnvases = totVend.sifon + totVend.bidon10 + totVend.bidon20;
+            const costoXEnvase = vtasNum>0 && gastoNum>0 ? Math.round(gastoNum/vtasNum) : 0;
+            return (
+              <div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+                  <div>
+                    <label style={s.label}>Gasto de traslado por día $</label>
+                    <input style={s.inputNum} type="number" placeholder="Ej: 5000" value={gastoTraslado} onChange={e=>setGastoTraslado(e.target.value)} />
+                    <div style={{fontSize:10,color:"var(--color-text-tertiary)",marginTop:2}}>GNC, nafta, uber, etc.</div>
+                  </div>
+                  <div>
+                    <label style={s.label}>Envases entregados ese día</label>
+                    <input style={s.inputNum} type="number" placeholder="Ej: 80" value={ventasDia} onChange={e=>setVentasDia(e.target.value)} />
+                    <div style={{fontSize:10,color:"var(--color-text-tertiary)",marginTop:2}}>Promedio de tu día de reparto</div>
+                  </div>
+                </div>
+                {costoXEnvase>0&&(
+                  <div style={{background:"var(--color-background-secondary)",borderRadius:8,padding:10}}>
+                    <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8}}>Costo de traslado por unidad: <b style={{color:"var(--color-text-info)"}}>{fmt(costoXEnvase)}</b></div>
+                    {productos.map(p=>{
+                      const costoReal = (p.costo||0) + costoXEnvase;
+                      const gananciaReal = (p.precio||0) - costoReal;
+                      const margenReal = p.precio>0?Math.round((gananciaReal/p.precio)*100):0;
+                      return (
+                        <div key={p.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+                          <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{p.nombre}</span>
+                          <div style={{textAlign:"right"}}>
+                            <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>Costo real: {fmt(costoReal)}</div>
+                            <div style={{fontSize:13,fontWeight:500,color:gananciaReal>0?"var(--color-text-success)":"var(--color-text-danger)"}}>
+                              Gan. real: {fmt(gananciaReal)} ({margenReal}%)
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      </div>}
       {tab==="envases"&&(
   <div style={{padding:16}}>
     <p style={{fontSize:13,color:"var(--color-text-secondary)",marginBottom:12,lineHeight:1.7}}>
