@@ -11,7 +11,7 @@
   <title>Reparto App · Reparto</title>
   <script>
     if('serviceWorker' in navigator){
-      const CACHE = 'lc-v41';
+      const CACHE = 'lc-v43';
       const ASSETS = [
         'https://unpkg.com/react@18/umd/react.production.min.js',
         'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -82,7 +82,9 @@ self.addEventListener('fetch',e=>{
           noVisitas: data.noVisitas || [],
           cargasDia: data.cargasDia || {},
           recordatorios: data.recordatorios || [],
-          prospectos: data.prospectos || []
+          prospectos: data.prospectos || [],
+          mantVeh: data.mantVeh || [],
+          histPrecios: data.histPrecios || []
         })
       ];
       // clientes en chunks de 50
@@ -119,6 +121,8 @@ self.addEventListener('fetch',e=>{
         var data = cfg.data();
         if(!data.recordatorios) data.recordatorios = [];
         if(!data.prospectos) data.prospectos = [];
+        if(!data.mantVeh) data.mantVeh = [];
+        if(!data.histPrecios) data.histPrecios = [];
         // load clientes
         var nc = cMeta.exists ? (cMeta.data().n||0) : 0;
         var vn = vMeta.exists ? (vMeta.data().n||0) : 0;
@@ -491,6 +495,8 @@ function App() {
       if (data.noVisitas?.length)  setNoVisitas(data.noVisitas);
       if (data.prospectos?.length) setProspectos(data.prospectos);
       if (data.recordatorios?.length) setRecordatorios(data.recordatorios);
+      if (data.mantVeh?.length)    localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh));
+      if (data.histPrecios?.length) localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios));
       setSyncStatus("saved");
       setTimeout(()=>setSyncStatus("idle"), 2000);
     });
@@ -500,32 +506,27 @@ function App() {
   const estadoRef = React.useRef({clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios});
   React.useEffect(()=>{ estadoRef.current={clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios}; });
 
-  // Auto backup semanal a localStorage
+  // Auto backup DIARIO a localStorage
   React.useEffect(()=>{
     const ultimoBackup = localStorage.getItem("lc_ultimo_backup");
     const hoy = new Date().toISOString().slice(0,10);
-    if(ultimoBackup===hoy) return;
-    // Check if it's been 7+ days
-    if(ultimoBackup){
-      const dias = Math.floor((new Date()-new Date(ultimoBackup))/86400000);
-      if(dias<7) return;
-    }
-    // Save snapshot to localStorage
+    if(ultimoBackup===hoy) return; // ya se hizo hoy
     try {
-      const snap = {fecha:hoy, clientes:clientes.length, ventas:ventas.length};
       localStorage.setItem("lc_backup_"+hoy, JSON.stringify({clientes,ventas,planillas}));
       localStorage.setItem("lc_ultimo_backup", hoy);
-      // Keep only last 4 backups
+      // Mantener solo los últimos 7 backups
       const keys = Object.keys(localStorage).filter(k=>k.startsWith("lc_backup_")).sort().reverse();
-      keys.slice(4).forEach(k=>localStorage.removeItem(k));
-      console.log("Auto-backup guardado:", hoy);
+      keys.slice(7).forEach(k=>localStorage.removeItem(k));
+      console.log("Auto-backup diario guardado:", hoy);
     } catch(e){ console.warn("Auto-backup falló:", e); }
   },[]);
 
   const syncData = (overrides={}) => {
     if(!window.db) return;
     setSyncStatus("saving");
-    const data = { ...estadoRef.current, ...overrides, noVisitas: estadoRef.current.noVisitas||[], prospectos: estadoRef.current.prospectos||[], recordatorios: estadoRef.current.recordatorios||[] };
+    const mantVehActual = (() => { try { return JSON.parse(localStorage.getItem("cat_mant_vehiculo_v1")||"[]"); } catch { return []; } })();
+    const histPreciosActual = (() => { try { return JSON.parse(localStorage.getItem("lc_hist_precios")||"[]"); } catch { return []; } })();
+    const data = { ...estadoRef.current, ...overrides, noVisitas: estadoRef.current.noVisitas||[], prospectos: estadoRef.current.prospectos||[], recordatorios: estadoRef.current.recordatorios||[], mantVeh: overrides.mantVeh||mantVehActual, histPrecios: overrides.histPrecios||histPreciosActual };
     estadoRef.current = data;
     debounceSave(() => cloudSave(data).then(function(ok){setSyncStatus(ok?"saved":"error");}).catch(function(){setSyncStatus("error");}));
   };
@@ -2631,36 +2632,36 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
             </summary>
             <div style={{marginTop:4}}>
               {(()=>{
-                const CAJON=6;
+                const pkEnv={"Sifón 1.5L":"sifon","Bidón 10L":"bidon10","Bidón 20L":"bidon20"};
                 const extra={sifon:0,bidon10:0,bidon20:0};
                 historial.forEach(v=>{
-                  (v.envPrest||[]).forEach(e=>{
-                    const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;
-                    if(k) extra[k]+=Number(e.cant)||0;
-                  });
-                  (v.envDev||[]).forEach(e=>{
-                    const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;
-                    if(k) extra[k]-=Number(e.cant)||0;
-                  });
+                  (v.envPrest||[]).forEach(e=>{const k=pkEnv[e.prod];if(k)extra[k]+=Number(e.cant)||0;});
+                  (v.envDev||[]).forEach(e=>{const k=pkEnv[e.prod];if(k)extra[k]-=Number(e.cant)||0;});
                 });
-                const total={sifon:(cliente.sifon||0)+extra.sifon, bidon10:(cliente.bidon10||0)+extra.bidon10, bidon20:(cliente.bidon20||0)+extra.bidon20};
-                const tieneExtra=extra.sifon!==0||extra.bidon10!==0||extra.bidon20!==0;
+                // Sumar ajuste manual
+                const aj=cliente.envAjuste||{};
+                const exTotal={sifon:extra.sifon+(aj.sifon||0),bidon10:extra.bidon10+(aj.bidon10||0),bidon20:extra.bidon20+(aj.bidon20||0)};
+                const hab={sifon:cliente.sifon||0,bidon10:cliente.bidon10||0,bidon20:cliente.bidon20||0};
+                const total={sifon:hab.sifon+exTotal.sifon,bidon10:hab.bidon10+exTotal.bidon10,bidon20:hab.bidon20+exTotal.bidon20};
+                const hayExtra=exTotal.sifon!==0||exTotal.bidon10!==0||exTotal.bidon20!==0;
                 return (<>
                   <div style={{...s.card,margin:"0 0 10px",background:"var(--color-background-tertiary)"}}>
                     <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8}}>📦 En poder del cliente ahora</div>
                     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                      {total.sifon>0&&<div style={s.metricCard}><div style={s.metricLabel}>Sifón</div><div style={{...s.metricVal,color:extra.sifon>0?"var(--color-text-warning)":extra.sifon<0?"var(--color-text-success)":"var(--color-text-primary)"}}>{total.sifon}</div></div>}
-                      {total.bidon10>0&&<div style={s.metricCard}><div style={s.metricLabel}>10L</div><div style={{...s.metricVal,color:extra.bidon10>0?"var(--color-text-warning)":extra.bidon10<0?"var(--color-text-success)":"var(--color-text-primary)"}}>{total.bidon10}</div></div>}
-                      {total.bidon20>0&&<div style={s.metricCard}><div style={s.metricLabel}>20L</div><div style={{...s.metricVal,color:extra.bidon20>0?"var(--color-text-warning)":extra.bidon20<0?"var(--color-text-success)":"var(--color-text-primary)"}}>{total.bidon20}</div></div>}
+                      {total.sifon>0&&<div style={s.metricCard}><div style={s.metricLabel}>Sifón</div><div style={{...s.metricVal,color:exTotal.sifon>0?"var(--color-text-warning)":exTotal.sifon<0?"var(--color-text-success)":"var(--color-text-primary)"}}>{total.sifon}</div></div>}
+                      {total.bidon10>0&&<div style={s.metricCard}><div style={s.metricLabel}>10L</div><div style={{...s.metricVal,color:exTotal.bidon10>0?"var(--color-text-warning)":exTotal.bidon10<0?"var(--color-text-success)":"var(--color-text-primary)"}}>{total.bidon10}</div></div>}
+                      {total.bidon20>0&&<div style={s.metricCard}><div style={s.metricLabel}>20L</div><div style={{...s.metricVal,color:exTotal.bidon20>0?"var(--color-text-warning)":exTotal.bidon20<0?"var(--color-text-success)":"var(--color-text-primary)"}}>{total.bidon20}</div></div>}
                       {cliente.dispenser>0&&<div style={s.metricCard}><div style={s.metricLabel}>Dispenser</div><div style={s.metricVal}>{cliente.dispenser}</div></div>}
                       {!total.sifon&&!total.bidon10&&!total.bidon20&&!cliente.dispenser&&<span style={{fontSize:13,color:"var(--color-text-tertiary)"}}>Sin envases</span>}
                     </div>
-                    {tieneExtra&&<div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:8,borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:6}}>
-                      Habitual: {cliente.sifon>0?`Sifón×${cliente.sifon} `:""}{ cliente.bidon10>0?`10L×${cliente.bidon10} `:""}{ cliente.bidon20>0?`20L×${cliente.bidon20}`:""}
-                      {extra.sifon!==0&&<span style={{color:extra.sifon>0?"var(--color-text-warning)":"var(--color-text-success)"}}>{extra.sifon>0?` +${extra.sifon} sif. prest.`:` ${Math.abs(extra.sifon)} sif. dev.`}</span>}
-                      {extra.bidon10!==0&&<span style={{color:extra.bidon10>0?"var(--color-text-warning)":"var(--color-text-success)"}}>{extra.bidon10>0?` +${extra.bidon10} 10L prest.`:` ${Math.abs(extra.bidon10)} 10L dev.`}</span>}
-                      {extra.bidon20!==0&&<span style={{color:extra.bidon20>0?"var(--color-text-warning)":"var(--color-text-success)"}}>{extra.bidon20>0?` +${extra.bidon20} 20L prest.`:` ${Math.abs(extra.bidon20)} 20L dev.`}</span>}
-                    </div>}
+                    {hayExtra&&(
+                      <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:8,borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:6}}>
+                        {(hab.sifon>0||hab.bidon10>0||hab.bidon20>0)&&<span>Habitual: {hab.sifon>0?`Sifón×${hab.sifon} `:""}{hab.bidon10>0?`10L×${hab.bidon10} `:""}{hab.bidon20>0?`20L×${hab.bidon20}`:""} · </span>}
+                        {exTotal.sifon!==0&&<span style={{color:exTotal.sifon>0?"var(--color-text-warning)":"var(--color-text-success)"}}>{exTotal.sifon>0?`+${exTotal.sifon} sif. extra`:` −${Math.abs(exTotal.sifon)} sif. devueltos`} </span>}
+                        {exTotal.bidon10!==0&&<span style={{color:exTotal.bidon10>0?"var(--color-text-warning)":"var(--color-text-success)"}}>{exTotal.bidon10>0?`+${exTotal.bidon10} 10L extra`:` −${Math.abs(exTotal.bidon10)} 10L devueltos`} </span>}
+                        {exTotal.bidon20!==0&&<span style={{color:exTotal.bidon20>0?"var(--color-text-warning)":"var(--color-text-success)"}}>{exTotal.bidon20>0?`+${exTotal.bidon20} 20L extra`:` −${Math.abs(exTotal.bidon20)} 20L devueltos`}</span>}
+                      </div>
+                    )}
                   </div>
                 </>);
               })()}
@@ -4651,7 +4652,7 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
   const [importando,setImportando]=useState(false);
   const [mantVeh,setMantVeh] = React.useState(()=>{try{return JSON.parse(localStorage.getItem("cat_mant_vehiculo_v1")||"[]");}catch{return [];}});
   const [mostrarNuevoMant,setMostrarNuevoMant] = React.useState(false);
-  const saveMantVeh = (lista) => {setMantVeh(lista);localStorage.setItem("cat_mant_vehiculo_v1",JSON.stringify(lista));};
+  const saveMantVeh = (lista) => {setMantVeh(lista);localStorage.setItem("cat_mant_vehiculo_v1",JSON.stringify(lista));if(syncData)syncData({mantVeh:lista});};
   const prestados={sifon:clientes.reduce((a,c)=>a+(c.sifon||0),0),bidon10:clientes.reduce((a,c)=>a+(c.bidon10||0),0),bidon20:clientes.reduce((a,c)=>a+(c.bidon20||0),0)};
   const stockKeys={"Sifón 1.5L":"sifon","Bidón 10L":"bidon10","Bidón 20L":"bidon20","Dispenser":"dispenser"};
   return (
