@@ -11,7 +11,7 @@
   <title>Reparto App · Reparto</title>
   <script>
     if('serviceWorker' in navigator){
-      const CACHE = 'lc-v43';
+      const CACHE = 'lc-v44';
       const ASSETS = [
         'https://unpkg.com/react@18/umd/react.production.min.js',
         'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -674,28 +674,7 @@ function App() {
     }
 
     saveVentas(nuevasVentas);
-
-    // Actualizar envases habituales del cliente según movimientos
-    const prodKeyEnv = {"Sifón 1.5L":"sifon","Bidón 10L":"bidon10","Bidón 20L":"bidon20"};
-    let cambiosEnv = {};
-    // Prestados: suman al habitual del cliente
-    envPrestFinal.forEach(e=>{
-      const k=prodKeyEnv[e.prod]; if(!k) return;
-      cambiosEnv[k] = (cambiosEnv[k]||0) + (Number(e.cant)||0);
-    });
-    // Devueltos: restan del habitual del cliente
-    (nuevaVenta.envDev||[]).forEach(e=>{
-      const k=prodKeyEnv[e.prod]; if(!k) return;
-      cambiosEnv[k] = (cambiosEnv[k]||0) - (Number(e.cant)||0);
-    });
-    const nuevosClientes = clientes.map(c2=>{
-      if(c2.id!==c.id) return c2;
-      const actualizado = {...c2, saldo:c.saldo+saldoExtra};
-      Object.entries(cambiosEnv).forEach(([k,delta])=>{
-        actualizado[k] = Math.max(0, (actualizado[k]||0) + delta);
-      });
-      return actualizado;
-    });
+    const nuevosClientes = clientes.map(c2=>c2.id===c.id?{...c2,saldo:c.saldo+saldoExtra}:c2);
     saveClientes(nuevosClientes);
   };
 
@@ -4155,10 +4134,12 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
                     {/* Envases extra prestados */}
                     {(()=>{
                       const ex=extraEnvases[c.id]||{};
+                      const aj=c.envAjuste||{};
+                      const total={sifon:(ex.sifon||0)+(aj.sifon||0),bidon10:(ex.bidon10||0)+(aj.bidon10||0),bidon20:(ex.bidon20||0)+(aj.bidon20||0)};
                       return (<>
-                        {ex.sifon>0&&<span style={{...s.tag,color:"var(--color-text-warning)",fontWeight:500}}>+{ex.sifon} sif extra</span>}
-                        {ex.bidon10>0&&<span style={{...s.tag,color:"var(--color-text-warning)",fontWeight:500}}>+{ex.bidon10} 10L extra</span>}
-                        {ex.bidon20>0&&<span style={{...s.tag,color:"var(--color-text-warning)",fontWeight:500}}>+{ex.bidon20} 20L extra</span>}
+                        {total.sifon>0&&<span style={{...s.tag,color:"var(--color-text-warning)",fontWeight:500}}>+{total.sifon} sif extra</span>}
+                        {total.bidon10>0&&<span style={{...s.tag,color:"var(--color-text-warning)",fontWeight:500}}>+{total.bidon10} 10L extra</span>}
+                        {total.bidon20>0&&<span style={{...s.tag,color:"var(--color-text-warning)",fontWeight:500}}>+{total.bidon20} 20L extra</span>}
                       </>);
                     })()}
                     {c.telefono&&<a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{...s.tag,textDecoration:"none",cursor:"pointer"}} onClick={e=>e.stopPropagation()}>💬 {c.telefono}</a>}
