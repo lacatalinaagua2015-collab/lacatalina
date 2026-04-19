@@ -11,7 +11,7 @@
   <title>Reparto App · Reparto</title>
   <script>
     if('serviceWorker' in navigator){
-      const CACHE = 'lc-v45';
+      const CACHE = 'lc-v50';
       const ASSETS = [
         'https://unpkg.com/react@18/umd/react.production.min.js',
         'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -174,6 +174,7 @@ self.addEventListener('fetch',e=>{
       --color-border-warning: #2e1f06;
       --color-border-danger: #2e0a0a;
       --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --color-accent: #185FA5;
       --border-radius-md: 8px;
       --border-radius-lg: 12px;
     }
@@ -209,6 +210,27 @@ self.addEventListener('fetch',e=>{
 <body>
 <div id="root"></div>
 <script type="text/babel">
+// ── PALETAS DE TEMAS ─────────────────────────────────────────────────────────
+const TEMAS_LC = {
+  "oscuro-azul":    { nombre:"Océano Oscuro",   modo:"oscuro", emoji:"🌊", vars:{"--color-background-primary":"#0f1923","--color-background-secondary":"#1a2b3c","--color-background-tertiary":"#253647","--color-background-info":"#1e3a5f","--color-background-success":"#0a2e1f","--color-background-warning":"#2e1f06","--color-background-danger":"#2e0a0a","--color-text-primary":"#e2eaf4","--color-text-secondary":"#7a9ab8","--color-text-tertiary":"#4a6a85","--color-text-info":"#5daaff","--color-text-success":"#4dd9a0","--color-text-warning":"#f5b942","--color-text-danger":"#f07070","--color-border-tertiary":"rgba(255,255,255,0.07)","--color-border-secondary":"rgba(255,255,255,0.13)","--color-border-primary":"rgba(255,255,255,0.22)","--color-accent":"#185FA5","body-bg":"#080f17"} },
+  "oscuro-verde":   { nombre:"Bosque Oscuro",   modo:"oscuro", emoji:"🌿", vars:{"--color-background-primary":"#0d1f17","--color-background-secondary":"#162e22","--color-background-tertiary":"#1e3d2d","--color-background-info":"#1a3d2f","--color-background-success":"#0a2e1f","--color-background-warning":"#2e2006","--color-background-danger":"#2e0a0a","--color-text-primary":"#e0f0e8","--color-text-secondary":"#7ab898","--color-text-tertiary":"#4a8565","--color-text-info":"#5dff9a","--color-text-success":"#4dd9a0","--color-text-warning":"#f5b942","--color-text-danger":"#f07070","--color-border-tertiary":"rgba(255,255,255,0.07)","--color-border-secondary":"rgba(255,255,255,0.13)","--color-border-primary":"rgba(255,255,255,0.22)","--color-accent":"#1a8a4a","body-bg":"#060f0a"} },
+  "oscuro-violeta": { nombre:"Noche Violeta",   modo:"oscuro", emoji:"🔮", vars:{"--color-background-primary":"#13101f","--color-background-secondary":"#1e1833","--color-background-tertiary":"#2a2045","--color-background-info":"#251a5f","--color-background-success":"#0a2e1f","--color-background-warning":"#2e1f06","--color-background-danger":"#2e0a0a","--color-text-primary":"#ede8f4","--color-text-secondary":"#9a88c8","--color-text-tertiary":"#6a5a95","--color-text-info":"#b87dff","--color-text-success":"#4dd9a0","--color-text-warning":"#f5b942","--color-text-danger":"#f07070","--color-border-tertiary":"rgba(255,255,255,0.07)","--color-border-secondary":"rgba(255,255,255,0.13)","--color-border-primary":"rgba(255,255,255,0.22)","--color-accent":"#7b3fc9","body-bg":"#080610"} },
+  "oscuro-rojo":    { nombre:"Carbón Rojo",     modo:"oscuro", emoji:"🔥", vars:{"--color-background-primary":"#1a1010","--color-background-secondary":"#2a1818","--color-background-tertiary":"#3a2020","--color-background-info":"#3a1a1a","--color-background-success":"#0a2e1f","--color-background-warning":"#2e1f06","--color-background-danger":"#3a0a0a","--color-text-primary":"#f4e8e8","--color-text-secondary":"#c88888","--color-text-tertiary":"#956a6a","--color-text-info":"#ff8d8d","--color-text-success":"#4dd9a0","--color-text-warning":"#f5b942","--color-text-danger":"#f07070","--color-border-tertiary":"rgba(255,255,255,0.07)","--color-border-secondary":"rgba(255,255,255,0.13)","--color-border-primary":"rgba(255,255,255,0.22)","--color-accent":"#c93030","body-bg":"#0f0606"} },
+  "oscuro-gris":    { nombre:"Pizarra Oscura",  modo:"oscuro", emoji:"⚫", vars:{"--color-background-primary":"#141416","--color-background-secondary":"#1e2024","--color-background-tertiary":"#28292e","--color-background-info":"#1a2235","--color-background-success":"#0a2e1f","--color-background-warning":"#2e2006","--color-background-danger":"#2e0a0a","--color-text-primary":"#e8e8ea","--color-text-secondary":"#8888a0","--color-text-tertiary":"#555565","--color-text-info":"#7aaaff","--color-text-success":"#4dd9a0","--color-text-warning":"#f5b942","--color-text-danger":"#f07070","--color-border-tertiary":"rgba(255,255,255,0.07)","--color-border-secondary":"rgba(255,255,255,0.13)","--color-border-primary":"rgba(255,255,255,0.22)","--color-accent":"#4466cc","body-bg":"#0a0a0c"} },
+  "claro-azul":     { nombre:"Cielo Claro",     modo:"claro",  emoji:"☀️", vars:{"--color-background-primary":"#f0f4f8","--color-background-secondary":"#ffffff","--color-background-tertiary":"#e4ecf4","--color-background-info":"#dbeafe","--color-background-success":"#d1fae5","--color-background-warning":"#fef3c7","--color-background-danger":"#fee2e2","--color-text-primary":"#1a2b3c","--color-text-secondary":"#4a6a85","--color-text-tertiary":"#7a9ab8","--color-text-info":"#1d4ed8","--color-text-success":"#065f46","--color-text-warning":"#92400e","--color-text-danger":"#991b1b","--color-border-tertiary":"rgba(0,0,0,0.07)","--color-border-secondary":"rgba(0,0,0,0.13)","--color-border-primary":"rgba(0,0,0,0.22)","--color-accent":"#185FA5","body-bg":"#dde5ed"} },
+  "claro-verde":    { nombre:"Primavera",        modo:"claro",  emoji:"🌱", vars:{"--color-background-primary":"#f0f7f3","--color-background-secondary":"#ffffff","--color-background-tertiary":"#e0f0e8","--color-background-info":"#d1fae5","--color-background-success":"#d1fae5","--color-background-warning":"#fef3c7","--color-background-danger":"#fee2e2","--color-text-primary":"#1a2e22","--color-text-secondary":"#3a6a4a","--color-text-tertiary":"#6a9a7a","--color-text-info":"#065f46","--color-text-success":"#065f46","--color-text-warning":"#92400e","--color-text-danger":"#991b1b","--color-border-tertiary":"rgba(0,0,0,0.07)","--color-border-secondary":"rgba(0,0,0,0.13)","--color-border-primary":"rgba(0,0,0,0.22)","--color-accent":"#1a7a3a","body-bg":"#d5ece0"} },
+  "claro-naranja":  { nombre:"Arena Cálida",    modo:"claro",  emoji:"🌅", vars:{"--color-background-primary":"#fdf6ee","--color-background-secondary":"#ffffff","--color-background-tertiary":"#f7ece0","--color-background-info":"#fef3c7","--color-background-success":"#d1fae5","--color-background-warning":"#fef3c7","--color-background-danger":"#fee2e2","--color-text-primary":"#2d1f0e","--color-text-secondary":"#7a5a3a","--color-text-tertiary":"#a07a5a","--color-text-info":"#b45309","--color-text-success":"#065f46","--color-text-warning":"#92400e","--color-text-danger":"#991b1b","--color-border-tertiary":"rgba(0,0,0,0.07)","--color-border-secondary":"rgba(0,0,0,0.13)","--color-border-primary":"rgba(0,0,0,0.22)","--color-accent":"#c05a10","body-bg":"#f0e4d5"} },
+  "claro-violeta":  { nombre:"Lavanda",          modo:"claro",  emoji:"💜", vars:{"--color-background-primary":"#f5f0fc","--color-background-secondary":"#ffffff","--color-background-tertiary":"#ede4f8","--color-background-info":"#ede9fe","--color-background-success":"#d1fae5","--color-background-warning":"#fef3c7","--color-background-danger":"#fee2e2","--color-text-primary":"#1e1040","--color-text-secondary":"#5a4080","--color-text-tertiary":"#8a70b0","--color-text-info":"#5b21b6","--color-text-success":"#065f46","--color-text-warning":"#92400e","--color-text-danger":"#991b1b","--color-border-tertiary":"rgba(0,0,0,0.07)","--color-border-secondary":"rgba(0,0,0,0.13)","--color-border-primary":"rgba(0,0,0,0.22)","--color-accent":"#6d28d9","body-bg":"#e8ddf5"} },
+  "claro-gris":     { nombre:"Minimalista",      modo:"claro",  emoji:"⚪", vars:{"--color-background-primary":"#f8f9fa","--color-background-secondary":"#ffffff","--color-background-tertiary":"#eef0f2","--color-background-info":"#e0e7ff","--color-background-success":"#d1fae5","--color-background-warning":"#fef3c7","--color-background-danger":"#fee2e2","--color-text-primary":"#111827","--color-text-secondary":"#4b5563","--color-text-tertiary":"#9ca3af","--color-text-info":"#3730a3","--color-text-success":"#065f46","--color-text-warning":"#92400e","--color-text-danger":"#991b1b","--color-border-tertiary":"rgba(0,0,0,0.07)","--color-border-secondary":"rgba(0,0,0,0.13)","--color-border-primary":"rgba(0,0,0,0.22)","--color-accent":"#374151","body-bg":"#e5e7eb"} },
+};
+function aplicarTemaLC(temaId) {
+  const tema = TEMAS_LC[temaId]; if(!tema) return;
+  const root = document.documentElement;
+  Object.entries(tema.vars).forEach(([k,v])=>{ if(k==="body-bg") document.body.style.background=v; else root.style.setProperty(k,v); });
+}
+function getTemaLC() { try { return JSON.parse(localStorage.getItem("lc_tema")||'"oscuro-azul"'); } catch { return "oscuro-azul"; } }
+(()=>{ try { aplicarTemaLC(getTemaLC()); } catch{} })();
+
 const { useState } = React;
 
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
@@ -426,6 +448,7 @@ function App() {
   const [syncStatus, setSyncStatus] = useState("idle");
   const [cloudSetup, setCloudSetup] = useState(false);
   const [darkMode, setDarkMode]   = useLS("cat_darkmode", false);
+  const [zonasReparto, setZonasReparto] = useLS("cat_zonas_v1", {});
   const [scaleIdx, setScaleIdx]   = useLS("cat_scale_v1", 1); // 0=S 1=M 2=L 3=XL
   const SCALES = [0.82, 1.0, 1.18, 1.36];
   const SCALE_LABELS = ["S","M","L","XL"];
@@ -746,7 +769,7 @@ function App() {
             if(!vts.length) return null;
             const fechas = [...new Set(vts.map(v=>v.fechaKey))].sort().reverse();
             return {dia, fecha:fechas[0]||"", count:vts.length, monto:vts.reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0), ventas:vts};
-          }).filter(Boolean)} />}
+          }).filter(Boolean)} zonasReparto={zonasReparto} onSetZona={(dia,zona)=>setZonasReparto({...zonasReparto,[dia]:zona})} />}
       {pantalla==="confirmacionesDia" && <ConfirmacionesDia
           dia={diaActual}
           ventas={ventas.filter(v=>v.dia===diaActual&&v.pago==="transferencia")}
@@ -1485,7 +1508,8 @@ function ConfirmacionesDia({dia,ventas,clientes,onConfirmar,onVolver}) {
   );
 }
 
-function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onStock,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,onVerConfirmaciones,clientes,ventas,stock}) {
+function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onStock,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,onVerConfirmaciones,clientes,ventas,stock,zonasReparto,onSetZona}) {
+  const [editandoZona, setEditandoZona] = React.useState(null);
   return (
     <div style={s.screen}>
       <div style={s.header}>
@@ -1536,14 +1560,48 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
         {dias.map((d,idx)=>{
           const deudas = (clientes||[]).filter(c=>c.dia===d&&c.saldo<0);
           const totalDeuda = deudas.reduce((a,c)=>a+Math.abs(c.saldo),0);
+          const totalClientes = (clientes||[]).filter(c=>c.dia===d).length;
+          const zona = (zonasReparto||{})[d]||"";
           return (<React.Fragment key={d}>
-          <button style={{...s.card,margin:0,textAlign:"left",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px"}} onClick={()=>onDia(d)}>
-            <div>
-              <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>{d}</span>
-              {totalDeuda>0&&<div style={{fontSize:11,color:"var(--color-text-danger)",marginTop:2}}>⚠ {deudas.length} cliente{deudas.length>1?"s":""} deben {fmt(totalDeuda)}</div>}
+          <button style={{...s.card,margin:0,textAlign:"left",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 16px"}} onClick={()=>onDia(d)}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5}}>
+                <span style={{fontSize:15,fontWeight:500,color:"var(--color-text-primary)"}}>{d}</span>
+                {zona&&<>
+                  <span style={{fontSize:15,fontWeight:500,color:"var(--color-text-primary)"}}>·</span>
+                  <span style={{fontSize:15,fontWeight:500,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{zona}</span>
+                </>}
+                {!zona&&<span style={{fontSize:12,color:"var(--color-text-tertiary)",fontStyle:"italic",cursor:"pointer"}} onClick={e=>{e.stopPropagation();setEditandoZona(d);}}>+ zona</span>}
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                {totalDeuda>0
+                  ?<span style={{fontSize:12,color:"var(--color-text-danger)"}}>⚠ {deudas.length} cliente{deudas.length>1?"s":""} {deudas.length>1?"deben":"debe"} {fmt(totalDeuda)}</span>
+                  :<span style={{fontSize:12,color:"var(--color-text-success)"}}>✓ Sin deudas</span>
+                }
+                <span style={{fontSize:12,color:"var(--color-text-tertiary)"}}>{totalClientes} cliente{totalClientes!==1?"s":""}</span>
+              </div>
             </div>
-            <span style={{color:"var(--color-text-tertiary)",fontSize:18}}>→</span>
+            <span style={{color:"var(--color-text-tertiary)",fontSize:18,marginLeft:10}}>→</span>
           </button>
+          {editandoZona===d&&(
+            <div style={{background:"var(--color-background-secondary)",border:"0.5px solid var(--color-border-secondary)",borderRadius:10,padding:"10px 14px",marginTop:2}} onClick={e=>e.stopPropagation()}>
+              <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:6}}>Zona de reparto del {d}</div>
+              <div style={{display:"flex",gap:8}}>
+                <input id={`zona-${d}`} style={s.input} defaultValue={zona} placeholder="Ej: Lomas de Tafí" autoFocus />
+                <button style={{...s.btnPrimary,padding:"6px 14px",fontSize:13,whiteSpace:"nowrap"}} onClick={()=>{
+                  const v=document.getElementById(`zona-${d}`).value.trim();
+                  onSetZona(d,v);
+                  setEditandoZona(null);
+                }}>OK</button>
+                <button style={{...s.btn,padding:"6px 10px",fontSize:13}} onClick={()=>setEditandoZona(null)}>✕</button>
+              </div>
+            </div>
+          )}
+          {zona&&editandoZona!==d&&(
+            <div style={{textAlign:"right",marginTop:2,marginBottom:2}}>
+              <span style={{fontSize:10,color:"var(--color-text-tertiary)",cursor:"pointer",textDecoration:"underline"}} onClick={e=>{e.stopPropagation();setEditandoZona(d);}}>editar zona</span>
+            </div>
+          )}
           {idx===dias.length-1&&stock&&(
             (()=>{
               const CAJON=6;
@@ -1602,22 +1660,28 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
           </React.Fragment>);
         })}
         <div style={s.divider} />
-        <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onGestionClientes}>
-          <span>👥 Gestión de clientes</span><span style={{color:"var(--color-text-tertiary)"}}>→</span>
-        </button>
-        <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onStock}>
-          <span>📦 Stock</span><span style={{color:"var(--color-text-tertiary)"}}>→</span>
-        </button>
-        <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onPromocion}>
-          <span>🚀 Promoción</span><span style={{color:"var(--color-text-tertiary)"}}>→</span>
-        </button>
-
-        <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onResumen}>
-          <span>📊 Resumen general</span><span style={{color:"var(--color-text-tertiary)"}}>→</span>
-        </button>
-        <button style={{...s.btn,textAlign:"left",display:"flex",justifyContent:"space-between",padding:"12px 16px"}} onClick={onConfig}>
-          <span>⚙ Configuración</span><span style={{color:"var(--color-text-tertiary)"}}>→</span>
-        </button>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,paddingBottom:8}}>
+          {[
+            ["👥","Clientes",onGestionClientes],
+            ["📦","Stock",onStock],
+            ["🚀","Promoción",onPromocion],
+            ["📊","Resumen",onResumen],
+            ["⚙️","Config",onConfig],
+          ].map(([ico,lbl,fn])=>(
+            <button key={lbl} onClick={fn} style={{
+              display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,
+              padding:"14px 6px",borderRadius:12,cursor:"pointer",
+              border:"2px solid transparent",
+              background:"var(--color-background-tertiary)",
+              boxShadow:"0 3px 6px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.06) inset",
+              color:"var(--color-text-secondary)",
+              transition:"all 0.15s",
+            }}>
+              <span style={{fontSize:22}}>{ico}</span>
+              <span style={{fontSize:11,fontWeight:500,color:"var(--color-text-primary)",textAlign:"center"}}>{lbl}</span>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -4639,13 +4703,30 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
   return (
     <div style={s.screen}>
       <div style={s.header}><button style={s.backBtn} onClick={onVolver}>← Volver</button><span style={s.headerTitle}>Configuración</span></div>
-      <div style={s.tabBar}>
-        <button style={s.tab(tab==="precios")} onClick={()=>setTab("precios")}>Precios</button>
-        <button style={s.tab(tab==="stock")} onClick={()=>setTab("stock")}>Stock</button>
-        <button style={s.tab(tab==="cargas")} onClick={()=>setTab("cargas")}>Cargas</button>
-        <button style={s.tab(tab==="historial")} onClick={()=>setTab("historial")}>Historial</button>
-        <button style={s.tab(tab==="backup")} onClick={()=>setTab("backup")}>Backup</button>
-        <button style={s.tab(tab==="vehiculo")} onClick={()=>setTab("vehiculo")}>🚐 Vehículo</button>
+      <div style={{padding:"14px 14px 6px",background:"var(--color-background-secondary)"}}>
+        {[
+          [["precios","💲","Precios"],["stock","📦","Stock"],["cargas","🚚","Cargas"],["historial","📋","Historial"]],
+          [["backup","💾","Backup"],["vehiculo","🚐","Vehículo"],["apariencia","🎨","Estilo"],["x","",""]],
+        ].map((fila,fi)=>(
+          <div key={fi} style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:8}}>
+            {fila.map(([id,ico,lbl])=>id==="x"?<div key="x"/>:(
+              <button key={id} onClick={()=>setTab(id)} style={{
+                display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,
+                padding:"12px 6px",borderRadius:12,cursor:"pointer",
+                border:`2px solid ${tab===id?"var(--color-accent)":"transparent"}`,
+                background:tab===id?"var(--color-background-secondary)":"var(--color-background-tertiary)",
+                boxShadow:tab===id
+                  ?"0 0 0 1px var(--color-accent), 0 4px 12px rgba(24,95,165,0.3)"
+                  :"0 3px 6px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.06) inset",
+                color:tab===id?"var(--color-accent)":"var(--color-text-secondary)",
+                transition:"all 0.15s",
+              }}>
+                <span style={{fontSize:20}}>{ico}</span>
+                <span style={{fontSize:10,fontWeight:tab===id?500:400,letterSpacing:"0.02em"}}>{lbl}</span>
+              </button>
+            ))}
+          </div>
+        ))}
       </div>
       {tab==="precios"&&<div style={{padding:16}}>
         {/* Lista de artículos */}
@@ -5049,6 +5130,58 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
           )}
         </div>
       )}
+      {tab==="apariencia"&&(
+        <div style={{padding:16}}>
+          <ConfigAparienciaLC />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ConfigAparienciaLC() {
+  const [temaActual, setTemaActual] = React.useState(getTemaLC);
+  const [modoVista, setModoVista] = React.useState(()=>TEMAS_LC[getTemaLC()]?.modo||"oscuro");
+  const [guardado, setGuardado] = React.useState(false);
+  const aplicar = (id) => {
+    setTemaActual(id); aplicarTemaLC(id);
+    localStorage.setItem("lc_tema", JSON.stringify(id));
+    setGuardado(true); setTimeout(()=>setGuardado(false),2000);
+  };
+  const temasFiltrados = Object.entries(TEMAS_LC).filter(([,t])=>t.modo===modoVista);
+  return (
+    <div>
+      <div style={{...s.card,marginBottom:12,background:"var(--color-background-secondary)"}}>
+        <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-primary)",marginBottom:10}}>🎨 Paleta de colores</div>
+        <div style={{display:"flex",gap:8,marginBottom:12}}>
+          {[["oscuro","🌙 Oscuro"],["claro","☀️ Claro"]].map(([m,l])=>(
+            <button key={m} style={{flex:1,padding:"7px 8px",fontSize:12,fontWeight:500,borderRadius:8,cursor:"pointer",
+              background:modoVista===m?"var(--color-accent)":"var(--color-background-tertiary)",
+              color:modoVista===m?"#fff":"var(--color-text-secondary)",
+              border:`1px solid ${modoVista===m?"transparent":"var(--color-border-secondary)"}`}}
+              onClick={()=>setModoVista(m)}>{l}</button>
+          ))}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          {temasFiltrados.map(([id,tema])=>(
+            <button key={id} onClick={()=>aplicar(id)} style={{
+              padding:"10px 8px",borderRadius:10,cursor:"pointer",textAlign:"center",
+              border:`2px solid ${temaActual===id?"var(--color-accent)":"var(--color-border-secondary)"}`,
+              background:temaActual===id?"var(--color-background-secondary)":"var(--color-background-tertiary)",
+            }}>
+              <div style={{fontSize:20,marginBottom:3}}>{tema.emoji}</div>
+              <div style={{fontSize:11,fontWeight:500,color:"var(--color-text-primary)",marginBottom:4}}>{tema.nombre}</div>
+              <div style={{display:"flex",gap:3,justifyContent:"center"}}>
+                {[tema.vars["--color-background-primary"],tema.vars["--color-accent"]||tema.vars["--color-text-info"],tema.vars["--color-text-success"],tema.vars["--color-text-warning"]].map((c,i)=>(
+                  <div key={i} style={{width:12,height:12,borderRadius:"50%",background:c,border:"1px solid rgba(128,128,128,0.3)"}}/>
+                ))}
+              </div>
+              {temaActual===id&&<div style={{fontSize:10,color:"var(--color-text-info)",marginTop:3}}>✓ Activo</div>}
+            </button>
+          ))}
+        </div>
+        {guardado&&<div style={{fontSize:12,color:"var(--color-text-success)",textAlign:"center",marginTop:8}}>✓ Estilo aplicado</div>}
+      </div>
     </div>
   );
 }
