@@ -84,7 +84,8 @@ self.addEventListener('fetch',e=>{
           recordatorios: data.recordatorios || [],
           prospectos: data.prospectos || [],
           mantVeh: data.mantVeh || [],
-          histPrecios: data.histPrecios || []
+          histPrecios: data.histPrecios || [],
+          zonasReparto: data.zonasReparto || {}
         })
       ];
       // clientes en chunks de 50
@@ -122,6 +123,7 @@ self.addEventListener('fetch',e=>{
         if(!data.recordatorios) data.recordatorios = [];
         if(!data.prospectos) data.prospectos = [];
         if(!data.mantVeh) data.mantVeh = [];
+        if(!data.zonasReparto) data.zonasReparto = {};
         if(!data.histPrecios) data.histPrecios = [];
         // load clientes
         var nc = cMeta.exists ? (cMeta.data().n||0) : 0;
@@ -520,6 +522,7 @@ function App() {
       if (data.recordatorios?.length) setRecordatorios(data.recordatorios);
       if (data.mantVeh?.length)    localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh));
       if (data.histPrecios?.length) localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios));
+      if (data.zonasReparto && Object.keys(data.zonasReparto).length) setZonasReparto(data.zonasReparto);
       setSyncStatus("saved");
       setTimeout(()=>setSyncStatus("idle"), 2000);
     });
@@ -527,7 +530,7 @@ function App() {
 
   // Ref siempre actualizado — evita datos viejos en el debounce
   const estadoRef = React.useRef({clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios});
-  React.useEffect(()=>{ estadoRef.current={clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios}; });
+  React.useEffect(()=>{ estadoRef.current={clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios,zonasReparto}; });
 
   // Auto backup DIARIO a localStorage
   React.useEffect(()=>{
@@ -549,7 +552,7 @@ function App() {
     setSyncStatus("saving");
     const mantVehActual = (() => { try { return JSON.parse(localStorage.getItem("cat_mant_vehiculo_v1")||"[]"); } catch { return []; } })();
     const histPreciosActual = (() => { try { return JSON.parse(localStorage.getItem("lc_hist_precios")||"[]"); } catch { return []; } })();
-    const data = { ...estadoRef.current, ...overrides, noVisitas: estadoRef.current.noVisitas||[], prospectos: estadoRef.current.prospectos||[], recordatorios: estadoRef.current.recordatorios||[], mantVeh: overrides.mantVeh||mantVehActual, histPrecios: overrides.histPrecios||histPreciosActual };
+    const data = { ...estadoRef.current, ...overrides, noVisitas: estadoRef.current.noVisitas||[], prospectos: estadoRef.current.prospectos||[], recordatorios: estadoRef.current.recordatorios||[], mantVeh: overrides.mantVeh||mantVehActual, histPrecios: overrides.histPrecios||histPreciosActual, zonasReparto: overrides.zonasReparto||estadoRef.current.zonasReparto||{} };
     estadoRef.current = data;
     debounceSave(() => cloudSave(data).then(function(ok){setSyncStatus(ok?"saved":"error");}).catch(function(){setSyncStatus("error");}));
   };
@@ -769,7 +772,7 @@ function App() {
             if(!vts.length) return null;
             const fechas = [...new Set(vts.map(v=>v.fechaKey))].sort().reverse();
             return {dia, fecha:fechas[0]||"", count:vts.length, monto:vts.reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0), ventas:vts};
-          }).filter(Boolean)} zonasReparto={zonasReparto} onSetZona={(dia,zona)=>setZonasReparto({...zonasReparto,[dia]:zona})} />}
+          }).filter(Boolean)} zonasReparto={zonasReparto} onSetZona={(dia,zona)=>{const nz={...zonasReparto,[dia]:zona};setZonasReparto(nz);syncData({zonasReparto:nz});}} />}
       {pantalla==="confirmacionesDia" && <ConfirmacionesDia
           dia={diaActual}
           ventas={ventas.filter(v=>v.dia===diaActual&&v.pago==="transferencia")}
