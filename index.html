@@ -549,9 +549,9 @@ function App() {
     try {
       localStorage.setItem("lc_backup_"+hoy, JSON.stringify({clientes,ventas,planillas}));
       localStorage.setItem("lc_ultimo_backup", hoy);
-      // Mantener solo los últimos 7 backups
+      // Mantener solo el último backup (el de ayer)
       const keys = Object.keys(localStorage).filter(k=>k.startsWith("lc_backup_")).sort().reverse();
-      keys.slice(7).forEach(k=>localStorage.removeItem(k));
+      keys.slice(1).forEach(k=>localStorage.removeItem(k));
       console.log("Auto-backup diario guardado:", hoy);
     } catch(e){ console.warn("Auto-backup falló:", e); }
   },[]);
