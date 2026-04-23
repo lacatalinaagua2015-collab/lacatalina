@@ -211,6 +211,11 @@ self.addEventListener('fetch',e=>{
       // Also clear old stock keys
       localStorage.removeItem('cat_stock_v3');
       localStorage.removeItem('cat_stock');
+      // LIMPIEZA AUTOMÁTICA: borrar backups viejos, dejar solo el último
+      try {
+        var bkeys = Object.keys(localStorage).filter(function(k){ return k.startsWith('lc_backup_'); }).sort().reverse();
+        bkeys.slice(1).forEach(function(k){ localStorage.removeItem(k); });
+      } catch(e2) {}
     } catch(e) {}
   </script>
 </head>
@@ -1932,7 +1937,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
   const totalGastos=(datos.gastos||[]).reduce((a,g)=>a+num(g.monto),0);
   const efectivo=num(datos.efectivo), fiado=num(datos.fiado), retenciones=num(datos.retenciones);
   const sobrante=efectivo-(totalVentaPlata-fiado); // retenciones es informativo, no afecta el sobrante
-  const ganancia=(cobEfectivo+cobTransBruto+cobFiado+cobSaldos)-totalVentaLlenar-totalGastos;
+  const ganancia=(cobEfectivo - totalVentaLlenar - totalGastos) + cobTransNeto;
   const totalLlenosIngresados=PRODUCTOS_CONFIG.reduce((a,p)=>a+num(datos.productos[p.id]?.llenos),0);
 
   return (
@@ -2216,7 +2221,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div>
               <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Ganancia neta del día</div>
-              <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>Total cobrado − Llenado − Gastos</div>
+              <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>Efectivo en mano + Transferencias netas</div>
             </div>
             <span style={{fontSize:22,fontWeight:500,color:ganancia>=0?"var(--color-text-success)":"var(--color-text-danger)"}}>{fmt(ganancia)}</span>
           </div>
