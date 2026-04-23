@@ -442,7 +442,7 @@ function App() {
       const s = JSON.parse(JSON.stringify(normStock(prev)));
       ["sifon","bidon10","bidon20"].forEach(k=>{
         s.soderia[k] = (s.soderia[k]||0) + (sobrLlenos[k]||0) + (vacios[k]||0);
-        s.camion[k]  = Math.max(0, (s.camion[k]||0) - (sobrLlenos[k]||0));
+        s.camion[k]  = Math.max(0, (s.camion[k]||0) - (sobrLlenos[k]||0) - (vacios[k]||0));
       });
       syncData({stock:s});
       return s;
@@ -744,7 +744,42 @@ function App() {
     if(JSON.stringify(nueva)!==JSON.stringify(planillaActual)){
       savePlanilla(planillaKey, nueva);
     }
-  }, [ventas, noVisitas, clientes, diaActual, fechaActual]);
+    // CIERRE AUTOMÁTICO DEL STOCK — se ejecuta una sola vez por día
+    const camionCerradoKey = `lc_cam_${planillaKey}`;
+    if(planillaActual.iniciado && !localStorage.getItem(camionCerradoKey)) {
+      localStorage.setItem(camionCerradoKey, "1");
+      const prodMap = {"Bidón 10L":"b10","Bidón 20L":"b20","Sifón 1.5L":"soda"};
+      // Cuánto salió en el camión (según planilla de inicio de reparto)
+      const llenos = {
+        b10: Number(planillaActual.productos?.b10?.llenos||0),
+        b20: Number(planillaActual.productos?.b20?.llenos||0),
+        soda: Number(planillaActual.productos?.soda?.llenos||0),
+      };
+      // Cuánto se vendió (cada venta = 1 vacío que vuelve en el intercambio)
+      const vendidos = {b10:0,b20:0,soda:0};
+      ventasDia.forEach(v=>v.detalle.forEach(d=>{const k=prodMap[d.nombre];if(k)vendidos[k]+=d.cantidad;}));
+      // Préstamos (sin recibir vacío) y devoluciones de deudas anteriores
+      const prestados = {b10:0,b20:0,soda:0};
+      const devueltos = {b10:0,b20:0,soda:0};
+      ventasDia.forEach(v=>{
+        (v.envPrest||[]).forEach(e=>{const k=prodMap[e.prod];if(k)prestados[k]+=Number(e.cant)||0;});
+        (v.envDev||[]).forEach(e=>{const k=prodMap[e.prod];if(k)devueltos[k]+=Number(e.cant)||0;});
+      });
+      setStock(prev=>{
+        const s=JSON.parse(JSON.stringify(normStock(prev)));
+        ["b10","b20","soda"].forEach(pk=>{
+          const sk=pk==="b10"?"bidon10":pk==="b20"?"bidon20":"sifon";
+          const sorb=Math.max(0, llenos[pk]-vendidos[pk]-prestados[pk]); // sobrantes llenos en camión
+          const vacios=vendidos[pk]+devueltos[pk]; // vacíos que vuelven (vendidos + devoluciones)
+          s.soderia[sk]=(s.soderia[sk]||0)+sorb+vacios; // todo vuelve a sodería
+          s.camion[sk]=Math.max(0,(s.camion[sk]||0)-sorb-vacios); // camión queda en 0
+          s.casa[sk]=Math.max(0,(s.casa[sk]||0)-Math.max(0,prestados[pk])); // préstamos salen del depósito
+        });
+        syncData({stock:normStock(s)});
+        return normStock(s);
+      });
+    }
+  }, [ventas, noVisitas, clientes, diaActual, fechaActual, planillas]);
 
   if (!apiKey || !binId) {
     return <SetupNube onSetup={(key,id)=>{ setApiKey(key); setBinId(id); setSyncStatus("saved"); }} />;
