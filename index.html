@@ -69,6 +69,61 @@ self.addEventListener('fetch',e=>{
         firebase.initializeApp(firebaseConfig);
       }
       window.db = firebase.firestore();
+
+      // Firebase secundario: Emma Control (para enviar datos de integración)
+      var ecConfig = {
+        apiKey: "AIzaSyBbLoljOPJgjNvVN7bfOuMl8NrUjFB-agU",
+        authDomain: "emma-control.firebaseapp.com",
+        projectId: "emma-control",
+      };
+      try {
+        var ecApp = firebase.apps.find(a=>a.name==='emma-control') || firebase.initializeApp(ecConfig,'emma-control');
+        window.dbEC = firebase.firestore(ecApp);
+      } catch(e){ console.log('EC init:',e); }
+
+      // Función para enviar datos del día a Emma Control
+      window.enviarAEmmaControl = function(token, fecha, ingresos, gastos){
+        if(!token || !window.dbEC) return;
+        var ref = window.dbEC.collection('integraciones').doc(token).collection('movs');
+        var batch = window.dbEC.batch();
+        // Ingreso del día
+        if(ingresos.total > 0){
+          var ingId = 'lc_ing_' + fecha.replace(/-/g,'');
+          batch.set(ref.doc(ingId), {
+            id: ingId,
+            tipo: 'ingreso',
+            ent: 'negocio',
+            desc: 'La Catalina — Reparto ' + fecha,
+            monto: ingresos.total,
+            efectivo: ingresos.efectivo,
+            transferencia: ingresos.transferencia,
+            cat: 'La Catalina',
+            fecha: fecha,
+            metodo: 'efectivo',
+            _origen: 'la_catalina',
+            _ts: Date.now(),
+          });
+        }
+        // Gastos del día
+        (gastos||[]).forEach(function(g, i){
+          if(!g.monto || g.monto <= 0) return;
+          var gId = 'lc_gas_' + fecha.replace(/-/g,'') + '_' + i;
+          batch.set(ref.doc(gId), {
+            id: gId,
+            tipo: 'gasto',
+            ent: 'negocio',
+            desc: g.desc || 'Gasto reparto',
+            monto: g.monto,
+            cat: g.cat || 'Otros',
+            fecha: fecha,
+            metodo: g.metodo || 'efectivo',
+            _origen: 'la_catalina',
+            _ts: Date.now(),
+          });
+        });
+        batch.commit().then(function(){ console.log('✅ Datos enviados a Emma Control'); })
+          .catch(function(e){ console.log('Error Emma Control:', e); });
+      };
       window.db.enablePersistence({synchronizeTabs:false}).catch(function(err){
         if(err.code==="failed-precondition"||err.code==="unimplemented"){
           console.warn("Offline persistence not available:", err.code);
@@ -458,6 +513,7 @@ function App() {
   const apiKey = "firebase";
   const binId  = "firebase";
   const [syncStatus, setSyncStatus] = useState("idle");
+  const [ecToken, setEcToken] = useState(()=>localStorage.getItem('lc_ec_token')||'');
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingOfflineSync, setPendingOfflineSync] = useState(
     ()=>!!localStorage.getItem("sr_offline_pending")
@@ -783,8 +839,22 @@ function App() {
         syncData({stock:normStock(s)});
         return normStock(s);
       });
+
+      // ── Enviar datos del día a Emma Control ──
+      if(ecToken && window.enviarAEmmaControl){
+        const cobEf=ventasDia.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
+        const cobTr=ventasDia.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
+        const totalCob=Math.round(cobEf+cobTr);
+        const gastosData=(planillaActual.gastos||[]).filter(g=>g.monto&&Number(g.monto)>0).map(g=>({
+          desc:g.desc||'Gasto reparto',
+          monto:Number(g.monto),
+          cat:g.cat||'Otros',
+          metodo:g.metodo||'efectivo',
+        }));
+        window.enviarAEmmaControl(ecToken, fechaActual, {total:totalCob,efectivo:Math.round(cobEf),transferencia:Math.round(cobTr)}, gastosData);
+      }
     }
-  }, [ventas, noVisitas, clientes, diaActual, fechaActual, planillas]);
+  }, [ventas, noVisitas, clientes, diaActual, fechaActual, planillas, ecToken]);
 
   if (!apiKey || !binId) {
     return <SetupNube onSetup={(key,id)=>{ setApiKey(key); setBinId(id); setSyncStatus("saved"); }} />;
@@ -1061,7 +1131,7 @@ function App() {
           onCobrarSaldo={(s)=>{if(cliente){const nc=clientes.map(x=>x.id===cliente.id?{...x,saldo:s}:x);saveClientes(nc);}}} />}
       {pantalla==="stock"          && <StockGeneral stock={stockNorm} setStock={(ns)=>{setStock(ns);syncData({stock:ns});}} clientes={clientes} ventas={ventas} productos={productos} planillas={planillas} onVolver={()=>irA("menu")} />}
       {pantalla==="resumen"        && <Resumen ventas={ventas} clientes={clientes} productos={productos} planillas={planillas} noVisitas={noVisitas||[]} onVolver={()=>irA("menu")} />}
-      {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stockNorm} setStock={(s)=>{const ns=normStock(s);setStockRaw(ns);syncData({stock:ns});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} syncData={syncData} onVolver={()=>irA("menu")} />}
+      {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stockNorm} setStock={(s)=>{const ns=normStock(s);setStockRaw(ns);syncData({stock:ns});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} syncData={syncData} onVolver={()=>irA("menu")} ecToken={ecToken} setEcToken={setEcToken} />}
     </div>
     {/* Botón flotante de escala — fuera del zoom para que no se afecte */}
     <button
@@ -4854,7 +4924,7 @@ function CalculadoraCostoReal({productos,ventas}) {
   );
 }
 
-function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,planillas,setPlanillas,stock,setStock,cargasDia,setCargasDia,syncData,onVolver}) {
+function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,planillas,setPlanillas,stock,setStock,cargasDia,setCargasDia,syncData,onVolver,ecToken,setEcToken}) {
   const [tab,setTab]=useState("precios");
   const [editandoId,setEditandoId]=useState(null);
   const [importando,setImportando]=useState(false);
@@ -4869,7 +4939,7 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
       <div style={{padding:"14px 14px 6px",background:"var(--color-background-secondary)"}}>
         {[
           [["precios","💲","Precios"],["stock","📦","Stock"],["cargas","🚚","Cargas"],["historial","📋","Historial"]],
-          [["backup","💾","Backup"],["vehiculo","🚐","Vehículo"],["apariencia","🎨","Estilo"],["x","",""]],
+          [["backup","💾","Backup"],["vehiculo","🚐","Vehículo"],["apariencia","🎨","Estilo"],["emma","🔗","Emma"]],
         ].map((fila,fi)=>(
           <div key={fi} style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:8}}>
             {fila.map(([id,ico,lbl])=>id==="x"?<div key="x"/>:(
@@ -5296,6 +5366,77 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
       {tab==="apariencia"&&(
         <div style={{padding:16}}>
           <ConfigAparienciaLC />
+        </div>
+      )}
+
+      {tab==="emma"&&(
+        <div style={{padding:16}}>
+          <div style={{background:"var(--color-background-secondary)",borderRadius:12,padding:14,border:"0.5px solid var(--color-border-tertiary)",marginBottom:14}}>
+            <div style={{fontSize:11,fontWeight:700,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>
+              🔗 Vincular con Emma Control
+            </div>
+            <div style={{fontSize:13,color:"var(--color-text-secondary)",lineHeight:1.6,marginBottom:14}}>
+              Pegá el código que aparece en Emma Control → Configuración → "Código de integración". Los ingresos y gastos del día se van a enviar automáticamente al cerrar el reparto.
+            </div>
+            <div style={{fontSize:11,fontWeight:700,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:6}}>Código Emma Control</div>
+            <input
+              value={ecToken}
+              onChange={e=>{
+                const v=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,10);
+                setEcToken(v);
+                localStorage.setItem('lc_ec_token',v);
+              }}
+              placeholder="Ej: EC4A8F2D"
+              style={{
+                width:'100%',background:"var(--color-background-tertiary)",
+                border:`2px solid ${ecToken?"var(--color-accent)":"var(--color-border-secondary)"}`,
+                borderRadius:10,padding:'12px 14px',fontSize:18,color:"var(--color-text-primary)",
+                fontFamily:'monospace',letterSpacing:'0.15em',fontWeight:700,outline:'none',
+                textTransform:'uppercase',marginBottom:12,
+              }}
+            />
+            {ecToken&&ecToken.length>=8?(
+              <div style={{display:'flex',alignItems:'center',gap:8,background:"rgba(16,158,100,0.12)",border:"0.5px solid rgba(16,158,100,0.3)",borderRadius:10,padding:'10px 14px',marginBottom:12}}>
+                <span style={{fontSize:18}}>✅</span>
+                <div>
+                  <div style={{fontSize:13,fontWeight:600,color:"#10d07a"}}>Vinculado con Emma Control</div>
+                  <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>Los datos se enviarán al cerrar el día</div>
+                </div>
+              </div>
+            ):(
+              <div style={{display:'flex',alignItems:'center',gap:8,background:"var(--color-background-tertiary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:10,padding:'10px 14px',marginBottom:12}}>
+                <span style={{fontSize:18}}>⚪</span>
+                <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>Sin vincular — ingresá el código para activar</div>
+              </div>
+            )}
+            {ecToken&&(
+              <button
+                onClick={()=>{if(window.confirm('¿Desvincular Emma Control?')){setEcToken('');localStorage.removeItem('lc_ec_token');}}}
+                style={{background:'none',border:'0.5px solid rgba(240,82,82,0.4)',borderRadius:8,padding:'8px 14px',color:'#f05252',fontSize:12,cursor:'pointer',width:'100%'}}>
+                🗑️ Desvincular
+              </button>
+            )}
+          </div>
+
+          <div style={{background:"var(--color-background-secondary)",borderRadius:12,padding:14,border:"0.5px solid var(--color-border-tertiary)"}}>
+            <div style={{fontSize:11,fontWeight:700,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>
+              ¿Qué se envía automáticamente?
+            </div>
+            {[
+              ['💰','Ingresos del día','Efectivo + transferencias cobradas'],
+              ['💸','Gastos adicionales','Combustible, gastos del reparto'],
+              ['📅','Fecha del reparto','Se registra en el día correspondiente'],
+              ['🔗','Identificador','Aparece con badge "La Catalina"'],
+            ].map(([ico,t,d])=>(
+              <div key={t} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'7px 0',borderBottom:'0.5px solid var(--color-border-tertiary)'}}>
+                <span style={{fontSize:18,flexShrink:0}}>{ico}</span>
+                <div>
+                  <div style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>{t}</div>
+                  <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>{d}</div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
