@@ -585,14 +585,20 @@ function App() {
           camion: {sifon:0,bidon10:0,bidon20:0},
         };
         setStock(normStock);
+        // Firebase gana: actualizar localStorage con el dato de la nube
+        try { localStorage.setItem("cat_stock_v4", JSON.stringify(normStock)); } catch {}
       }
-      if (data.productos?.length)  setProductos(data.productos);
-      if (data.noVisitas?.length)  setNoVisitas(data.noVisitas);
-      if (data.prospectos?.length) setProspectos(data.prospectos);
-      if (data.recordatorios?.length) setRecordatorios(data.recordatorios);
+      if (data.productos?.length)  { setProductos(data.productos); try { localStorage.setItem("cat_productos_v3", JSON.stringify(data.productos)); } catch {} }
+      if (data.noVisitas?.length)  { setNoVisitas(data.noVisitas); try { localStorage.setItem("cat_novisitas_v1", JSON.stringify(data.noVisitas)); } catch {} }
+      if (data.prospectos?.length) { setProspectos(data.prospectos); try { localStorage.setItem("cat_prospectos_v1", JSON.stringify(data.prospectos)); } catch {} }
+      if (data.recordatorios?.length) { setRecordatorios(data.recordatorios); try { localStorage.setItem("cat_recordatorios_v1", JSON.stringify(data.recordatorios)); } catch {} }
       if (data.mantVeh?.length)    localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh));
       if (data.histPrecios?.length) localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios));
       if (data.zonasReparto && Object.keys(data.zonasReparto).length) setZonasReparto(data.zonasReparto);
+      // También actualizar clientes y ventas en localStorage
+      if (data.clientes?.length) try { localStorage.setItem("cat_clientes_v3", JSON.stringify(data.clientes)); } catch {}
+      if (data.ventas?.length)   try { localStorage.setItem("cat_ventas_v3", JSON.stringify(data.ventas)); } catch {}
+      if (data.planillas)        try { localStorage.setItem("cat_planillas_v1", JSON.stringify(data.planillas)); } catch {}
       setSyncStatus("saved");
       setTimeout(()=>setSyncStatus("idle"), 2000);
     });
@@ -807,7 +813,12 @@ function App() {
     }
     // CIERRE AUTOMÁTICO DEL STOCK — se ejecuta una sola vez por día
     const camionCerradoKey = `lc_cam_${planillaKey}`;
-    if(planillaActual.iniciado && !localStorage.getItem(camionCerradoKey)) {
+    // Solo cerrar si hubo reparto real (al menos 1 venta O la planilla tiene productos cargados)
+    const huboReparto = ventasDia.length > 0 || 
+      (planillaActual.productos?.b10?.llenos > 0) || 
+      (planillaActual.productos?.b20?.llenos > 0) || 
+      (planillaActual.productos?.soda?.llenos > 0);
+    if(planillaActual.iniciado && huboReparto && !localStorage.getItem(camionCerradoKey)) {
       localStorage.setItem(camionCerradoKey, "1");
       const prodMap = {"Bidón 10L":"b10","Bidón 20L":"b20","Sifón 1.5L":"soda"};
       // Cuánto salió en el camión (según planilla de inicio de reparto)
@@ -1546,7 +1557,13 @@ function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolv
         </div>
 
         {/* Stock base editable — se setea una vez */}
-        {[["soderia","🏭 Sodería (stock base llenos)"],["casa","🏠 Casa / Depósito"]].map(([lugar,titulo])=>(
+        {/* Nota aclaratoria */}
+    <div style={{...s.card,background:"rgba(245,158,11,0.1)",border:"0.5px solid rgba(245,158,11,0.3)",marginBottom:10}}>
+      <div style={{fontSize:12,color:"#f59e0b",lineHeight:1.6}}>
+        ⚠️ <b>Ajustá manualmente</b> si el stock no coincide con el físico. El cierre automático solo corre cuando hay reparto real con productos cargados.
+      </div>
+    </div>
+    {[["soderia","🏭 Sodería (stock base llenos)"],["casa","🏠 Casa / Depósito"]].map(([lugar,titulo])=>(
           <div key={lugar} style={{...s.card,margin:"0 0 12px"}}>
             <div style={{marginBottom:10}}>
               <div style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)"}}>{titulo}</div>
@@ -1612,9 +1629,9 @@ function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolv
                   <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{c.dia}</div>
                 </div>
                 <div style={{display:"flex",gap:4,flexWrap:"wrap",justifyContent:"flex-end"}}>
-                  {extra.sifon>0&&<span style={{...s.tag,color:"var(--color-text-warning)"}}>+{extra.sifon} sif</span>}
-                  {extra.bidon10>0&&<span style={{...s.tag,color:"var(--color-text-warning)"}}>+{extra.bidon10} 10L</span>}
-                  {extra.bidon20>0&&<span style={{...s.tag,color:"var(--color-text-warning)"}}>+{extra.bidon20} 20L</span>}
+                  {extra.sifon>0&&<span style={{...s.tag,fontSize:14,fontWeight:700,padding:"4px 11px",background:"rgba(245,158,11,0.28)",color:"#fbbf24",border:"1px solid rgba(245,158,11,0.55)"}}>+{extra.sifon} sif extra</span>}
+                  {extra.bidon10>0&&<span style={{...s.tag,fontSize:14,fontWeight:700,padding:"4px 11px",background:"rgba(245,158,11,0.28)",color:"#fbbf24",border:"1px solid rgba(245,158,11,0.55)"}}>+{extra.bidon10} 10L extra</span>}
+                  {extra.bidon20>0&&<span style={{...s.tag,fontSize:14,fontWeight:700,padding:"4px 11px",background:"rgba(245,158,11,0.28)",color:"#fbbf24",border:"1px solid rgba(245,158,11,0.55)"}}>+{extra.bidon20} 20L extra</span>}
                 </div>
               </div>
             </div>
@@ -2490,9 +2507,9 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
           </div>
           <div style={{flex:1,cursor:"pointer",minWidth:0}} onClick={()=>onSeleccionar(c)}>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <div style={{fontWeight:500,fontSize:15,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5}}>
+              <div style={{fontWeight:700,fontSize:18,color:"#e2ecff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5}}>
                 {c.nombre}
-                {c.foto&&<span style={{fontSize:10,color:"#4dd9a0",flexShrink:0,marginLeft:3}}>📷</span>}
+                {c.foto&&<span style={{fontSize:11,color:"#4dd9a0",flexShrink:0,marginLeft:3}}>📷</span>}
               </div>
               {(recordatorios||[]).some(r=>r.clienteId===c.id&&!r.confirmado)&&(
                 <span style={{fontSize:13,flexShrink:0}} title="Recordatorio pendiente">🔔</span>
@@ -2503,27 +2520,29 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
                   <button style={{background:"none",border:"none",cursor:"pointer",padding:"2px 4px",lineHeight:1,flexShrink:0,display:"flex",alignItems:"center",gap:3,borderRadius:6,background:vt.transConfirmada?"transparent":"rgba(245,185,66,0.15)"}}
                     onClick={e=>{e.stopPropagation();onConfirmarTransfer&&onConfirmarTransfer(c.id,vt.id);}}
                     title={vt.transConfirmada?"Transfer. confirmada — tocá para desmarcar":"Tocá para confirmar transferencia"}>
-                    <span style={{fontSize:15}}>{vt.transConfirmada?"🟢":"🔴"}</span>
-                    {!vt.transConfirmada&&<span style={{fontSize:11,fontWeight:500,color:"#f5b942"}}>{fmt(vt.pagadoNum||vt.neto||0)}</span>}
+                    <span style={{fontSize:18}}>{vt.transConfirmada?"🟢":"🔴"}</span>
+                    {!vt.transConfirmada&&<span style={{fontSize:13,fontWeight:700,color:"#f5b942"}}>{fmt(vt.pagadoNum||vt.neto||0)}</span>}
                   </button>
                 );
               })()}
             </div>
-            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:2}}>
+            {/* Dirección clara y grande */}
+            <div style={{fontSize:15,color:"#c8d8e8",marginTop:3,fontWeight:500,lineHeight:1.3}}>
               {c.calle?`${c.calle} ${c.nro||""}`:c.manzana?`Mz ${c.manzana} L ${c.lote}`:""}{c.barrio?` · ${c.barrio}`:""}
             </div>
-            {c.notas&&<div style={{fontSize:12,color:"var(--color-text-warning)",marginTop:2}}>📝 {c.notas}</div>}
-            <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>
-              {c.sifon>0    && <span style={s.tag}>Sifón×{c.sifon}</span>}
-              {c.bidon10>0  && <span style={s.tag}>10L×{c.bidon10}</span>}
-              {c.bidon20>0  && <span style={s.tag}>20L×{c.bidon20}</span>}
-              {c.dispenser>0 && <span style={{...s.tag,color:"#5daaff"}}>Disp×{c.dispenser}</span>}
+            {c.notas&&<div style={{fontSize:13,color:"var(--color-text-warning)",marginTop:3}}>📝 {c.notas}</div>}
+            {/* Envases — fondo más visible */}
+            <div style={{display:"flex",flexWrap:"wrap",gap:5,marginTop:7}}>
+              {c.sifon>0    && <span style={{...s.tag,fontSize:14,fontWeight:700,padding:"4px 11px",background:"rgba(56,138,221,0.28)",color:"#90d0ff",border:"1px solid rgba(56,138,221,0.5)"}}>Sif ×{c.sifon}</span>}
+              {c.bidon10>0  && <span style={{...s.tag,fontSize:14,fontWeight:700,padding:"4px 11px",background:"rgba(56,138,221,0.28)",color:"#90d0ff",border:"1px solid rgba(56,138,221,0.5)"}}>10L ×{c.bidon10}</span>}
+              {c.bidon20>0  && <span style={{...s.tag,fontSize:14,fontWeight:700,padding:"4px 11px",background:"rgba(56,138,221,0.28)",color:"#90d0ff",border:"1px solid rgba(56,138,221,0.5)"}}>20L ×{c.bidon20}</span>}
+              {c.dispenser>0 && <span style={{...s.tag,fontSize:14,fontWeight:700,padding:"4px 11px",background:"rgba(56,138,221,0.28)",color:"#90d0ff",border:"1px solid rgba(56,138,221,0.5)"}}>Disp ×{c.dispenser}</span>}
               {atendido    && <span style={s.badge("success")}>✓ Listo</span>}
               {est==="noesta" && !atendido  && <span style={s.badge("warning")}>🔄 No estaba aún</span>}
               {est==="noesta2"  && <span style={s.badge("warning")}>No estaba</span>}
               {est==="noquiso"  && <span style={s.badge("danger")}>No quiso</span>}
-              {c.saldo<0   && <span style={s.badge("danger")}>Debe {fmt(Math.abs(c.saldo))}</span>}
-              {c.saldo>0   && <span style={s.badge("success")}>A favor {fmt(c.saldo)}</span>}
+              {c.saldo<0   && <span style={{...s.badge("danger"),fontSize:13,fontWeight:700,padding:"3px 10px"}}>Debe {fmt(Math.abs(c.saldo))}</span>}
+              {c.saldo>0   && <span style={{...s.badge("success"),fontSize:13,fontWeight:700,padding:"3px 10px"}}>A favor {fmt(c.saldo)}</span>}
             </div>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0,alignItems:"center"}}>
