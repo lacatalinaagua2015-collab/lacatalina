@@ -1033,24 +1033,25 @@ function App() {
           saveNoVisitas(nv);
         }}
         />}
-      {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>irA("venta")} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
+      {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>irA("venta")} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
           onNoEstaCliente={()=>{const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noesta"}];saveNoVisitas(nv);}}
           onNoQuiereCliente={()=>{const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noquiso"}];saveNoVisitas(nv);}}
           recordatorios={recordatorios}
           onGuardarRecordatorio={(r)=>saveRecordatorios([...(recordatorios||[]),r])}
           onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
           onCobrarSaldo={(monto,pago)=>{
-            const c=cliente;
+            const cl=cliente;
+            const saldoAntes=cl.saldo||0;
+            const saldoDespues=saldoAntes+monto;
             const det=[{nombre:"Cobro de deuda",cantidad:1,precio:0,total:0}];
-            const calc=calcVenta(det,pago,String(monto),0,productos);
-            const vt={id:Date.now(),clienteId:c.id,cliente:c.nombre,dia:diaActual,fechaKey:fechaActual,fecha:new Date().toLocaleString("es-AR"),
+            const vt={id:Date.now(),clienteId:cl.id,cliente:cl.nombre,dia:diaActual,fechaKey:fechaActual,fecha:new Date().toLocaleString("es-AR"),
               detalle:det,pago,obs:`Cobro de deuda $${monto.toLocaleString("es-AR")} (${pago})`,saldoAplicado:0,
-              neto:0,bruto:0,desc:0,costo:0,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[]};
-            const nv=[...ventas,vt];
-            saveVentas(nv);
-            const nc=clientes.map(x=>x.id===c.id?{...x,saldo:(c.saldo||0)+monto}:x);
-            saveClientes(nc);
-          }} />}
+              neto:0,bruto:0,desc:0,costo:0,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],
+              saldoAntes,saldoDespues};
+            saveVentas([...ventas,vt]);
+            saveClientes(clientes.map(x=>x.id===cl.id?{...x,saldo:saldoDespues}:x));
+          }}
+          onGuardarAjuste={(vt)=>{saveVentas([...ventas,vt]);}} />}
       {pantalla==="venta"          && cliente && <NuevaVenta cliente={cliente} productos={productos} fecha={fechaActual}
         onNoEsta={()=>{
           const prev=(noVisitas||[]).find(v=>v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual);
@@ -1125,7 +1126,7 @@ function App() {
           if(!diaActual) setDiaActual(c.dia);
           irA("venta");
         }} onVerDetalle={(c)=>{setClienteId(c.id);irA("detalleDesdeGestion");}} ventas={ventas} />}
-      {pantalla==="detalleDesdeGestion" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} dia={diaActual||cliente.dia} fecha={fechaActual} productos={productos} onVenta={()=>{setDiaActual(cliente.dia);const hoy=new Date().toISOString().slice(0,10);if(!fechaActual)setFechaActual(hoy);irA("venta");}} onVolver={()=>irA("gestionClientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>{eliminarCliente(cliente.id);irA("gestionClientes");}}
+      {pantalla==="detalleDesdeGestion" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual||cliente.dia} fecha={fechaActual} productos={productos} onVenta={()=>{setDiaActual(cliente.dia);const hoy=new Date().toISOString().slice(0,10);if(!fechaActual)setFechaActual(hoy);irA("venta");}} onVolver={()=>irA("gestionClientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>{eliminarCliente(cliente.id);irA("gestionClientes");}}
           onNoEstaCliente={()=>{}} onNoQuiereCliente={()=>{}}
           recordatorios={recordatorios} onGuardarRecordatorio={(r)=>saveRecordatorios([...(recordatorios||[]),r])} onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
           onCobrarSaldo={(s)=>{if(cliente){const nc=clientes.map(x=>x.id===cliente.id?{...x,saldo:s}:x);saveClientes(nc);}}} />}
@@ -2640,7 +2641,7 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
   );
 }
 
-function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onEditar,onEliminarVenta,onEditarVenta,onEliminarCliente,onNoEstaCliente,onNoQuiereCliente,recordatorios,onGuardarRecordatorio,onConfirmarRecordatorio,onCobrarSaldo}) {
+function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,onVolver,onEditar,onEliminarVenta,onEditarVenta,onEliminarCliente,onNoEstaCliente,onNoQuiereCliente,recordatorios,onGuardarRecordatorio,onConfirmarRecordatorio,onCobrarSaldo,onGuardarAjuste}) {
   const [editandoCliente,setEditandoCliente] = useState(false);
   const [editandoVentaId,setEditandoVentaId] = useState(null);
   const [editandoSaldo,setEditandoSaldo] = useState(false);
@@ -2649,6 +2650,7 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
   const [mostrarRecordatorio,setMostrarRecordatorio] = useState(false);
   const [mostrarPagoSaldo,setMostrarPagoSaldo] = useState(false);
   const [mostrarFotoGrande,setMostrarFotoGrande] = useState(false);
+  const [razonAjuste,setRazonAjuste] = useState("");
   const recActivos = (recordatorios||[]).filter(r=>r.clienteId===cliente.id&&!r.confirmado);
   const historial = [...ventas].sort((a,b)=>(b.fechaKey||"").localeCompare(a.fechaKey||"")||(b.id||0)-(a.id||0));
   const ventaHoy  = fecha ? ventas.find(v=>v.fechaKey===fecha) : null;
@@ -2819,15 +2821,29 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
                   <input style={{...s.input,marginBottom:8}} type="number" min={0} placeholder="Monto ($)"
                     value={montoSaldoEdit} onChange={e=>setMontoSaldoEdit(e.target.value)} />
                 )}
+                <div style={{marginBottom:8}}>
+                  <label style={{...s.label,marginBottom:4}}>Razón del ajuste (obligatorio)</label>
+                  <input style={s.input} placeholder="Ej: Error de carga, condonación, inicio" value={razonAjuste} onChange={e=>setRazonAjuste(e.target.value)}/>
+                </div>
                 <div style={{display:"flex",gap:6}}>
-                  <button style={{...s.btn,flex:1,fontSize:12}} onClick={()=>{setEditandoSaldo(false);setTipoSaldoEdit("");setMontoSaldoEdit("");}}>Cancelar</button>
+                  <button style={{...s.btn,flex:1,fontSize:12}} onClick={()=>{setEditandoSaldo(false);setTipoSaldoEdit("");setMontoSaldoEdit("");setRazonAjuste("");}}>Cancelar</button>
                   <button style={{...s.btnPrimary,flex:2,fontSize:12,padding:"8px"}} onClick={()=>{
-                    let s=cliente.saldo||0;
-                    if(tipoSaldoEdit==="favor") s=Math.abs(Number(montoSaldoEdit)||0);
-                    if(tipoSaldoEdit==="deuda") s=-Math.abs(Number(montoSaldoEdit)||0);
-                    if(tipoSaldoEdit==="cero")  s=0;
-                    onEditar({saldo:s});
-                    setEditandoSaldo(false);setTipoSaldoEdit("");setMontoSaldoEdit("");
+                    if(!razonAjuste.trim()){alert("Ingresá la razón del ajuste");return;}
+                    const saldoAntes=cliente.saldo||0;
+                    let saldoNuevo=saldoAntes;
+                    if(tipoSaldoEdit==="favor") saldoNuevo=Math.abs(Number(montoSaldoEdit)||0);
+                    if(tipoSaldoEdit==="deuda") saldoNuevo=-Math.abs(Number(montoSaldoEdit)||0);
+                    if(tipoSaldoEdit==="cero")  saldoNuevo=0;
+                    onEditar({saldo:saldoNuevo});
+                    // Guardar registro del ajuste
+                    const vt={id:Date.now(),clienteId:cliente.id,cliente:cliente.nombre,
+                      dia:dia,fechaKey:fecha,fecha:new Date().toLocaleString("es-AR"),
+                      detalle:[{nombre:"Ajuste de saldo",cantidad:1,precio:0,total:0}],
+                      pago:"manual",obs:`Ajuste: ${razonAjuste} · ${tipoSaldoEdit==="favor"?"A favor":tipoSaldoEdit==="deuda"?"Deuda":"En cero"}${tipoSaldoEdit!=="cero"?` $${(Number(montoSaldoEdit)||0).toLocaleString("es-AR")}` :""}`,
+                      neto:0,bruto:0,desc:0,costo:0,ganancia:0,pagadoNum:0,saldoDelta:saldoNuevo-saldoAntes,
+                      envPrest:[],envDev:[],saldoAntes,saldoDespues:saldoNuevo,_esAjuste:true};
+                    onGuardarAjuste&&onGuardarAjuste(vt);
+                    setEditandoSaldo(false);setTipoSaldoEdit("");setMontoSaldoEdit("");setRazonAjuste("");
                   }}>Guardar saldo</button>
                 </div>
               </div>
@@ -2863,32 +2879,92 @@ function DetalleCliente({cliente,ventas,dia,fecha,productos,onVenta,onVolver,onE
           {/* Historial colapsable */}
           <details style={{marginTop:4}} open>
             <summary style={{cursor:"pointer",listStyle:"none",display:"flex",alignItems:"center",justifyContent:"space-between",background:"var(--color-background-tertiary)",borderRadius:8,padding:"10px 14px",marginBottom:4}}>
-              <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>📋 Historial ({ventas.length} compras · {fmt(totalComprado)})</span>
+              <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>📋 Historial completo del cliente</span>
               <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>▾</span>
             </summary>
           <div style={{marginTop:4}}>
-          {historial.length===0&&<p style={{fontSize:13,color:"var(--color-text-tertiary)",padding:"4px 0"}}>Sin registros aún</p>}
-          {historial.map(v=>(
-            <div key={v.id} style={{marginBottom:8}}>
+          {/* Leyenda */}
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+            {[["🛒","#3b82f6","Venta"],["💳","#10b981","Cobro"],["✏️","#818cf8","Ajuste saldo"],["🚪","#f59e0b","No estaba"],["🙅","#ef4444","No quiso"]].map(([ico,col,lbl])=>(
+              <span key={lbl} style={{fontSize:10,color:col,background:col+"18",border:`0.5px solid ${col}44`,borderRadius:20,padding:"2px 7px",fontWeight:600}}>{ico} {lbl}</span>
+            ))}
+          </div>
+          {(()=>{
+            const nvItems=(noVisitas||[]).map(nv=>({...nv,_esNoVisita:true,fechaKey:nv.fecha}));
+            const todo=[...historial,...nvItems].sort((a,b)=>(b.fechaKey||"").localeCompare(a.fechaKey||"")||(b.id||0)-(a.id||0));
+            if(todo.length===0) return <p style={{fontSize:13,color:"var(--color-text-tertiary)",padding:"4px 0"}}>Sin registros aún</p>;
+            return todo.map((item,idx)=>{
+              // ── NO VISITA ──
+              if(item._esNoVisita){
+                const esNoEsta=item.motivo==="noesta";
+                return(
+                  <div key={"nv"+idx} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",marginBottom:6,background:esNoEsta?"rgba(245,158,11,0.08)":"rgba(239,68,68,0.08)",borderRadius:10,border:`0.5px solid ${esNoEsta?"rgba(245,158,11,0.3)":"rgba(239,68,68,0.3)"}`}}>
+                    <span style={{fontSize:18}}>{esNoEsta?"🚪":"🙅"}</span>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:600,color:esNoEsta?"#f59e0b":"#ef4444"}}>{esNoEsta?"No estaba en casa":"No quiso comprar"}</div>
+                      <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{item.fechaKey} · {item.dia}</div>
+                    </div>
+                  </div>
+                );
+              }
+              const v=item;
+              const esCobro=v.pagadoNum>0&&v.neto===0&&!v._esAjuste;
+              const esAjuste=v._esAjuste||false;
+              if(esCobro) return(
+                <div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"10px 12px",marginBottom:6,background:"rgba(16,185,129,0.08)",borderRadius:10,border:"0.5px solid rgba(16,185,129,0.3)"}}>
+                  <div style={{display:"flex",gap:8,alignItems:"flex-start",flex:1}}>
+                    <span style={{fontSize:18}}>💳</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:700,color:"#10b981"}}>Cobro de deuda</div>
+                      <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:1}}>{v.fechaKey} · {v.pago}</div>
+                      {v.saldoAntes!==undefined&&<div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>Saldo antes: {fmt(v.saldoAntes)} → después: {fmt(v.saldoDespues)}</div>}
+                    </div>
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
+                    <div style={{fontSize:16,fontWeight:700,color:"#10b981"}}>+{fmt(v.pagadoNum)}</div>
+                    <button style={{fontSize:10,color:"var(--color-text-danger)",background:"none",border:"none",cursor:"pointer",marginTop:4}} onClick={()=>{if(window.confirm("¿Eliminar este cobro?"))onEliminarVenta(v.id);}}>Eliminar</button>
+                  </div>
+                </div>
+              );
+              if(esAjuste) return(
+                <div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"10px 12px",marginBottom:6,background:"rgba(129,140,248,0.08)",borderRadius:10,border:"0.5px solid rgba(129,140,248,0.3)"}}>
+                  <div style={{display:"flex",gap:8,alignItems:"flex-start",flex:1}}>
+                    <span style={{fontSize:18}}>✏️</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:700,color:"#818cf8"}}>Ajuste de saldo</div>
+                      <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:2}}>{v.obs?.replace("Ajuste: ","")}</div>
+                      <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:1}}>{v.fechaKey}</div>
+                      {v.saldoAntes!==undefined&&<div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>Saldo: {fmt(v.saldoAntes)} → {fmt(v.saldoDespues)}</div>}
+                    </div>
+                  </div>
+                  <button style={{fontSize:10,color:"var(--color-text-danger)",background:"none",border:"none",cursor:"pointer",flexShrink:0}} onClick={()=>{if(window.confirm("¿Eliminar este ajuste?"))onEliminarVenta(v.id);}}>Eliminar</button>
+                </div>
+              );
+              return(
+            <div key={v.id} style={{marginBottom:6}}>
               {editandoVentaId===v.id
                 ? <EditVenta venta={v} productos={productos} onGuardar={(d,p,m,sa,obs,tr2)=>{onEditarVenta(v.id,d,p,m,sa,obs,tr2);setEditandoVentaId(null);}} onCancelar={()=>setEditandoVentaId(null)} />
-                : <div style={{...s.card,margin:0}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
-                      <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{v.fechaKey||v.fecha?.slice(0,10)||v.dia} · {v.fecha?.slice(-8)||""}</span>
-                      <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(v.neto)}</span>
+                : <div style={{padding:"10px 12px",background:"rgba(59,130,246,0.06)",borderRadius:10,border:"0.5px solid rgba(59,130,246,0.2)"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,alignItems:"center"}}>
+                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                        <span style={{fontSize:16}}>🛒</span>
+                        <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{v.fechaKey||v.dia}</span>
+                      </div>
+                      <span style={{fontSize:15,fontWeight:700,color:"#3b82f6"}}>{fmt(v.neto)}</span>
                     </div>
-                    <div style={{fontSize:13,color:"var(--color-text-primary)",marginBottom:3}}>{v.detalle.map(d=>`${d.nombre} ×${d.cantidad}`).join(" · ")}</div>
-                    <div style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:6}}>
-                      {v.pago}{v.desc>0?` · desc. ${fmt(v.desc)}`:""}{v.saldoAplicado>0?` · saldo ${fmt(v.saldoAplicado)}`:""}{v.obs?` · ${v.obs}`:""}
+                    <div style={{fontSize:13,color:"var(--color-text-primary)",marginBottom:2,paddingLeft:22}}>{v.detalle.map(d=>`${d.nombre} ×${d.cantidad}`).join(" · ")}</div>
+                    <div style={{fontSize:11,color:"var(--color-text-secondary)",paddingLeft:22,marginBottom:6}}>
+                      {v.pago}{v.desc>0?` · desc. ${fmt(v.desc)}`:""}{v.saldoAplicado>0?` · saldo apl. ${fmt(v.saldoAplicado)}`:""}{v.obs?` · ${v.obs}`:""}
                     </div>
                     <div style={{display:"flex",justifyContent:"flex-end",gap:6}}>
-                      <button style={{...s.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>setEditandoVentaId(v.id)}>Editar</button>
-                      <button style={{...s.btnDanger,fontSize:11,padding:"4px 10px"}} onClick={()=>{if(window.confirm(`¿Eliminar venta de ${fmt(v.neto)}?`))onEliminarVenta(v.id);}}>Eliminar</button>
+                      <button style={{...s.btn,fontSize:11,padding:"3px 8px"}} onClick={()=>setEditandoVentaId(v.id)}>Editar</button>
+                      <button style={{...s.btnDanger,fontSize:11,padding:"3px 8px"}} onClick={()=>{if(window.confirm(`¿Eliminar venta de ${fmt(v.neto)}?`))onEliminarVenta(v.id);}}>Eliminar</button>
                     </div>
                   </div>
               }
             </div>
-          ))}
+            );
+            });})()}
           </div>
           </details>
 
@@ -3266,6 +3342,9 @@ function CobroDeudaPanel({saldo,onCobrar}) {
         <button style={{...s.btn,flex:1}} onClick={()=>setOpen(false)}>Cancelar</button>
         <button style={{...s.btnPrimary,flex:2}} onClick={()=>{
           const m = Number(monto)||deuda;
+          if(m > deuda){
+            if(!window.confirm(`El monto ingresado ($${m.toLocaleString("es-AR")}) es MAYOR que la deuda ($${deuda.toLocaleString("es-AR")}). La diferencia ($${(m-deuda).toLocaleString("es-AR")}) quedará como SALDO A FAVOR del cliente. ¿Continuar?`)) return;
+          }
           onCobrar(m,pago);
         }}>Registrar cobro</button>
       </div>
