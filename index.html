@@ -1050,7 +1050,7 @@ function App() {
           }
           irA("clientes");
         }} onVolver={()=>irA("selectorFechaClientes")} />}
-      {pantalla==="clientes"       && <ListaClientes clientes={clientes.filter(c=>c.dia===diaActual)} dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual)} noVisitas={(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual)} onSeleccionar={c=>{setClienteId(c.id);irA("detalleCliente");}} onNuevoCliente={()=>irA("nuevoCliente")} onVolver={()=>irA("selectorFechaClientes")} onReordenar={lista=>{
+      {pantalla==="clientes"       && <ListaClientes clientes={clientes.filter(c=>c.dia===diaActual)} dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual)} ventasTodas={ventas} noVisitas={(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual)} onSeleccionar={c=>{setClienteId(c.id);irA("detalleCliente");}} onNuevoCliente={()=>irA("nuevoCliente")} onVolver={()=>irA("selectorFechaClientes")} onReordenar={lista=>{
           const otros=clientes.filter(c=>c.dia!==diaActual);
           saveClientes([...otros,...lista]);
         }} onRegistrarNoVisita={(clienteId,motivo)=>{const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo}];saveNoVisitas(nv);}} onQuitarNoVisita={(clienteId)=>{const nv=(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual));saveNoVisitas(nv);}}
@@ -2544,7 +2544,7 @@ function InicioReparto({dia,fecha,planilla,productos,cargasDia,stock,onGuardar,o
   );
 }
 
-function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onConfirmarTransfer}) {
+function ListaClientes({clientes,dia,fecha,ventas,ventasTodas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onConfirmarTransfer}) {
   const [busqueda,setBusqueda] = useState("");
   const [editandoOrden,setEditandoOrden] = useState(null);
   const [ordenTemp,setOrdenTemp] = useState("");
@@ -2636,7 +2636,7 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
             </div>
             {c.notas&&<div style={{fontSize:13,color:"var(--color-text-warning)",marginTop:3}}>📝 {c.notas}</div>}
             <div style={{display:"flex",flexWrap:"wrap",gap:5,marginTop:7}}>
-              <TagsCliente cliente={c} ventas={ventas}/>
+              <TagsCliente cliente={c} ventas={ventasTodas||ventas}/>
 
             </div>
             {/* Badges de estado */}
