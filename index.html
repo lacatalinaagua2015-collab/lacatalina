@@ -331,6 +331,34 @@ const planillaDiaVacia = () => ({
 });
 
 const fmt = (n) => "$" + Math.round(Number(n)||0).toLocaleString("es-AR");
+
+function TagsCliente({cliente,ventas,style}) {
+  const cl=cliente;
+  const TH={background:"rgba(56,138,221,0.28)",color:"#ffffff",border:"1px solid rgba(56,138,221,0.5)",borderRadius:6,padding:"3px 9px",fontSize:13,fontWeight:700,display:"inline-block"};
+  const TP={background:"rgba(245,158,11,0.28)",color:"#ffffff",border:"1px solid rgba(245,158,11,0.55)",borderRadius:6,padding:"3px 9px",fontSize:13,fontWeight:700,display:"inline-block"};
+  const TD={background:"rgba(226,75,74,0.25)",color:"#ffffff",border:"1px solid rgba(226,75,74,0.5)",borderRadius:6,padding:"3px 9px",fontSize:13,fontWeight:700,display:"inline-block"};
+  const TF={background:"rgba(29,158,117,0.25)",color:"#ffffff",border:"1px solid rgba(29,158,117,0.5)",borderRadius:6,padding:"3px 9px",fontSize:13,fontWeight:700,display:"inline-block"};
+  const ex={sifon:0,b10:0,b20:0};
+  (ventas||[]).filter(v=>v.clienteId===cl.id).forEach(v=>{
+    (v.envPrest||[]).forEach(e=>{if(e.prod==="Sifón 1.5L")ex.sifon+=Number(e.cant)||0;if(e.prod==="Bidón 10L")ex.b10+=Number(e.cant)||0;if(e.prod==="Bidón 20L")ex.b20+=Number(e.cant)||0;});
+    (v.envDev||[]).forEach(e=>{if(e.prod==="Sifón 1.5L")ex.sifon-=Number(e.cant)||0;if(e.prod==="Bidón 10L")ex.b10-=Number(e.cant)||0;if(e.prod==="Bidón 20L")ex.b20-=Number(e.cant)||0;});
+  });
+  return(
+    <div style={{display:"flex",flexWrap:"wrap",gap:5,...(style||{})}}>
+      {cl.sifon>0&&<span style={TH}>Sif ×{cl.sifon}</span>}
+      {cl.bidon10>0&&<span style={TH}>10L ×{cl.bidon10}</span>}
+      {cl.bidon20>0&&<span style={TH}>20L ×{cl.bidon20}</span>}
+      {cl.dispenser>0&&<span style={TH}>Disp ×{cl.dispenser}</span>}
+      {ex.sifon>0&&<span style={TP}>+{ex.sifon} sif prest.</span>}
+      {ex.b10>0&&<span style={TP}>+{ex.b10} 10L prest.</span>}
+      {ex.b20>0&&<span style={TP}>+{ex.b20} 20L prest.</span>}
+      {(cl.saldo||0)<0&&<span style={TD}>Debe {fmt(Math.abs(cl.saldo))}</span>}
+      {(cl.saldo||0)>0&&<span style={TF}>A favor {fmt(cl.saldo)}</span>}
+    </div>
+  );
+}
+
+
 const num = (v) => Number(v)||0;
 
 // ─── Cloud Storage (Firebase Firestore) ─────────────────────────────────────
@@ -585,14 +613,20 @@ function App() {
           camion: {sifon:0,bidon10:0,bidon20:0},
         };
         setStock(normStock);
+        // Firebase gana: actualizar localStorage con el dato de la nube
+        try { localStorage.setItem("cat_stock_v4", JSON.stringify(normStock)); } catch {}
       }
-      if (data.productos?.length)  setProductos(data.productos);
-      if (data.noVisitas?.length)  setNoVisitas(data.noVisitas);
-      if (data.prospectos?.length) setProspectos(data.prospectos);
-      if (data.recordatorios?.length) setRecordatorios(data.recordatorios);
+      if (data.productos?.length)  { setProductos(data.productos); try { localStorage.setItem("cat_productos_v3", JSON.stringify(data.productos)); } catch {} }
+      if (data.noVisitas?.length)  { setNoVisitas(data.noVisitas); try { localStorage.setItem("cat_novisitas_v1", JSON.stringify(data.noVisitas)); } catch {} }
+      if (data.prospectos?.length) { setProspectos(data.prospectos); try { localStorage.setItem("cat_prospectos_v1", JSON.stringify(data.prospectos)); } catch {} }
+      if (data.recordatorios?.length) { setRecordatorios(data.recordatorios); try { localStorage.setItem("cat_recordatorios_v1", JSON.stringify(data.recordatorios)); } catch {} }
       if (data.mantVeh?.length)    localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh));
       if (data.histPrecios?.length) localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios));
       if (data.zonasReparto && Object.keys(data.zonasReparto).length) setZonasReparto(data.zonasReparto);
+      // También actualizar clientes y ventas en localStorage
+      if (data.clientes?.length) try { localStorage.setItem("cat_clientes_v3", JSON.stringify(data.clientes)); } catch {}
+      if (data.ventas?.length)   try { localStorage.setItem("cat_ventas_v3", JSON.stringify(data.ventas)); } catch {}
+      if (data.planillas)        try { localStorage.setItem("cat_planillas_v1", JSON.stringify(data.planillas)); } catch {}
       setSyncStatus("saved");
       setTimeout(()=>setSyncStatus("idle"), 2000);
     });
@@ -807,7 +841,12 @@ function App() {
     }
     // CIERRE AUTOMÁTICO DEL STOCK — se ejecuta una sola vez por día
     const camionCerradoKey = `lc_cam_${planillaKey}`;
-    if(planillaActual.iniciado && !localStorage.getItem(camionCerradoKey)) {
+    // Solo cerrar si hubo reparto real (al menos 1 venta O la planilla tiene productos cargados)
+    const huboReparto = ventasDia.length > 0 || 
+      (planillaActual.productos?.b10?.llenos > 0) || 
+      (planillaActual.productos?.b20?.llenos > 0) || 
+      (planillaActual.productos?.soda?.llenos > 0);
+    if(planillaActual.iniciado && huboReparto && !localStorage.getItem(camionCerradoKey)) {
       localStorage.setItem(camionCerradoKey, "1");
       const prodMap = {"Bidón 10L":"b10","Bidón 20L":"b20","Sifón 1.5L":"soda"};
       // Cuánto salió en el camión (según planilla de inicio de reparto)
@@ -1130,7 +1169,7 @@ function App() {
           onNoEstaCliente={()=>{}} onNoQuiereCliente={()=>{}}
           recordatorios={recordatorios} onGuardarRecordatorio={(r)=>saveRecordatorios([...(recordatorios||[]),r])} onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
           onCobrarSaldo={(s)=>{if(cliente){const nc=clientes.map(x=>x.id===cliente.id?{...x,saldo:s}:x);saveClientes(nc);}}} />}
-      {pantalla==="stock"          && <StockGeneral stock={stockNorm} setStock={(ns)=>{setStock(ns);syncData({stock:ns});}} clientes={clientes} ventas={ventas} productos={productos} planillas={planillas} onVolver={()=>irA("menu")} />}
+      {pantalla==="stock"          && <StockGeneral stock={stockNorm} setStock={(ns)=>{setStock(ns);syncData({stock:ns});}} clientes={clientes} ventas={ventas} productos={productos} planillas={planillas} onVolver={()=>irA("menu")} onAjustarEnvases={(vt)=>{const nv=[...ventas,vt];saveVentas(nv);alert("✅ Envases corregidos correctamente");}} />}
       {pantalla==="resumen"        && <Resumen ventas={ventas} clientes={clientes} productos={productos} planillas={planillas} noVisitas={noVisitas||[]} onVolver={()=>irA("menu")} />}
       {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stockNorm} setStock={(s)=>{const ns=normStock(s);setStockRaw(ns);syncData({stock:ns});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} syncData={syncData} onVolver={()=>irA("menu")} ecToken={ecToken} setEcToken={setEcToken} />}
     </div>
@@ -1429,27 +1468,25 @@ function SetupNube({onSetup}) {
   );
 }
 
-function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolver}) {
+function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolver,onAjustarEnvases}) {
   const CAJON = 6;
-  const [tab, setTab] = React.useState("stock");
+  const [tab, setTab] = React.useState("inv");
   const [guardado, setGuardado] = React.useState(false);
-  // Stock base editable (solo Sodería y Casa — se setea una vez)
-  const [base, setBase] = React.useState(()=>({
-    soderia: {...stock?.soderia||{sifon:0,bidon10:0,bidon20:0}},
-    casa:    {...stock?.casa   ||{sifon:0,bidon10:0,bidon20:0}},
-  }));
-  const setB = (lugar,key,val) => setBase(b=>({...b,[lugar]:{...b[lugar],[key]:Number(val)||0}}));
-
-  // Calcular lo vendido en total por día (desde todas las ventas registradas)
   const DIAS = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
   const prodKey = {"Sifón 1.5L":"sifon","Bidón 10L":"bidon10","Bidón 20L":"bidon20"};
 
-  // Ventas de hoy (fechaKey = hoy)
-  const hoy = new Date().toISOString().slice(0,10);
-  const ventasHoy = ventas.filter(v=>v.fechaKey===hoy);
+  // Stock base editable (sodería y depósito)
+  const [base, setBase] = React.useState(()=>({
+    soderia: {...(stock?.soderia||{sifon:0,bidon10:0,bidon20:0})},
+    casa:    {...(stock?.casa   ||{sifon:0,bidon10:0,bidon20:0})},
+  }));
+  const setB = (lugar,key,val) => setBase(b=>({...b,[lugar]:{...b[lugar],[key]:Number(val)||0}}));
 
-  // Lo cargado hoy (de las planillas del día)
-  const cargadoHoy = {sifon:0, bidon10:0, bidon20:0};
+  // Hoy
+  const hoy = new Date().toISOString().slice(0,10);
+
+  // Lo cargado hoy en el camión (desde planillas)
+  const cargadoHoy = {sifon:0,bidon10:0,bidon20:0};
   DIAS.forEach(d=>{
     const p = planillas[`${d}_${hoy}`];
     if(p?.productos){
@@ -1458,47 +1495,89 @@ function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolv
       cargadoHoy.bidon20 += Number(p.productos.b20?.llenos||0);
     }
   });
+  const hayRepartHoy = cargadoHoy.sifon>0||cargadoHoy.bidon10>0||cargadoHoy.bidon20>0;
 
   // Lo vendido hoy
-  const vendidoHoy = {sifon:0, bidon10:0, bidon20:0};
+  const ventasHoy = ventas.filter(v=>v.fechaKey===hoy);
+  const vendidoHoy = {sifon:0,bidon10:0,bidon20:0};
   ventasHoy.forEach(v=>v.detalle.forEach(d=>{
     const k=prodKey[d.nombre]; if(k) vendidoHoy[k]+=d.cantidad;
   }));
 
-  // Lo que está en el camión ahora = cargado hoy - vendido hoy
-  const enCamionHoy = {
+  // Devuelto hoy (vacíos recibidos)
+  const devueltoHoy = {sifon:0,bidon10:0,bidon20:0};
+  ventasHoy.forEach(v=>{
+    (v.envDev||[]).forEach(e=>{
+      const k = e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;
+      if(k) devueltoHoy[k]+=Number(e.cant)||0;
+    });
+  });
+
+  // En camión ahora = cargado - vendido
+  const enCamion = {
     sifon:   Math.max(0, cargadoHoy.sifon   - vendidoHoy.sifon),
     bidon10: Math.max(0, cargadoHoy.bidon10 - vendidoHoy.bidon10),
     bidon20: Math.max(0, cargadoHoy.bidon20 - vendidoHoy.bidon20),
   };
 
-  // Stock sodería calculado = base - en camión
-  const soCal = {
-    sifon:   Math.max(0, base.soderia.sifon   - enCamionHoy.sifon),
-    bidon10: Math.max(0, base.soderia.bidon10 - enCamionHoy.bidon10),
-    bidon20: Math.max(0, base.soderia.bidon20 - enCamionHoy.bidon20),
+  // Calcular envases prestados EXTRA por cliente (suma histórica de préstamos - devoluciones)
+  const calcPrestados = (clienteId) => {
+    const ex = {sifon:0,bidon10:0,bidon20:0};
+    ventas.filter(v=>v.clienteId===clienteId).forEach(v=>{
+      (v.envPrest||[]).forEach(e=>{
+        const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;
+        if(k) ex[k]+=Number(e.cant)||0;
+      });
+      (v.envDev||[]).forEach(e=>{
+        const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;
+        if(k) ex[k]-=Number(e.cant)||0;
+      });
+    });
+    return {sifon:Math.max(0,ex.sifon),bidon10:Math.max(0,ex.bidon10),bidon20:Math.max(0,ex.bidon20)};
   };
 
-  // Envases en clientes
-  const envC = {sifon:0,bidon10:0,bidon20:0};
-  clientes.forEach(c=>{envC.sifon+=(c.sifon||0);envC.bidon10+=(c.bidon10||0);envC.bidon20+=(c.bidon20||0);});
-  ventas.forEach(v=>{
-    (v.envPrest||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)envC[k]+=Number(e.cant)||0;});
-    (v.envDev||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)envC[k]-=Number(e.cant)||0;});
+  // Total prestados extra en todos los clientes
+  const totalPrestados = {sifon:0,bidon10:0,bidon20:0};
+  const clientesConPrestados = clientes.filter(c=>{
+    const ex=calcPrestados(c.id);
+    if(ex.sifon>0||ex.bidon10>0||ex.bidon20>0) {
+      totalPrestados.sifon+=ex.sifon;
+      totalPrestados.bidon10+=ex.bidon10;
+      totalPrestados.bidon20+=ex.bidon20;
+      return true;
+    }
+    return false;
   });
 
   const guardar = () => {
-    setStock({soderia:base.soderia, casa:base.casa, camion:stock?.camion||{sifon:0,bidon10:0,bidon20:0}});
+    setStock({soderia:base.soderia,casa:base.casa,camion:stock?.camion||{sifon:0,bidon10:0,bidon20:0}});
     setGuardado(true);
     setTimeout(()=>setGuardado(false),2000);
   };
 
-  const Row = ({l,v,color})=>(
-    <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-      <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>{l}</span>
-      <span style={{fontSize:13,fontWeight:500,color:color||"var(--color-text-primary)"}}>{v}</span>
+  const StatBox = ({label,val,sub,color}) => (
+    <div style={{flex:1,background:"var(--color-background-tertiary)",borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
+      <div style={{fontSize:22,fontWeight:700,color:color||"var(--color-text-primary)"}}>{val}</div>
+      {sub&&<div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>{sub}</div>}
+      <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:2}}>{label}</div>
     </div>
   );
+
+  const InputStock = ({lugar,label,field,isCajon}) => {
+    const val = isCajon ? Math.floor((base[lugar]?.[field]||0)/CAJON) : (base[lugar]?.[field]||0);
+    return (
+      <div>
+        <label style={{...s.label,textAlign:"center",fontSize:11}}>{label}</label>
+        <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0} value={val}
+          onChange={e=>{
+            const v=Number(e.target.value)||0;
+            if(isCajon){const sueltos=(base[lugar]?.[field]||0)%CAJON;setB(lugar,field,v*CAJON+sueltos);}
+            else setB(lugar,field,v);
+          }}/>
+        {isCajon&&<div style={{fontSize:10,color:"var(--color-text-tertiary)",textAlign:"center",marginTop:2}}>{base[lugar]?.[field]||0} sifones</div>}
+      </div>
+    );
+  };
 
   return (
     <div style={s.screen}>
@@ -1506,123 +1585,166 @@ function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolv
         <button style={s.backBtn} onClick={onVolver}>← Volver</button>
         <span style={s.headerTitle}>📦 Stock</span>
       </div>
+
+      {/* TABS */}
       <div style={{display:"flex",gap:6,padding:"10px 14px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-        {[["stock","📦 Inventario"],["clientes","👥 Clientes"]].map(([t,l])=>(
+        {[["inv","📦 Inventario"],["clientes","👥 Clientes"]].map(([t,l])=>(
           <button key={t} style={{...s.btn,flex:1,padding:"8px 4px",fontSize:13,fontWeight:tab===t?600:400,
             background:tab===t?"var(--color-background-secondary)":"transparent",
-            borderBottom:tab===t?"2px solid #185FA5":"none",
-            borderRadius:tab===t?"8px 8px 0 0":"8px",
+            borderBottom:tab===t?"2px solid #185FA5":"none",borderRadius:tab===t?"8px 8px 0 0":"8px",
             color:tab===t?"var(--color-text-primary)":"var(--color-text-secondary)"}}
             onClick={()=>setTab(t)}>{l}</button>
         ))}
       </div>
 
       <div style={{padding:14,overflowY:"auto"}}>
-      {tab==="stock"&&(<>
-        {/* Estado actual calculado */}
-        <div style={{...s.card,margin:"0 0 12px",background:"var(--color-background-secondary)"}}>
-          <div style={{fontSize:11,fontWeight:500,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:10}}>📊 Estado actual (calculado)</div>
-          <div style={{display:"flex",gap:8,marginBottom:10}}>
-            {[["🏭 Sodería",[Math.floor(soCal.sifon/CAJON),soCal.bidon10,soCal.bidon20]],["🚚 En reparto",[Math.floor(enCamionHoy.sifon/CAJON),enCamionHoy.bidon10,enCamionHoy.bidon20]]].map(([titulo,vals])=>(
-              <div key={titulo} style={{flex:1}}>
-                <div style={{fontSize:10,color:"var(--color-text-tertiary)",marginBottom:4}}>{titulo}</div>
-                <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                  {vals.map((v,i)=>(
-                    <div key={i} style={{display:"flex",justifyContent:"space-between",background:"var(--color-background-tertiary)",borderRadius:6,padding:"4px 8px"}}>
-                      <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{["Caj","10L","20L"][i]}</span>
-                      <span style={{fontSize:14,fontWeight:600,color:v<3?"var(--color-text-danger)":v<8?"var(--color-text-warning)":"var(--color-text-primary)"}}>{v}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+
+      {/* ══ TAB INVENTARIO ══ */}
+      {tab==="inv"&&(<>
+
+        {/* SECCIÓN 1 — Sodería */}
+        <div style={{...s.card,margin:"0 0 12px",borderLeft:"3px solid #1D9E75"}}>
+          <div style={{fontSize:12,fontWeight:700,color:"#1D9E75",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:10}}>🏭 Sodería — Stock disponible</div>
+          <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginBottom:10}}>Llenos listos para salir mañana</div>
+          <div style={{display:"flex",gap:8,marginBottom:12}}>
+            <StatBox label="Cajones soda" val={Math.floor((base.soderia.sifon||0)/CAJON)} sub={`${base.soderia.sifon||0} sif`} color="#e2ecff"/>
+            <StatBox label="Bidón 10L" val={base.soderia.bidon10||0} color="#e2ecff"/>
+            <StatBox label="Bidón 20L" val={base.soderia.bidon20||0} color="#e2ecff"/>
           </div>
-          {(cargadoHoy.sifon>0||cargadoHoy.bidon10>0||cargadoHoy.bidon20>0)&&(
-            <div style={{fontSize:11,color:"var(--color-text-tertiary)",borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:6,marginTop:4}}>
-              Hoy: cargado {Math.floor(cargadoHoy.sifon/CAJON)} caj · {cargadoHoy.bidon10} 10L · {cargadoHoy.bidon20} 20L
-              {" / "}vendido {Math.floor(vendidoHoy.sifon/CAJON)} caj · {vendidoHoy.bidon10} 10L · {vendidoHoy.bidon20} 20L
+          <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginBottom:8}}>Ajustar stock físico:</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+            <InputStock lugar="soderia" label="Cajones soda" field="sifon" isCajon={true}/>
+            <InputStock lugar="soderia" label="Bidón 10L" field="bidon10"/>
+            <InputStock lugar="soderia" label="Bidón 20L" field="bidon20"/>
+          </div>
+        </div>
+
+        {/* SECCIÓN 2 — Camión (solo si hay reparto hoy) */}
+        {hayRepartHoy ? (
+          <div style={{...s.card,margin:"0 0 12px",borderLeft:"3px solid #185FA5"}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#185FA5",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:10}}>🚚 Camión — En reparto ahora</div>
+            <div style={{display:"flex",gap:8,marginBottom:8}}>
+              <StatBox label="Cajones" val={Math.floor(enCamion.sifon/CAJON)} color="#7ecfff"/>
+              <StatBox label="10L" val={enCamion.bidon10} color="#7ecfff"/>
+              <StatBox label="20L" val={enCamion.bidon20} color="#7ecfff"/>
             </div>
+            <div style={{fontSize:11,color:"var(--color-text-tertiary)",borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:8}}>
+              Cargado: {Math.floor(cargadoHoy.sifon/CAJON)} caj · {cargadoHoy.bidon10} 10L · {cargadoHoy.bidon20} 20L
+              {"  |  "}Vendido: {Math.floor(vendidoHoy.sifon/CAJON)} caj · {vendidoHoy.bidon10} 10L · {vendidoHoy.bidon20} 20L
+            </div>
+          </div>
+        ) : (
+          <div style={{...s.card,margin:"0 0 12px",background:"rgba(24,95,165,0.05)",border:"0.5px dashed rgba(24,95,165,0.3)"}}>
+            <div style={{fontSize:13,color:"var(--color-text-tertiary)",textAlign:"center",padding:"8px 0"}}>🚚 Sin reparto activo hoy</div>
+          </div>
+        )}
+
+        {/* SECCIÓN 3 — Clientes prestados */}
+        <div style={{...s.card,margin:"0 0 12px",borderLeft:"3px solid rgba(245,158,11,0.7)"}}>
+          <div style={{fontSize:12,fontWeight:700,color:"#f59e0b",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:10}}>👤 En clientes — Prestados extra</div>
+          <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginBottom:10}}>Envases que están en la calle sin devolver (además del consumo habitual)</div>
+          {(totalPrestados.sifon+totalPrestados.bidon10+totalPrestados.bidon20)===0 ? (
+            <div style={{fontSize:13,color:"var(--color-text-tertiary)",textAlign:"center",padding:"8px 0"}}>✅ Sin envases prestados extra</div>
+          ) : (
+            <>
+              <div style={{display:"flex",gap:8,marginBottom:8}}>
+                {totalPrestados.sifon>0&&<StatBox label="Sifones" val={totalPrestados.sifon} color="#f59e0b"/>}
+                {totalPrestados.bidon10>0&&<StatBox label="10L" val={totalPrestados.bidon10} color="#f59e0b"/>}
+                {totalPrestados.bidon20>0&&<StatBox label="20L" val={totalPrestados.bidon20} color="#f59e0b"/>}
+              </div>
+              <button style={{...s.btn,width:"100%",fontSize:13,padding:"8px"}} onClick={()=>setTab("clientes")}>
+                Ver detalle por cliente →
+              </button>
+            </>
           )}
         </div>
 
-        {/* Stock base editable — se setea una vez */}
-        {[["soderia","🏭 Sodería (stock base llenos)"],["casa","🏠 Casa / Depósito"]].map(([lugar,titulo])=>(
-          <div key={lugar} style={{...s.card,margin:"0 0 12px"}}>
-            <div style={{marginBottom:10}}>
-              <div style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)"}}>{titulo}</div>
-              <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>Modificá solo cuando ajustés físicamente el stock</div>
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-              <div>
-                <label style={{...s.label,textAlign:"center",fontSize:11}}>Cajones soda</label>
-                <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0}
-                  value={Math.floor((base[lugar]?.sifon||0)/CAJON)}
-                  onChange={e=>{ const caj=Number(e.target.value)||0; const sueltos=(base[lugar]?.sifon||0)%CAJON; setB(lugar,"sifon",caj*CAJON+sueltos); }} />
-                <div style={{fontSize:10,color:"var(--color-text-tertiary)",textAlign:"center",marginTop:2}}>{base[lugar]?.sifon||0} sifones</div>
-              </div>
-              <div>
-                <label style={{...s.label,textAlign:"center",fontSize:11}}>Bidón 10L</label>
-                <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0} value={base[lugar]?.bidon10||0} onChange={e=>setB(lugar,"bidon10",e.target.value)} />
-              </div>
-              <div>
-                <label style={{...s.label,textAlign:"center",fontSize:11}}>Bidón 20L</label>
-                <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0} value={base[lugar]?.bidon20||0} onChange={e=>setB(lugar,"bidon20",e.target.value)} />
-              </div>
-            </div>
+        {/* SECCIÓN 4 — Depósito */}
+        <div style={{...s.card,margin:"0 0 12px",borderLeft:"3px solid rgba(99,102,241,0.7)"}}>
+          <div style={{fontSize:12,fontWeight:700,color:"#818cf8",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:10}}>🏠 Depósito — Stock de reserva</div>
+          <div style={{display:"flex",gap:8,marginBottom:12}}>
+            <StatBox label="Cajones" val={Math.floor((base.casa.sifon||0)/CAJON)} sub={`${base.casa.sifon||0} sif`} color="#e2ecff"/>
+            <StatBox label="10L" val={base.casa.bidon10||0} color="#e2ecff"/>
+            <StatBox label="20L" val={base.casa.bidon20||0} color="#e2ecff"/>
           </div>
-        ))}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+            <InputStock lugar="casa" label="Cajones soda" field="sifon" isCajon={true}/>
+            <InputStock lugar="casa" label="Bidón 10L" field="bidon10"/>
+            <InputStock lugar="casa" label="Bidón 20L" field="bidon20"/>
+          </div>
+        </div>
+
         <button style={{...s.btnPrimary,background:guardado?"#0F6E56":undefined}} onClick={guardar}>
-          {guardado?"✓ Guardado":"Guardar stock base"}
+          {guardado?"✓ Guardado":"Guardar stock"}
         </button>
       </>)}
 
+      {/* ══ TAB CLIENTES ══ */}
       {tab==="clientes"&&(<>
         <div style={{...s.card,margin:"0 0 12px",background:"var(--color-background-secondary)"}}>
-          <div style={{fontSize:11,fontWeight:500,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:10}}>Total envases en clientes</div>
+          <div style={{fontSize:11,fontWeight:700,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:10}}>📊 Total envases prestados extra</div>
           <div style={{display:"flex",gap:8}}>
-            {[[Math.floor(envC.sifon/CAJON),"caj",`${envC.sifon} sif`],[envC.bidon10,"10L",null],[envC.bidon20,"20L",null]].map(([v,u,sub])=>(
-              <div key={u} style={{flex:1,background:"var(--color-background-tertiary)",borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
-                <div style={{fontSize:22,fontWeight:700,color:"var(--color-text-info)"}}>{v}</div>
-                {sub&&<div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>{sub}</div>}
-                <div style={{fontSize:10,color:"var(--color-text-secondary)",marginTop:2}}>{u}</div>
-              </div>
-            ))}
+            <StatBox label="Sifones" val={totalPrestados.sifon} color={totalPrestados.sifon>0?"#f59e0b":"var(--color-text-tertiary)"}/>
+            <StatBox label="10L" val={totalPrestados.bidon10} color={totalPrestados.bidon10>0?"#f59e0b":"var(--color-text-tertiary)"}/>
+            <StatBox label="20L" val={totalPrestados.bidon20} color={totalPrestados.bidon20>0?"#f59e0b":"var(--color-text-tertiary)"}/>
           </div>
         </div>
-        {clientes.filter(c=>{
-          const vC=ventas.filter(v=>v.clienteId===c.id);
-          const ex={sifon:0,bidon10:0,bidon20:0};
-          vC.forEach(v=>{
-            (v.envPrest||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)ex[k]+=Number(e.cant)||0;});
-            (v.envDev||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)ex[k]-=Number(e.cant)||0;});
-          });
-          return ex.sifon>0||ex.bidon10>0||ex.bidon20>0;
-        }).sort((a,b)=>{const dA=DIAS.indexOf(a.dia),dB=DIAS.indexOf(b.dia);return dA!==dB?dA-dB:(a.orden||9999)-(b.orden||9999);}).map(c=>{
-          const vC=ventas.filter(v=>v.clienteId===c.id);
-          const extra={sifon:0,bidon10:0,bidon20:0};
-          vC.forEach(v=>{
-            (v.envPrest||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)extra[k]+=Number(e.cant)||0;});
-            (v.envDev||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)extra[k]-=Number(e.cant)||0;});
-          });
-          return (
-            <div key={c.id} style={{...s.card,margin:"0 0 8px"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
-                <div>
-                  <div style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>{c.nombre}</div>
-                  <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{c.dia}</div>
-                </div>
-                <div style={{display:"flex",gap:4,flexWrap:"wrap",justifyContent:"flex-end"}}>
-                  {extra.sifon>0&&<span style={{...s.tag,color:"var(--color-text-warning)"}}>+{extra.sifon} sif</span>}
-                  {extra.bidon10>0&&<span style={{...s.tag,color:"var(--color-text-warning)"}}>+{extra.bidon10} 10L</span>}
-                  {extra.bidon20>0&&<span style={{...s.tag,color:"var(--color-text-warning)"}}>+{extra.bidon20} 20L</span>}
-                </div>
+
+        {clientesConPrestados.length===0 && (
+          <p style={{textAlign:"center",color:"var(--color-text-tertiary)",padding:"30px 0",fontSize:14}}>✅ Ningún cliente tiene envases prestados extra</p>
+        )}
+
+        {clientesConPrestados.sort((a,b)=>{
+          const dA=DIAS.indexOf(a.dia),dB=DIAS.indexOf(b.dia);
+          return dA!==dB?dA-dB:(a.orden||9999)-(b.orden||9999);
+        }).map(c=>{
+          const ex=calcPrestados(c.id);
+          const dir=c.calle?`${c.calle} ${c.nro||""}`:c.manzana?`Mz ${c.manzana} L ${c.lote}`:"";
+          return(
+            <div key={c.id} style={{...s.card,margin:"0 0 8px",borderLeft:"3px solid rgba(245,158,11,0.5)"}}>
+              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                <div style={{fontWeight:700,fontSize:17,color:"#ffffff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nombre}</div>
+                <span style={{background:"#1D9E75",color:"#fff",fontSize:10,padding:"1px 7px",borderRadius:20,fontWeight:700,flexShrink:0}}>{c.dia}</span>
               </div>
+              {dir&&<div style={{fontSize:14,color:"#c8d8e8",fontWeight:500,marginBottom:8}}>{dir}{c.barrio?` · ${c.barrio}`:""}</div>}
+              <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginBottom:8}}>
+                {/* Habituales */}
+                {c.sifon>0&&<span style={{background:"rgba(56,138,221,0.28)",color:"#fff",border:"1px solid rgba(56,138,221,0.5)",borderRadius:6,padding:"3px 9px",fontSize:12,fontWeight:700}}>Sif ×{c.sifon} (hab.)</span>}
+                {c.bidon10>0&&<span style={{background:"rgba(56,138,221,0.28)",color:"#fff",border:"1px solid rgba(56,138,221,0.5)",borderRadius:6,padding:"3px 9px",fontSize:12,fontWeight:700}}>10L ×{c.bidon10} (hab.)</span>}
+                {c.bidon20>0&&<span style={{background:"rgba(56,138,221,0.28)",color:"#fff",border:"1px solid rgba(56,138,221,0.5)",borderRadius:6,padding:"3px 9px",fontSize:12,fontWeight:700}}>20L ×{c.bidon20} (hab.)</span>}
+                {/* Prestados extra */}
+                {ex.sifon>0&&<span style={{background:"rgba(245,158,11,0.28)",color:"#fff",border:"1px solid rgba(245,158,11,0.55)",borderRadius:6,padding:"3px 9px",fontSize:12,fontWeight:700}}>+{ex.sifon} sif extra</span>}
+                {ex.bidon10>0&&<span style={{background:"rgba(245,158,11,0.28)",color:"#fff",border:"1px solid rgba(245,158,11,0.55)",borderRadius:6,padding:"3px 9px",fontSize:12,fontWeight:700}}>+{ex.bidon10} 10L extra</span>}
+                {ex.bidon20>0&&<span style={{background:"rgba(245,158,11,0.28)",color:"#fff",border:"1px solid rgba(245,158,11,0.55)",borderRadius:6,padding:"3px 9px",fontSize:12,fontWeight:700}}>+{ex.bidon20} 20L extra</span>}
+              </div>
+              {/* Total en su casa */}
+              <div style={{background:"var(--color-background-tertiary)",borderRadius:8,padding:"6px 10px",fontSize:12,color:"var(--color-text-secondary)",marginBottom:8}}>
+                📦 Total en su casa: {c.sifon+ex.sifon>0?`${c.sifon+ex.sifon} sif`:""} {c.bidon10+ex.bidon10>0?`${c.bidon10+ex.bidon10} bid 10L`:""} {c.bidon20+ex.bidon20>0?`${c.bidon20+ex.bidon20} bid 20L`:""}
+              </div>
+              <button onClick={()=>{
+                const sif=Number(prompt(`Sifones prestados EXTRA de ${c.nombre} (0 si ya devolvió todos):`,ex.sifon));
+                const b10=Number(prompt("Bidones 10L prestados extra:",ex.bidon10));
+                const b20=Number(prompt("Bidones 20L prestados extra:",ex.bidon20));
+                if(isNaN(sif)||isNaN(b10)||isNaN(b20)){alert("Cancelado");return;}
+                const devs=[];
+                if(ex.sifon-sif>0)devs.push({prod:"Sifón 1.5L",cant:ex.sifon-sif});
+                if(ex.bidon10-b10>0)devs.push({prod:"Bidón 10L",cant:ex.bidon10-b10});
+                if(ex.bidon20-b20>0)devs.push({prod:"Bidón 20L",cant:ex.bidon20-b20});
+                if(devs.length===0){alert("Sin cambios");return;}
+                const vt={id:Date.now(),clienteId:c.id,cliente:c.nombre,dia:"",fechaKey:new Date().toISOString().slice(0,10),
+                  fecha:new Date().toLocaleString("es-AR"),detalle:[{nombre:"Ajuste envases",cantidad:1,precio:0,total:0}],
+                  pago:"ajuste",obs:"Corrección manual de envases prestados",neto:0,bruto:0,desc:0,costo:0,ganancia:0,
+                  pagadoNum:0,saldoDelta:0,_esAjuste:true,saldoAntes:c.saldo||0,saldoDespues:c.saldo||0,
+                  envPrest:[],envDev:devs};
+                onAjustarEnvases&&onAjustarEnvases(vt);
+              }} style={{background:"rgba(226,75,74,0.2)",color:"#ffffff",border:"1px solid rgba(226,75,74,0.4)",borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                ✏️ Corregir envases
+              </button>
             </div>
           );
         })}
-        {clientes.filter(c=>{const vC=ventas.filter(v=>v.clienteId===c.id);const ex={sifon:0,bidon10:0,bidon20:0};vC.forEach(v=>{(v.envPrest||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)ex[k]+=Number(e.cant)||0;});(v.envDev||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)ex[k]-=Number(e.cant)||0;});});return ex.sifon>0||ex.bidon10>0||ex.bidon20>0;}).length===0&&
-          <p style={{textAlign:"center",color:"var(--color-text-tertiary)",padding:"30px 0",fontSize:14}}>No hay clientes con envases prestados extra</p>}
       </>)}
+
       </div>
     </div>
   );
@@ -1713,7 +1835,7 @@ function ConfirmacionesDia({dia,ventas,clientes,onConfirmar,onVolver}) {
                       return (
                         <div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"0.5px solid rgba(77,217,160,0.15)"}}>
                           <div>
-                            <div style={{fontSize:13,color:"var(--color-text-primary)"}}>{c?.nombre||"Cliente"}</div>
+                            <div style={{fontWeight:700,fontSize:18,color:"#ffffff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c?.nombre||"Cliente"}</div>
                             <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:1}}>{(v.detalle||[]).map(d=>`${d.nombre}×${d.cantidad}`).join(" · ")}</div>
                           </div>
                           <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
@@ -2490,9 +2612,9 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
           </div>
           <div style={{flex:1,cursor:"pointer",minWidth:0}} onClick={()=>onSeleccionar(c)}>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <div style={{fontWeight:500,fontSize:15,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5}}>
+              <div style={{fontWeight:700,fontSize:18,color:"#e2ecff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5}}>
                 {c.nombre}
-                {c.foto&&<span style={{fontSize:10,color:"#4dd9a0",flexShrink:0,marginLeft:3}}>📷</span>}
+                {c.foto&&<span style={{fontSize:11,color:"#4dd9a0",flexShrink:0,marginLeft:3}}>📷</span>}
               </div>
               {(recordatorios||[]).some(r=>r.clienteId===c.id&&!r.confirmado)&&(
                 <span style={{fontSize:13,flexShrink:0}} title="Recordatorio pendiente">🔔</span>
@@ -2503,27 +2625,26 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
                   <button style={{background:"none",border:"none",cursor:"pointer",padding:"2px 4px",lineHeight:1,flexShrink:0,display:"flex",alignItems:"center",gap:3,borderRadius:6,background:vt.transConfirmada?"transparent":"rgba(245,185,66,0.15)"}}
                     onClick={e=>{e.stopPropagation();onConfirmarTransfer&&onConfirmarTransfer(c.id,vt.id);}}
                     title={vt.transConfirmada?"Transfer. confirmada — tocá para desmarcar":"Tocá para confirmar transferencia"}>
-                    <span style={{fontSize:15}}>{vt.transConfirmada?"🟢":"🔴"}</span>
-                    {!vt.transConfirmada&&<span style={{fontSize:11,fontWeight:500,color:"#f5b942"}}>{fmt(vt.pagadoNum||vt.neto||0)}</span>}
+                    <span style={{fontSize:18}}>{vt.transConfirmada?"🟢":"🔴"}</span>
+                    {!vt.transConfirmada&&<span style={{fontSize:13,fontWeight:700,color:"#f5b942"}}>{fmt(vt.pagadoNum||vt.neto||0)}</span>}
                   </button>
                 );
               })()}
             </div>
-            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:2}}>
+            <div style={{fontSize:15,color:"#c8d8e8",fontWeight:500,marginTop:3,lineHeight:1.3}}>
               {c.calle?`${c.calle} ${c.nro||""}`:c.manzana?`Mz ${c.manzana} L ${c.lote}`:""}{c.barrio?` · ${c.barrio}`:""}
             </div>
-            {c.notas&&<div style={{fontSize:12,color:"var(--color-text-warning)",marginTop:2}}>📝 {c.notas}</div>}
-            <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>
-              {c.sifon>0    && <span style={s.tag}>Sifón×{c.sifon}</span>}
-              {c.bidon10>0  && <span style={s.tag}>10L×{c.bidon10}</span>}
-              {c.bidon20>0  && <span style={s.tag}>20L×{c.bidon20}</span>}
-              {c.dispenser>0 && <span style={{...s.tag,color:"#5daaff"}}>Disp×{c.dispenser}</span>}
-              {atendido    && <span style={s.badge("success")}>✓ Listo</span>}
-              {est==="noesta" && !atendido  && <span style={s.badge("warning")}>🔄 No estaba aún</span>}
-              {est==="noesta2"  && <span style={s.badge("warning")}>No estaba</span>}
-              {est==="noquiso"  && <span style={s.badge("danger")}>No quiso</span>}
-              {c.saldo<0   && <span style={s.badge("danger")}>Debe {fmt(Math.abs(c.saldo))}</span>}
-              {c.saldo>0   && <span style={s.badge("success")}>A favor {fmt(c.saldo)}</span>}
+            {c.notas&&<div style={{fontSize:13,color:"var(--color-text-warning)",marginTop:3}}>📝 {c.notas}</div>}
+            <div style={{display:"flex",flexWrap:"wrap",gap:5,marginTop:7}}>
+              <TagsCliente cliente={c} ventas={ventas}/>
+
+            </div>
+            {/* Badges de estado */}
+            <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap"}}>
+              {atendido    && <span style={{...s.badge("success"),fontSize:12}}>✓ Entregado</span>}
+              {est==="noesta" && !atendido  && <span style={{...s.badge("warning"),fontSize:12}}>🔄 No estaba (1ra vez)</span>}
+              {est==="noesta2"  && <span style={{...s.badge("warning"),fontSize:12}}>No estaba</span>}
+              {est==="noquiso"  && <span style={{...s.badge("danger"),fontSize:12}}>No quiso</span>}
             </div>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0,alignItems:"center"}}>
@@ -4491,32 +4612,16 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
                   {c.orden||"#"}
                 </div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:500,fontSize:14,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nombre}</div>
-                  <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:2}}>
-                    {c.dia} · {c.calle?`${c.calle} ${c.nro||""}`:c.manzana?`Mz ${c.manzana} L ${c.lote}`:""}{c.barrio?` · ${c.barrio}`:""}
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+                    <div style={{fontWeight:700,fontSize:18,color:"#ffffff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nombre}</div>
+                    <span style={{background:"#1D9E75",color:"#fff",fontSize:10,padding:"1px 7px",borderRadius:20,fontWeight:700,flexShrink:0}}>{c.dia}</span>
                   </div>
-                  {c.notas&&<div style={{fontSize:11,color:"var(--color-text-warning)",marginTop:2}}>📝 {c.notas}</div>}
-                  <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>
-                    {/* Saldo */}
-                    {c.saldo<0&&<span style={s.badge("danger")}>Debe {fmt(Math.abs(c.saldo))}</span>}
-                    {c.saldo>0&&<span style={s.badge("success")}>A favor {fmt(c.saldo)}</span>}
-                    {/* Envases habituales */}
-                    {c.sifon>0&&<span style={s.tag}>Sifón×{c.sifon}</span>}
-                    {c.bidon10>0&&<span style={s.tag}>10L×{c.bidon10}</span>}
-                    {c.bidon20>0&&<span style={s.tag}>20L×{c.bidon20}</span>}
-                    {c.dispenser>0&&<span style={{...s.tag,color:"#5daaff"}}>Disp×{c.dispenser}</span>}
-                    {/* Envases extra prestados */}
-                    {(()=>{
-                      const ex=extraEnvases[c.id]||{};
-                      const aj=c.envAjuste||{};
-                      const total={sifon:(ex.sifon||0)+(aj.sifon||0),bidon10:(ex.bidon10||0)+(aj.bidon10||0),bidon20:(ex.bidon20||0)+(aj.bidon20||0)};
-                      return (<>
-                        {total.sifon>0&&<span style={{...s.tag,color:"var(--color-text-warning)",fontWeight:500}}>+{total.sifon} sif extra</span>}
-                        {total.bidon10>0&&<span style={{...s.tag,color:"var(--color-text-warning)",fontWeight:500}}>+{total.bidon10} 10L extra</span>}
-                        {total.bidon20>0&&<span style={{...s.tag,color:"var(--color-text-warning)",fontWeight:500}}>+{total.bidon20} 20L extra</span>}
-                      </>);
-                    })()}
-                    {c.telefono&&<a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{...s.tag,textDecoration:"none",cursor:"pointer"}} onClick={e=>e.stopPropagation()}>💬 {c.telefono}</a>}
+                  <div style={{fontSize:15,color:"#c8d8e8",fontWeight:500,marginTop:2,marginBottom:4}}>
+                    {c.calle?`${c.calle} ${c.nro||""}`:c.manzana?`Mz ${c.manzana} L ${c.lote}`:""}{c.barrio?` · ${c.barrio}`:""}
+                  </div>
+                  {c.notas&&<div style={{fontSize:12,color:"var(--color-text-warning)",marginBottom:4}}>📝 {c.notas}</div>}
+                  <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:4}}>
+                    <TagsCliente cliente={c} ventas={ventas}/>
                   </div>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0,alignItems:"center"}}>
@@ -4526,7 +4631,7 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
                 </div>
               </div>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8,borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:8}}>
-                <button style={{...s.btnDanger,fontSize:11,padding:"4px 12px"}} onClick={e=>{e.stopPropagation();onEliminar(c.id);}}>Eliminar</button>
+                <button style={{background:"rgba(226,75,74,0.2)",color:"#ffffff",border:"1px solid rgba(226,75,74,0.5)",borderRadius:6,padding:"2px 9px",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={e=>{e.stopPropagation();onEliminar(c.id);}}>🗑 Eliminar</button>
                 <div style={{display:"flex",gap:6}}>
                   {onRegistrarVenta&&<button style={{...s.btn,fontSize:11,padding:"4px 12px",background:"#185FA5",color:"#e2eaf4",border:"none"}} onClick={e=>{e.stopPropagation();onRegistrarVenta(c);}}>📦 Venta</button>}
                   <button style={{...s.btn,fontSize:11,padding:"4px 12px"}} onClick={e=>{e.stopPropagation();setEditandoId(c.id);}}>Editar</button>
