@@ -981,19 +981,18 @@ function App() {
         onGuardar={(p,descontar)=>{
           savePlanilla(`${diaActual}_${fechaActual}`,p);
           if(descontar){
-            setStock(prev=>{
-              const s=JSON.parse(JSON.stringify(normStock(prev)));
-              const soda=Number(p.productos?.soda?.llenos||0);
-              const b10=Number(p.productos?.b10?.llenos||0);
-              const b20=Number(p.productos?.b20?.llenos||0);
-              s.soderia.sifon  =Math.max(0,(s.soderia.sifon||0)-soda);
-              s.soderia.bidon10=Math.max(0,(s.soderia.bidon10||0)-b10);
-              s.soderia.bidon20=Math.max(0,(s.soderia.bidon20||0)-b20);
-              s.camion.sifon   =(s.camion.sifon||0)+soda;
-              s.camion.bidon10 =(s.camion.bidon10||0)+b10;
-              s.camion.bidon20 =(s.camion.bidon20||0)+b20;
-              syncData({stock:normStock(s)}); return normStock(s);
-            });
+            const s=JSON.parse(JSON.stringify(normStock(stockNorm)));
+            const soda=Number(p.productos?.soda?.llenos||0);
+            const b10=Number(p.productos?.b10?.llenos||0);
+            const b20=Number(p.productos?.b20?.llenos||0);
+            s.soderia.sifon  =Math.max(0,(s.soderia.sifon||0)-soda);
+            s.soderia.bidon10=Math.max(0,(s.soderia.bidon10||0)-b10);
+            s.soderia.bidon20=Math.max(0,(s.soderia.bidon20||0)-b20);
+            s.camion.sifon   =(s.camion.sifon||0)+soda;
+            s.camion.bidon10 =(s.camion.bidon10||0)+b10;
+            s.camion.bidon20 =(s.camion.bidon20||0)+b20;
+            setStock(normStock(s));
+            syncData({stock:normStock(s)});
           }
           irA("clientes");
         }} onVolver={()=>irA("selectorFechaClientes")} />}
@@ -2150,18 +2149,18 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
   });
 
   const confirmarCierre = () => {
-    setStock(prev=>{
-      const s = JSON.parse(JSON.stringify(prev));
-      if(!s.soderia_vacios) s.soderia_vacios = {sifon:0,bidon10:0,bidon20:0};
-      ["soda","b10","b20"].forEach(pk=>{
-        const sk = planKeyToStockKey[pk];
-        s.soderia[sk]        = (s.soderia[sk]||0)        + sobrantes[pk];
-        s.soderia_vacios[sk] = (s.soderia_vacios[sk]||0) + vaciosRec[pk];
-        s.camion[sk]         = 0;
-      });
-      syncData({stock:s});
-      return s;
+    // Calcular el nuevo stock a partir del prop actual (ya normalizado)
+    const s = JSON.parse(JSON.stringify(stock));
+    if(!s.soderia_vacios) s.soderia_vacios = {sifon:0,bidon10:0,bidon20:0};
+    ["soda","b10","b20"].forEach(pk=>{
+      const sk = planKeyToStockKey[pk];
+      s.soderia[sk]        = (s.soderia[sk]||0)        + sobrantes[pk];
+      s.soderia_vacios[sk] = (s.soderia_vacios[sk]||0) + vaciosRec[pk];
+      s.camion[sk]         = 0;
     });
+    // Guardar stock en estado y en Firebase por separado (nunca dentro de setState)
+    setStock(s);
+    syncData({stock:s});
     onGuardar({...datos, _diaCerrado:true, _stockActualizado:true});
     setMostrarCierre(false);
   };
@@ -2496,6 +2495,31 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
                     </div>
                   );
                 })}
+                {/* Fila de totales finales en sodería */}
+                <div style={{background:"rgba(29,158,117,0.08)",borderTop:"1px solid rgba(29,158,117,0.3)",padding:"10px 12px"}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"var(--color-text-secondary)",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.05em"}}>📦 Quedará en sodería después del cierre</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:4}}>
+                    {["soda","b10","b20"].map(pk=>{
+                      const sk = planKeyToStockKey[pk];
+                      const nuevoLleno = (stock?.soderia?.[sk]||0) + sobrantes[pk];
+                      const nuevoVacio = (stock?.soderia_vacios?.[sk]||0) + vaciosRec[pk];
+                      const esSoda = pk==="soda";
+                      return (
+                        <div key={pk} style={{textAlign:"center",background:"var(--color-background-primary)",borderRadius:8,padding:"8px 4px"}}>
+                          <div style={{fontSize:10,color:"var(--color-text-tertiary)",marginBottom:2}}>{PROD_LABEL[pk]}</div>
+                          <div style={{fontSize:15,fontWeight:700,color:"var(--color-text-success)"}}>
+                            {esSoda ? `${Math.floor(nuevoLleno/CAJON_SODA)} caj` : nuevoLleno}
+                          </div>
+                          <div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>llenos</div>
+                          <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-warning)",marginTop:2}}>
+                            {esSoda ? `${Math.floor(nuevoVacio/CAJON_SODA)} caj` : nuevoVacio}
+                          </div>
+                          <div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>vacíos</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginBottom:16,textAlign:"center"}}>
