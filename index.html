@@ -1463,6 +1463,11 @@ function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolv
 
   // Lo cargado hoy en el camión (desde planillas)
   const cargadoHoy = {sifon:0,bidon10:0,bidon20:0};
+  // Si el día ya fue cerrado, el camión está vacío
+  const diaCerradoHoy = DIAS.some(d=>{
+    const p = planillas[`${d}_${hoy}`];
+    return !!p?._diaCerrado;
+  });
   DIAS.forEach(d=>{
     const p = planillas[`${d}_${hoy}`];
     if(p?.productos){
@@ -1489,8 +1494,8 @@ function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolv
     });
   });
 
-  // En camión ahora = cargado - vendido
-  const enCamion = {
+  // En camión ahora = cargado - vendido (0 si el día ya fue cerrado)
+  const enCamion = diaCerradoHoy ? {sifon:0,bidon10:0,bidon20:0} : {
     sifon:   Math.max(0, cargadoHoy.sifon   - vendidoHoy.sifon),
     bidon10: Math.max(0, cargadoHoy.bidon10 - vendidoHoy.bidon10),
     bidon20: Math.max(0, cargadoHoy.bidon20 - vendidoHoy.bidon20),
@@ -1609,17 +1614,27 @@ function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolv
 
         {/* SECCIÓN 2 — Camión (solo si hay reparto hoy) */}
         {hayRepartHoy ? (
-          <div style={{...s.card,margin:"0 0 12px",borderLeft:"3px solid #185FA5"}}>
-            <div style={{fontSize:12,fontWeight:700,color:"#185FA5",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:10}}>🚚 Camión — En reparto ahora</div>
-            <div style={{display:"flex",gap:8,marginBottom:8}}>
-              <StatBox label="Cajones" val={Math.floor(enCamion.sifon/CAJON)} color="#7ecfff"/>
-              <StatBox label="10L" val={enCamion.bidon10} color="#7ecfff"/>
-              <StatBox label="20L" val={enCamion.bidon20} color="#7ecfff"/>
+          <div style={{...s.card,margin:"0 0 12px",borderLeft:`3px solid ${diaCerradoHoy?"#1D9E75":"#185FA5"}`}}>
+            <div style={{fontSize:12,fontWeight:700,color:diaCerradoHoy?"#1D9E75":"#185FA5",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:10}}>
+              🚚 Camión — {diaCerradoHoy?"Día cerrado ✅":"En reparto ahora"}
             </div>
-            <div style={{fontSize:11,color:"var(--color-text-tertiary)",borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:8}}>
-              Cargado: {Math.floor(cargadoHoy.sifon/CAJON)} caj · {cargadoHoy.bidon10} 10L · {cargadoHoy.bidon20} 20L
-              {"  |  "}Vendido: {Math.floor(vendidoHoy.sifon/CAJON)} caj · {vendidoHoy.bidon10} 10L · {vendidoHoy.bidon20} 20L
-            </div>
+            {diaCerradoHoy ? (
+              <div style={{fontSize:13,color:"var(--color-text-success)",textAlign:"center",padding:"8px 0"}}>
+                ✅ El camión fue descargado — stock actualizado
+              </div>
+            ) : (
+              <>
+                <div style={{display:"flex",gap:8,marginBottom:8}}>
+                  <StatBox label="Cajones" val={Math.floor(enCamion.sifon/CAJON)} color="#7ecfff"/>
+                  <StatBox label="10L" val={enCamion.bidon10} color="#7ecfff"/>
+                  <StatBox label="20L" val={enCamion.bidon20} color="#7ecfff"/>
+                </div>
+                <div style={{fontSize:11,color:"var(--color-text-tertiary)",borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:8}}>
+                  Cargado: {Math.floor(cargadoHoy.sifon/CAJON)} caj · {cargadoHoy.bidon10} 10L · {cargadoHoy.bidon20} 20L
+                  {"  |  "}Vendido: {Math.floor(vendidoHoy.sifon/CAJON)} caj · {vendidoHoy.bidon10} 10L · {vendidoHoy.bidon20} 20L
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <div style={{...s.card,margin:"0 0 12px",background:"rgba(24,95,165,0.05)",border:"0.5px dashed rgba(24,95,165,0.3)"}}>
