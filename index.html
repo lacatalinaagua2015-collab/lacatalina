@@ -1047,7 +1047,7 @@ function App() {
             const vt={id:Date.now(),clienteId:cl.id,cliente:cl.nombre,dia:diaActual,fechaKey:fechaActual,fecha:new Date().toLocaleString("es-AR"),
               detalle:det,pago,obs:`Cobro de deuda $${monto.toLocaleString("es-AR")} (${pago})`,saldoAplicado:0,
               neto:0,bruto:0,desc:0,costo:0,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],
-              saldoAntes,saldoDespues};
+              saldoAntes,saldoDespues,_esCobro:true};
             saveVentas([...ventas,vt]);
             saveClientes(clientes.map(x=>x.id===cl.id?{...x,saldo:saldoDespues}:x));
           }}
@@ -1059,7 +1059,7 @@ function App() {
           const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo}];
           saveNoVisitas(nv);
           const clientesDia=clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
-          const visitadosIds=new Set([...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual).map(v=>v.clienteId),...(nv).filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2"||v.motivo==="noesta")).map(v=>v.clienteId)]);
+          const visitadosIds=new Set([...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId),...(nv).filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2"||v.motivo==="noesta")).map(v=>v.clienteId)]);
           visitadosIds.add(clienteId);
           const siguiente=clientesDia.find(c=>!visitadosIds.has(c.id)&&c.id!==clienteId);
           if(siguiente){setClienteId(siguiente.id);irA("detalleCliente");}else irA("clientes");
@@ -1068,7 +1068,7 @@ function App() {
           const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo:"noquiso"}];
           saveNoVisitas(nv);
           const clientesDia=clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
-          const visitadosIds=new Set([...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual).map(v=>v.clienteId),...nv.filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2"||v.motivo==="noesta")).map(v=>v.clienteId)]);
+          const visitadosIds=new Set([...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId),...nv.filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2"||v.motivo==="noesta")).map(v=>v.clienteId)]);
           visitadosIds.add(clienteId);
           const siguiente=clientesDia.find(c=>!visitadosIds.has(c.id)&&c.id!==clienteId);
           if(siguiente){setClienteId(siguiente.id);irA("detalleCliente");}else irA("clientes");
@@ -1078,7 +1078,7 @@ function App() {
   // Auto-advance to next pending client (noesta = volver al final, no saltar a ellos)
   const clientesDia = clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
   const visitadosIds = new Set([
-    ...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual).map(v=>v.clienteId),
+    ...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId),
     ...(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2"||v.motivo==="noesta")).map(v=>v.clienteId)
   ]);
   visitadosIds.add(clienteId);
@@ -1129,7 +1129,21 @@ function App() {
       {pantalla==="detalleDesdeGestion" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual||cliente.dia} fecha={fechaActual} productos={productos} onVenta={()=>{setDiaActual(cliente.dia);const hoy=new Date().toISOString().slice(0,10);if(!fechaActual)setFechaActual(hoy);irA("venta");}} onVolver={()=>irA("gestionClientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>{eliminarCliente(cliente.id);irA("gestionClientes");}}
           onNoEstaCliente={()=>{}} onNoQuiereCliente={()=>{}}
           recordatorios={recordatorios} onGuardarRecordatorio={(r)=>saveRecordatorios([...(recordatorios||[]),r])} onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
-          onCobrarSaldo={(s)=>{if(cliente){const nc=clientes.map(x=>x.id===cliente.id?{...x,saldo:s}:x);saveClientes(nc);}}} />}
+          onCobrarSaldo={(monto,pago)=>{
+            if(cliente){
+              const saldoAntes=cliente.saldo||0;
+              const saldoDespues=saldoAntes+monto;
+              const det=[{nombre:"Cobro de deuda",cantidad:1,precio:0,total:0}];
+              const fk=fechaActual||new Date().toISOString().slice(0,10);
+              const vt={id:Date.now(),clienteId:cliente.id,cliente:cliente.nombre,
+                dia:diaActual||cliente.dia,fechaKey:fk,fecha:new Date().toLocaleString("es-AR"),
+                detalle:det,pago,obs:`Cobro de deuda $${monto.toLocaleString("es-AR")} (${pago})`,saldoAplicado:0,
+                neto:0,bruto:0,desc:0,costo:0,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],
+                saldoAntes,saldoDespues,_esCobro:true};
+              saveVentas([...ventas,vt]);
+              saveClientes(clientes.map(x=>x.id===cliente.id?{...x,saldo:saldoDespues}:x));
+            }
+          }} />}
       {pantalla==="stock"          && <StockGeneral stock={stockNorm} setStock={(ns)=>{setStock(ns);syncData({stock:ns});}} clientes={clientes} ventas={ventas} productos={productos} planillas={planillas} onVolver={()=>irA("menu")} />}
       {pantalla==="resumen"        && <Resumen ventas={ventas} clientes={clientes} productos={productos} planillas={planillas} noVisitas={noVisitas||[]} onVolver={()=>irA("menu")} />}
       {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stockNorm} setStock={(s)=>{const ns=normStock(s);setStockRaw(ns);syncData({stock:ns});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} syncData={syncData} onVolver={()=>irA("menu")} ecToken={ecToken} setEcToken={setEcToken} />}
@@ -2423,7 +2437,7 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
   const [editandoOrden,setEditandoOrden] = useState(null);
   const [ordenTemp,setOrdenTemp] = useState("");
   // ventas y noVisitas ya filtradas por fecha+dia desde App
-  const atendidos = new Set(ventas.map(v=>v.clienteId));
+  const atendidos = new Set(ventas.filter(v=>!v._esCobro&&!v._esAjuste).map(v=>v.clienteId));
   const noVMap = {}; (noVisitas||[]).filter(v=>v.fecha===fecha).forEach(v=>{noVMap[v.clienteId]=v.motivo;});
   // visitados = ventas + noesta2 + noquiso (noesta 1ra vez NO cuenta)
   const visitadosSinVenta = new Set(
@@ -2649,7 +2663,7 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
   const [razonAjuste,setRazonAjuste] = useState("");
   const recActivos = (recordatorios||[]).filter(r=>r.clienteId===cliente.id&&!r.confirmado);
   const historial = [...ventas].sort((a,b)=>(b.fechaKey||"").localeCompare(a.fechaKey||"")||(b.id||0)-(a.id||0));
-  const ventaHoy  = fecha ? ventas.find(v=>v.fechaKey===fecha) : null;
+  const ventaHoy  = fecha ? ventas.find(v=>v.fechaKey===fecha&&!v._esCobro&&!v._esAjuste) : null;
   const initials  = cliente.nombre.split(" ").slice(0,2).map(w=>w[0]||"").join("").toUpperCase();
   const totalComprado = ventas.reduce((a,v)=>a+(v.neto||0),0);
   const promedioVenta = ventas.length>0 ? Math.round(totalComprado/ventas.length) : 0;
