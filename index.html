@@ -387,7 +387,7 @@ const s = {
   metricLabel:{ fontSize:11, color:"var(--color-text-secondary)", marginBottom:3 },
   metricVal:{ fontSize:17, fontWeight:500, color:"var(--color-text-primary)" },
   badge:(c)=>({ fontSize:10, fontWeight:500, padding:"2px 7px", borderRadius:6, background:`var(--color-background-${c})`, color:`var(--color-text-${c})` }),
-  tag:{ fontSize:11, color:"var(--color-text-secondary)", background:"var(--color-background-tertiary)", borderRadius:6, padding:"2px 7px" },
+  tag:{ fontSize:13, fontWeight:500, color:"var(--color-text-secondary)", background:"var(--color-background-tertiary)", borderRadius:8, padding:"3px 9px" },
   divider:{ borderTop:"0.5px solid var(--color-border-tertiary)", margin:"10px 0" },
   sectionTitle:{ fontSize:10, color:"var(--color-text-tertiary)", padding:"12px 14px 4px", fontWeight:500, textTransform:"uppercase", letterSpacing:"0.07em", display:"block" },
   select:{ width:"100%", padding:"8px 10px", border:"0.5px solid var(--color-border-secondary)", borderRadius:8, fontSize:14, background:"var(--color-background-tertiary)", color:"var(--color-text-primary)", outline:"none", boxSizing:"border-box" },
@@ -4606,7 +4606,6 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0,alignItems:"center"}}>
                   {c.maps&&<a href={c.maps} target="_blank" rel="noreferrer" style={{fontSize:18,textDecoration:"none"}} onClick={e=>e.stopPropagation()}>📍</a>}
-                  {c.telefono&&<a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:18,textDecoration:"none"}} onClick={e=>e.stopPropagation()}>💬</a>}
                   <span style={{fontSize:18,cursor:"pointer",lineHeight:1}} onClick={e=>{e.stopPropagation();setFotoClienteId(fotoClienteId===c.id?null:c.id);}}>📷</span>
                 </div>
               </div>
