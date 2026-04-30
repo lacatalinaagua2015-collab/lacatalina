@@ -1453,6 +1453,8 @@ function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolv
     casa:    {...stock?.casa   ||{sifon:0,bidon10:0,bidon20:0}},
   }));
   const setB = (lugar,key,val) => setBase(b=>({...b,[lugar]:{...b[lugar],[key]:Number(val)||0}}));
+  const [baseVacios, setBaseVacios] = React.useState(()=>({...stock?.soderiaVacios||{sifon:0,bidon10:0,bidon20:0}}));
+  const setV = (key,val) => setBaseVacios(b=>({...b,[key]:Number(val)||0}));
 
   // Calcular lo vendido en total por día (desde todas las ventas registradas)
   const DIAS = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
@@ -1479,14 +1481,18 @@ function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolv
     const k=prodKey[d.nombre]; if(k) vendidoHoy[k]+=d.cantidad;
   }));
 
-  // En camión: dato real guardado por InicioReparto (no recalcular)
-  const enCamionHoy = stock?.camion || {sifon:0, bidon10:0, bidon20:0};
+  // En camión: valor real de Firebase (actualizado por InicioReparto/cerrarCamion)
+  const enCamionHoy = {
+    sifon:   stock?.camion?.sifon   || 0,
+    bidon10: stock?.camion?.bidon10 || 0,
+    bidon20: stock?.camion?.bidon20 || 0,
+  };
 
-  // Sodería: base.soderia ya fue descontada correctamente al cargar el camión
+  // Sodería: valor real de Firebase (se descuenta al iniciar reparto)
   const soCal = {
-    sifon:   base.soderia.sifon,
-    bidon10: base.soderia.bidon10,
-    bidon20: base.soderia.bidon20,
+    sifon:   stock?.soderia?.sifon   || 0,
+    bidon10: stock?.soderia?.bidon10 || 0,
+    bidon20: stock?.soderia?.bidon20 || 0,
   };
 
   // Envases en clientes
@@ -1498,7 +1504,7 @@ function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolv
   });
 
   const guardar = () => {
-    setStock({soderia:base.soderia, casa:base.casa, camion:stock?.camion||{sifon:0,bidon10:0,bidon20:0}});
+    setStock({soderia:base.soderia, casa:base.casa, soderiaVacios:baseVacios, camion:stock?.camion||{sifon:0,bidon10:0,bidon20:0}});
     setGuardado(true);
     setTimeout(()=>setGuardado(false),2000);
   };
@@ -1555,8 +1561,60 @@ function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolv
           )}
         </div>
 
-        {/* Stock base editable — se setea una vez */}
-        {[["soderia","🏭 Sodería (stock base llenos)"],["casa","🏠 Casa / Depósito"]].map(([lugar,titulo])=>(
+        {/* Sodería llenos */}
+        {[["soderia","🏭 Sodería (stock base llenos)"]].map(([lugar,titulo])=>(
+          <div key={lugar} style={{...s.card,margin:"0 0 12px"}}>
+            <div style={{marginBottom:10}}>
+              <div style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)"}}>{titulo}</div>
+              <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>Modificá solo cuando ajustés físicamente el stock</div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+              <div>
+                <label style={{...s.label,textAlign:"center",fontSize:11}}>Cajones soda</label>
+                <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0}
+                  value={Math.floor((base[lugar]?.sifon||0)/CAJON)}
+                  onChange={e=>{ const caj=Number(e.target.value)||0; const sueltos=(base[lugar]?.sifon||0)%CAJON; setB(lugar,"sifon",caj*CAJON+sueltos); }} />
+                <div style={{fontSize:10,color:"var(--color-text-tertiary)",textAlign:"center",marginTop:2}}>{base[lugar]?.sifon||0} sifones</div>
+              </div>
+              <div>
+                <label style={{...s.label,textAlign:"center",fontSize:11}}>Bidón 10L</label>
+                <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0} value={base[lugar]?.bidon10||0} onChange={e=>setB(lugar,"bidon10",e.target.value)} />
+              </div>
+              <div>
+                <label style={{...s.label,textAlign:"center",fontSize:11}}>Bidón 20L</label>
+                <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0} value={base[lugar]?.bidon20||0} onChange={e=>setB(lugar,"bidon20",e.target.value)} />
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {/* Sodería vacíos en depósito */}
+        <div style={{...s.card,margin:"0 0 12px"}}>
+          <div style={{marginBottom:10}}>
+            <div style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)"}}>📦 Sodería (vacíos en depósito)</div>
+            <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>Modificá solo cuando ajustés físicamente el stock</div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+            <div>
+              <label style={{...s.label,textAlign:"center",fontSize:11}}>Cajones soda</label>
+              <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0}
+                value={Math.floor((baseVacios.sifon||0)/CAJON)}
+                onChange={e=>{ const caj=Number(e.target.value)||0; const sueltos=(baseVacios.sifon||0)%CAJON; setV("sifon",caj*CAJON+sueltos); }} />
+              <div style={{fontSize:10,color:"var(--color-text-tertiary)",textAlign:"center",marginTop:2}}>{baseVacios.sifon||0} sifones</div>
+            </div>
+            <div>
+              <label style={{...s.label,textAlign:"center",fontSize:11}}>Bidón 10L</label>
+              <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0} value={baseVacios.bidon10||0} onChange={e=>setV("bidon10",e.target.value)} />
+            </div>
+            <div>
+              <label style={{...s.label,textAlign:"center",fontSize:11}}>Bidón 20L</label>
+              <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0} value={baseVacios.bidon20||0} onChange={e=>setV("bidon20",e.target.value)} />
+            </div>
+          </div>
+        </div>
+
+        {/* Casa / Depósito */}
+        {[["casa","🏠 Casa / Depósito"]].map(([lugar,titulo])=>(
           <div key={lugar} style={{...s.card,margin:"0 0 12px"}}>
             <div style={{marginBottom:10}}>
               <div style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)"}}>{titulo}</div>
