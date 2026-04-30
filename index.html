@@ -1011,7 +1011,7 @@ function App() {
           }
           irA("clientes");
         }} onVolver={()=>irA("selectorFechaClientes")} />}
-      {pantalla==="clientes"       && <ListaClientes clientes={clientes.filter(c=>c.dia===diaActual)} dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual)} noVisitas={(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual)} onSeleccionar={c=>{setClienteId(c.id);irA("detalleCliente");}} onNuevoCliente={()=>irA("nuevoCliente")} onVolver={()=>irA("selectorFechaClientes")} onReordenar={lista=>{
+      {pantalla==="clientes"       && <ListaClientes clientes={clientes.filter(c=>c.dia===diaActual)} dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual)} todasVentas={ventas} noVisitas={(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual)} onSeleccionar={c=>{setClienteId(c.id);irA("detalleCliente");}} onNuevoCliente={()=>irA("nuevoCliente")} onVolver={()=>irA("selectorFechaClientes")} onReordenar={lista=>{
           const otros=clientes.filter(c=>c.dia!==diaActual);
           saveClientes([...otros,...lista]);
         }} onRegistrarNoVisita={(clienteId,motivo)=>{const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo}];saveNoVisitas(nv);}} onQuitarNoVisita={(clienteId)=>{const nv=(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual));saveNoVisitas(nv);}}
@@ -1537,7 +1537,15 @@ function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolv
       {tab==="stock"&&(<>
         {/* Estado actual calculado */}
         <div style={{...s.card,margin:"0 0 12px",background:"var(--color-background-secondary)"}}>
-          <div style={{fontSize:11,fontWeight:500,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:10}}>📊 Estado actual (calculado)</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <div style={{fontSize:11,fontWeight:500,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.05em"}}>📊 Estado actual (calculado)</div>
+            {(enCamionHoy.sifon>0||enCamionHoy.bidon10>0||enCamionHoy.bidon20>0)&&(
+              <button style={{...s.btn,fontSize:10,padding:"3px 8px",color:"var(--color-text-danger)",border:"1px solid var(--color-text-danger)"}}
+                onClick={()=>{ if(window.confirm("¿Limpiar camión? Usalo solo si no hay reparto activo.")){setStock(prev=>({...prev,camion:{sifon:0,bidon10:0,bidon20:0}}));syncData({stock:{...stockNorm,camion:{sifon:0,bidon10:0,bidon20:0}}});} }}>
+                🔄 Limpiar camión
+              </button>
+            )}
+          </div>
           <div style={{display:"flex",gap:8,marginBottom:10}}>
             {[["🏭 Sodería",[Math.floor(soCal.sifon/CAJON),soCal.bidon10,soCal.bidon20]],["🚚 En reparto",[Math.floor(enCamionHoy.sifon/CAJON),enCamionHoy.bidon10,enCamionHoy.bidon20]]].map(([titulo,vals])=>(
               <div key={titulo} style={{flex:1}}>
@@ -2490,7 +2498,7 @@ function InicioReparto({dia,fecha,planilla,productos,cargasDia,stock,onGuardar,o
   );
 }
 
-function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onConfirmarTransfer}) {
+function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onConfirmarTransfer}) {
   const [busqueda,setBusqueda] = useState("");
   const [editandoOrden,setEditandoOrden] = useState(null);
   const [ordenTemp,setOrdenTemp] = useState("");
@@ -2540,6 +2548,12 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
     const [fotoOpen,setFotoOpen] = React.useState(false);
     const atendido=atendidos.has(c.id), est=noVMap[c.id];
     const bc=atendido?"#1D9E75":est==="noesta"?"#EF9F27":(est==="noesta2"||est==="noquiso")?"#E24B4A":"var(--color-border-tertiary)";
+    // Envases extra que tiene el cliente (historial completo, no solo hoy)
+    const envExtra={sifon:0,bidon10:0,bidon20:0};
+    (todasVentas||ventas).filter(v=>v.clienteId===c.id).forEach(v=>{
+      (v.envPrest||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)envExtra[k]+=Number(e.cant)||0;});
+      (v.envDev||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)envExtra[k]-=Number(e.cant)||0;});
+    });
     return (
       <>
       <div style={{...s.card,borderLeft:`3px solid ${bc}`,opacity:(visitados.has(c.id))?0.65:est==="noesta"?0.85:1}}>
@@ -2592,6 +2606,9 @@ function ListaClientes({clientes,dia,fecha,ventas,noVisitas,prospectos,recordato
               {est==="noquiso"  && <span style={s.badge("danger")}>No quiso</span>}
               {c.saldo<0   && <span style={s.badge("danger")}>Debe {fmt(Math.abs(c.saldo))}</span>}
               {c.saldo>0   && <span style={s.badge("success")}>A favor {fmt(c.saldo)}</span>}
+              {envExtra.sifon>0   && <span style={{...s.tag,color:"#f5b942",fontWeight:600}}>🔁 Sif×{envExtra.sifon}</span>}
+              {envExtra.bidon10>0 && <span style={{...s.tag,color:"#f5b942",fontWeight:600}}>🔁 10L×{envExtra.bidon10}</span>}
+              {envExtra.bidon20>0 && <span style={{...s.tag,color:"#f5b942",fontWeight:600}}>🔁 20L×{envExtra.bidon20}</span>}
             </div>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0,alignItems:"center"}}>
@@ -4584,7 +4601,7 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
                         {total.bidon20>0&&<span style={{...s.tag,color:"var(--color-text-warning)",fontWeight:500}}>+{total.bidon20} 20L extra</span>}
                       </>);
                     })()}
-                    {c.telefono&&<a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{...s.tag,textDecoration:"none",cursor:"pointer"}} onClick={e=>e.stopPropagation()}>💬 {c.telefono}</a>}
+                    {c.telefono&&<a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{...s.tag,textDecoration:"none",cursor:"pointer"}} onClick={e=>e.stopPropagation()}>💬</a>}
                   </div>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0,alignItems:"center"}}>
