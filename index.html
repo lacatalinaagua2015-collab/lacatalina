@@ -2106,6 +2106,61 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
   const set = (k,v) => setDatos(d=>({...d,[k]:v}));
   const yaCerrado = !!planilla._diaCerrado;
   const [mostrarCierre,setMostrarCierre] = useState(false);
+
+  // ── Cálculo de stock para el cierre del día ──────────────────
+  const CAJON = 6;
+  const planKeyToSk = {soda:"sifon",b10:"bidon10",b20:"bidon20"};
+  const llenosCargados = {
+    soda: Number(datos.productos?.soda?.llenos||0),
+    b10:  Number(datos.productos?.b10?.llenos||0),
+    b20:  Number(datos.productos?.b20?.llenos||0),
+  };
+  const vendidosDia={soda:0,b10:0,b20:0};
+  const prestadosDia={soda:0,b10:0,b20:0};
+  const devueltosDia={soda:0,b10:0,b20:0};
+  const prodKeyPl={"Sifón 1.5L":"soda","Bidón 10L":"b10","Bidón 20L":"b20"};
+  ventas.forEach(v=>{
+    v.detalle.forEach(d=>{const k=prodKeyPl[d.nombre];if(k)vendidosDia[k]+=d.cantidad;});
+    (v.envPrest||[]).forEach(e=>{const k=prodKeyPl[e.prod];if(k)prestadosDia[k]+=Number(e.cant)||0;});
+    (v.envDev||[]).forEach(e=>{const k=prodKeyPl[e.prod];if(k)devueltosDia[k]+=Number(e.cant)||0;});
+  });
+  // sobrantes = llenos que no se vendieron ni prestaron → vuelven a sodería como llenos
+  const sobrantes={soda:0,b10:0,b20:0};
+  // vacios = lo vendido + lo que devolvieron → vuelven a sodería como vacíos
+  const vaciosRec={soda:0,b10:0,b20:0};
+  ["soda","b10","b20"].forEach(pk=>{
+    sobrantes[pk]=Math.max(0,llenosCargados[pk]-vendidosDia[pk]-prestadosDia[pk]);
+    vaciosRec[pk]=vendidosDia[pk]+devueltosDia[pk];
+  });
+  // Sodería después del cierre
+  const soderiaActual = stock?.soderia||{sifon:0,bidon10:0,bidon20:0};
+  const soderiaVaciosActual = stock?.soderia_vacios||{sifon:0,bidon10:0,bidon20:0};
+  const soderiaPost={soda:0,b10:0,b20:0};
+  const soderiaVaciosPost={soda:0,b10:0,b20:0};
+  ["soda","b10","b20"].forEach(pk=>{
+    const sk=planKeyToSk[pk];
+    soderiaPost[pk]=(soderiaActual[sk]||0)+sobrantes[pk];
+    soderiaVaciosPost[pk]=(soderiaVaciosActual[sk]||0)+vaciosRec[pk];
+  });
+
+  const confirmarCierre = () => {
+    // Actualizar stock: sodería llenos += sobrantes, sodería vacíos += vacíos, camión = 0
+    setStock(prev=>{
+      const s=JSON.parse(JSON.stringify(prev||{}));
+      if(!s.soderia) s.soderia={sifon:0,bidon10:0,bidon20:0};
+      if(!s.soderia_vacios) s.soderia_vacios={sifon:0,bidon10:0,bidon20:0};
+      ["soda","b10","b20"].forEach(pk=>{
+        const sk=planKeyToSk[pk];
+        s.soderia[sk]=(s.soderia[sk]||0)+sobrantes[pk];
+        s.soderia_vacios[sk]=(s.soderia_vacios[sk]||0)+vaciosRec[pk];
+      });
+      s.camion={sifon:0,bidon10:0,bidon20:0};
+      syncData&&syncData({stock:s});
+      return s;
+    });
+    onGuardar({...datos,_diaCerrado:true,_stockActualizado:true});
+    setMostrarCierre(false);
+  };
   const setProd=(pid,campo,v)=>setDatos(d=>({...d,productos:{...d.productos,[pid]:{...d.productos[pid],[campo]:v}}}));
   const setGasto=(i,campo,v)=>{const g=[...(datos.gastos||[])];g[i]={...g[i],[campo]:v};setDatos(d=>({...d,gastos:g}));};
   const addGasto=()=>setDatos(d=>({...d,gastos:[...(d.gastos||[]),{cat:"propina",monto:""}]}));
@@ -2417,32 +2472,106 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
           </div>
         )}
 
-        {/* Modal confirmación cierre */}
+        {/* Modal cierre del día — verificación de stock */}
         {mostrarCierre&&(
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:999,display:"flex",alignItems:"flex-end",justifyContent:"center"}}
             onClick={()=>setMostrarCierre(false)}>
-            <div style={{background:"var(--color-background-primary)",borderRadius:"16px 16px 0 0",padding:"24px 20px",width:"100%",maxWidth:480}}
+            <div style={{background:"var(--color-background-primary)",borderRadius:"16px 16px 0 0",padding:"20px",width:"100%",maxWidth:480,maxHeight:"85vh",overflowY:"auto"}}
               onClick={e=>e.stopPropagation()}>
-              <div style={{fontSize:17,fontWeight:700,color:"var(--color-text-primary)",marginBottom:4}}>🔒 Cerrar el día</div>
-              <div style={{fontSize:13,color:"var(--color-text-secondary)",marginBottom:16,lineHeight:1.5}}>
-                Al cerrar el día se actualizará el stock de la sodería automáticamente con los envases que volvieron.
+              <div style={{fontSize:17,fontWeight:700,color:"var(--color-text-primary)",marginBottom:4}}>🔒 Cerrar el día — Verificación de stock</div>
+              <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:14,lineHeight:1.5}}>
+                Al confirmar, los envases vuelven a la sodería y el camión queda en 0.
               </div>
-              <div style={{...s.card,margin:"0 0 16px",background:"var(--color-background-secondary)"}}>
-                {[["Efectivo cobrado",fmt(cobEfectivo),"success"],["Transferencias",fmt(cobTransBruto),"info"],["Fiado del día",fmt(cobFiado),"warning"],["Total gastos",fmt((datos.gastos||[]).reduce((a,g)=>a+(Number(g.monto)||0),0)),"danger"]].map(([l,v,c])=>(
-                  <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-                    <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>{l}</span>
-                    <span style={{fontSize:13,fontWeight:500,color:`var(--color-text-${c})`}}>{v}</span>
-                  </div>
-                ))}
+
+              {/* Tabla de envases */}
+              <div style={{background:"var(--color-background-secondary)",borderRadius:10,overflow:"hidden",marginBottom:12}}>
+                {/* Header */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"8px 12px",background:"var(--color-background-tertiary)"}}>
+                  {["","Soda (caj)","10L","20L"].map((h,i)=>(
+                    <div key={i} style={{fontSize:10,fontWeight:600,color:"var(--color-text-secondary)",textAlign:i===0?"left":"center",textTransform:"uppercase"}}>{h}</div>
+                  ))}
+                </div>
+                {/* Cargado */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"8px 12px",borderBottom:"0.5px solid var(--color-border-tertiary)",alignItems:"center"}}>
+                  <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>🚚 Cargado</div>
+                  {["soda","b10","b20"].map(pk=>(
+                    <div key={pk} style={{textAlign:"center",fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>
+                      {pk==="soda"?Math.floor(llenosCargados[pk]/CAJON):llenosCargados[pk]}
+                    </div>
+                  ))}
+                </div>
+                {/* Vendido */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"8px 12px",borderBottom:"0.5px solid var(--color-border-tertiary)",alignItems:"center"}}>
+                  <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>📦 Vendido</div>
+                  {["soda","b10","b20"].map(pk=>(
+                    <div key={pk} style={{textAlign:"center",fontSize:14,fontWeight:500,color:"var(--color-text-warning)"}}>
+                      {pk==="soda"?Math.floor(vendidosDia[pk]/CAJON):vendidosDia[pk]}
+                    </div>
+                  ))}
+                </div>
+                {/* Divider */}
+                <div style={{padding:"6px 12px",background:"rgba(77,217,160,0.05)",borderTop:"1px solid rgba(77,217,160,0.2)"}}>
+                  <div style={{fontSize:10,fontWeight:700,color:"#4dd9a0",textTransform:"uppercase",letterSpacing:"0.05em"}}>Vuelve a sodería</div>
+                </div>
+                {/* Llenos que vuelven */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"8px 12px",borderBottom:"0.5px solid var(--color-border-tertiary)",alignItems:"center"}}>
+                  <div style={{fontSize:12,color:"#4dd9a0",fontWeight:500}}>✅ Llenos</div>
+                  {["soda","b10","b20"].map(pk=>(
+                    <div key={pk} style={{textAlign:"center",fontSize:16,fontWeight:700,color:"#4dd9a0"}}>
+                      +{pk==="soda"?Math.floor(sobrantes[pk]/CAJON):sobrantes[pk]}
+                    </div>
+                  ))}
+                </div>
+                {/* Vacíos que vuelven */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"8px 12px",alignItems:"center"}}>
+                  <div style={{fontSize:12,color:"#f5b942",fontWeight:500}}>📦 Vacíos</div>
+                  {["soda","b10","b20"].map(pk=>(
+                    <div key={pk} style={{textAlign:"center",fontSize:16,fontWeight:700,color:"#f5b942"}}>
+                      +{pk==="soda"?Math.floor(vaciosRec[pk]/CAJON):vaciosRec[pk]}
+                    </div>
+                  ))}
+                </div>
               </div>
+
+              {/* Sodería después */}
+              <div style={{background:"var(--color-background-secondary)",borderRadius:10,overflow:"hidden",marginBottom:14}}>
+                <div style={{padding:"8px 12px",background:"rgba(24,95,165,0.15)"}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"var(--color-text-info)",textTransform:"uppercase",letterSpacing:"0.05em"}}>🏭 Sodería después del cierre</div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"6px 12px",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+                  {["","Soda (caj)","10L","20L"].map((h,i)=>(
+                    <div key={i} style={{fontSize:10,color:"var(--color-text-tertiary)",textAlign:i===0?"left":"center"}}>{h}</div>
+                  ))}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"8px 12px",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+                  <div style={{fontSize:12,color:"#4dd9a0"}}>✅ Llenos</div>
+                  {["soda","b10","b20"].map(pk=>(
+                    <div key={pk} style={{textAlign:"center",fontSize:16,fontWeight:700,color:"#4dd9a0"}}>
+                      {pk==="soda"?Math.floor(soderiaPost[pk]/CAJON):soderiaPost[pk]}
+                    </div>
+                  ))}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"8px 12px"}}>
+                  <div style={{fontSize:12,color:"#f5b942"}}>📦 Vacíos</div>
+                  {["soda","b10","b20"].map(pk=>(
+                    <div key={pk} style={{textAlign:"center",fontSize:16,fontWeight:700,color:"#f5b942"}}>
+                      {pk==="soda"?Math.floor(soderiaVaciosPost[pk]/CAJON):soderiaVaciosPost[pk]}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Camión → 0 */}
+              <div style={{...s.card,margin:"0 0 14px",background:"rgba(240,112,112,0.1)",border:"0.5px solid rgba(240,112,112,0.3)",padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:13,color:"var(--color-text-danger)"}}>🚚 Camión queda en</span>
+                <span style={{fontSize:20,fontWeight:700,color:"var(--color-text-danger)"}}>0</span>
+              </div>
+
               <div style={{display:"flex",gap:10}}>
                 <button style={{flex:1,padding:"13px",borderRadius:10,border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-secondary)",color:"var(--color-text-secondary)",fontSize:14,cursor:"pointer"}}
                   onClick={()=>setMostrarCierre(false)}>Cancelar</button>
                 <button style={{flex:2,padding:"13px",borderRadius:10,border:"none",background:"#f5b942",color:"#1a1a1a",fontSize:14,fontWeight:700,cursor:"pointer"}}
-                  onClick={()=>{
-                    onGuardar({...datos,_diaCerrado:true});
-                    setMostrarCierre(false);
-                  }}>✅ Confirmar cierre del día</button>
+                  onClick={confirmarCierre}>✅ Confirmar cierre</button>
               </div>
             </div>
           </div>
