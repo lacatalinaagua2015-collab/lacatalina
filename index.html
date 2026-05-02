@@ -2090,12 +2090,20 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
   const todasVentasDia = [...ventasPropias,...ventasExtraDia];
   const totalesPorProd = {b10:{vacios:0,plata:0,llenar:0},b20:{vacios:0,plata:0,llenar:0},soda:{vacios:0,plata:0,llenar:0,cajones:0}};
   todasVentasDia.forEach(v=>{ v.detalle.forEach(d=>{ const k=prodKey[d.nombre]; if(!k) return; totalesPorProd[k].vacios+=d.cantidad; totalesPorProd[k].plata+=d.total; }); });
-  const sodaCajones = Math.floor(totalesPorProd.soda.vacios/CAJON_SODA)||0;
+  // Cajones: resto ≤ 3 no suma, resto ≥ 4 suma un cajón más
+  const calcCajones = (sifones) => { const full=Math.floor(sifones/CAJON_SODA); return (sifones%CAJON_SODA)>=4 ? full+1 : full; };
+  const sodaCajones = calcCajones(totalesPorProd.soda.vacios);
   totalesPorProd.soda.cajones = sodaCajones;
   totalesPorProd.soda.llenar  = sodaCajones * COSTO_CAJON_SODA;
   totalesPorProd.b10.llenar   = totalesPorProd.b10.vacios * costB10;
   totalesPorProd.b20.llenar   = totalesPorProd.b20.vacios * costB20;
-  const pesoAuto   = Math.round(sodaCajones*10.8 + totalesPorProd.b10.vacios*10.5 + totalesPorProd.b20.vacios*20.5);
+  // Peso desde la CARGA INICIAL del día (lo que salió en el camión — dato de la planilla)
+  const sifonesCargados = Number(planilla?.productos?.soda?.llenos||0);
+  const b10Cargados     = Number(planilla?.productos?.b10?.llenos||0);
+  const b20Cargados     = Number(planilla?.productos?.b20?.llenos||0);
+  const cajonesCargados = calcCajones(sifonesCargados);
+  const pesoAuto   = cajonesCargados * 10 + b10Cargados * 10 + b20Cargados * 20;
+  // Bultos = cajones vendidos + bidones vendidos (con la misma regla de cajones)
   const bultosAuto = sodaCajones + totalesPorProd.b10.vacios + totalesPorProd.b20.vacios;
   const totalVentaPlata  = Object.values(totalesPorProd).reduce((a,p)=>a+p.plata,0);
   const totalVentaLlenar = Object.values(totalesPorProd).reduce((a,p)=>a+p.llenar,0);
