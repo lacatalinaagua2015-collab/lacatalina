@@ -989,7 +989,7 @@ function App() {
           onVolver={()=>irA("menu")} />}
       {pantalla==="diaPrincipal"   && <DiaPrincipal dia={diaActual} onIrClientes={()=>irA("selectorFechaClientes")} onIrPlanilla={()=>irA("selectorFechaPlanilla")} onVolver={()=>irA("menu")} onVerConfirmaciones={()=>irA("confirmacionesDia")} ventasPendientesTransfer={ventas.filter(v=>v.dia===diaActual&&v.pago==="transferencia"&&!v.transConfirmada).length} />}
       {pantalla==="selectorFechaPlanilla" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("planilla");}} onVolver={()=>irA("diaPrincipal")} />}
-      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.dia===diaActual&&v.fechaKey===fechaActual)} clientes={clientes} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);irA("selectorFechaPlanilla");}} onVolver={()=>irA("selectorFechaPlanilla")} />}
+      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual)} clientes={clientes} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);irA("selectorFechaPlanilla");}} onVolver={()=>irA("selectorFechaPlanilla")} />}
       {pantalla==="selectorFechaClientes" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("inicioReparto");}} onVolver={()=>irA("diaPrincipal")} />}
       {pantalla==="inicioReparto"  && <InicioReparto dia={diaActual} fecha={fechaActual} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} cargasDia={cargasDia} stock={stockNorm}
         onGuardar={(p,descontar)=>{
@@ -1046,7 +1046,18 @@ function App() {
             const sig=normalPend[0]||noestaPend[0];
             if(sig){setClienteId(sig.id);irA("detalleCliente");}else irA("clientes");
           }}
-          onNoQuiereCliente={()=>{const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noquiso"}];saveNoVisitas(nv);}}
+          onNoQuiereCliente={()=>{
+            const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noquiso"}];
+            saveNoVisitas(nv);
+            const clientesDia=clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
+            const ventasIds=new Set(ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId));
+            const noVMap={};nv.filter(v=>v.dia===diaActual&&v.fecha===fechaActual).forEach(v=>{noVMap[v.clienteId]=v.motivo;});
+            const terminados=new Set(clientesDia.filter(c=>ventasIds.has(c.id)||noVMap[c.id]==="noquiso"||noVMap[c.id]==="noesta2").map(c=>c.id));
+            const normalPend=clientesDia.filter(c=>!terminados.has(c.id)&&noVMap[c.id]!=="noesta"&&c.id!==cliente.id);
+            const noestaPend=clientesDia.filter(c=>noVMap[c.id]==="noesta"&&!terminados.has(c.id)&&c.id!==cliente.id);
+            const sig=normalPend[0]||noestaPend[0];
+            if(sig){setClienteId(sig.id);irA("detalleCliente");}else irA("clientes");
+          }}
           recordatorios={recordatorios}
           onGuardarRecordatorio={(r)=>saveRecordatorios([...(recordatorios||[]),r])}
           onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
@@ -1860,9 +1871,9 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
           <div style={{fontSize:11,fontWeight:500,color:"#5daaff",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.05em"}}>🔔 Recordatorios pendientes</div>
           {recordatoriosActivos.slice(0,5).map(r=>(
             <div key={r.id} style={{...s.card,margin:"0 0 6px",background:"#1e2e4a",border:"0.5px solid #5daaff",display:"flex",gap:8,alignItems:"flex-start"}}>
-              <div style={{flex:1}}>
-                <div style={{fontSize:12,fontWeight:500,color:"#5daaff"}}>{r.clienteNombre} · {r.dia}</div>
-                <div style={{fontSize:12,color:"var(--color-text-primary)",marginTop:2}}>{r.motivo}</div>
+              <div style={{flex:1,cursor:"pointer"}} onClick={()=>onAgenda&&onAgenda()}>
+                <div style={{fontSize:12,fontWeight:500,color:"#5daaff"}}>{r.clienteNombre} · {r.dia} <span style={{fontSize:10,opacity:0.7}}>→ tocá para ver</span></div>
+                <div style={{fontSize:12,color:"var(--color-text-primary)",marginTop:2}}>{r.tipo==="cobro"?"💰":"🏠"} {r.motivo}</div>
                 <div style={{fontSize:10,color:"var(--color-text-tertiary)",marginTop:2}}>{r.fecha}{r.hora?` · ${r.hora}`:""}</div>
               </div>
               <button style={{background:"#4dd9a0",color:"#0a2e1f",border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,fontWeight:600,cursor:"pointer",flexShrink:0,marginTop:2}}
@@ -3164,7 +3175,7 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
                   🔄 No está
                 </button>
                 <button style={{background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"1px solid var(--color-border-danger)",borderRadius:10,padding:"12px 0",fontSize:13,cursor:"pointer",fontWeight:500,flex:1,minWidth:90}}
-                  onClick={()=>{onNoQuiereCliente&&onNoQuiereCliente();onVolver();}}>
+                  onClick={()=>{onNoQuiereCliente&&onNoQuiereCliente();}}>
                   🚫 No quiere
                 </button>
                 <button style={{...s.btnPrimary,padding:"12px 0",fontSize:15,borderRadius:10,flex:2,minWidth:120}} onClick={onVenta}>
