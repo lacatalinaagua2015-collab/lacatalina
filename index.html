@@ -2086,9 +2086,10 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
   const costB20    = getProdCosto("Bidón 20L")   || 1100;
   const COSTO_CAJON_SODA = costSifon * CAJON_SODA;
   const prodKey = {"Bidón 10L":"b10","Bidón 20L":"b20","Sifón 1.5L":"soda"};
-  // Solo ventas de clientes propios del día
+  // Todas las ventas del día (propias + otros días) para envases y plata
+  const todasVentasDia = [...ventasPropias,...ventasExtraDia];
   const totalesPorProd = {b10:{vacios:0,plata:0,llenar:0},b20:{vacios:0,plata:0,llenar:0},soda:{vacios:0,plata:0,llenar:0,cajones:0}};
-  ventasPropias.forEach(v=>{ v.detalle.forEach(d=>{ const k=prodKey[d.nombre]; if(!k) return; totalesPorProd[k].vacios+=d.cantidad; totalesPorProd[k].plata+=d.total; }); });
+  todasVentasDia.forEach(v=>{ v.detalle.forEach(d=>{ const k=prodKey[d.nombre]; if(!k) return; totalesPorProd[k].vacios+=d.cantidad; totalesPorProd[k].plata+=d.total; }); });
   const sodaCajones = Math.floor(totalesPorProd.soda.vacios/CAJON_SODA)||0;
   totalesPorProd.soda.cajones = sodaCajones;
   totalesPorProd.soda.llenar  = sodaCajones * COSTO_CAJON_SODA;
@@ -2103,15 +2104,15 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
   const extraTrans    = ventasExtraDia.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
   const extraFiado    = ventasExtraDia.filter(v=>v.pago==="fiado").reduce((a,v)=>a+(v.neto||0),0);
   const extraTotal    = extraEfectivo + extraTrans + extraFiado;
-  // Cobranza — solo ventas propias del día
-  const cobEfectivo   = ventasPropias.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
-  const cobTransBruto = ventasPropias.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
+  // Cobranza — todas las ventas del día (propias + otros días)
+  const cobEfectivo   = todasVentasDia.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
+  const cobTransBruto = todasVentasDia.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
   const cobTransDesc  = Math.round(cobTransBruto*0.025);
   const cobTransNeto  = cobTransBruto - cobTransDesc;
   const ventasPendTrans = ventas.filter(v=>v.pago==="transferencia"&&!v.transConfirmada);
-  const cobFiado      = ventasPropias.filter(v=>v.pago==="fiado").reduce((a,v)=>a+(v.neto||0),0);
-  const cobSaldosEfec  = ventasPropias.filter(v=>v.pago==="contado").reduce((a,v)=>{ const extra=(v.pagadoNum||0)-(v.neto||0); return a+(extra>0?extra:0); },0);
-  const cobSaldosTrans = ventasPropias.filter(v=>v.pago==="transferencia").reduce((a,v)=>{ const extra=(v.pagadoNum||0)-(v.neto||0); return a+(extra>0?extra:0); },0);
+  const cobFiado      = todasVentasDia.filter(v=>v.pago==="fiado").reduce((a,v)=>a+(v.neto||0),0);
+  const cobSaldosEfec  = todasVentasDia.filter(v=>v.pago==="contado").reduce((a,v)=>{ const extra=(v.pagadoNum||0)-(v.neto||0); return a+(extra>0?extra:0); },0);
+  const cobSaldosTrans = todasVentasDia.filter(v=>v.pago==="transferencia").reduce((a,v)=>{ const extra=(v.pagadoNum||0)-(v.neto||0); return a+(extra>0?extra:0); },0);
   const cobSaldos      = cobSaldosEfec + cobSaldosTrans;
   const fiadoNeto      = cobFiado - cobSaldos;
 
