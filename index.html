@@ -2076,8 +2076,8 @@ function DiaPrincipal({dia,onIrClientes,onIrPlanilla,onVolver,onVerConfirmacione
 function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setStock,syncData,onGuardar,onVolver}) {
   // Separar ventas del día propio vs ventas de clientes de otro día
   const clientesDia = new Set((clientes||[]).filter(c=>c.dia===dia).map(c=>c.id));
-  const ventasPropias  = ventas.filter(v=>clientesDia.has(v.clienteId));
-  const ventasExtraDia = ventas.filter(v=>!clientesDia.has(v.clienteId)&&v.fechaKey===fecha);
+  const ventasPropias  = ventas.filter(v=>clientesDia.has(v.clienteId)&&v.dia===dia);
+  const ventasExtraDia = ventas.filter(v=>!clientesDia.has(v.clienteId)&&v.dia===dia);
   // Auto-calcular desde ventas del dia
   const CAJON_SODA = 6;
   const getProdCosto = (nombre) => { const p=(productos||[]).find(x=>x.nombre===nombre); return p?(p.costo||0):0; };
