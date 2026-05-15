@@ -1,0 +1,334 @@
+// ════════════════════════════════════════════════════════════════════
+// ◆  10-gestion.js — GestionClientes, FormCliente
+// ════════════════════════════════════════════════════════════════════
+
+function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReordenarTodo,onRegistrarVenta,onVerDetalle,ventas}) {
+  const [fotoClienteId,setFotoClienteId] = React.useState(null);
+  const fotoCliente = fotoClienteId ? clientes.find(c=>c.id===fotoClienteId) : null;
+  const [busqueda,setBusqueda]   = useState("");
+  const [filtroDia,setFiltroDia] = useState("todos");
+  const [modoNuevo,setModoNuevo] = useState(false);
+  const [editandoId,setEditandoId] = useState(null);
+
+  // Calcular envases extra por cliente
+  const extraEnvases = React.useMemo(()=>{
+    const m={};
+    (ventas||[]).forEach(v=>{
+      if(!m[v.clienteId]) m[v.clienteId]={sifon:0,bidon10:0,bidon20:0};
+      (v.envPrest||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)m[v.clienteId][k]+=Number(e.cant)||0;});
+      (v.envDev||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)m[v.clienteId][k]-=Number(e.cant)||0;});
+    });
+    return m;
+  },[ventas]);
+
+  const filtrados = clientes
+    .filter(c=>filtroDia==="todos"||c.dia===filtroDia)
+    .filter(c=>c.nombre.toLowerCase().includes(busqueda.toLowerCase())||
+               (c.barrio||"").toLowerCase().includes(busqueda.toLowerCase())||
+               (c.telefono||"").includes(busqueda))
+    .sort((a,b)=>{
+    if(a.dia!==b.dia) return DIAS.indexOf(a.dia)-DIAS.indexOf(b.dia);
+    return (a.orden||9999)-(b.orden||9999);
+  });
+
+  return (
+    <>
+    <div style={s.screen}>
+      <div style={s.header}>
+        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
+        <span style={s.headerTitle}>Gestión de clientes</span>
+        <button style={{...s.btn,padding:"6px 12px",fontSize:12,background:"#185FA5",color:"#e2eaf4",border:"none"}}
+          onClick={()=>{setModoNuevo(true);setEditandoId(null);}}>
+          + Nuevo
+        </button>
+      </div>
+
+      {/* Filtros */}
+      <div style={{padding:"10px 14px 6px"}}>
+        <input style={s.input} placeholder="Buscar por nombre, barrio o teléfono..." value={busqueda} onChange={e=>setBusqueda(e.target.value)} />
+        <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap",alignItems:"center"}}>
+          {["todos",...DIAS].map(d=>(
+            <button key={d} style={{...s.btn,fontSize:11,padding:"3px 10px",
+              background:filtroDia===d?"#185FA5":"var(--color-background-tertiary)",
+              color:filtroDia===d?"#e2eaf4":"var(--color-text-secondary)",
+              border:filtroDia===d?"none":"0.5px solid var(--color-border-secondary)"}}
+              onClick={()=>setFiltroDia(d)}>
+              {d==="todos"?"Todos":d}
+            </button>
+          ))}
+          <button style={{...s.btn,fontSize:11,padding:"3px 10px",marginLeft:"auto"}}
+          onClick={()=>{
+            const porDia = {};
+            DIAS.forEach(d=>{ porDia[d]=[...clientes].filter(c=>c.dia===d).sort((a,b)=>(a.orden||9999)-(b.orden||9999)); });
+            const compactados = clientes.map(c=>{
+              const lista = porDia[c.dia];
+              const idx = lista.findIndex(x=>x.id===c.id);
+              return idx>=0 ? {...c, orden:idx+1} : c;
+            });
+            if(window.confirm("¿Reordenar todos los clientes eliminando los huecos en la numeración?")) onReordenarTodo(compactados);
+          }}>
+          ↺ Reordenar
+        </button>
+        </div>
+        <p style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:6}}>
+          {filtrados.length} clientes{filtroDia!=="todos"?` · ${filtroDia}`:""}
+        </p>
+      </div>
+
+      {/* Formulario nuevo cliente */}
+      {modoNuevo && (
+        <div style={{...s.card,margin:"6px 14px",borderLeft:"3px solid #185FA5"}}>
+          <div style={{...s.row,justifyContent:"space-between",marginBottom:10}}>
+            <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Nuevo cliente</span>
+            <button style={{...s.btn,fontSize:11,padding:"3px 10px"}} onClick={()=>setModoNuevo(false)}>Cancelar</button>
+          </div>
+          <FormCliente
+            inicial={{nombre:"",dia:"Martes",barrio:"",manzana:"",lote:"",sector:"",calle:"",nro:"",aclaracion:"",telefono:"",maps:"",notas:"",sifon:0,bidon10:0,bidon20:0,orden:""}}
+            onGuardar={(datos)=>{onNuevo(datos);setModoNuevo(false);}}
+          />
+        </div>
+      )}
+
+      {/* Lista */}
+      {filtrados.map(c=>(
+        <div key={c.id} style={{...s.card,borderLeft:editandoId===c.id?"3px solid #5daaff":"0.5px solid var(--color-border-tertiary)"}}>
+          {editandoId===c.id ? (
+            <>
+              <div style={{...s.row,justifyContent:"space-between",marginBottom:10}}>
+                <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Editando</span>
+                <button style={{...s.btn,fontSize:11,padding:"3px 10px"}} onClick={()=>setEditandoId(null)}>Cancelar</button>
+              </div>
+              <FormCliente
+                inicial={c}
+                onGuardar={(datos)=>{onEditar(c.id,datos);setEditandoId(null);}}
+              />
+              {/* Ajuste de envases EXTRA prestados (editable) */}
+              {(()=>{
+                const ex = extraEnvases[c.id]||{sifon:0,bidon10:0,bidon20:0};
+                // total actual prestado = calculado desde ventas + ajuste manual
+                // el usuario edita el TOTAL directamente; envAjuste = total - ex
+                const aj = c.envAjuste||{sifon:0,bidon10:0,bidon20:0};
+                const total = {sifon:ex.sifon+(aj.sifon||0),bidon10:ex.bidon10+(aj.bidon10||0),bidon20:ex.bidon20+(aj.bidon20||0)};
+                const setTotal=(k,val)=>{
+                  const n=Number(val)||0;
+                  onEditar(c.id,{envAjuste:{...aj,[k]:n-(ex[k]||0)}});
+                };
+                return (
+                  <div style={{...s.card,margin:"4px 0",background:"var(--color-background-tertiary)",padding:"10px 12px",borderLeft:"3px solid var(--color-border-warning)"}}>
+                    <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-warning)",marginBottom:4}}>📦 Envases extra prestados al cliente</div>
+                    <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginBottom:8}}>Editá directamente la cantidad que tiene en su poder. Ponelo en 0 si ya los devolvió todos.</div>
+                    <div style={{display:"flex",gap:8}}>
+                      {[["sifon","Sifón"],["bidon10","10L"],["bidon20","20L"]].map(([k,l])=>(
+                        <div key={k} style={{flex:1,textAlign:"center"}}>
+                          <label style={{...s.label,textAlign:"center",fontSize:11}}>{l}</label>
+                          <input
+                            style={{...s.inputNum,textAlign:"center",fontSize:18,fontWeight:700,
+                              color:total[k]>0?"var(--color-text-warning)":total[k]<0?"var(--color-text-success)":"var(--color-text-tertiary)"}}
+                            type="number"
+                            value={total[k]}
+                            onChange={e=>setTotal(k,e.target.value)}
+                          />
+                          <div style={{fontSize:9,color:"var(--color-text-tertiary)",marginTop:3}}>{total[k]>0?"prestado":total[k]<0?"devuelto de más":"ok"}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+            </>
+          ) : (
+            <>
+              <div style={{display:"flex",alignItems:"flex-start",gap:10,cursor:onVerDetalle?"pointer":"default"}}
+                onClick={()=>onVerDetalle&&onVerDetalle(c)}>
+                {/* Número de orden */}
+                <div style={{width:32,height:32,borderRadius:8,background:"var(--color-background-tertiary)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:600,color:"var(--color-text-tertiary)",flexShrink:0}}>
+                  {c.orden||"#"}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:500,fontSize:14,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nombre}</div>
+                  <div style={{fontSize:16,color:"var(--color-text-secondary)",marginTop:2}}>
+                    {c.dia} · {c.calle?`${c.calle} ${c.nro||""}`:c.manzana?`Mz ${c.manzana} L ${c.lote}`:""}{c.barrio?` · ${c.barrio}`:""}
+                  </div>
+                  {c.notas&&<div style={{fontSize:11,color:"var(--color-text-warning)",marginTop:2}}>📝 {c.notas}</div>}
+                  <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>
+                    {/* Saldo */}
+                    {c.saldo<0&&<span style={s.badge("danger")}>Debe {fmt(Math.abs(c.saldo))}</span>}
+                    {c.saldo>0&&<span style={s.badge("success")}>A favor {fmt(c.saldo)}</span>}
+                    {/* Envases habituales */}
+                    {c.sifon>0&&<span style={s.tag}>Sifón×{c.sifon}</span>}
+                    {c.bidon10>0&&<span style={s.tag}>10L×{c.bidon10}</span>}
+                    {c.bidon20>0&&<span style={s.tag}>20L×{c.bidon20}</span>}
+                    {c.dispenser>0&&<span style={{...s.tag,color:"#5daaff"}}>Disp×{c.dispenser}</span>}
+                    {/* Envases extra prestados */}
+                    {(()=>{
+                      const ex=extraEnvases[c.id]||{};
+                      const aj=c.envAjuste||{};
+                      const total={sifon:(ex.sifon||0)+(aj.sifon||0),bidon10:(ex.bidon10||0)+(aj.bidon10||0),bidon20:(ex.bidon20||0)+(aj.bidon20||0)};
+                      return (<>
+                        {total.sifon>0&&<span style={{...s.tag,color:"var(--color-text-warning)",fontWeight:500}}>+{total.sifon} sif extra</span>}
+                        {total.bidon10>0&&<span style={{...s.tag,color:"var(--color-text-warning)",fontWeight:500}}>+{total.bidon10} 10L extra</span>}
+                        {total.bidon20>0&&<span style={{...s.tag,color:"var(--color-text-warning)",fontWeight:500}}>+{total.bidon20} 20L extra</span>}
+                      </>);
+                    })()}
+                  </div>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0,alignItems:"center"}}>
+                  {c.maps&&<a href={c.maps} target="_blank" rel="noreferrer" style={{fontSize:18,textDecoration:"none"}} onClick={e=>e.stopPropagation()}>📍</a>}
+                  {c.telefono&&<a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:18,textDecoration:"none"}} onClick={e=>e.stopPropagation()}>💬</a>}
+                  <span style={{fontSize:18,cursor:"pointer",lineHeight:1}} onClick={e=>{e.stopPropagation();setFotoClienteId(fotoClienteId===c.id?null:c.id);}}>📷</span>
+                </div>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8,borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:8}}>
+                <button style={{...s.btnDanger,fontSize:11,padding:"4px 12px"}} onClick={e=>{e.stopPropagation();onEliminar(c.id);}}>Eliminar</button>
+                <div style={{display:"flex",gap:6}}>
+                  {onRegistrarVenta&&<button style={{...s.btn,fontSize:11,padding:"4px 12px",background:"#185FA5",color:"#e2eaf4",border:"none"}} onClick={e=>{e.stopPropagation();onRegistrarVenta(c);}}>📦 Venta</button>}
+                  <button style={{...s.btn,fontSize:11,padding:"4px 12px"}} onClick={e=>{e.stopPropagation();setEditandoId(c.id);}}>Editar</button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      ))}
+
+      {filtrados.length===0&&!modoNuevo&&(
+        <div style={{textAlign:"center",padding:"40px 20px",color:"var(--color-text-tertiary)",fontSize:14}}>
+          No hay clientes{filtroDia!=="todos"?` en ${filtroDia}`:""}.
+        </div>
+      )}
+    </div>
+    {/* Modal foto domicilio */}
+    {fotoClienteId&&(
+      <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.92)",zIndex:2000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setFotoClienteId(null)}>
+        {fotoCliente&&fotoCliente.foto
+          ? <img src={fotoCliente.foto} alt="Domicilio" style={{maxWidth:"100%",maxHeight:"60vh",borderRadius:10,objectFit:"contain",marginBottom:16}} />
+          : <div style={{color:"#aaa",fontSize:14,marginBottom:20}}>Sin foto aún · {fotoCliente&&fotoCliente.nombre}</div>
+        }
+        <div style={{display:"flex",gap:12}} onClick={e=>e.stopPropagation()}>
+          <label style={{background:"#185FA5",color:"#e2eaf4",padding:"12px 20px",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer",textAlign:"center"}}>
+            📷 Cámara
+            <input type="file" accept="image/*" capture="environment" style={{display:"none"}}
+              onChange={async e=>{const f=e.target.files[0];if(!f)return;const b64=await comprimirFoto(f);onEditar(fotoClienteId,{foto:b64});setFotoClienteId(null);}} />
+          </label>
+          <label style={{background:"#2a3a4a",color:"#e2eaf4",padding:"12px 20px",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer",textAlign:"center"}}>
+            🖼 Galería
+            <input type="file" accept="image/*" style={{display:"none"}}
+              onChange={async e=>{const f=e.target.files[0];if(!f)return;const b64=await comprimirFoto(f);onEditar(fotoClienteId,{foto:b64});setFotoClienteId(null);}} />
+          </label>
+          {fotoCliente&&fotoCliente.foto&&<button style={{background:"#3a2020",color:"#e05c5c",padding:"12px 14px",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer",border:"none"}} onClick={()=>{onEditar(fotoClienteId,{foto:""});setFotoClienteId(null);}}>🗑</button>}
+        </div>
+        <span style={{color:"#aaa",fontSize:11,marginTop:14}}>Tocá fuera para cerrar</span>
+      </div>
+    )}
+    </>
+  );
+}
+
+function FormCliente({inicial,onGuardar}) {
+  const [datos,setDatos] = useState({...inicial});
+  const set = (k,v) => setDatos(d=>({...d,[k]:v}));
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      <div style={s.grid2}>
+        <div>
+          <label style={s.label}>Día de reparto</label>
+          <select style={s.select} value={datos.dia||"Martes"} onChange={e=>set("dia",e.target.value)}>
+            {DIAS.map(d=><option key={d} value={d}>{d}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={s.label}>Número de orden</label>
+          <input style={s.input} type="number" min={1} placeholder="ej: 5" value={datos.orden||""} onChange={e=>set("orden",Number(e.target.value)||"")} />
+        </div>
+      </div>
+      <div>
+        <label style={s.label}>Nombre y apellido *</label>
+        <input style={s.input} placeholder="Nombre completo" value={datos.nombre||""} onChange={e=>set("nombre",e.target.value)} />
+      </div>
+      <div style={s.grid2}>
+        <div><label style={s.label}>Barrio</label><input style={s.input} placeholder="Barrio" value={datos.barrio||""} onChange={e=>set("barrio",e.target.value)} /></div>
+        <div><label style={s.label}>Sector</label><input style={s.input} placeholder="Sector" value={datos.sector||""} onChange={e=>set("sector",e.target.value)} /></div>
+      </div>
+      <div style={s.grid3}>
+        <div><label style={s.label}>Manzana</label><input style={s.input} placeholder="Mz" value={datos.manzana||""} onChange={e=>set("manzana",e.target.value)} /></div>
+        <div><label style={s.label}>Lote</label><input style={s.input} placeholder="Lote" value={datos.lote||""} onChange={e=>set("lote",e.target.value)} /></div>
+        <div><label style={s.label}>Casa</label><input style={s.input} placeholder="Casa" value={datos.aclaracion||""} onChange={e=>set("aclaracion",e.target.value)} /></div>
+      </div>
+      <div style={s.grid2}>
+        <div><label style={s.label}>Calle</label><input style={s.input} placeholder="Calle" value={datos.calle||""} onChange={e=>set("calle",e.target.value)} /></div>
+        <div><label style={s.label}>Número</label><input style={s.input} placeholder="Nro" value={datos.nro||""} onChange={e=>set("nro",e.target.value)} /></div>
+      </div>
+      <div>
+        <label style={s.label}>Teléfono (sin 0 ni 15)</label>
+        <input style={s.input} placeholder="3816559000" value={datos.telefono||""} onChange={e=>set("telefono",e.target.value)} />
+      </div>
+      <div>
+        <label style={s.label}>Link Google Maps</label>
+        <input style={s.input} placeholder="https://maps.app.goo.gl/..." value={datos.maps||""} onChange={e=>set("maps",e.target.value)} />
+      </div>
+      <div>
+        <label style={s.label}>Notas rápidas</label>
+        <input style={s.input} placeholder="timbre roto, perro, cobrar deuda..." value={datos.notas||""} onChange={e=>set("notas",e.target.value)} />
+      </div>
+      <label style={{...s.label,marginTop:4}}>Envases habituales asignados</label>
+      <div style={s.grid3}>
+        {[["sifon","Sifón"],["bidon10","Bidón 10L"],["bidon20","Bidón 20L"]].map(([k,l])=>(
+          <div key={k}>
+            <label style={{...s.label,textAlign:"center"}}>{l}</label>
+            <input style={{...s.input,textAlign:"center"}} type="number" min={0} value={datos[k]||0} onChange={e=>set(k,Number(e.target.value))} />
+          </div>
+        ))}
+      </div>
+      <div>
+        <label style={s.label}>Dispenser en comodato</label>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <button style={{...s.btn,padding:"5px 14px",fontSize:18,lineHeight:1}} onClick={()=>set("dispenser",Math.max(0,(datos.dispenser||0)-1))}>−</button>
+          <span style={{fontSize:18,fontWeight:500,minWidth:28,textAlign:"center",color:"var(--color-text-primary)"}}>{datos.dispenser||0}</span>
+          <button style={{...s.btn,padding:"5px 14px",fontSize:18,lineHeight:1}} onClick={()=>set("dispenser",(datos.dispenser||0)+1)}>+</button>
+          <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>unidades</span>
+        </div>
+      </div>
+      {/* Saldo */}
+      <div style={{...s.card,margin:"4px 0",background:"var(--color-background-tertiary)",padding:"10px 12px"}}>
+        <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8}}>Saldo del cliente</div>
+        <div style={{display:"flex",gap:8,marginBottom:6}}>
+          {[["favor","A favor (tiene crédito)"],["deuda","Debe (saldo pendiente)"],["cero","Sin saldo"]].map(([v,l])=>(
+            <button key={v} style={{flex:1,fontSize:11,padding:"6px 4px",borderRadius:8,border:"0.5px solid var(--color-border-secondary)",cursor:"pointer",
+              background:datos._tipoSaldo===v?"#185FA5":"var(--color-background-secondary)",
+              color:datos._tipoSaldo===v?"#e2eaf4":"var(--color-text-secondary)"}}
+              onClick={()=>set("_tipoSaldo",v)}>
+              {l.split(" ")[0]}
+            </button>
+          ))}
+        </div>
+        {datos._tipoSaldo&&datos._tipoSaldo!=="cero"&&(
+          <div>
+            <label style={s.label}>{datos._tipoSaldo==="favor"?"Monto a favor ($)":"Monto que debe ($)"}</label>
+            <input style={s.input} type="number" min={0} placeholder="0"
+              value={datos._montoSaldo||""}
+              onChange={e=>set("_montoSaldo",e.target.value)} />
+          </div>
+        )}
+        {datos.saldo!==0&&<div style={{fontSize:11,color:datos.saldo<0?"var(--color-text-danger)":"var(--color-text-success)",marginTop:4}}>
+          Saldo actual: {fmt(datos.saldo)} · {datos.saldo<0?"Debe":"A favor"}
+        </div>}
+        <div style={{marginTop:6}}>
+          <label style={s.label}>O ingresá el saldo directamente (−negativo = debe · +positivo = a favor)</label>
+          <input style={s.input} type="number" placeholder="ej: -2500 o 1800"
+            value={datos._saldoDirecto??""} onChange={e=>set("_saldoDirecto",e.target.value)} />
+        </div>
+      </div>
+      <button style={{...s.btnPrimary,marginTop:4,opacity:!datos.nombre?0.45:1}} disabled={!datos.nombre}
+        onClick={()=>{
+          let saldo = datos.saldo||0;
+          if(datos._tipoSaldo==="favor")  saldo =  Math.abs(Number(datos._montoSaldo)||0);
+          if(datos._tipoSaldo==="deuda")  saldo = -Math.abs(Number(datos._montoSaldo)||0);
+          if(datos._tipoSaldo==="cero")   saldo = 0;
+          if(datos._saldoDirecto!==undefined&&datos._saldoDirecto!=="") saldo=Number(datos._saldoDirecto);
+          onGuardar({...datos, saldo});
+        }}>
+        Guardar cliente
+      </button>
+    </div>
+  );
+}
+
