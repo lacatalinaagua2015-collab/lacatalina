@@ -293,9 +293,9 @@ function Promocion({prospectos,onSave,onConvertir,onVolver}) {
           const c=compras(p), s=semanas(p), vhoy=visitadoHoy(p), lst=listo(p);
           const bc=lst?"#4dd9a0":vhoy?"#5daaff":"var(--color-border-tertiary)";
           return (
-            <div key={p.id} style={{...s.card,borderLeft:`3px solid ${bc}`,cursor:"pointer"}}
-              onClick={()=>{setSelId(p.id);setSubVista("detalle");}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+            <div key={p.id} style={{...s.card,borderLeft:`3px solid ${bc}`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",cursor:"pointer"}}
+                onClick={()=>{setSelId(p.id);setSubVista("detalle");}}>
                 <div style={{flex:1}}>
                   <div style={{fontWeight:500,fontSize:14,color:"var(--color-text-primary)"}}>{p.nombre}</div>
                   <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:2}}>
@@ -319,6 +319,16 @@ function Promocion({prospectos,onSave,onConvertir,onVolver}) {
                 <div style={{height:5,borderRadius:3,background:lst?"#4dd9a0":"#185FA5",width:`${Math.min(100,c/4*100)}%`}}/>
               </div>
               <div style={{fontSize:10,color:"var(--color-text-tertiary)",marginTop:3}}>{lst?"✓ 4 semanas completadas":`${c}/4 semanas de compra`}</div>
+              {!vhoy&&(
+                <div style={{display:"flex",gap:6,marginTop:8}}>
+                  <button style={{flex:1,background:"var(--color-background-warning)",color:"var(--color-text-warning)",border:"0.5px solid var(--color-border-warning)",borderRadius:8,padding:"8px 4px",fontSize:12,fontWeight:500,cursor:"pointer"}}
+                    onClick={e=>{e.stopPropagation();registrar(p.id,"noesta");}}>No estaba</button>
+                  <button style={{flex:1,background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"0.5px solid var(--color-border-danger)",borderRadius:8,padding:"8px 4px",fontSize:12,fontWeight:500,cursor:"pointer"}}
+                    onClick={e=>{e.stopPropagation();registrar(p.id,"noquiso");}}>No quiso</button>
+                  <button style={{flex:2,background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:8,padding:"8px 4px",fontSize:12,fontWeight:600,cursor:"pointer"}}
+                    onClick={e=>{e.stopPropagation();registrar(p.id,"compro");}}>✓ Compró</button>
+                </div>
+              )}
             </div>
           );
         })}
