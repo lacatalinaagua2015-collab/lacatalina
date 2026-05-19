@@ -19,12 +19,13 @@ function Resumen({ventas,clientes,productos,planillas,noVisitas,onVolver}) {
   },[ventas,filtro,mesSel,diaSel]);
 
   // ── Métricas ──────────────────────────────────────────────────────────────
-  const totalNeto    = filtradas.reduce((a,v)=>a+(v.neto||0),0);
-  const totalGan     = filtradas.reduce((a,v)=>a+(v.ganancia||0),0);
-  const totalCosto   = filtradas.reduce((a,v)=>a+(v.costo||0),0);
-  const cobEfectivo  = filtradas.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.neto||0),0);
-  const cobTrans     = filtradas.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v.neto||0),0);
-  const cobFiado     = filtradas.filter(v=>v.pago==="fiado").reduce((a,v)=>a+(v.neto||0),0);
+  const ventasReales  = filtradas.filter(v=>!v._esMixtoTrans);
+  const totalNeto    = ventasReales.reduce((a,v)=>a+(v.neto||0),0);
+  const totalGan     = ventasReales.reduce((a,v)=>a+(v.ganancia||0),0);
+  const totalCosto   = ventasReales.reduce((a,v)=>a+(v.costo||0),0);
+  const cobEfectivo  = ventasReales.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.montoEfec>0?v.montoEfec:v.neto||0),0);
+  const cobTrans     = filtradas.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v._esMixtoTrans?v.neto:v.neto)||0,0);
+  const cobFiado     = ventasReales.filter(v=>v.pago==="fiado").reduce((a,v)=>a+(v.neto||0),0);
   const cobSaldos    = filtradas.reduce((a,v)=>{const e=(v.pagadoNum||0)-(v.neto||0);return a+(e>0?e:0);},0);
   const porPago      = {contado:cobEfectivo, transferencia:cobTrans, fiado:cobFiado};
   const cantidades   = {};
@@ -41,12 +42,16 @@ function Resumen({ventas,clientes,productos,planillas,noVisitas,onVolver}) {
     const anio = fk.slice(0,4);
     if(filtro==="anio" && anio!==mesSel.slice(0,4)) return;
     if(!porMes[fk]) porMes[fk]={mes:fk,total:0,efectivo:0,trans:0,fiado:0,ganancia:0,ventas:0};
-    porMes[fk].total    += v.neto||0;
-    porMes[fk].efectivo += v.pago==="contado"?v.neto||0:0;
-    porMes[fk].trans    += v.pago==="transferencia"?v.neto||0:0;
-    porMes[fk].fiado    += v.pago==="fiado"?v.neto||0:0;
-    porMes[fk].ganancia += v.ganancia||0;
-    porMes[fk].ventas   += 1;
+    if(v._esMixtoTrans){
+      porMes[fk].trans += v.neto||0; // solo suma a transferencia, no al total ni ganancia
+    } else {
+      porMes[fk].total    += v.neto||0;
+      porMes[fk].efectivo += v.pago==="contado"?(v.montoEfec>0?v.montoEfec:v.neto||0):0;
+      porMes[fk].trans    += v.pago==="transferencia"?v.neto||0:0;
+      porMes[fk].fiado    += v.pago==="fiado"?v.neto||0:0;
+      porMes[fk].ganancia += v.ganancia||0;
+      porMes[fk].ventas   += 1;
+    }
   });
   const mesesOrdenados = Object.values(porMes).sort((a,b)=>a.mes.localeCompare(b.mes));
   const ultimosMeses   = mesesOrdenados.slice(-12);
@@ -137,7 +142,7 @@ function Resumen({ventas,clientes,productos,planillas,noVisitas,onVolver}) {
 
       {/* Métricas principales */}
       <div style={{...s.grid2,padding:"0 14px",gap:8,marginBottom:8}}>
-        <div style={s.metricCard}><div style={s.metricLabel}>Total vendido</div><div style={{...s.metricVal,color:"#5daaff"}}>{fmt(totalNeto)}</div><div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>{filtradas.length} entregas</div></div>
+        <div style={s.metricCard}><div style={s.metricLabel}>Total vendido</div><div style={{...s.metricVal,color:"#5daaff"}}>{fmt(totalNeto)}</div><div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>{ventasReales.filter(v=>!v._esCobro&&!v._esAjuste).length} entregas</div></div>
         <div style={s.metricCard}><div style={s.metricLabel}>Ganancia neta</div><div style={{...s.metricVal,color:"#4dd9a0"}}>{fmt(totalGan)}</div><div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>−{fmt(totalCosto)} llenado</div></div>
       </div>
 

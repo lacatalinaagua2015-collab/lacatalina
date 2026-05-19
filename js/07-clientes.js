@@ -2,7 +2,7 @@
 // ◆  07-clientes.js — ListaClientes, DetalleCliente, EditCliente
 // ════════════════════════════════════════════════════════════════════
 
-function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onConfirmarTransfer}) {
+function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onNoQuiereProspecto,onConfirmarTransfer}) {
   const [busqueda,setBusqueda] = useState("");
   const [editandoOrden,setEditandoOrden] = useState(null);
   const [ordenTemp,setOrdenTemp] = useState("");
@@ -15,9 +15,12 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
   );
   const visitados = new Set([...atendidos,...visitadosSinVenta]);
   const prospectosDelDia = (prospectos||[]).filter(p=>p.dia===dia&&p.estado==="activo");
-  const visitadosProspectos = new Set(
-    ventas.filter(v=>prospectosDelDia.some(p=>p.id===v.clienteId)).map(v=>v.clienteId)
-  );
+  const noVMapProspectos = {};
+  (noVisitas||[]).filter(v=>v.fecha===fecha).forEach(v=>{noVMapProspectos[v.clienteId]=v.motivo;});
+  const visitadosProspectos = new Set([
+    ...ventas.filter(v=>prospectosDelDia.some(p=>p.id===v.clienteId)).map(v=>v.clienteId),
+    ...prospectosDelDia.filter(p=>noVMapProspectos[p.id]==="noquiso").map(p=>p.id)
+  ]);
 
   const marcarNoVisita = (id,motivo) => {
     const prev = noVMap[id];
@@ -218,8 +221,15 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
                 <div style={{display:"flex",gap:6,marginTop:8,justifyContent:"flex-end"}}>
                   <button style={{background:"var(--color-background-warning)",color:"var(--color-text-warning)",border:"0.5px solid var(--color-border-warning)",borderRadius:8,padding:"5px 10px",fontSize:11,cursor:"pointer"}}
                     onClick={()=>onNoEstaProspecto&&onNoEstaProspecto(p.id)}>No estaba</button>
+                  <button style={{background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"0.5px solid var(--color-border-danger)",borderRadius:8,padding:"5px 10px",fontSize:11,cursor:"pointer"}}
+                    onClick={()=>onNoQuiereProspecto&&onNoQuiereProspecto(p.id)}>No quiere</button>
                   <button style={{background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:8,padding:"5px 12px",fontSize:12,cursor:"pointer",fontWeight:500}}
                     onClick={()=>onVentaProspecto&&onVentaProspecto(p)}>Registrar entrega →</button>
+                </div>
+              )}
+              {visitadosProspectos.has(p.id)&&noVMapProspectos[p.id]==="noquiso"&&(
+                <div style={{marginTop:6,textAlign:"right"}}>
+                  <span style={s.badge("danger")}>🙅 No quiso</span>
                 </div>
               )}
             </div>

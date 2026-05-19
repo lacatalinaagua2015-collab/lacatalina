@@ -476,6 +476,7 @@ function App() {
         neto:montoTrans2, bruto:montoTrans2, desc:0, costo:0, ganancia:montoTrans2,
         pagadoNum:montoTrans2, saldoDelta:montoTrans2, // suma al saldo del cliente
         envPrest:[], envDev:[],
+        _esMixtoTrans:true,
       };
       nuevasVentas = [...nuevasVentas, ventaTr];
       saldoExtra += montoTrans2; // la transferencia abona al saldo
@@ -532,6 +533,7 @@ function App() {
         pago:"transferencia", obs:"[Parte transfer. de pago mixto]", saldoAplicado:0,
         neto:montoTrans2, bruto:montoTrans2, desc:0, costo:0, ganancia:montoTrans2,
         pagadoNum:montoTrans2, saldoDelta:montoTrans2, envPrest:[], envDev:[],
+        _esMixtoTrans:true,
       };
       nev = [...nev, ventaTr];
       saldoExtra += montoTrans2;
