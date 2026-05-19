@@ -36,7 +36,7 @@ function EditVenta({venta,productos,onGuardar,onCancelar}) { // onGuardar(detall
         <div style={{...s.card,margin:"0 0 8px",background:"var(--color-background-tertiary)"}}>
           <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:6}}>Total: {fmt(neto)}</div>
           <div style={{display:"flex",gap:8}}>
-            <div style={{flex:1}}><label style={s.label}>Efectivo $</label><input style={s.input} type="number" placeholder="0" value={montoEfec} onChange={e=>setMontoEfec(e.target.value)}/></div>
+            <div style={{flex:1}}><label style={s.label}>Efectivo $</label><input style={s.input} type="number" placeholder="0" value={montoEfec} onChange={e=>{const ef=e.target.value;setMontoEfec(ef);const r=neto-(Number(ef)||0);setMontoTrans(r>0?String(Math.round(r)):"");}}/></div>
             <div style={{flex:1}}><label style={s.label}>Transferencia $</label><input style={s.input} type="number" placeholder="0" value={montoTrans} onChange={e=>setMontoTrans(e.target.value)}/></div>
           </div>
           {(Number(montoEfec||0)+Number(montoTrans||0))>0&&(
@@ -343,7 +343,12 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
             <div style={{display:"flex",gap:8,marginBottom:6}}>
               <div style={{flex:1}}>
                 <label style={s.label}>Efectivo $</label>
-                <input style={s.input} type="number" placeholder="0" value={montoEfec} onChange={e=>setMontoEfec(e.target.value)} />
+                <input style={s.input} type="number" placeholder="0" value={montoEfec} onChange={e=>{
+                  const ef = e.target.value;
+                  setMontoEfec(ef);
+                  const resto = aPagar - (Number(ef)||0);
+                  setMontoTrans(resto > 0 ? String(Math.round(resto)) : "");
+                }} />
               </div>
               <div style={{flex:1}}>
                 <label style={s.label}>Transferencia $</label>

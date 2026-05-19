@@ -17,8 +17,11 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
   const prospectosDelDia = (prospectos||[]).filter(p=>p.dia===dia&&p.estado==="activo");
   const noVMapProspectos = {};
   (noVisitas||[]).filter(v=>v.fecha===fecha).forEach(v=>{noVMapProspectos[v.clienteId]=v.motivo;});
+  const ventasProspectos = new Set(
+    ventas.filter(v=>prospectosDelDia.some(p=>p.id===v.clienteId)).map(v=>v.clienteId)
+  );
   const visitadosProspectos = new Set([
-    ...ventas.filter(v=>prospectosDelDia.some(p=>p.id===v.clienteId)).map(v=>v.clienteId),
+    ...ventasProspectos,
     ...prospectosDelDia.filter(p=>noVMapProspectos[p.id]==="noquiso").map(p=>p.id)
   ]);
 
@@ -209,7 +212,7 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
                     {p.bidon10>0&&<span style={s.tag}>10L×{p.bidon10}</span>}
                     {p.bidon20>0&&<span style={s.tag}>20L×{p.bidon20}</span>}
                     {p.dispenser>0&&<span style={{...s.tag,color:"#5daaff"}}>Disp×{p.dispenser}</span>}
-                    {visitadosProspectos.has(p.id)&&<span style={s.badge("success")}>✓ Registrado</span>}
+                    {ventasProspectos.has(p.id)&&<span style={s.badge("success")}>✓ Registrado</span>}
                   </div>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0}}>
