@@ -2,6 +2,68 @@
 // ◆  12-config.js — Config pantalla principal
 // ════════════════════════════════════════════════════════════════════
 
+function NotifConfig() {
+  const [permiso, setPermiso] = React.useState(
+    'Notification' in window ? Notification.permission : 'no-soportado'
+  );
+  const [horaCierre, setHoraCierre] = React.useState(
+    localStorage.getItem('lc_hora_notif_cierre') || '18:00'
+  );
+  const pedirPermiso = async () => {
+    if(!('Notification' in window)) return;
+    const r = await Notification.requestPermission();
+    setPermiso(r);
+  };
+  const guardarHora = (h) => {
+    setHoraCierre(h);
+    localStorage.setItem('lc_hora_notif_cierre', h);
+  };
+  const estadoColor = permiso === 'granted' ? '#4dd9a0' : permiso === 'denied' ? '#f07070' : '#f5b942';
+  const estadoTexto = permiso === 'granted' ? '✅ Activadas' : permiso === 'denied' ? '🚫 Bloqueadas por el sistema' : permiso === 'no-soportado' ? '⚠ No soportado' : '⏳ Sin activar';
+  return (
+    <>
+      <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:4}}>🔔 Notificaciones</div>
+      <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:10}}>
+        Alertas emergentes con sonido para transferencias, cierre del día y agenda.
+      </div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <span style={{fontSize:13,fontWeight:600,color:estadoColor}}>{estadoTexto}</span>
+        {permiso !== 'granted' && permiso !== 'denied' && (
+          <button style={{background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:500,cursor:"pointer"}}
+            onClick={pedirPermiso}>
+            Activar
+          </button>
+        )}
+        {permiso === 'denied' && (
+          <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>Activalas desde el navegador</span>
+        )}
+      </div>
+      {permiso === 'granted' && (
+        <>
+          <div style={{borderTop:"0.5px solid var(--color-border-tertiary)",margin:"8px 0"}}/>
+          <div style={{marginTop:8}}>
+            <label style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:3,display:"block"}}>⏰ Hora de aviso: cierre del día</label>
+            <input type="time" style={{padding:"8px 10px",border:"0.5px solid var(--color-border-secondary)",borderRadius:8,fontSize:14,background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",outline:"none",boxSizing:"border-box"}}
+              value={horaCierre}
+              onChange={e=>guardarHora(e.target.value)}
+            />
+            <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:4}}>
+              Si a esa hora la planilla está vacía, recibís un aviso.
+            </div>
+          </div>
+          <div style={{marginTop:10}}>
+            <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>📋 Otros avisos automáticos:</div>
+            <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginTop:4,lineHeight:1.7}}>
+              💳 Transferencias sin confirmar → <b>13:00</b> y <b>19:00</b><br/>
+              📅 Recordatorios de agenda → a la hora exacta
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
 function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,planillas,setPlanillas,stock,setStock,cargasDia,setCargasDia,syncData,onVolver,ecToken,setEcToken}) {
   const [tab,setTab]=useState("precios");
   const [editandoId,setEditandoId]=useState(null);
@@ -366,68 +428,9 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
             })()}
           </div>
           <div style={{...s.card,margin:0}}>
-            {(()=>{
-              const [permiso, setPermiso] = React.useState(
-                'Notification' in window ? Notification.permission : 'no-soportado'
-              );
-              const [horaCierre, setHoraCierre] = React.useState(
-                localStorage.getItem('lc_hora_notif_cierre') || '18:00'
-              );
-              const pedirPermiso = async () => {
-                if(!('Notification' in window)) return;
-                const r = await Notification.requestPermission();
-                setPermiso(r);
-              };
-              const guardarHora = (h) => {
-                setHoraCierre(h);
-                localStorage.setItem('lc_hora_notif_cierre', h);
-              };
-              const estadoColor = permiso === 'granted' ? '#4dd9a0' : permiso === 'denied' ? '#f07070' : '#f5b942';
-              const estadoTexto = permiso === 'granted' ? '✅ Activadas' : permiso === 'denied' ? '🚫 Bloqueadas por el sistema' : permiso === 'no-soportado' ? '⚠ No soportado' : '⏳ Sin activar';
-              return (
-                <>
-                  <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:4}}>🔔 Notificaciones</div>
-                  <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:10}}>
-                    Alertas emergentes con sonido en tu celular para transferencias, cierre del día y agenda.
-                  </div>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                    <span style={{fontSize:13,fontWeight:600,color:estadoColor}}>{estadoTexto}</span>
-                    {permiso !== 'granted' && permiso !== 'denied' && (
-                      <button style={{...s.btnPrimary,width:"auto",padding:"8px 16px",fontSize:13}}
-                        onClick={pedirPermiso}>
-                        Activar notificaciones
-                      </button>
-                    )}
-                    {permiso === 'denied' && (
-                      <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>Activalas desde el navegador</span>
-                    )}
-                  </div>
-                  {permiso === 'granted' && (
-                    <>
-                      <div style={s.divider}/>
-                      <div style={{marginTop:8}}>
-                        <label style={s.label}>⏰ Hora de aviso: cierre del día</label>
-                        <input type="time" style={{...s.input,maxWidth:140,marginTop:4}}
-                          value={horaCierre}
-                          onChange={e=>guardarHora(e.target.value)}
-                        />
-                        <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:4}}>
-                          Si a esa hora la planilla del día está vacía, vas a recibir un aviso.
-                        </div>
-                      </div>
-                      <div style={{marginTop:10}}>
-                        <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>📋 Otros avisos automáticos:</div>
-                        <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginTop:4,lineHeight:1.6}}>
-                          💳 Transferencias sin confirmar → a las <b>13:00</b> y <b>19:00</b><br/>
-                          📅 Recordatorios de agenda → a la hora exacta de cada uno
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </>
-              );
-            })()}
+            <NotifConfig />
           </div>
+
           <div style={{...s.card,margin:0}}>
             <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:4}}>📥 Exportar backup</div>
             <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:10}}>Descarga un Excel con clientes, ventas, planillas y saldos.</div>
