@@ -509,10 +509,19 @@ function App() {
 
   const eliminarVenta = (ventaId) => {
     const v = ventas.find(x=>x.id===ventaId); if(!v) return;
-    const nv = ventas.filter(x=>x.id!==ventaId);
-    saveVentas(nv);
+    // Si era un pago mixto, también eliminar la venta fantasma de transferencia asociada
+    const ventaTr = v.montoTrans > 0
+      ? ventas.find(x => x._esMixtoTrans && x.clienteId === v.clienteId && x.fechaKey === v.fechaKey)
+      : null;
+    const idsAEliminar = new Set([ventaId, ...(ventaTr ? [ventaTr.id] : [])]);
+    saveVentas(ventas.filter(x => !idsAEliminar.has(x.id)));
     const c = clientes.find(x=>x.id===v.clienteId);
-    if(c){ const nc=clientes.map(x=>x.id===c.id?{...x,saldo:c.saldo-v.saldoDelta}:x); saveClientes(nc); }
+    if(c){
+      // Revertir el saldo completo (parte efectivo + parte transferencia si había)
+      const saldoARevertir = (v.saldoDelta||0) + (ventaTr ? (ventaTr.saldoDelta||0) : 0);
+      const nc=clientes.map(x=>x.id===c.id?{...x,saldo:c.saldo-saldoARevertir}:x);
+      saveClientes(nc);
+    }
   };
 
   const editarVenta = (ventaId, detalle, pago, montoPagado, saldoAplicado, obs, montoTrans2) => {
@@ -678,8 +687,8 @@ function App() {
           const sig=normalPend[0]||noestaPend[0];
           if(sig){setClienteId(sig.id);irA("detalleCliente");}else irA("clientes");
         }}
-        onGuardar={(d,p,m,sa,ep,ed,obs,op)=>{
-  registrarVenta(d,p,m,sa,ep,ed,obs,op);
+        onGuardar={(d,p,m,sa,ep,ed,obs,op,montoTrans2,saldoDeltaMixto)=>{
+  registrarVenta(d,p,m,sa,ep,ed,obs,op,montoTrans2,saldoDeltaMixto);
   // Auto-advance to next pending client (noesta = volver al final, no saltar a ellos)
   const clientesDia = clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
   const visitadosIds = new Set([
