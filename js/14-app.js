@@ -523,8 +523,6 @@ function App() {
     return () => clearInterval(interval);
   }, [ventas, planillas, recordatorios, clientes, diaActual, showNotif]);
   // ── FIN NOTIFICACIONES ─────────────────────────────────────────────────────
-    return <SetupNube onSetup={(key,id)=>{ setApiKey(key); setBinId(id); setSyncStatus("saved"); }} />;
-  }
 
   const registrarVenta = (detalle, pago, montoPagado, saldoAplicado, envPrest, envDev, obs, opcionSaldo, montoTrans2, saldoDeltaMixto) => {
     const c = cliente;
