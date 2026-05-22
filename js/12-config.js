@@ -2,21 +2,12 @@
 // ◆  12-config.js — Config pantalla principal
 // ════════════════════════════════════════════════════════════════════
 
-function NotifConfig() {
-  const [permiso, setPermiso] = React.useState(
-    'Notification' in window ? Notification.permission : 'no-soportado'
-  );
-  const [horaCierre, setHoraCierre] = React.useState(
-    localStorage.getItem('lc_hora_notif_cierre') || '18:00'
-  );
+// Componente sin hooks — recibe permiso y setter como props desde Config
+function NotifConfig({ permiso, onPermisoChange }) {
   const pedirPermiso = async () => {
     if(!('Notification' in window)) return;
     const r = await Notification.requestPermission();
-    setPermiso(r);
-  };
-  const guardarHora = (h) => {
-    setHoraCierre(h);
-    localStorage.setItem('lc_hora_notif_cierre', h);
+    onPermisoChange(r);
   };
   const estadoColor = permiso === 'granted' ? '#4dd9a0' : permiso === 'denied' ? '#f07070' : '#f5b942';
   const estadoTexto = permiso === 'granted' ? '✅ Activadas' : permiso === 'denied' ? '🚫 Bloqueadas por el sistema' : permiso === 'no-soportado' ? '⚠ No soportado' : '⏳ Sin activar';
@@ -26,40 +17,32 @@ function NotifConfig() {
       <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:10}}>
         Alertas emergentes con sonido para transferencias, cierre del día y agenda.
       </div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
         <span style={{fontSize:13,fontWeight:600,color:estadoColor}}>{estadoTexto}</span>
         {permiso !== 'granted' && permiso !== 'denied' && (
           <button style={{background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:500,cursor:"pointer"}}
-            onClick={pedirPermiso}>
-            Activar
-          </button>
+            onClick={pedirPermiso}>Activar</button>
         )}
         {permiso === 'denied' && (
           <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>Activalas desde el navegador</span>
         )}
       </div>
-      {permiso === 'granted' && (
-        <>
-          <div style={{borderTop:"0.5px solid var(--color-border-tertiary)",margin:"8px 0"}}/>
-          <div style={{marginTop:8}}>
-            <label style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:3,display:"block"}}>⏰ Hora de aviso: cierre del día</label>
-            <input type="time" style={{padding:"8px 10px",border:"0.5px solid var(--color-border-secondary)",borderRadius:8,fontSize:14,background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",outline:"none",boxSizing:"border-box"}}
-              value={horaCierre}
-              onChange={e=>guardarHora(e.target.value)}
-            />
-            <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:4}}>
-              Si a esa hora la planilla está vacía, recibís un aviso.
-            </div>
-          </div>
-          <div style={{marginTop:10}}>
-            <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>📋 Otros avisos automáticos:</div>
-            <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginTop:4,lineHeight:1.7}}>
-              💳 Transferencias sin confirmar → <b>13:00</b> y <b>19:00</b><br/>
-              📅 Recordatorios de agenda → a la hora exacta
-            </div>
-          </div>
-        </>
-      )}
+      {permiso === 'granted' && (<>
+        <div style={{borderTop:"0.5px solid var(--color-border-tertiary)",margin:"8px 0"}}/>
+        <div style={{marginBottom:8}}>
+          <label style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:3,display:"block"}}>⏰ Cierre del día — hora de aviso</label>
+          <input type="time"
+            style={{padding:"8px 10px",border:"0.5px solid var(--color-border-secondary)",borderRadius:8,fontSize:14,background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",outline:"none",boxSizing:"border-box"}}
+            defaultValue={localStorage.getItem('lc_hora_notif_cierre') || '18:00'}
+            onChange={e=>localStorage.setItem('lc_hora_notif_cierre', e.target.value)}
+          />
+          <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:4}}>Si a esa hora la planilla está vacía, recibís un aviso.</div>
+        </div>
+        <div style={{fontSize:12,color:"var(--color-text-tertiary)",lineHeight:1.7}}>
+          💳 Transferencias → <b>13:00</b> y <b>19:00</b><br/>
+          📅 Recordatorios de agenda → a la hora exacta
+        </div>
+      </>)}
     </>
   );
 }
@@ -70,6 +53,9 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
   const [importando,setImportando]=useState(false);
   const [mantVeh,setMantVeh] = React.useState(()=>{try{return JSON.parse(localStorage.getItem("cat_mant_vehiculo_v1")||"[]");}catch{return [];}});
   const [mostrarNuevoMant,setMostrarNuevoMant] = React.useState(false);
+  const [notifPermiso, setNotifPermiso] = React.useState(
+    'Notification' in window ? Notification.permission : 'no-soportado'
+  );
   const saveMantVeh = (lista) => {setMantVeh(lista);localStorage.setItem("cat_mant_vehiculo_v1",JSON.stringify(lista));if(syncData)syncData({mantVeh:lista});};
   const prestados={sifon:clientes.reduce((a,c)=>a+(c.sifon||0),0),bidon10:clientes.reduce((a,c)=>a+(c.bidon10||0),0),bidon20:clientes.reduce((a,c)=>a+(c.bidon20||0),0)};
   const stockKeys={"Sifón 1.5L":"sifon","Bidón 10L":"bidon10","Bidón 20L":"bidon20","Dispenser":"dispenser"};
@@ -428,9 +414,8 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
             })()}
           </div>
           <div style={{...s.card,margin:0}}>
-            <NotifConfig />
+            <NotifConfig permiso={notifPermiso} onPermisoChange={setNotifPermiso} />
           </div>
-
           <div style={{...s.card,margin:0}}>
             <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:4}}>📥 Exportar backup</div>
             <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:10}}>Descarga un Excel con clientes, ventas, planillas y saldos.</div>
