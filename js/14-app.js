@@ -430,7 +430,99 @@ function App() {
     }
   }, [ventas, noVisitas, clientes, diaActual, fechaActual, planillas, ecToken]);
 
-  if (!apiKey || !binId) {
+  // ── SISTEMA DE NOTIFICACIONES ──────────────────────────────────────────────
+  const notifEnviadasRef = React.useRef({});
+
+  // Genera un tono de 3 pulsos con Web Audio API (sin archivos externos)
+  const playNotifSound = React.useCallback(() => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [[880,0,0.12],[1100,0.18,0.12],[880,0.36,0.18]].forEach(([freq,t,dur])=>{
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = freq; osc.type = 'sine';
+        gain.gain.setValueAtTime(0.35, ctx.currentTime+t);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+t+dur);
+        osc.start(ctx.currentTime+t); osc.stop(ctx.currentTime+t+dur+0.05);
+      });
+    } catch(e) {}
+  }, []);
+
+  // Muestra una notificación nativa (solo una vez por clave por día)
+  const showNotif = React.useCallback((titulo, cuerpo, clave) => {
+    if(notifEnviadasRef.current[clave]) return;
+    notifEnviadasRef.current[clave] = true;
+    playNotifSound();
+    if('Notification' in window && Notification.permission === 'granted') {
+      new Notification(titulo, {
+        body: cuerpo,
+        icon: '/favicon.ico',
+        vibrate: [200, 100, 200, 100, 200],
+        tag: clave,
+      });
+    }
+  }, [playNotifSound]);
+
+  // Verificador de notificaciones — corre al iniciar y cada 60 segundos
+  React.useEffect(() => {
+    const horaNotifCierre = localStorage.getItem('lc_hora_notif_cierre') || '18:00';
+    const check = () => {
+      if(!('Notification' in window) || Notification.permission !== 'granted') return;
+      const now = new Date();
+      const hhmm = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+      const hoy = now.toISOString().slice(0,10);
+
+      // 1. Transferencias pendientes a las 13:00 y 19:00
+      if(hhmm === '13:00' || hhmm === '19:00') {
+        const pendientes = (ventas||[]).filter(v =>
+          v.fechaKey === hoy &&
+          (v.pago === 'transferencia' || v._esMixtoTrans) &&
+          !v.transConfirmada
+        );
+        if(pendientes.length > 0) {
+          showNotif(
+            '💳 Transferencias pendientes',
+            `Tenés ${pendientes.length} transferencia${pendientes.length > 1 ? 's' : ''} sin confirmar de hoy.`,
+            `trans_${hoy}_${hhmm}`
+          );
+        }
+      }
+
+      // 2. Cierre del día a la hora configurada
+      if(hhmm === horaNotifCierre && diaActual) {
+        const planKey = `${diaActual}_${hoy}`;
+        const plan = planillas[planKey];
+        const sinCerrar = !plan || (plan.efectivo === '' && plan.fiado === '');
+        if(sinCerrar) {
+          showNotif(
+            '📋 Cierre del día pendiente',
+            `Son las ${horaNotifCierre}. Todavía no cerraste la planilla de ${diaActual}.`,
+            `cierre_${hoy}`
+          );
+        }
+      }
+
+      // 3. Recordatorios de agenda con hora exacta
+      (recordatorios||[]).forEach(r => {
+        if(r.confirmado || !r.fecha || !r.hora) return;
+        const rHhmm = r.hora.slice(0, 5);
+        if(r.fecha === hoy && rHhmm === hhmm) {
+          const c = (clientes||[]).find(x => x.id === r.clienteId);
+          showNotif(
+            `📅 Recordatorio${c ? ' · ' + c.nombre : ''}`,
+            r.motivo || 'Recordatorio de agenda',
+            `agenda_${r.id || (r.fecha + r.hora)}`
+          );
+        }
+      });
+    };
+
+    check();
+    const interval = setInterval(check, 60000);
+    return () => clearInterval(interval);
+  }, [ventas, planillas, recordatorios, clientes, diaActual, showNotif]);
+  // ── FIN NOTIFICACIONES ─────────────────────────────────────────────────────
     return <SetupNube onSetup={(key,id)=>{ setApiKey(key); setBinId(id); setSyncStatus("saved"); }} />;
   }
 
@@ -509,19 +601,10 @@ function App() {
 
   const eliminarVenta = (ventaId) => {
     const v = ventas.find(x=>x.id===ventaId); if(!v) return;
-    // Si era un pago mixto, también eliminar la venta fantasma de transferencia asociada
-    const ventaTr = v.montoTrans > 0
-      ? ventas.find(x => x._esMixtoTrans && x.clienteId === v.clienteId && x.fechaKey === v.fechaKey)
-      : null;
-    const idsAEliminar = new Set([ventaId, ...(ventaTr ? [ventaTr.id] : [])]);
-    saveVentas(ventas.filter(x => !idsAEliminar.has(x.id)));
+    const nv = ventas.filter(x=>x.id!==ventaId);
+    saveVentas(nv);
     const c = clientes.find(x=>x.id===v.clienteId);
-    if(c){
-      // Revertir el saldo completo (parte efectivo + parte transferencia si había)
-      const saldoARevertir = (v.saldoDelta||0) + (ventaTr ? (ventaTr.saldoDelta||0) : 0);
-      const nc=clientes.map(x=>x.id===c.id?{...x,saldo:c.saldo-saldoARevertir}:x);
-      saveClientes(nc);
-    }
+    if(c){ const nc=clientes.map(x=>x.id===c.id?{...x,saldo:c.saldo-v.saldoDelta}:x); saveClientes(nc); }
   };
 
   const editarVenta = (ventaId, detalle, pago, montoPagado, saldoAplicado, obs, montoTrans2) => {
@@ -687,8 +770,8 @@ function App() {
           const sig=normalPend[0]||noestaPend[0];
           if(sig){setClienteId(sig.id);irA("detalleCliente");}else irA("clientes");
         }}
-        onGuardar={(d,p,m,sa,ep,ed,obs,op,montoTrans2,saldoDeltaMixto)=>{
-  registrarVenta(d,p,m,sa,ep,ed,obs,op,montoTrans2,saldoDeltaMixto);
+        onGuardar={(d,p,m,sa,ep,ed,obs,op)=>{
+  registrarVenta(d,p,m,sa,ep,ed,obs,op);
   // Auto-advance to next pending client (noesta = volver al final, no saltar a ellos)
   const clientesDia = clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
   const visitadosIds = new Set([
