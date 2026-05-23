@@ -248,7 +248,44 @@ function App() {
   // ── NOTIFICACIONES ────────────────────────────────────────────────
   React.useEffect(()=>{
     if(!("Notification" in window)) return;
-    const pedirPermiso = async () => { if(Notification.permission==="default") await Notification.requestPermission(); };
+
+    // Convierte la VAPID public key de base64url a Uint8Array
+    function _vapidToUint8(base64String) {
+      const p = (base64String + '===').slice(0, base64String.length + (4 - base64String.length % 4) % 4);
+      const raw = window.atob(p.replace(/-/g, '+').replace(/_/g, '/'));
+      return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+    }
+
+    // Suscribe al navegador a Web Push y guarda la suscripcion en Firestore
+    async function suscribirPush() {
+      if (!('PushManager' in window)) return;
+      try {
+        const sw = await navigator.serviceWorker.ready;
+        // Verificar si ya hay suscripcion activa y guardada
+        const sub = await sw.pushManager.getSubscription();
+        if (sub && localStorage.getItem('lc_push_ok_v1')) return; // ya esta listo
+
+        const VAPID_PUBLIC = 'BLvllGAY5r46Zi6cwHnbfCrQeV-NVnBq-kwrmX8n_UCvqTkVSh1Hserwp1kiQMiRF8LiAiDq_-CY1J8xproao8I';
+        const nuevaSub = sub || await sw.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: _vapidToUint8(VAPID_PUBLIC),
+        });
+        // Guardar suscripcion en Firestore para que GitHub Actions la lea
+        if (window.db) {
+          await window.db.collection('lc2').doc('push_sub').set({
+            sub: JSON.stringify(nuevaSub.toJSON()),
+            ts: Date.now(),
+          });
+          localStorage.setItem('lc_push_ok_v1', '1');
+          console.log('✅ Push subscription guardada en Firestore');
+        }
+      } catch(e) { console.log('Push sub error:', e.message); }
+    }
+
+    const pedirPermiso = async () => {
+      if (Notification.permission === "default") await Notification.requestPermission();
+      if (Notification.permission === "granted") await suscribirPush();
+    };
     pedirPermiso();
     const programar18hs = () => {
       const ahora = new Date();
