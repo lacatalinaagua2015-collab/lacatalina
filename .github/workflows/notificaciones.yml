@@ -1,0 +1,36 @@
+name: Notificaciones La Catalina
+
+on:
+  schedule:
+    # Todos los horarios en UTC. Argentina = UTC-3 (sin cambio de horario).
+    - cron: '0 10 * * *'   # 07:00 Argentina — mantenimiento de vehículo
+    - cron: '0 16 * * *'   # 13:00 Argentina — transferencias pendientes
+    - cron: '0 21 * * *'   # 18:00 Argentina — ¿cerraste el día?
+    - cron: '0 22 * * *'   # 19:00 Argentina — transferencias pendientes
+    - cron: '0 23 * * *'   # 20:00 Argentina — cierre de planilla
+
+  # Permite ejecutarlo manualmente desde la pestaña "Actions" de GitHub
+  workflow_dispatch:
+
+jobs:
+  notificar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependencias
+        run: npm install web-push firebase-admin
+
+      - name: Enviar notificación
+        run: node scripts/enviar-notif.js
+        env:
+          VAPID_PUBLIC_KEY:  ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_EMAIL:       ${{ secrets.VAPID_EMAIL }}
+          FIREBASE_SA:       ${{ secrets.FIREBASE_SA }}
