@@ -248,9 +248,9 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
   const b10Cargados     = Number(planilla?.productos?.b10?.llenos||0);
   const b20Cargados     = Number(planilla?.productos?.b20?.llenos||0);
   const cajonesCargados = calcCajones(sifonesCargados);
-  const pesoAuto   = cajonesCargados * 10 + b10Cargados * 10 + b20Cargados * 20;
+  const pesoAuto   = cajonesCargados * 13 + b10Cargados * 10 + b20Cargados * 20;
   // Bultos = cajones vendidos + bidones vendidos (con la misma regla de cajones)
-  const bultosAuto = sodaCajones + totalesPorProd.b10.vacios + totalesPorProd.b20.vacios;
+  const bultosAuto = cajonesCargados + b10Cargados + b20Cargados;
   const totalVentaPlata  = Object.values(totalesPorProd).reduce((a,p)=>a+p.plata,0);
   const totalVentaLlenar = Object.values(totalesPorProd).reduce((a,p)=>a+p.llenar,0);
   // Totales ventas de otros días
@@ -369,6 +369,13 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
             </div>
           ))}
         </div>
+        {/* Desglose de peso y bultos */}
+        {(pesoAuto>0||bultosAuto>0)&&(
+          <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginBottom:10,lineHeight:1.7,background:"var(--color-background-tertiary)",borderRadius:8,padding:"6px 10px"}}>
+            {bultosAuto>0&&<div>📦 <b>Bultos auto:</b> {cajonesCargados||cajonesLlenos||0} cajones soda + {b10Cargados||b10Llenos||0} bid.10L + {b20Cargados||b20Llenos||0} bid.20L = <b>{bultosAuto}</b></div>}
+            {pesoAuto>0&&<div>⚖️ <b>Peso auto:</b> {cajonesCargados||cajonesLlenos||0}×13kg + {b10Cargados||b10Llenos||0}×10kg + {b20Cargados||b20Llenos||0}×20kg = <b>{pesoAuto} kg</b></div>}
+          </div>
+        )}
 
         {/* Llenos — ingreso manual, vacios/plata/llenar auto desde ventas */}
         <span style={{...s.sectionTitle,padding:"12px 0 8px"}}>Envases cargados (solo ingresá los llenos)</span>
@@ -437,7 +444,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
               <div style={{display:"flex",gap:6}}>
                 <button style={{flex:1,padding:"7px",borderRadius:8,border:"none",background:"#0a2e1f",color:"#4dd9a0",fontSize:12,fontWeight:500,cursor:"pointer",opacity:!g.monto?0.5:1}}
                   disabled={!g.monto}
-                  onClick={()=>{setGasto(i,"confirmado",true);setTimeout(()=>onGuardar({...datos,gastos:datos.gastos.map((x,j)=>j===i?{...x,confirmado:true}:x)}),50);}}>
+                  onClick={()=>setGasto(i,"confirmado",true)}>
                   ✓ Confirmar y guardar
                 </button>
                 <button style={s.btnDanger} onClick={()=>delGasto(i)}>✕</button>
