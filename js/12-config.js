@@ -47,8 +47,8 @@ function NotifConfig({ permiso, onPermisoChange }) {
   );
 }
 
-function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,planillas,setPlanillas,stock,setStock,cargasDia,setCargasDia,syncData,onVolver,ecToken,setEcToken}) {
-  const [tab,setTab]=useState("precios");
+function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,planillas,setPlanillas,stock,setStock,cargasDia,setCargasDia,syncData,onVolver,ecToken,setEcToken,tabInicial}) {
+  const [tab,setTab]=useState(tabInicial||"stock");
   const [editandoId,setEditandoId]=useState(null);
   const [importando,setImportando]=useState(false);
   const [mantVeh,setMantVeh] = React.useState(()=>{try{return JSON.parse(localStorage.getItem("cat_mant_vehiculo_v1")||"[]");}catch{return [];}});
@@ -64,8 +64,8 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
       <div style={s.header}><button style={s.backBtn} onClick={onVolver}>← Volver</button><span style={s.headerTitle}>Configuración</span></div>
       <div style={{padding:"14px 14px 6px",background:"var(--color-background-secondary)"}}>
         {[
-          [["precios","💲","Precios"],["stock","📦","Stock"],["cargas","🚚","Cargas"],["historial","📋","Historial"]],
-          [["backup","💾","Backup"],["vehiculo","🚐","Vehículo"],["apariencia","🎨","Estilo"],["emma","🔗","Emma"]],
+          [["stock","📦","Stock"],["cargas","🚚","Cargas"],["datos","📋","Datos"],["vehiculo","🚐","Vehículo"]],
+          [["apariencia","🎨","Estilo"],["emma","🔗","Emma"],["x","",""],["x","",""]],
         ].map((fila,fi)=>(
           <div key={fi} style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:8}}>
             {fila.map(([id,ico,lbl])=>id==="x"?<div key="x"/>:(
@@ -87,8 +87,11 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
           </div>
         ))}
       </div>
-      {tab==="precios"&&<div style={{padding:16}}>
-        {/* Lista de artículos */}
+      {tab==="stock"&&<div style={{padding:16}}>
+        {/* ── Precios y costos ── */}
+        <div style={{...s.card,margin:"0 0 14px",background:"var(--color-background-info)",border:"0.5px solid var(--color-border-info)",padding:"10px 14px"}}>
+          <span style={{fontSize:13,fontWeight:700,color:"var(--color-text-info)"}}>💲 Precios y costos</span>
+        </div>
         {productos.map(p=>{
           const editing = editandoId===p.id;
           const [pr,setPr] = [p.precio, v=>setProductos(productos.map(x=>x.id===p.id?{...x,precio:Number(v)||0}:x))];
@@ -117,22 +120,10 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
                     <button style={{...s.btn,fontSize:11,padding:"3px 10px"}} onClick={()=>setEditandoId(null)}>Cancelar</button>
                   </div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-                    <div>
-                      <label style={s.label}>Nombre</label>
-                      <input style={s.input} defaultValue={p.nombre} id={`nm-${p.id}`} />
-                    </div>
-                    <div>
-                      <label style={s.label}>Precio de venta $</label>
-                      <input style={s.inputNum} type="number" defaultValue={p.precio} id={`pr-${p.id}`} />
-                    </div>
-                    <div>
-                      <label style={s.label}>Costo de llenado $</label>
-                      <input style={s.inputNum} type="number" defaultValue={p.costo} id={`co-${p.id}`} />
-                    </div>
-                    <div>
-                      <label style={s.label}>Unidad (ej: 1.5L)</label>
-                      <input style={s.input} defaultValue={p.unidad||""} id={`un-${p.id}`} placeholder="opcional" />
-                    </div>
+                    <div><label style={s.label}>Nombre</label><input style={s.input} defaultValue={p.nombre} id={`nm-${p.id}`} /></div>
+                    <div><label style={s.label}>Precio de venta $</label><input style={s.inputNum} type="number" defaultValue={p.precio} id={`pr-${p.id}`} /></div>
+                    <div><label style={s.label}>Costo de llenado $</label><input style={s.inputNum} type="number" defaultValue={p.costo} id={`co-${p.id}`} /></div>
+                    <div><label style={s.label}>Unidad (ej: 1.5L)</label><input style={s.input} defaultValue={p.unidad||""} id={`un-${p.id}`} placeholder="opcional" /></div>
                   </div>
                   <button style={s.btnPrimary} onClick={()=>{
                     const nm=document.getElementById(`nm-${p.id}`).value;
@@ -147,8 +138,6 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
             </div>
           );
         })}
-
-        {/* Agregar nuevo artículo */}
         {editandoId==="nuevo"?(
           <div style={{...s.card,margin:"0 0 12px",borderLeft:"3px solid #4dd9a0"}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
@@ -175,82 +164,37 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
           <button style={{...s.btn,width:"100%",padding:"10px",fontSize:13,marginBottom:16,borderStyle:"dashed"}}
             onClick={()=>setEditandoId("nuevo")}>+ Agregar nuevo artículo</button>
         )}
-
-        {/* Calculadora de costo real */}
         <CalculadoraCostoReal productos={productos} ventas={ventas} />
-      </div>}
-      {tab==="envases"&&(
-  <div style={{padding:16}}>
-    <p style={{fontSize:13,color:"var(--color-text-secondary)",marginBottom:12,lineHeight:1.7}}>
-      <b>En la calle:</b> envases en poder de clientes (automático).<br/>
-      <b>En depósito:</b> envases nuevos o retirados.<br/>
-      <b>De venta:</b> los que cargás cada mañana según el día.
-    </p>
-    {/* Dispenser */}
-    <div style={{...s.card,margin:"0 0 14px"}}>
-      <p style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:12}}>Dispenser</p>
-      <div style={s.grid2}>
-        <div style={s.metricCard}>
-          <div style={s.metricLabel}>En poder de clientes</div>
-          <div style={{fontSize:22,fontWeight:500,color:"var(--color-text-primary)",marginTop:6}}>{prestados.dispenser||0}</div>
+
+        {/* ── Stock en depósito ── */}
+        <div style={{...s.card,margin:"16px 0 14px",background:"var(--color-background-info)",border:"0.5px solid var(--color-border-info)",padding:"10px 14px"}}>
+          <span style={{fontSize:13,fontWeight:700,color:"var(--color-text-info)"}}>📦 Stock en depósito</span>
         </div>
-        <div style={s.metricCard}>
-          <div style={s.metricLabel}>En depósito</div>
-          <input style={{...s.inputNum,marginTop:6,fontSize:18,fontWeight:500,textAlign:"center"}} type="number" min={0}
-            value={stock.dispenser_deposito||""} placeholder="0"
-            onChange={e=>setStock({...stock,dispenser_deposito:Number(e.target.value)})} />
-        </div>
-      </div>
-      <div style={{display:"flex",justifyContent:"space-between",marginTop:10,paddingTop:10,borderTop:"0.5px solid var(--color-border-tertiary)"}}>
-        <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Total en circulación</span>
-        <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>{(prestados.dispenser||0)+(stock.dispenser_deposito||0)}</span>
-      </div>
-    </div>
-    {productos.map(p=>{
-      const key=stockKeys[p.nombre]; if(!key) return null;
-      const enCalle=prestados[key];
-      const enDeposito=num(stock[key+"_deposito"]);
-      const enVenta=DIAS.reduce((obj,d)=>{obj[d]=num((stock[key+"_venta"]||{})[d]||0);return obj;},{});
-      return (
-        <div key={p.id} style={{...s.card,margin:"0 0 14px"}}>
-          <p style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:12}}>{p.nombre}</p>
-          <div style={s.grid3}>
-            <div style={s.metricCard}>
-              <div style={s.metricLabel}>En la calle</div>
-              <div style={{fontSize:22,fontWeight:500,color:"var(--color-text-primary)",marginTop:6}}>{enCalle}</div>
-              <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>clientes</div>
-            </div>
-            <div style={s.metricCard}>
-              <div style={s.metricLabel}>En depósito</div>
-              <input style={{...s.inputNum,marginTop:6,fontSize:18,fontWeight:500,textAlign:"center"}} type="number" min={0}
-                value={enDeposito||""} placeholder="0"
-                onChange={e=>setStock({...stock,[key+"_deposito"]:Number(e.target.value)})} />
-            </div>
-            <div style={s.metricCard}>
-              <div style={s.metricLabel}>Total</div>
-              <div style={{fontSize:22,fontWeight:500,color:"#185FA5",marginTop:6}}>{enCalle+enDeposito}</div>
-              <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>en circulación</div>
-            </div>
-          </div>
-          <div style={{marginTop:10,paddingTop:10,borderTop:"0.5px solid var(--color-border-tertiary)"}}>
-            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:6,fontWeight:500}}>Envases de venta por día</div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-              {DIAS.map(d=>(
-                <div key={d} style={{flex:1,minWidth:60}}>
-                  <label style={{...s.label,textAlign:"center",fontSize:11}}>{d.slice(0,3)}</label>
-                  <input type="number" min={0} placeholder="0"
-                    style={{...s.inputNum,textAlign:"center",fontSize:14}}
-                    value={enVenta[d]||""}
-                    onChange={e=>setStock({...stock,[key+"_venta"]:{...(stock[key+"_venta"]||{}),[d]:Number(e.target.value)}})} />
+        <p style={{fontSize:13,color:"var(--color-text-secondary)",marginBottom:16,lineHeight:1.6}}>
+          Control de stock en los 3 lugares. Al iniciar reparto el camión se carga desde la sodería automáticamente.
+        </p>
+        {[["soderia","🏭 Sodería"],["casa","🏠 Casa"],["camion","🚚 Camión"]].map(([lugar,titulo])=>(
+          <div key={lugar} style={{...s.card,margin:"0 0 12px"}}>
+            <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:10}}>{titulo}</div>
+            <div style={s.grid3}>
+              {[["sifon","Sifón"],["bidon10","Bidón 10L"],["bidon20","Bidón 20L"]].map(([k,l])=>(
+                <div key={k}>
+                  <label style={{...s.label,textAlign:"center"}}>{l}</label>
+                  <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0}
+                    value={stock?.[lugar]?.[k]??0}
+                    onChange={e=>{
+                      const ns=JSON.parse(JSON.stringify(stock||{}));
+                      if(!ns[lugar]) ns[lugar]={sifon:0,bidon10:0,bidon20:0};
+                      ns[lugar][k]=Number(e.target.value)||0;
+                      setStock(ns);
+                    }}/>
                 </div>
               ))}
             </div>
           </div>
-        </div>
-      );
-    })}
-  </div>
-)}
+        ))}
+        <button style={s.btnPrimary} onClick={()=>{syncData({stock});alert("✅ Stock guardado");}}>Guardar stock</button>
+      </div>}
       {tab==="cargas"&&(
           <div style={{padding:16}}>
             <p style={{fontSize:13,color:"var(--color-text-secondary)",marginBottom:16,lineHeight:1.6}}>
@@ -306,146 +250,33 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
             <button style={s.btnPrimary} onClick={()=>{ setCargasDia(Object.assign({},cargasDia)); alert("Cargas guardadas"); }}>Guardar cargas</button>
           </div>
         )}
-        {tab==="stock"&&(
-          <div style={{padding:16}}>
-            <p style={{fontSize:13,color:"var(--color-text-secondary)",marginBottom:16,lineHeight:1.6}}>
-              Control de stock en los 3 lugares. Al iniciar reparto el camión se carga desde la sodería automáticamente.
-            </p>
-            {[["soderia","🏭 Sodería"],["casa","🏠 Casa"],["camion","🚚 Camión"]].map(([lugar,titulo])=>(
-              <div key={lugar} style={{...s.card,margin:"0 0 12px"}}>
-                <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:10}}>{titulo}</div>
-                <div style={s.grid3}>
-                  {[["sifon","Sifón"],["bidon10","Bidón 10L"],["bidon20","Bidón 20L"]].map(([k,l])=>(
-                    <div key={k}>
-                      <label style={{...s.label,textAlign:"center"}}>{l}</label>
-                      <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0}
-                        value={stock?.[lugar]?.[k]??0}
-                        onChange={e=>{
-                          const ns=JSON.parse(JSON.stringify(stock||{}));
-                          if(!ns[lugar]) ns[lugar]={sifon:0,bidon10:0,bidon20:0};
-                          ns[lugar][k]=Number(e.target.value)||0;
-                          setStock(ns);
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-            <button style={s.btnPrimary} onClick={()=>{syncData({stock});alert("Stock guardado");}}>Guardar stock</button>
+        {tab==="datos"&&(
+          <div style={{padding:16,display:"flex",flexDirection:"column",gap:0}}>
+            {/* ── Historial ── */}
+            <CargaHistorica
+              clientes={clientes}
+              productos={productos}
+              onGuardar={(vts)=>{const nv=[...(ventas||[]),...vts];setVentas(nv);if(syncData)syncData({ventas:nv});}}
+              onVolver={null}
+              enConfig={true}
+            />
+            {/* ── Backup simplificado ── */}
+            <div style={{borderTop:"1px solid var(--color-border-secondary)",marginTop:8,paddingTop:16,display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-primary)",marginBottom:4}}>💾 Backup</div>
+              <button style={s.btnPrimary} onClick={()=>exportarExcel(clientes,ventas,productos,planillas)}>
+                📥 Exportar backup · {clientes.length} clientes · {ventas.length} ventas
+              </button>
+              <button style={{...s.btn,width:"100%",padding:"11px",background:"#EF9F27",color:"#fff",border:"none",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer"}}
+                onClick={()=>{if(window.confirm("¿Subir todos los datos a la nube?")){
+                  cloudSave({clientes,ventas,planillas,stock,productos,noVisitas:(noVisitas||[]),prospectos:(prospectos||[])})
+                    .then(()=>alert("✅ Datos sincronizados."))
+                    .catch(()=>alert("❌ Error. Verificá tu conexión."));
+                }}}>
+                🔄 Forzar sincronización
+              </button>
+            </div>
           </div>
         )}
-        {tab==="historial"&&(
-          <CargaHistorica
-            clientes={clientes}
-            productos={productos}
-            onGuardar={(vts)=>{const nv=[...(ventas||[]),...vts];setVentas(nv);if(syncData)syncData({ventas:nv});}}
-            onVolver={null}
-            enConfig={true}
-          />
-        )}
-        {tab==="backup"&&(
-        <div style={{padding:16,display:"flex",flexDirection:"column",gap:12}}>
-          {/* RECUPERACION DE EMERGENCIA */}
-          {(()=>{
-            const backupKeys = Object.keys(localStorage).filter(k=>k.startsWith("lc_backup_")).sort().reverse();
-            if(backupKeys.length===0) return null;
-            return (
-              <div style={{...s.card,margin:0,borderLeft:"3px solid #4dd9a0",background:"#0a2e1f"}}>
-                <div style={{fontSize:14,fontWeight:600,color:"#4dd9a0",marginBottom:4}}>🔄 Recuperar clientes desde backup local</div>
-                <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:10}}>Si perdiste clientes, podés restaurarlos desde un backup automático guardado en este dispositivo. <strong style={{color:"#f5b942"}}>Solo restaura los CLIENTES, sin tocar ventas ni planillas.</strong></div>
-                {backupKeys.map(key=>{
-                  let data=null;
-                  try{data=JSON.parse(localStorage.getItem(key));}catch(e){}
-                  if(!data) return null;
-                  const fecha=key.replace("lc_backup_","");
-                  const nClientes=(data.clientes||[]).length;
-                  const diasConClientes=[...new Set((data.clientes||[]).map(c=>c.dia))].join(", ");
-                  return (
-                    <div key={key} style={{...s.card,margin:"0 0 8px",background:"var(--color-background-tertiary)",padding:"10px 12px"}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
-                        <div>
-                          <div style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>📅 {fecha}</div>
-                          <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:2}}>{nClientes} clientes · {diasConClientes||"sin días"}</div>
-                        </div>
-                        <button
-                          style={{background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:8,padding:"6px 14px",fontSize:12,fontWeight:500,cursor:"pointer"}}
-                          onClick={()=>{
-                            if(window.confirm(`¿Restaurar ${nClientes} clientes desde el backup del ${fecha}?\n\nEsto reemplaza los clientes actuales (${clientes.length}) con los del backup.\nVentas y planillas NO se tocan.`)){
-                              setClientes(data.clientes||[]);
-                              syncData({clientes:data.clientes||[]});
-                              alert(`✅ ${nClientes} clientes restaurados desde ${fecha}`);
-                            }
-                          }}>
-                          Restaurar
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
-          <div style={{...s.card,margin:0,background:"var(--color-background-secondary)"}}>
-            <div style={{fontSize:13,color:"var(--color-text-secondary)",lineHeight:1.7}}>Los datos se guardan en el teléfono. Hacé un backup periódico para no perderlos si cambiás de dispositivo o borrás el navegador.</div>
-          </div>
-          <div style={{...s.card,margin:0}}>
-            <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:8}}>💾 Espacio utilizado</div>
-            {(()=>{
-              let total=0;
-              try{for(let k in localStorage){if(localStorage.hasOwnProperty(k)){total+=((localStorage[k]||'').length*2);}}}catch(e){}
-              const kb=Math.round(total/1024);
-              const pct=Math.min(100,Math.round(kb/5120*100));
-              const color=pct>80?"#e05c5c":pct>50?"#f5b942":"#4dd9a0";
-              const fotos=clientes.filter(c=>c.foto&&c.foto.startsWith('data:')).length;
-              return (
-                <div>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                    <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>{kb} KB de ~5.000 KB</span>
-                    <span style={{fontSize:13,fontWeight:600,color}}>{pct}%</span>
-                  </div>
-                  <div style={{height:8,background:"var(--color-background-tertiary)",borderRadius:4,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:pct+"%",background:color,borderRadius:4,transition:"width 0.3s"}} />
-                  </div>
-                  {fotos>0&&<div style={{fontSize:12,color:"var(--color-text-tertiary)",marginTop:6}}>📷 {fotos} fotos de domicilios guardadas</div>}
-                  {pct>70&&<div style={{fontSize:12,color:"#e05c5c",marginTop:8}}>⚠️ Espacio alto. Eliminá fotos si la app deja de funcionar.</div>}
-                </div>
-              );
-            })()}
-          </div>
-          <div style={{...s.card,margin:0}}>
-            <NotifConfig permiso={notifPermiso} onPermisoChange={setNotifPermiso} />
-          </div>
-          <div style={{...s.card,margin:0}}>
-            <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:4}}>📥 Exportar backup</div>
-            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:10}}>Descarga un Excel con clientes, ventas, planillas y saldos.</div>
-            <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginBottom:12}}>Clientes: {clientes.length} · Ventas: {ventas.length} · Planillas: {Object.keys(planillas).length}</div>
-            <button style={s.btnPrimary} onClick={()=>exportarExcel(clientes,ventas,productos,planillas)}>Descargar Excel</button>
-          </div>
-          <div style={{...s.card,margin:0,borderLeft:"3px solid #EF9F27"}}>
-            <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:4}}>🔄 Forzar sincronización</div>
-            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:12}}>Si en un dispositivo no aparecen los clientes, usá este botón desde el dispositivo donde SÍ se ven bien. Sube todos los datos actuales a la nube y los demás dispositivos los van a recibir al reabrir la app.</div>
-            <button style={{...s.btn,width:"100%",padding:"12px",fontSize:14,background:"#EF9F27",color:"#fff",border:"none"}} onClick={()=>{
-              if(window.confirm("¿Subir todos los datos actuales a la nube? Esto va a sobreescribir lo que haya guardado.")){
-                cloudSave({clientes,ventas,planillas,stock,productos,noVisitas:(noVisitas||[]),prospectos:(prospectos||[])})
-                  .then(()=>alert("✅ Datos sincronizados. Cerrá y volvé a abrir la app en el otro dispositivo."))
-                  .catch(()=>alert("❌ Error al sincronizar. Verificá tu conexión."));
-              }
-            }}>Subir datos a la nube ahora</button>
-          </div>
-          <div style={{...s.card,margin:0}}>
-            <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:4}}>📤 Importar backup</div>
-            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:12}}>Restaura datos desde un Excel generado por esta app. Reemplaza todo lo actual.</div>
-            {!importando
-              ?<button style={{...s.btn,width:"100%",padding:"12px",fontSize:14}} onClick={()=>setImportando(true)}>Seleccionar archivo Excel</button>
-              :<div>
-                <input type="file" accept=".xlsx" style={{...s.input,marginBottom:8,padding:"6px"}} onChange={e=>{if(e.target.files[0]){if(window.confirm("¿Reemplazar todos los datos con el backup?")){importarBackup(e.target.files[0],setClientes,setVentas,setPlanillas);}setImportando(false);}}} />
-                <button style={{...s.btn,width:"100%"}} onClick={()=>setImportando(false)}>Cancelar</button>
-              </div>
-            }
-          </div>
-        </div>
-      )}
       {tab==="vehiculo"&&(
         <div style={{padding:16}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
@@ -565,6 +396,25 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Soporte técnico */}
+          <div style={{background:"var(--color-background-secondary)",borderRadius:12,padding:14,border:"0.5px solid var(--color-border-tertiary)",marginTop:14}}>
+            <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-primary)",marginBottom:4}}>💬 Soporte técnico</div>
+            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:12,lineHeight:1.6}}>
+              ¿Tenés algún problema o consulta? Escribinos por WhatsApp.
+            </div>
+            <a href="https://wa.me/5493813399962?text=Hola%2C+necesito+ayuda+con+La+Catalina"
+              target="_blank" rel="noopener"
+              style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+                padding:"13px",borderRadius:10,background:"#0a2e1f",
+                border:"1px solid #4dd9a0",color:"#4dd9a0",
+                fontSize:14,fontWeight:600,textDecoration:"none"}}>
+              💬 Abrir WhatsApp
+            </a>
+            <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:8,textAlign:"center"}}>
+              Emma Soluciones Digitales · +54 9 381 339-9962
+            </div>
           </div>
         </div>
       )}

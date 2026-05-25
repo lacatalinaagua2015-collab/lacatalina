@@ -143,7 +143,6 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
                           </div>
                         </div>
                       ))}
-                      <button style={{...s.btn,width:"100%",marginTop:10,fontSize:12,padding:"7px"}} onClick={e=>{e.stopPropagation();onStock();}}>Editar stock →</button>
                     </div>}
                   </div>
                 );
