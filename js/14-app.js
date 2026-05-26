@@ -815,11 +815,11 @@ function App() {
   const clientesDia = clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
   const visitadosIds = new Set([
     ...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId),
-    ...(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2"||v.motivo==="noesta")).map(v=>v.clienteId)
+    ...(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual&&(v.motivo==="noquiso"||v.motivo==="noesta2"||v.motivo==="noesta"||v.motivo==="salteado")).map(v=>v.clienteId)
   ]);
   visitadosIds.add(clienteId);
   const siguiente = clientesDia.find(c=>!visitadosIds.has(c.id)&&c.id!==clienteId);
-  if(siguiente){ setClienteId(siguiente.id); irA("detalleCliente"); }
+  if(siguiente){ setClienteId(siguiente.id); irA("venta"); }
   else irA("clientes");
 }}
         onSaltar={()=>{

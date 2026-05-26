@@ -353,8 +353,6 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
         {cliente.notas&&<span style={{fontSize:11,color:"var(--color-text-warning)"}}>📝 {cliente.notas}</span>}
       </div>
       <div style={{padding:16}}>
-        {/* Envases habituales del cliente */}
-        {(()=>{const tags=[];if(cliente.sifon>0)tags.push(`Sifón×${cliente.sifon}`);if(cliente.bidon10>0)tags.push(`10L×${cliente.bidon10}`);if(cliente.bidon20>0)tags.push(`20L×${cliente.bidon20}`);return tags.length>0?(<div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>{tags.map(t=><span key={t} style={{...s.tag,background:"#1e3a5f",color:"var(--color-text-info)",border:"0.5px solid var(--color-border-info)",fontSize:11}}>🧴 {t}</span>)}</div>):null;})()}
         <span style={{...s.sectionTitle,padding:"0 0 10px"}}>Cantidades entregadas</span>
         {productos.map(p=>(
           <div key={p.id} style={{...s.card,margin:"0 0 8px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
