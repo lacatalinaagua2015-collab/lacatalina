@@ -303,7 +303,14 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
   const [envPrest,setEnvPrest]=useState([{prod:"",cant:""}]);
   const [envDev,setEnvDev]=useState([{prod:"",cant:""}]);
   const [obs,setObs]=useState("");
-  const detalle=productos.map(p=>({nombre:p.nombre,cantidad:cantidades[p.nombre]||0,precio:p.precio,total:(cantidades[p.nombre]||0)*p.precio})).filter(d=>d.cantidad>0);
+  const [dispRotoPrecio, setDispRotoPrecio] = React.useState("");
+  const dispenser = productos.find(p=>p.esDispenser);
+  const prodEntrega = productos.filter(p=>!p.esDispenser);
+  const rotoPrecioNum = Number(dispRotoPrecio)||0;
+  const detalle=[
+    ...prodEntrega.map(p=>({nombre:p.nombre,cantidad:cantidades[p.nombre]||0,precio:p.precio,total:(cantidades[p.nombre]||0)*p.precio})).filter(d=>d.cantidad>0),
+    ...(rotoPrecioNum>0?[{nombre:"Dispenser (rotura)",cantidad:1,precio:rotoPrecioNum,total:rotoPrecioNum,_esDispRoto:true}]:[]),
+  ];
   const bruto=detalle.reduce((a,d)=>a+d.total,0);
   const desc=0; // retención informativa solo en planilla
   const neto=bruto-desc;
@@ -354,7 +361,7 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
       </div>
       <div style={{padding:16}}>
         <span style={{...s.sectionTitle,padding:"0 0 10px"}}>Cantidades entregadas</span>
-        {productos.map(p=>(
+        {prodEntrega.map(p=>(
           <div key={p.id} style={{...s.card,margin:"0 0 8px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div><div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>{p.nombre}</div><div style={{fontSize:12,color:"var(--color-text-secondary)"}}>{fmt(p.precio)} c/u</div></div>
             <div style={{display:"flex",gap:6,alignItems:"center"}}>
@@ -500,6 +507,40 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
           }} />
         )}
         <div style={s.divider} />
+        {/* ── Dispenser ─────────────────────────────────── */}
+        {dispenser&&(()=>{
+          const cantActual = cliente.dispenser||0;
+          const prestados = envPrest.filter(e=>e.prod==="Dispenser").reduce((a,e)=>a+(Number(e.cant)||0),0);
+          const devueltos = envDev.filter(e=>e.prod==="Dispenser").reduce((a,e)=>a+(Number(e.cant)||0),0);
+          const enCliente = cantActual + prestados - devueltos;
+          return (
+            <div style={{...s.card,margin:"0 0 10px",padding:"12px 14px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>🧊 Dispenser</span>
+                <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>En el cliente: <b style={{color:"var(--color-text-primary)"}}>{enCliente}</b></span>
+              </div>
+              <div style={{display:"flex",gap:6,marginBottom:10}}>
+                <button style={{flex:1,background:"var(--color-background-info)",color:"var(--color-text-info)",border:"0.5px solid var(--color-border-secondary)",borderRadius:8,padding:"8px",fontSize:12,fontWeight:500,cursor:"pointer"}}
+                  onClick={()=>setEnvPrest(prev=>{const n=[...prev];const idx=n.findIndex(e=>e.prod==="Dispenser");if(idx>=0){const c=[...n];c[idx]={...c[idx],cant:String((Number(c[idx].cant)||0)+1)};return c;}return [...n.filter(e=>e.prod!==""),{prod:"Dispenser",cant:"1"}];})}>
+                  + Prestar uno
+                </button>
+                <button style={{flex:1,background:"var(--color-background-success)",color:"var(--color-text-success)",border:"0.5px solid var(--color-border-secondary)",borderRadius:8,padding:"8px",fontSize:12,fontWeight:500,cursor:"pointer",opacity:enCliente<=0?0.4:1}}
+                  disabled={enCliente<=0}
+                  onClick={()=>setEnvDev(prev=>{const n=[...prev];const idx=n.findIndex(e=>e.prod==="Dispenser");if(idx>=0){const c=[...n];c[idx]={...c[idx],cant:String((Number(c[idx].cant)||0)+1)};return c;}return [...n.filter(e=>e.prod!==""),{prod:"Dispenser",cant:"1"}];})}>
+                  − Devolver uno
+                </button>
+              </div>
+              <label style={{...s.label,marginBottom:4}}>💔 Cobrar rotura (precio a acordar)</label>
+              <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                <input style={{...s.input,flex:1}} type="number"
+                  placeholder={`Costo referencia: ${fmt(dispenser.costo)}`}
+                  value={dispRotoPrecio} onChange={e=>setDispRotoPrecio(e.target.value)} />
+                {rotoPrecioNum>0&&<button style={{...s.btnDanger,padding:"8px 10px",fontSize:12}} onClick={()=>setDispRotoPrecio("")}>✕</button>}
+              </div>
+              {rotoPrecioNum>0&&<div style={{marginTop:6,fontSize:12,color:"var(--color-text-danger)",fontWeight:500}}>Se cobrará {fmt(rotoPrecioNum)} por rotura</div>}
+            </div>
+          );
+        })()}
         <label style={{...s.label,fontSize:13,marginBottom:6}}>Envases prestados al cliente</label>
         {envPrest.map((_,i)=><ER key={i} list={envPrest} setList={setEnvPrest} i={i} />)}
         <button style={{...s.btn,fontSize:12,padding:"4px 12px",marginBottom:12}} onClick={()=>setEnvPrest([...envPrest,{prod:"",cant:""}])}>+ Fila</button>
