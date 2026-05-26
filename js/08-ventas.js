@@ -277,7 +277,7 @@ function CobroDeudaPanel({saldo,onCobrar}) {
   );
 }
 
-function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVolver,onSaltar,ventasCliente}) {
+function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVolver,onSaltar,ventasCliente,progressData}) {
   const [transConfirmada,setTransConfirmada] = React.useState(false);
 
   const sonarTransferencia = () => {
@@ -359,6 +359,17 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
         })()}
         {cliente.notas&&<span style={{fontSize:11,color:"var(--color-text-warning)"}}>📝 {cliente.notas}</span>}
       </div>
+      {/* Barra de progreso del día */}
+      {progressData&&(
+        <div style={{background:"var(--color-background-tertiary)",borderBottom:"0.5px solid var(--color-border-tertiary)",padding:"6px 14px",display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,flex:1,minWidth:120}}>
+            <div style={{flex:1,height:5,borderRadius:3,background:"var(--color-background-secondary)",overflow:"hidden"}}><div style={{height:"100%",borderRadius:3,background:"#185FA5",width:`${Math.round((progressData.visitados/Math.max(progressData.total,1))*100)}%`}} /></div>
+            <span style={{fontSize:11,color:"var(--color-text-secondary)",whiteSpace:"nowrap"}}>{progressData.visitados}/{progressData.total}</span>
+          </div>
+          <span style={{fontSize:11,color:"var(--color-text-success)",fontWeight:500}}>{fmt(progressData.montoHoy)}</span>
+          {progressData.stock&&Object.entries(progressData.stock).map(([k,v])=>v>0?<span key={k} style={{fontSize:10,color:"var(--color-text-tertiary)"}}>{k}:{v}</span>:null)}
+        </div>
+      )}
       <div style={{padding:16}}>
         <span style={{...s.sectionTitle,padding:"0 0 10px"}}>Cantidades entregadas</span>
         {prodEntrega.map(p=>(

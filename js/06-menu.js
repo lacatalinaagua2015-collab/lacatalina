@@ -2,7 +2,7 @@
 // ◆  06-menu.js — MenuDias, DiaPrincipal, PlanillaDelDia, InicioReparto
 // ════════════════════════════════════════════════════════════════════
 
-function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onStock,onAgenda,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,onVerConfirmaciones,clientes,ventas,stock,zonasReparto,onSetZona,onDiaHoy,onDiaResumen,noVisitas}) {
+function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onStock,onAgenda,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,onVerConfirmaciones,clientes,ventas,stock,zonasReparto,onSetZona,onDiaHoy,onDiaResumen,noVisitas,onFiados}) {
   const [editandoZona, setEditandoZona] = React.useState(null);
   const hoyDiaNombre = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"][new Date().getDay()];
   const hoyFechaKey = new Date().toISOString().slice(0,10);
@@ -191,6 +191,7 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
             ["🚀","Promoción",onPromocion],
             ["📅","Agenda",onAgenda],
             ["📊","Resumen",onResumen],
+            ["💰","Fiados",onFiados],
             ["⚙️","Config",onConfig],
           ].map(([ico,lbl,fn])=>(
             <button key={lbl} onClick={fn} style={{

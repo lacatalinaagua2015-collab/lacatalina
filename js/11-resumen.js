@@ -34,6 +34,17 @@ function Resumen({ventas,clientes,productos,planillas,noVisitas,onVolver}) {
   const conDeuda     = clientes.filter(c=>c.saldo<0);
   const conFavor     = clientes.filter(c=>c.saldo>0);
 
+  // ── Ranking de clientes por volumen ──────────────────────────────────────
+  const rankingClientes = React.useMemo(()=>{
+    const mapa = {};
+    filtradas.filter(v=>!v._esCobro&&!v._esAjuste).forEach(v=>{
+      if(!mapa[v.clienteId]) mapa[v.clienteId]={id:v.clienteId,nombre:v.cliente,total:0,compras:0};
+      mapa[v.clienteId].total += v.neto||0;
+      mapa[v.clienteId].compras += 1;
+    });
+    return Object.values(mapa).sort((a,b)=>b.total-a.total).slice(0,10);
+  },[filtradas]);
+
   // ── Agrupación por mes (para vista anual e histórico) ─────────────────────
   const porMes = {};
   ventas.forEach(v=>{
@@ -219,6 +230,25 @@ function Resumen({ventas,clientes,productos,planillas,noVisitas,onVolver}) {
           </div>
         ))}
       </div>
+
+      {/* Ranking de clientes por volumen */}
+      {rankingClientes.length>0&&(
+        <>
+          <span style={s.sectionTitle}>🏆 Top clientes del período</span>
+          <div style={{...s.card,margin:"0 14px 8px",padding:0,overflow:"hidden"}}>
+            {rankingClientes.map((c,idx)=>(
+              <div key={c.id} style={{display:"flex",alignItems:"center",padding:"8px 14px",borderBottom:idx<rankingClientes.length-1?"0.5px solid var(--color-border-tertiary)":"none",gap:10}}>
+                <span style={{fontSize:11,fontWeight:700,color:"var(--color-text-tertiary)",minWidth:18,textAlign:"center"}}>
+                  {idx===0?"🥇":idx===1?"🥈":idx===2?"🥉":`${idx+1}`}
+                </span>
+                <span style={{flex:1,fontSize:13,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nombre}</span>
+                <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{c.compras} compras</span>
+                <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-success)"}}>{fmt(c.total)}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* Saldos */}
       {conDeuda.length>0&&(

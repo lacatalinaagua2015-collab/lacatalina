@@ -96,6 +96,7 @@ function App() {
   const [darkMode, setDarkMode]   = useLS("cat_darkmode", false);
   const [tabConfig, setTabConfig] = useState("stock");
   const [zonasReparto, setZonasReparto] = useLS("cat_zonas_v1", {});
+  const [modalResumenDia, setModalResumenDia] = useState(null); // {dia, fechaKey}
   const [scaleIdx, setScaleIdx]   = useLS("cat_scale_v1", 1); // 0=S 1=M 2=L 3=XL
   const SCALES = [0.82, 1.0, 1.18, 1.36];
   const SCALE_LABELS = ["S","M","L","XL"];
@@ -686,8 +687,9 @@ function App() {
             return {dia, fecha:fechas[0]||"", count:vts.length, monto:vts.reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0), ventas:vts};
           }).filter(Boolean)} zonasReparto={zonasReparto} onSetZona={(dia,zona)=>{const nz={...zonasReparto,[dia]:zona};setZonasReparto(nz);syncData({zonasReparto:nz});}}
           onDiaHoy={(dia,fechaKey)=>{setDiaActual(dia);setFechaActual(fechaKey);setFechaObj(new Date(fechaKey+"T12:00:00"));irA("inicioReparto");}}
-          onDiaResumen={(dia,fechaKey)=>{setDiaActual(dia);setFechaActual(fechaKey);setFechaObj(new Date(fechaKey+"T12:00:00"));irA("planilla");}}
-          noVisitas={noVisitas||[]} />}
+          onDiaResumen={(dia,fechaKey)=>{setDiaActual(dia);setFechaActual(fechaKey);setFechaObj(new Date(fechaKey+"T12:00:00"));setModalResumenDia({dia,fechaKey});}}
+          noVisitas={noVisitas||[]}
+          onFiados={()=>irA("fiadosPendientes")} />}
       {pantalla==="confirmacionesDia" && <ConfirmacionesDia
           dia={diaActual}
           ventas={ventas.filter(v=>v.dia===diaActual&&v.pago==="transferencia")}
@@ -782,6 +784,23 @@ function App() {
           }}
           onGuardarAjuste={(vt)=>{saveVentas([...ventas,vt]);}} />}
       {pantalla==="venta"          && cliente && <NuevaVenta cliente={cliente} productos={productos} fecha={fechaActual}
+        progressData={(()=>{
+          const clientesDia=clientes.filter(c=>c.dia===diaActual);
+          const ventasHoy=ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste);
+          const noVHoy=(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual);
+          const visitadosIds=new Set([...ventasHoy.map(v=>v.clienteId),...noVHoy.map(v=>v.clienteId)]);
+          const montoHoy=ventasHoy.reduce((a,v)=>a+(v.neto||0),0);
+          const sifs=ventasHoy.reduce((a,v)=>a+(v.detalle||[]).filter(d=>d.nombre==="Sifón 1.5L").reduce((b,d)=>b+d.cantidad,0),0);
+          const b10=ventasHoy.reduce((a,v)=>a+(v.detalle||[]).filter(d=>d.nombre==="Bidón 10L").reduce((b,d)=>b+d.cantidad,0),0);
+          const b20=ventasHoy.reduce((a,v)=>a+(v.detalle||[]).filter(d=>d.nombre==="Bidón 20L").reduce((b,d)=>b+d.cantidad,0),0);
+          const planillaHoy=planillas[`${diaActual}_${fechaActual}`]||{};
+          const stockRestante={
+            "Sif":Math.max(0,(Number(planillaHoy.productos?.soda?.llenos)||0)-sifs),
+            "10L":Math.max(0,(Number(planillaHoy.productos?.b10?.llenos)||0)-b10),
+            "20L":Math.max(0,(Number(planillaHoy.productos?.b20?.llenos)||0)-b20),
+          };
+          return {visitados:visitadosIds.size,total:clientesDia.length,montoHoy,stock:stockRestante};
+        })()}
         onNoEsta={()=>{
           const prev=(noVisitas||[]).find(v=>v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual);
           const motivo=prev?.motivo==="noesta"?"noesta2":"noesta";
@@ -903,6 +922,57 @@ function App() {
       />}
       {pantalla==="stock"          && <StockGeneral stock={stockNorm} setStock={(ns)=>{setStock(ns);syncData({stock:ns});}} clientes={clientes} ventas={ventas} productos={productos} planillas={planillas} onVolver={()=>irA("menu")} />}
       {pantalla==="resumen"        && <Resumen ventas={ventas} clientes={clientes} productos={productos} planillas={planillas} noVisitas={noVisitas||[]} onVolver={()=>irA("menu")} />}
+      {pantalla==="fiadosPendientes" && <FiadosPendientes clientes={clientes} onCobrar={(clienteId,monto,pago)=>{
+        const cl=clientes.find(c=>c.id===clienteId);
+        if(!cl) return;
+        const saldoAntes=cl.saldo||0;
+        const saldoDespues=saldoAntes+monto;
+        const vt={id:Date.now(),clienteId:cl.id,cliente:cl.nombre,dia:cl.dia,fechaKey:new Date().toISOString().slice(0,10),fecha:new Date().toLocaleString("es-AR"),
+          detalle:[{nombre:"Cobro de deuda",cantidad:1,precio:0,total:0}],pago,obs:`Cobro de deuda ${fmt(monto)} (${pago})`,
+          neto:0,bruto:0,desc:0,costo:0,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],saldoAntes,saldoDespues,_esCobro:true};
+        saveVentas([...ventas,vt]);
+        saveClientes(clientes.map(c=>c.id===clienteId?{...c,saldo:saldoDespues}:c));
+      }} onVolver={()=>irA("menu")} />}
+      {/* Modal resumen del día al completarse */}
+      {modalResumenDia&&(()=>{
+        const {dia,fechaKey}=modalResumenDia;
+        const vDia=ventas.filter(v=>v.fechaKey===fechaKey&&v.dia===dia&&!v._esCobro&&!v._esAjuste);
+        const efectivo=vDia.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
+        const transTot=vDia.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
+        const transConf=vDia.filter(v=>v.pago==="transferencia"&&v.transConfirmada).reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
+        const transPend=transTot-transConf;
+        const fiado=vDia.filter(v=>v.pago==="fiado").reduce((a,v)=>a+(v.neto||0),0);
+        const total=efectivo+transTot+fiado;
+        return (
+          <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.75)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+            <div style={{background:"var(--color-background-primary)",borderRadius:16,padding:24,width:"100%",maxWidth:360,display:"flex",flexDirection:"column",gap:14}}>
+              <div style={{textAlign:"center"}}>
+                <div style={{fontSize:36,marginBottom:6}}>✅</div>
+                <div style={{fontSize:17,fontWeight:600,color:"var(--color-text-primary)"}}>¡Día completado!</div>
+                <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginTop:2,textTransform:"capitalize"}}>{dia} · {new Date(fechaKey+"T12:00:00").toLocaleDateString("es-AR",{day:"numeric",month:"long"})}</div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {[["💵 Efectivo",efectivo,"success"],["💳 Transferencias",transTot,"info"],transPend>0&&["   🔴 Pendientes de confirmar",transPend,"warning"],["📋 Fiado nuevo",fiado,"warning"]].filter(Boolean).map(([l,v,c])=>(
+                  <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",borderRadius:8,background:"var(--color-background-secondary)"}}>
+                    <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>{l}</span>
+                    <span style={{fontSize:14,fontWeight:500,color:`var(--color-text-${c})`}}>{fmt(v)}</span>
+                  </div>
+                ))}
+                <div style={{display:"flex",justifyContent:"space-between",padding:"10px 12px",borderRadius:8,background:"var(--color-background-tertiary)",borderTop:"0.5px solid var(--color-border-tertiary)"}}>
+                  <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)"}}>Total del día</span>
+                  <span style={{fontSize:17,fontWeight:700,color:"var(--color-text-success)"}}>{fmt(total)}</span>
+                </div>
+              </div>
+              <button style={{...s.btnPrimary}} onClick={()=>{setModalResumenDia(null);irA("planilla");}}>
+                Ver planilla completa →
+              </button>
+              <button style={{...s.btn,textAlign:"center"}} onClick={()=>setModalResumenDia(null)}>
+                Cerrar
+              </button>
+            </div>
+          </div>
+        );
+      })()}
       {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stockNorm} setStock={(s)=>{const ns=normStock(s);setStockRaw(ns);syncData({stock:ns});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} syncData={syncData} onVolver={()=>irA("menu")} ecToken={ecToken} setEcToken={setEcToken} tabInicial={tabConfig} />}
     </div>
     {/* Botón flotante de escala — fuera del zoom para que no se afecte */}
