@@ -2,11 +2,18 @@
 // ◆  06-menu.js — MenuDias, DiaPrincipal, PlanillaDelDia, InicioReparto
 // ════════════════════════════════════════════════════════════════════
 
-function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onStock,onAgenda,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,onVerConfirmaciones,clientes,ventas,stock,zonasReparto,onSetZona,onDiaHoy}) {
+function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onStock,onAgenda,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,onVerConfirmaciones,clientes,ventas,stock,zonasReparto,onSetZona,onDiaHoy,onDiaResumen,noVisitas}) {
   const [editandoZona, setEditandoZona] = React.useState(null);
   const hoyDiaNombre = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"][new Date().getDay()];
   const hoyFechaKey = new Date().toISOString().slice(0,10);
   const hoyLabel = new Date().toLocaleDateString("es-AR",{day:"numeric",month:"short"});
+
+  // Calcular si el día de hoy está completo (todos los clientes visitados)
+  const clientesHoy = (clientes||[]).filter(c=>c.dia===hoyDiaNombre);
+  const ventasHoyIds = new Set((ventas||[]).filter(v=>v.fechaKey===hoyFechaKey).map(v=>v.clienteId));
+  const noVisitasHoyIds = new Set((noVisitas||[]).filter(v=>v.fecha===hoyFechaKey).map(v=>v.clienteId));
+  const visitadosHoy = clientesHoy.filter(c=>ventasHoyIds.has(c.id)||noVisitasHoyIds.has(c.id));
+  const diaCompleto = clientesHoy.length>0 && visitadosHoy.length>=clientesHoy.length;
   return (
     <div style={s.screen}>
       <div style={s.header}>
@@ -83,11 +90,21 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
           </button>
           {d===hoyDiaNombre&&onDiaHoy&&(
             <button
-              style={{background:"#185FA5",borderRadius:12,padding:"8px 10px",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,minWidth:56,border:"none",cursor:"pointer",flexShrink:0}}
-              onClick={()=>onDiaHoy(d, hoyFechaKey)}>
-              <span style={{fontSize:18}}>📅</span>
-              <span style={{fontSize:9,color:"#e2eaf4",fontWeight:500,textAlign:"center",lineHeight:1.3}}>Hoy</span>
-              <span style={{fontSize:9,color:"#b5d4f4",lineHeight:1}}>{hoyLabel}</span>
+              style={{
+                background: diaCompleto ? "#0a5c3a" : "#185FA5",
+                borderRadius:12,padding:"8px 10px",
+                display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+                gap:2,minWidth:56,border: diaCompleto ? "1.5px solid #4dd9a0" : "none",
+                cursor:"pointer",flexShrink:0
+              }}
+              onClick={()=> diaCompleto ? (onDiaResumen&&onDiaResumen(d,hoyFechaKey)) : onDiaHoy(d,hoyFechaKey)}>
+              <span style={{fontSize:16}}>{diaCompleto ? "✅" : "📅"}</span>
+              <span style={{fontSize:9,color: diaCompleto ? "#4dd9a0" : "#e2eaf4",fontWeight:500,textAlign:"center",lineHeight:1.3}}>
+                {diaCompleto ? "Listo" : "Hoy"}
+              </span>
+              <span style={{fontSize:9,color: diaCompleto ? "#9FE1CB" : "#b5d4f4",lineHeight:1}}>
+                {diaCompleto ? `${visitadosHoy.length}/${clientesHoy.length}` : hoyLabel}
+              </span>
             </button>
           )}
           </div>
