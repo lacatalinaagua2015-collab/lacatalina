@@ -277,7 +277,7 @@ function CobroDeudaPanel({saldo,onCobrar}) {
   );
 }
 
-function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVolver}) {
+function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVolver,onSaltar,ventasCliente}) {
   const [transConfirmada,setTransConfirmada] = React.useState(false);
 
   const sonarTransferencia = () => {
@@ -323,7 +323,34 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
     <div style={s.screen}>
       <div style={s.header}>
         <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>Entrega · {cliente.nombre}</span>
+        <div style={{flex:1,paddingLeft:4}}>
+          <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>{cliente.nombre}</div>
+          <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:1}}>
+            {cliente.calle?`${cliente.calle} ${cliente.nro||""}`:cliente.manzana?`Mz ${cliente.manzana} L ${cliente.lote}`:""}{cliente.barrio?` · ${cliente.barrio}`:""}{cliente.orden?` · #${cliente.orden}`:""}
+          </div>
+        </div>
+        <div style={{display:"flex",gap:6,fontSize:17,flexShrink:0}}>
+          {cliente.maps&&<a href={cliente.maps} target="_blank" rel="noreferrer" style={{textDecoration:"none"}} onClick={e=>e.stopPropagation()}>📍</a>}
+          {cliente.telefono&&<a href={`https://wa.me/54${cliente.telefono}`} target="_blank" rel="noreferrer" style={{textDecoration:"none"}} onClick={e=>e.stopPropagation()}>💬</a>}
+        </div>
+      </div>
+      {/* Panel de info del cliente */}
+      <div style={{background:"var(--color-background-secondary)",borderBottom:"0.5px solid var(--color-border-tertiary)",padding:"7px 14px",display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+        {cliente.saldo<0&&<span style={{fontSize:11,fontWeight:500,padding:"2px 8px",borderRadius:5,background:"var(--color-background-danger)",color:"var(--color-text-danger)"}}>Debe {fmt(Math.abs(cliente.saldo))}</span>}
+        {cliente.saldo>0&&<span style={{fontSize:11,fontWeight:500,padding:"2px 8px",borderRadius:5,background:"var(--color-background-success)",color:"var(--color-text-success)"}}>A favor {fmt(cliente.saldo)}</span>}
+        {cliente.sifon>0&&<span style={{fontSize:11,padding:"2px 8px",borderRadius:5,background:"var(--color-background-info)",color:"var(--color-text-info)"}}>Sifón×{cliente.sifon}</span>}
+        {cliente.bidon10>0&&<span style={{fontSize:11,padding:"2px 8px",borderRadius:5,background:"var(--color-background-info)",color:"var(--color-text-info)"}}>10L×{cliente.bidon10}</span>}
+        {cliente.bidon20>0&&<span style={{fontSize:11,padding:"2px 8px",borderRadius:5,background:"var(--color-background-info)",color:"var(--color-text-info)"}}>20L×{cliente.bidon20}</span>}
+        {cliente.dispenser>0&&<span style={{fontSize:11,padding:"2px 8px",borderRadius:5,background:"var(--color-background-tertiary)",color:"var(--color-text-secondary)"}}>Disp×{cliente.dispenser}</span>}
+        {(()=>{
+          const aj=cliente.envAjuste||{};
+          const items=[];
+          if((aj.sifon||0)>0) items.push(`+${aj.sifon} sif.`);
+          if((aj.bidon10||0)>0) items.push(`+${aj.bidon10} 10L`);
+          if((aj.bidon20||0)>0) items.push(`+${aj.bidon20} 20L`);
+          return items.length>0?<span style={{fontSize:11,padding:"2px 8px",borderRadius:5,background:"var(--color-background-warning)",color:"var(--color-text-warning)"}}>{items.join(" ")} prest.</span>:null;
+        })()}
+        {cliente.notas&&<span style={{fontSize:11,color:"var(--color-text-warning)"}}>📝 {cliente.notas}</span>}
       </div>
       <div style={{padding:16}}>
         {/* Envases habituales del cliente */}
@@ -463,6 +490,10 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
             onClick={onNoQuiere}>
             🚫 No quiere
           </button>
+          {onSaltar&&<button style={{flex:1,background:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",border:"0.5px solid var(--color-border-secondary)",borderRadius:8,padding:"11px 8px",fontSize:13,fontWeight:500,cursor:"pointer"}}
+            onClick={onSaltar}>
+            ⏭ Saltar
+          </button>}
         </div>
         {/* Cobrar deuda sin entrega */}
         {cliente.saldo<0&&(
