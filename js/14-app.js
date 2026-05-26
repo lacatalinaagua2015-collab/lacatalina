@@ -774,16 +774,16 @@ function App() {
             const cl=cliente;
             const saldoAntes=cl.saldo||0;
             const saldoDespues=saldoAntes+monto;
-            const det=[{nombre:"Cobro de deuda",cantidad:1,precio:0,total:0}];
+            const det=[{nombre:"Cobro de deuda",cantidad:1,precio:monto,total:monto}];
             const vt={id:Date.now(),clienteId:cl.id,cliente:cl.nombre,dia:diaActual,fechaKey:fechaActual,fecha:new Date().toLocaleString("es-AR"),
-              detalle:det,pago,obs:`Cobro de deuda $${monto.toLocaleString("es-AR")} (${pago})`,saldoAplicado:0,
-              neto:0,bruto:0,desc:0,costo:0,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],
+              detalle:det,pago,obs:`Cobro de deuda ${fmt(monto)} (${pago})`,saldoAplicado:0,
+              neto:monto,bruto:monto,desc:0,costo:monto,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],
               saldoAntes,saldoDespues,_esCobro:true};
             saveVentas([...ventas,vt]);
             saveClientes(clientes.map(x=>x.id===cl.id?{...x,saldo:saldoDespues}:x));
           }}
           onGuardarAjuste={(vt)=>{saveVentas([...ventas,vt]);}} />}
-      {pantalla==="venta"          && cliente && <NuevaVenta cliente={cliente} productos={productos} fecha={fechaActual}
+      {pantalla==="venta"          && cliente && <NuevaVenta key={clienteId} cliente={cliente} productos={productos} fecha={fechaActual}
         progressData={(()=>{
           const clientesDia=clientes.filter(c=>c.dia===diaActual);
           const ventasHoy=ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste);
@@ -928,8 +928,8 @@ function App() {
         const saldoAntes=cl.saldo||0;
         const saldoDespues=saldoAntes+monto;
         const vt={id:Date.now(),clienteId:cl.id,cliente:cl.nombre,dia:cl.dia,fechaKey:new Date().toISOString().slice(0,10),fecha:new Date().toLocaleString("es-AR"),
-          detalle:[{nombre:"Cobro de deuda",cantidad:1,precio:0,total:0}],pago,obs:`Cobro de deuda ${fmt(monto)} (${pago})`,
-          neto:0,bruto:0,desc:0,costo:0,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],saldoAntes,saldoDespues,_esCobro:true};
+          detalle:[{nombre:"Cobro de deuda",cantidad:1,precio:monto,total:monto}],pago,obs:`Cobro de deuda ${fmt(monto)} (${pago})`,
+          neto:monto,bruto:monto,desc:0,costo:monto,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],saldoAntes,saldoDespues,_esCobro:true};
         saveVentas([...ventas,vt]);
         saveClientes(clientes.map(c=>c.id===clienteId?{...c,saldo:saldoDespues}:c));
       }} onVolver={()=>irA("menu")} />}
