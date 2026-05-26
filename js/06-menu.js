@@ -251,7 +251,7 @@ function DiaPrincipal({dia,onIrClientes,onIrPlanilla,onVolver,onVerConfirmacione
 }
 
 function DetalleVentasDia({ventas, clientes}) {
-  const [abierto, setAbierto] = React.useState(false);
+  const [abierto, setAbierto] = React.useState(true);
   return (
     <div style={{...s.card,margin:"0 0 8px",padding:0,overflow:"hidden"}}>
       <button
@@ -589,8 +589,13 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
         <div style={s.divider} />
         <span style={{...s.sectionTitle,padding:"0 0 10px"}}>Resumen del día</span>
 
-        {/* Detalle de ventas del día — componente separado para no violar reglas de hooks */}
-        {todasVentasDia.length>0&&<DetalleVentasDia ventas={todasVentasDia} clientes={clientes} />}
+        {/* Detalle de ventas — primero y abierto por defecto */}
+        {todasVentasDia.length>0
+          ? <DetalleVentasDia ventas={todasVentasDia} clientes={clientes} />
+          : <div style={{...s.card,margin:"0 0 8px",padding:"12px 16px",background:"var(--color-background-tertiary)"}}>
+              <span style={{fontSize:13,color:"var(--color-text-tertiary)"}}>📋 Sin ventas registradas para este día</span>
+            </div>
+        }
 
         {/* Ventas del día */}
         <div style={{...s.card,margin:"0 0 8px",background:"var(--color-background-secondary)",padding:"14px 16px"}}>
