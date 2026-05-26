@@ -819,7 +819,7 @@ function App() {
   const siguiente = clientesDia.find(c=>!visitadosIds.has(c.id)&&c.id!==clienteId);
   if(siguiente){ setClienteId(siguiente.id); irA("detalleCliente"); }
   else irA("clientes");
-}
+}}
         onSaltar={()=>{
           const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo:"salteado"}];
           saveNoVisitas(nv);
