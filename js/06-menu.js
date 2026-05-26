@@ -250,21 +250,59 @@ function DiaPrincipal({dia,onIrClientes,onIrPlanilla,onVolver,onVerConfirmacione
   );
 }
 
-function DetalleVentasDia({ventas, clientes}) {
-  const [abierto, setAbierto] = React.useState(true);
+function DetalleTransferencias({ventas, ventasPendTrans}) {
+  const [abierto, setAbierto] = React.useState(false);
+  const pendientes = (ventasPendTrans||[]).length;
   return (
-    <div style={{...s.card,margin:"0 0 8px",padding:0,overflow:"hidden"}}>
+    <div style={{marginTop:8,borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:8}}>
+      <button style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"2px 0"}}
+        onClick={()=>setAbierto(o=>!o)}>
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <span style={{fontSize:11,color:"var(--color-text-secondary)",fontWeight:500,textTransform:"uppercase",letterSpacing:"0.05em"}}>Detalle de transferencias</span>
+          {pendientes>0&&<span style={{fontSize:10,padding:"1px 6px",borderRadius:4,background:"var(--color-background-warning)",color:"#f5b942",fontWeight:600}}>🔴 {pendientes} pend.</span>}
+        </div>
+        <span style={{fontSize:13,color:"var(--color-text-tertiary)",display:"inline-block",transform:abierto?"rotate(180deg)":"rotate(0deg)"}}>▾</span>
+      </button>
+      {abierto&&(
+        <div style={{marginTop:6}}>
+          {ventas.map(v=>{
+            const confirmada=!!v.transConfirmada;
+            return (
+              <div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+                <div style={{flex:1}}>
+                  <span style={{fontSize:12,color:"var(--color-text-primary)",fontWeight:500}}>{v.cliente}</span>
+                  <span style={{marginLeft:6,fontSize:10,padding:"1px 6px",borderRadius:4,
+                    background:confirmada?"var(--color-background-success)":"var(--color-background-warning)",
+                    color:confirmada?"var(--color-text-success)":"#f5b942",fontWeight:600}}>
+                    {confirmada?"✅ Confirmada":"🔴 Pendiente"}
+                  </span>
+                </div>
+                <span style={{fontSize:13,fontWeight:500,color:confirmada?"var(--color-text-success)":"#f5b942"}}>{fmt(v.pagadoNum||v.neto||0)}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DetalleVentasDia({ventas, clientes}) {
+  const [abierto, setAbierto] = React.useState(false);
+  return (
+    <div style={{margin:"0 0 8px",borderRadius:12,overflow:"hidden",border:"1.5px solid #185FA5",background:"var(--color-background-info)"}}>
       <button
         style={{width:"100%",padding:"12px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",textAlign:"left"}}
         onClick={()=>setAbierto(o=>!o)}>
-        <div>
-          <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>📋 Detalle de ventas del día</span>
-          <span style={{marginLeft:8,fontSize:11,color:"var(--color-text-tertiary)"}}>{ventas.length} venta{ventas.length>1?"s":""}</span>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:16}}>📋</span>
+          <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-info)"}}>Detalle de ventas del día</span>
+          <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{ventas.length} venta{ventas.length>1?"s":""}</span>
         </div>
-        <span style={{color:"var(--color-text-tertiary)",fontSize:14,display:"inline-block",transform:abierto?"rotate(180deg)":"rotate(0deg)"}}>▾</span>
+        <span style={{color:"var(--color-text-info)",fontSize:14,display:"inline-block",transform:abierto?"rotate(180deg)":"rotate(0deg)"}}>▾</span>
       </button>
       {abierto&&(
-        <div style={{borderTop:"0.5px solid var(--color-border-tertiary)"}}>
+        <div style={{borderTop:"0.5px solid var(--color-border-info)",background:"var(--color-background-primary)"}}>
           {ventas.map((v,idx)=>{
             const pagoBadge={
               contado:{bg:"var(--color-background-success)",color:"var(--color-text-success)",txt:"Contado"},
@@ -687,35 +725,12 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
               <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Neto a acreditar</span>
               <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-info)"}}>{fmt(cobTransNeto)}</span>
             </div>
-            {/* Todas las transferencias del día — confirmadas y pendientes */}
-            {todasVentasDia.filter(v=>v.pago==="transferencia").length>0&&(
-              <div style={{marginTop:8,borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:8}}>
-                <div style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:6,fontWeight:500,textTransform:"uppercase",letterSpacing:"0.05em"}}>
-                  Detalle de transferencias
-                </div>
-                {todasVentasDia.filter(v=>v.pago==="transferencia").map(v=>{
-                  const confirmada=!!v.transConfirmada;
-                  return (
-                    <div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-                      <div style={{flex:1}}>
-                        <span style={{fontSize:12,color:"var(--color-text-primary)",fontWeight:500}}>{v.cliente}</span>
-                        <span style={{marginLeft:6,fontSize:11,padding:"1px 6px",borderRadius:4,
-                          background:confirmada?"var(--color-background-success)":"var(--color-background-warning)",
-                          color:confirmada?"var(--color-text-success)":"#f5b942",fontWeight:600}}>
-                          {confirmada?"✅ Confirmada":"🔴 Pendiente"}
-                        </span>
-                      </div>
-                      <span style={{fontSize:13,fontWeight:500,color:confirmada?"var(--color-text-success)":"#f5b942"}}>{fmt(v.pagadoNum||v.neto||0)}</span>
-                    </div>
-                  );
-                })}
-                {ventasPendTrans.length>0&&(
-                  <div style={{marginTop:6,fontSize:11,color:"#f5b942",fontWeight:500}}>
-                    ⚠ {ventasPendTrans.length} pendiente{ventasPendTrans.length>1?"s":""} de confirmar
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Todas las transferencias del día — colapsable */}
+            {(()=>{
+              const transDelDia = todasVentasDia.filter(v=>v.pago==="transferencia");
+              if(!transDelDia.length) return null;
+              return <DetalleTransferencias ventas={transDelDia} ventasPendTrans={ventasPendTrans} />;
+            })()}
           </div>
         )}
 
