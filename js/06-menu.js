@@ -402,6 +402,8 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
   const set = (k,v) => setDatos(d=>({...d,[k]:v}));
   const yaCerrado = !!planilla._diaCerrado;
   const [mostrarCierre,setMostrarCierre] = useState(false);
+  const [realesLlenos,setRealesLlenos] = useState({soda:"",b10:"",b20:""});
+  const [realesVacios,setRealesVacios] = useState({soda:"",b10:"",b20:""});
 
   // ── Cálculo de stock para el cierre del día ──────────────────
   const CAJON = 6;
@@ -420,13 +422,14 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
     (v.envPrest||[]).forEach(e=>{const k=prodKeyPl[e.prod];if(k)prestadosDia[k]+=Number(e.cant)||0;});
     (v.envDev||[]).forEach(e=>{const k=prodKeyPl[e.prod];if(k)devueltosDia[k]+=Number(e.cant)||0;});
   });
-  // sobrantes = llenos que no se vendieron ni prestaron → vuelven a sodería como llenos
+  // FÓRMULA CORRECTA:
+  // Sobrantes llenos = cargados − vendidos (prestados no reducen llenos, se compensan con devueltos)
+  // Vacíos del día = vendidos + devueltos − prestados (los prestados de hoy cancelan devueltos de hoy)
   const sobrantes={soda:0,b10:0,b20:0};
-  // vacios = lo vendido + lo que devolvieron → vuelven a sodería como vacíos
   const vaciosRec={soda:0,b10:0,b20:0};
   ["soda","b10","b20"].forEach(pk=>{
-    sobrantes[pk]=Math.max(0,llenosCargados[pk]-vendidosDia[pk]-prestadosDia[pk]);
-    vaciosRec[pk]=vendidosDia[pk]+devueltosDia[pk];
+    sobrantes[pk]=Math.max(0,llenosCargados[pk]-vendidosDia[pk]);
+    vaciosRec[pk]=Math.max(0,vendidosDia[pk]+devueltosDia[pk]-prestadosDia[pk]);
   });
   // Sodería después del cierre
   const soderiaActual = stock?.soderia||{sifon:0,bidon10:0,bidon20:0};
@@ -440,21 +443,37 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
   });
 
   const confirmarCierre = () => {
-    // Actualizar stock: sodería llenos += sobrantes, sodería vacíos += vacíos, camión = 0
+    // Usar valores reales si el usuario los modificó, si no usar los calculados
+    const llenVuelta={soda:0,b10:0,b20:0};
+    const vacVuelta={soda:0,b10:0,b20:0};
+    const planKeyToSkL={"soda":"sifon","b10":"bidon10","b20":"bidon20"};
+    ["soda","b10","b20"].forEach(pk=>{
+      const calcL=pk==="soda"?sobrantes[pk]:sobrantes[pk];
+      const calcV=vaciosRec[pk];
+      llenVuelta[pk]=realesLlenos[pk]!==""?Number(realesLlenos[pk])*(pk==="soda"?CAJON:1):calcL;
+      vacVuelta[pk]=realesVacios[pk]!==""?Number(realesVacios[pk])*(pk==="soda"?CAJON:1):calcV;
+    });
+    // Registrar diferencias para auditoría
+    const diffs={};
+    ["soda","b10","b20"].forEach(pk=>{
+      const dl=llenVuelta[pk]-sobrantes[pk];
+      const dv=vacVuelta[pk]-vaciosRec[pk];
+      if(dl!==0||dv!==0) diffs[pk]={llenos:dl,vacios:dv};
+    });
     setStock(prev=>{
       const s=JSON.parse(JSON.stringify(prev||{}));
       if(!s.soderia) s.soderia={sifon:0,bidon10:0,bidon20:0};
       if(!s.soderia_vacios) s.soderia_vacios={sifon:0,bidon10:0,bidon20:0};
       ["soda","b10","b20"].forEach(pk=>{
-        const sk=planKeyToSk[pk];
-        s.soderia[sk]=(s.soderia[sk]||0)+sobrantes[pk];
-        s.soderia_vacios[sk]=(s.soderia_vacios[sk]||0)+vaciosRec[pk];
+        const sk=planKeyToSkL[pk];
+        s.soderia[sk]=(s.soderia[sk]||0)+llenVuelta[pk];
+        s.soderia_vacios[sk]=(s.soderia_vacios[sk]||0)+vacVuelta[pk];
       });
       s.camion={sifon:0,bidon10:0,bidon20:0};
       syncData&&syncData({stock:s});
       return s;
     });
-    onGuardar({...datos,_diaCerrado:true,_stockActualizado:true});
+    onGuardar({...datos,_diaCerrado:true,_stockActualizado:true,_cierreDiffs:Object.keys(diffs).length>0?diffs:null});
     setMostrarCierre(false);
   };
   const setProd=(pid,campo,v)=>setDatos(d=>({...d,productos:{...d.productos,[pid]:{...d.productos[pid],[campo]:v}}}));
@@ -819,23 +838,43 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
                 <div style={{padding:"6px 12px",background:"rgba(77,217,160,0.05)",borderTop:"1px solid rgba(77,217,160,0.2)"}}>
                   <div style={{fontSize:10,fontWeight:700,color:"#4dd9a0",textTransform:"uppercase",letterSpacing:"0.05em"}}>Vuelve a sodería</div>
                 </div>
-                {/* Llenos que vuelven */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"8px 12px",borderBottom:"0.5px solid var(--color-border-tertiary)",alignItems:"center"}}>
+                {/* Llenos sobrantes — confirmá o corregí */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"8px 12px",borderBottom:"0.5px solid var(--color-border-tertiary)",alignItems:"center",gap:4}}>
                   <div style={{fontSize:12,color:"#4dd9a0",fontWeight:500}}>✅ Llenos</div>
-                  {["soda","b10","b20"].map(pk=>(
-                    <div key={pk} style={{textAlign:"center",fontSize:16,fontWeight:700,color:"#4dd9a0"}}>
-                      +{pk==="soda"?Math.floor(sobrantes[pk]/CAJON):sobrantes[pk]}
-                    </div>
-                  ))}
+                  {["soda","b10","b20"].map(pk=>{
+                    const calc=pk==="soda"?Math.floor(sobrantes[pk]/CAJON):sobrantes[pk];
+                    const real=realesLlenos[pk]!==""?Number(realesLlenos[pk]):calc;
+                    const diff=real-calc;
+                    return (
+                      <div key={pk} style={{textAlign:"center"}}>
+                        <div style={{fontSize:11,color:"#4dd9a0",marginBottom:2}}>App: {calc}</div>
+                        <input type="number" min={0} value={realesLlenos[pk]}
+                          placeholder={String(calc)}
+                          style={{width:"100%",padding:"4px",borderRadius:6,border:"0.5px solid #4dd9a0",background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",fontSize:14,textAlign:"center"}}
+                          onChange={e=>setRealesLlenos(r=>({...r,[pk]:e.target.value}))}/>
+                        {diff!==0&&<div style={{fontSize:10,color:diff>0?"var(--color-text-warning)":"var(--color-text-danger)",marginTop:1}}>{diff>0?"+":""}{diff}</div>}
+                      </div>
+                    );
+                  })}
                 </div>
-                {/* Vacíos que vuelven */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"8px 12px",alignItems:"center"}}>
+                {/* Vacíos del día — confirmá o corregí */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"8px 12px",alignItems:"center",gap:4}}>
                   <div style={{fontSize:12,color:"#f5b942",fontWeight:500}}>📦 Vacíos</div>
-                  {["soda","b10","b20"].map(pk=>(
-                    <div key={pk} style={{textAlign:"center",fontSize:16,fontWeight:700,color:"#f5b942"}}>
-                      +{pk==="soda"?Math.floor(vaciosRec[pk]/CAJON):vaciosRec[pk]}
-                    </div>
-                  ))}
+                  {["soda","b10","b20"].map(pk=>{
+                    const calc=pk==="soda"?Math.floor(vaciosRec[pk]/CAJON):vaciosRec[pk];
+                    const real=realesVacios[pk]!==""?Number(realesVacios[pk]):calc;
+                    const diff=real-calc;
+                    return (
+                      <div key={pk} style={{textAlign:"center"}}>
+                        <div style={{fontSize:11,color:"#f5b942",marginBottom:2}}>App: {calc}</div>
+                        <input type="number" min={0} value={realesVacios[pk]}
+                          placeholder={String(calc)}
+                          style={{width:"100%",padding:"4px",borderRadius:6,border:"0.5px solid #f5b942",background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",fontSize:14,textAlign:"center"}}
+                          onChange={e=>setRealesVacios(r=>({...r,[pk]:e.target.value}))}/>
+                        {diff!==0&&<div style={{fontSize:10,color:diff>0?"var(--color-text-warning)":"var(--color-text-danger)",marginTop:1}}>{diff>0?"+":""}{diff}</div>}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
