@@ -120,8 +120,8 @@ function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolv
             ))}
           </div>
           <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
-            {[["🏭 Sodería",Math.floor((stock?.soderia?.sifon||0)/CAJON),(stock?.soderia?.bidon10||0),(stock?.soderia?.bidon20||0)],["📦 Depósito",Math.floor((stock?.casa?.sifon||0)/CAJON),(stock?.casa?.bidon10||0),(stock?.casa?.bidon20||0)],["👥 Clientes",Math.floor(envC.sifon/CAJON),envC.bidon10,envC.bidon20]].map(([lugar,s,b10,b20])=>(
-              <div key={lugar} style={{fontSize:10,color:"var(--color-text-secondary)"}}>{lugar}: {s}caj · {b10} 10L · {b20} 20L</div>
+            {[["🏭 Sodería",Math.floor((stock?.soderia?.sifon||0)/CAJON),(stock?.soderia?.bidon10||0),(stock?.soderia?.bidon20||0)],["📦 Depósito",Math.floor((stock?.casa?.sifon||0)/CAJON),(stock?.casa?.bidon10||0),(stock?.casa?.bidon20||0)],["👥 Clientes",Math.floor(envC.sifon/CAJON),envC.bidon10,envC.bidon20]].map(([lugar,caj,b10,b20])=>(
+              <div key={lugar} style={{fontSize:10,color:"var(--color-text-secondary)"}}>{lugar}: {caj}caj · {b10} 10L · {b20} 20L</div>
             ))}
           </div>
         </div>
