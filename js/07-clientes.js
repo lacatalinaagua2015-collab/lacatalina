@@ -2,7 +2,7 @@
 // ◆  07-clientes.js — ListaClientes, DetalleCliente, EditCliente
 // ════════════════════════════════════════════════════════════════════
 
-function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onNoQuiereProspecto,onConfirmarTransfer}) {
+function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onNoQuiereProspecto,onConfirmarTransfer,onVerProspecto,onEliminarProspecto}) {
   const [busqueda,setBusqueda] = useState("");
   const [editandoOrden,setEditandoOrden] = useState(null);
   const [ordenTemp,setOrdenTemp] = useState("");
@@ -199,7 +199,8 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
         <>
           <span style={{...s.sectionTitle,color:"#f5b942"}}>🚀 Prospectos en promoción ({prospectosDelDia.length})</span>
           {prospectosDelDia.map(p=>(
-            <div key={p.id} style={{...s.card,borderLeft:"3px solid #f5b942",opacity:visitadosProspectos.has(p.id)?0.7:1}}>
+            <div key={p.id} style={{...s.card,borderLeft:"3px solid #f5b942",opacity:visitadosProspectos.has(p.id)?0.7:1,cursor:"pointer"}}
+              onClick={()=>onVerProspecto&&onVerProspecto(p)}>
               <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
                 <div style={{width:34,height:34,borderRadius:8,background:"#2e1f06",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:600,color:"#f5b942",flexShrink:0}}>P</div>
                 <div style={{flex:1,minWidth:0}}>
@@ -218,6 +219,8 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
                 <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0}}>
                   {p.maps&&<a href={p.maps} target="_blank" rel="noreferrer" style={{fontSize:18,textDecoration:"none"}} onClick={e=>e.stopPropagation()}>📍</a>}
                   {p.telefono&&<a href={`https://wa.me/54${p.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:18,textDecoration:"none"}} onClick={e=>e.stopPropagation()}>💬</a>}
+                  <button style={{fontSize:11,color:"var(--color-text-danger)",background:"none",border:"none",cursor:"pointer",padding:2}}
+                    onClick={e=>{e.stopPropagation();onEliminarProspecto&&onEliminarProspecto(p.id);}}>🗑</button>
                 </div>
               </div>
               {!visitadosProspectos.has(p.id)&&(

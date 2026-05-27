@@ -9,7 +9,7 @@ function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolv
   // Stock base editable (solo Sodería y Casa — se setea una vez)
   const [base, setBase] = React.useState(()=>({
     soderia: {...stock?.soderia||{sifon:0,bidon10:0,bidon20:0}},
-    casa:    {...stock?.casa   ||{sifon:0,bidon10:0,bidon20:0}},
+    casa:    {...stock?.casa   ||{sifon:0,bidon10:0,bidon20:0,dispenser:0}},
   }));
   const setB = (lugar,key,val) => setBase(b=>({...b,[lugar]:{...b[lugar],[key]:Number(val)||0}}));
   const [baseVacios, setBaseVacios] = React.useState(()=>({...stock?.soderiaVacios||{sifon:0,bidon10:0,bidon20:0}}));
@@ -126,6 +126,37 @@ function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolv
           </div>
         </div>
 
+        {/* Indicador % en campo vs disponible */}
+        {(()=>{
+          const dispField=(stock?.soderia?.sifon||0)+(stock?.casa?.sifon||0);
+          const enCampo=envC.sifon; const totalSifon=totalCtrl.sifon;
+          const pct=totalSifon>0?Math.round((enCampo/totalSifon)*100):0;
+          const dispB10=(stock?.soderia?.bidon10||0)+(stock?.casa?.bidon10||0);
+          const pctB10=totalCtrl.bidon10>0?Math.round((envC.bidon10/totalCtrl.bidon10)*100):0;
+          const pctB20=totalCtrl.bidon20>0?Math.round((envC.bidon20/totalCtrl.bidon20)*100):0;
+          return (
+            <div style={{...s.card,margin:"0 0 10px",padding:"12px 14px"}}>
+              <div style={{fontSize:11,fontWeight:500,color:"var(--color-text-tertiary)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8}}>📊 En la calle vs disponible</div>
+              {[["Soda",pct,enCampo,totalSifon,"un"],["Bidón 10L",pctB10,envC.bidon10,totalCtrl.bidon10,"un"],["Bidón 20L",pctB20,envC.bidon20,totalCtrl.bidon20,"un"]].map(([l,p,campo,total,u])=>(
+                <div key={l} style={{marginBottom:8}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                    <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>{l}</span>
+                    <span style={{fontSize:11,color:p>80?"var(--color-text-warning)":p>60?"var(--color-text-info)":"var(--color-text-success)"}}>
+                      {campo} en calle · {total-campo} disponibles ({100-p}%)
+                    </span>
+                  </div>
+                  <div style={{height:6,borderRadius:3,background:"var(--color-background-tertiary)",overflow:"hidden"}}>
+                    <div style={{height:"100%",borderRadius:3,
+                      background:p>80?"var(--color-text-warning)":p>60?"#185FA5":"var(--color-text-success)",
+                      width:`${p}%`,transition:"width 0.3s"}} />
+                  </div>
+                </div>
+              ))}
+              {pct>80&&<div style={{fontSize:11,color:"var(--color-text-warning)",marginTop:4}}>⚠️ Más del 80% de la soda está en clientes — considerá restock</div>}
+            </div>
+          );
+        })()}
+
         {/* Estado actual calculado */}
         <div style={{...s.card,margin:"0 0 12px",background:"var(--color-background-secondary)"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
@@ -219,7 +250,7 @@ function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolv
               <div style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)"}}>{titulo}</div>
               <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>Modificá solo cuando ajustés físicamente el stock</div>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
               <div>
                 <label style={{...s.label,textAlign:"center",fontSize:11}}>Cajones soda</label>
                 <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0}
@@ -234,6 +265,10 @@ function StockGeneral({stock,setStock,clientes,ventas,productos,planillas,onVolv
               <div>
                 <label style={{...s.label,textAlign:"center",fontSize:11}}>Bidón 20L</label>
                 <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0} value={base[lugar]?.bidon20||0} onChange={e=>setB(lugar,"bidon20",e.target.value)} />
+              </div>
+              <div>
+                <label style={{...s.label,textAlign:"center",fontSize:11}}>🧊 Dispenser</label>
+                <input style={{...s.inputNum,textAlign:"center"}} type="number" min={0} value={base[lugar]?.dispenser||0} onChange={e=>setB(lugar,"dispenser",e.target.value)} />
               </div>
             </div>
           </div>

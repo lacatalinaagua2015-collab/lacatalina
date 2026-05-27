@@ -687,7 +687,7 @@ function App() {
             return {dia, fecha:fechas[0]||"", count:vts.length, monto:vts.reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0), ventas:vts};
           }).filter(Boolean)} zonasReparto={zonasReparto} onSetZona={(dia,zona)=>{const nz={...zonasReparto,[dia]:zona};setZonasReparto(nz);syncData({zonasReparto:nz});}}
           onDiaHoy={(dia,fechaKey)=>{setDiaActual(dia);setFechaActual(fechaKey);setFechaObj(new Date(fechaKey+"T12:00:00"));irA("inicioReparto");}}
-          onDiaResumen={(dia,fechaKey)=>{setDiaActual(dia);setFechaActual(fechaKey);setFechaObj(new Date(fechaKey+"T12:00:00"));setModalResumenDia({dia,fechaKey});}}
+          onDiaResumen={(dia,fechaKey)=>{setDiaActual(dia);setFechaActual(fechaKey);setFechaObj(new Date(fechaKey+"T12:00:00"));irA("planilla");}}
           noVisitas={noVisitas||[]}
           onFiados={()=>irA("fiadosPendientes")} />}
       {pantalla==="confirmacionesDia" && <ConfirmacionesDia
@@ -730,6 +730,9 @@ function App() {
         }}
         prospectos={(prospectos||[]).filter(p=>p.dia===diaActual&&p.estado==="activo")}
         recordatorios={recordatorios}
+        onVerProspecto={(p)=>{setClienteId(p.id);irA("detalleProspecto");}}
+        onEditarProspecto={(id,cambios)=>{saveProspectos((prospectos||[]).map(x=>x.id===id?{...x,...cambios}:x));}}
+        onEliminarProspecto={(id)=>{if(window.confirm("¿Eliminar este prospecto?"))saveProspectos((prospectos||[]).filter(x=>x.id!==id));}}
         onVentaProspecto={(p)=>{
           if(!clientes.find(c=>c.id===p.id)){
             saveClientes([...clientes,{...p,saldo:0,_esProspecto:true}]);
@@ -844,7 +847,14 @@ function App() {
         onSaltar={()=>{
           const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo:"salteado"}];
           saveNoVisitas(nv);
-          irA("clientes");
+          // Auto-avanzar al siguiente cliente pendiente
+          const visitadosIds=new Set([
+            ...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual).map(v=>v.clienteId),
+            ...nv.filter(v=>v.fecha===fechaActual&&v.dia===diaActual).map(v=>v.clienteId)
+          ]);
+          const clientesDia=clientes.filter(c=>c.dia===diaActual);
+          const sig=clientesDia.find(c=>!visitadosIds.has(c.id)&&c.id!==clienteId);
+          if(sig){setClienteId(sig.id);irA("venta");}else irA("clientes");
         }}
         onVolver={()=>irA("detalleCliente")} />}
       {pantalla==="nuevoCliente"   && <NuevoCliente diaActual={diaActual} onGuardar={(datos)=>{
@@ -857,6 +867,29 @@ function App() {
             .sort((a,b)=>DIAS.indexOf(a.dia)-DIAS.indexOf(b.dia)||(a.orden||9999)-(b.orden||9999));
           saveClientes(nc);irA("clientes");
         }} onVolver={()=>irA("clientes")} />}
+      {pantalla==="detalleProspecto"  && prospectos&&prospectos.find(p=>p.id===clienteId)&&(()=>{
+        const prosp=prospectos.find(p=>p.id===clienteId);
+        return <DetalleCliente
+          cliente={{...prosp,saldo:prosp.saldo||0,tipo:"prospecto"}}
+          ventas={ventas.filter(v=>v.clienteId===prosp.id)}
+          noVisitas={(noVisitas||[]).filter(v=>v.clienteId===prosp.id)}
+          dia={diaActual} fecha={fechaActual} productos={productos}
+          onVenta={()=>{
+            saveClientes([...clientes,{...prosp,saldo:0,_esProspecto:true}]);
+            saveProspectos((prospectos||[]).map(x=>x.id===prosp.id?{...x,estado:"convertido"}:x));
+            irA("venta");
+          }}
+          onVolver={()=>irA("clientes")}
+          onEditar={cambios=>saveProspectos((prospectos||[]).map(x=>x.id===prosp.id?{...x,...cambios}:x))}
+          onEliminarCliente={()=>{
+            if(window.confirm("¿Eliminar este prospecto?"))
+              saveProspectos((prospectos||[]).filter(x=>x.id!==prosp.id));
+            irA("clientes");
+          }}
+          onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta}
+          onNoEstaCliente={()=>irA("clientes")} onNoQuiereCliente={()=>irA("clientes")}
+        />;
+      })()}
       {pantalla==="promocion"       && <Promocion prospectos={prospectos} clientes={clientes} onSave={saveProspectos} onConvertir={(p)=>{
         const nuevo={...p,id:Date.now(),saldo:0,sifon:0,bidon10:1,bidon20:0};
         saveClientes([...clientes,nuevo]);
