@@ -5,7 +5,8 @@
 function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onStock,onAgenda,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,onVerConfirmaciones,clientes,ventas,stock,zonasReparto,onSetZona,onDiaHoy,onDiaResumen,noVisitas,onFiados}) {
   const [editandoZona, setEditandoZona] = React.useState(null);
   const hoyDiaNombre = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"][new Date().getDay()];
-  const hoyFechaKey = new Date().toISOString().slice(0,10);
+  // Usar hora LOCAL para evitar bug de zona horaria (Argentina UTC-3)
+  const hoyFechaKey = (()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;})();
   const hoyLabel = new Date().toLocaleDateString("es-AR",{day:"numeric",month:"short"});
 
   // Calcular si el día de hoy está completo (todos los clientes visitados)
@@ -103,7 +104,7 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
                 {diaCompleto ? "Listo" : "Hoy"}
               </span>
               <span style={{fontSize:9,color: diaCompleto ? "#9FE1CB" : "#b5d4f4",lineHeight:1}}>
-                {diaCompleto ? `${visitadosHoy.length}/${clientesHoy.length}` : hoyLabel}
+                {diaCompleto ? "Listo" : `${visitadosHoy.length}/${clientesHoy.length}`}
               </span>
             </button>
           )}
