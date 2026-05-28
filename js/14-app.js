@@ -590,7 +590,12 @@ function App() {
     const pagoReal = opcionSaldo==="mixto_ef"?"contado":opcionSaldo==="mixto_tr"?"transferencia":pago;
     const obsExtra = montoTrans2>0?` [Mixto: ef $${montoPagado} + tr $${montoTrans2}]`:"";
 
-    const calc = calcVenta(detalle, pagoReal, montoPagado, saldoAplicado, productos);
+    // Para pago mixto: el calc usa el TOTAL pagado (ef+tr) asi el saldoDelta refleja lo real
+    // La ventaTr solo existe para el flujo de confirmacion de transferencia, sin impacto en saldo
+    const montoParaCalc = (opcionSaldo==="mixto_ef" && montoTrans2>0)
+      ? String(Number(montoPagado) + montoTrans2)
+      : montoPagado;
+    const calc = calcVenta(detalle, pagoReal, montoParaCalc, saldoAplicado, productos);
     const nuevaVenta = {
       id:Date.now(), clienteId:c.id, cliente:c.nombre,
       dia:diaActual, fechaKey:fechaActual, fecha:new Date().toLocaleString("es-AR"),
@@ -600,24 +605,24 @@ function App() {
       montoTrans:montoTrans2||0, montoEfec:opcionSaldo==="mixto_ef"?Number(montoPagado):0,
     };
 
-    // Si es pago mixto, también guardamos la parte de transferencia como venta separada
+    // Si es pago mixto, guardamos la transferencia como venta pendiente de confirmacion
+    // saldoDelta=0 porque el saldo ya fue calculado en la venta principal con el total
     let nuevasVentas = [...ventas, nuevaVenta];
     let saldoExtra = calc.saldoDelta;
     if(montoTrans2>0 && opcionSaldo==="mixto_ef") {
-      // Registrar transferencia como venta separada vinculada
       const ventaTr = {
         id:Date.now()+2, clienteId:c.id, cliente:c.nombre,
         dia:diaActual, fechaKey:fechaActual, fecha:new Date().toLocaleString("es-AR"),
         detalle:[{nombre:"Pago mixto · transferencia",cantidad:1,precio:montoTrans2,total:montoTrans2}],
         pago:"transferencia", obs:"[Parte transfer. de pago mixto]", saldoAplicado:0,
         neto:montoTrans2, bruto:montoTrans2, desc:0, costo:0, ganancia:0,
-        pagadoNum:montoTrans2, saldoDelta:montoTrans2,
+        pagadoNum:montoTrans2, saldoDelta:0, // sin impacto en saldo
         envPrest:[], envDev:[],
         _esMixtoTrans:true,
-        transConfirmada:true, // ya fue recibida en el momento del pago
+        transConfirmada:false, // aparece como transferencia pendiente de confirmar
       };
       nuevasVentas = [...nuevasVentas, ventaTr];
-      saldoExtra += montoTrans2; // la transferencia abona al saldo
+      // saldoExtra ya es correcto, NO sumamos montoTrans2
     }
 
     saveVentas(nuevasVentas);
@@ -707,7 +712,14 @@ function App() {
           onVolver={()=>irA("menu")} />}
       {pantalla==="diaPrincipal"   && <DiaPrincipal dia={diaActual} onIrClientes={()=>irA("selectorFechaClientes")} onIrPlanilla={()=>irA("selectorFechaPlanilla")} onVolver={()=>irA("menu")} onVerConfirmaciones={()=>irA("confirmacionesDia")} ventasPendientesTransfer={ventas.filter(v=>v.dia===diaActual&&v.pago==="transferencia"&&!v.transConfirmada).length} />}
       {pantalla==="selectorFechaPlanilla" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("planilla");}} onVolver={()=>irA("diaPrincipal")} />}
-      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual)} clientes={clientes} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} autoCierre={!!planillas[`${diaActual}_${fechaActual}`]?.iniciado} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);irA("selectorFechaPlanilla");}} onVolver={()=>irA("selectorFechaPlanilla")} />}
+      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual)} clientes={clientes} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} autoCierre={!!planillas[`${diaActual}_${fechaActual}`]?.iniciado}
+        onGuardar={d=>{
+          savePlanilla(`${diaActual}_${fechaActual}`,d);
+          if(!d._diaCerrado) irA("selectorFechaPlanilla");
+          // Si es cierre de d\xc3\xada, no navega: setMostrarCierre(false) vuelve a la planilla normal
+        }}
+        onAutoGuardar={d=>savePlanilla(`${diaActual}_${fechaActual}`,d)}
+        onVolver={()=>irA("selectorFechaPlanilla")} />}
       {pantalla==="selectorFechaClientes" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("inicioReparto");}} onVolver={()=>irA("diaPrincipal")} />}
       {pantalla==="inicioReparto"  && <InicioReparto dia={diaActual} fecha={fechaActual} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} cargasDia={cargasDia} stock={stockNorm}
         onGuardar={(p,descontar)=>{

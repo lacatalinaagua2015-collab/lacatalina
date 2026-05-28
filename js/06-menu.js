@@ -341,7 +341,7 @@ function DetalleVentasDia({ventas, clientes}) {
   );
 }
 
-function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setStock,syncData,onGuardar,onVolver,autoCierre}) {
+function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setStock,syncData,onGuardar,onVolver,autoCierre,onAutoGuardar}) {
   // Separar ventas del día propio vs ventas de clientes de otro día
   const clientesDia = new Set((clientes||[]).filter(c=>c.dia===dia).map(c=>c.id));
   const ventasPropias  = ventas.filter(v=>clientesDia.has(v.clienteId));
@@ -711,7 +711,11 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
               <div style={{display:"flex",gap:6}}>
                 <button style={{flex:1,padding:"7px",borderRadius:8,border:"none",background:"#0a2e1f",color:"#4dd9a0",fontSize:12,fontWeight:500,cursor:"pointer",opacity:!g.monto?0.5:1}}
                   disabled={!g.monto}
-                  onClick={()=>setGasto(i,"confirmado",true)}>
+                  onClick={()=>{
+                    const nuevosGastos = (datos.gastos||[]).map((g2,j)=>j===i?{...g2,confirmado:true}:g2);
+                    setDatos(d=>({...d,gastos:nuevosGastos}));
+                    onAutoGuardar&&onAutoGuardar({...datos,gastos:nuevosGastos});
+                  }}>
                   ✓ Confirmar y guardar
                 </button>
                 <button style={s.btnDanger} onClick={()=>delGasto(i)}>✕</button>
