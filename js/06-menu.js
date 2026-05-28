@@ -488,6 +488,132 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
   const ganancia=(cobEfectivo - totalVentaLlenar - totalGastos) + cobTransNeto;
   const totalLlenosIngresados=PRODUCTOS_CONFIG.reduce((a,p)=>a+num(datos.productos[p.id]?.llenos),0);
 
+  // ── Early return: pantalla de cierre ─────────────────────────────
+  if(mostrarCierre){
+    const llenosVuelta={
+      soda: realesLlenos.soda!==""?Number(realesLlenos.soda):Math.floor(sobrantes.soda/CAJON),
+      b10:  realesLlenos.b10!==""?Number(realesLlenos.b10):sobrantes.b10,
+      b20:  realesLlenos.b20!==""?Number(realesLlenos.b20):sobrantes.b20,
+    };
+    const vaciosVuelta={
+      soda: realesVacios.soda!==""?Number(realesVacios.soda):Math.floor(vaciosRec.soda/CAJON),
+    };
+    return (
+      <div style={s.screen}>
+        <div style={s.header}>
+          <button style={s.backBtn} onClick={()=>setMostrarCierre(false)}>← Volver</button>
+          <span style={s.headerTitle}>Cierre del día · {dia}</span>
+        </div>
+        <div style={{padding:16}}>
+
+          {/* LO QUE CARGASTE HOY */}
+          <span style={{...s.sectionTitle,padding:"0 0 8px"}}>LO QUE CARGASTE HOY</span>
+          <div style={{...s.card,margin:"0 0 12px"}}>
+            {[
+              ["Soda", llenosCargados.soda>0?`${Math.floor(llenosCargados.soda/CAJON)} cajones (${llenosCargados.soda} un)`:"—"],
+              ["Bidón 10L", llenosCargados.b10>0?`${llenosCargados.b10} unidades`:"—"],
+              ["Bidón 20L", llenosCargados.b20>0?`${llenosCargados.b20} unidades`:"—"],
+            ].map(([l,v])=>(
+              <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+                <span style={{fontSize:14,color:"var(--color-text-secondary)"}}>{l}</span>
+                <span style={{fontSize:15,fontWeight:500,color:"var(--color-text-primary)"}}>{v}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* MOVIMIENTOS DEL DÍA */}
+          <span style={{...s.sectionTitle,padding:"0 0 8px"}}>MOVIMIENTOS DEL DÍA (REGISTRADOS)</span>
+          <div style={{...s.card,margin:"0 0 12px",padding:"10px 12px"}}>
+            <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",marginBottom:8}}>
+              {["","Vendido","Prestado","Devuelto"].map(h=>(
+                <div key={h} style={{fontSize:11,color:"var(--color-text-tertiary)",textAlign:h?"center":"left",fontWeight:500}}>{h}</div>
+              ))}
+            </div>
+            {[["Soda","soda"],["10L","b10"],["20L","b20"]].map(([label,pk])=>(
+              <div key={pk} style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",padding:"7px 0",borderTop:"0.5px solid var(--color-border-tertiary)",alignItems:"center"}}>
+                <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{label}</span>
+                <span style={{textAlign:"center",fontSize:15,fontWeight:600,color:"var(--color-text-warning)"}}>
+                  {vendidosDia[pk]>0?`−${pk==="soda"?Math.floor(vendidosDia[pk]/CAJON):vendidosDia[pk]}`:"—"}
+                </span>
+                <span style={{textAlign:"center",fontSize:15,fontWeight:600,color:prestadosDia[pk]>0?"var(--color-text-warning)":"var(--color-text-tertiary)"}}>
+                  {prestadosDia[pk]>0?`−${pk==="soda"?Math.floor(prestadosDia[pk]/CAJON):prestadosDia[pk]}`:"0"}
+                </span>
+                <span style={{textAlign:"center",fontSize:15,fontWeight:600,color:devueltosDia[pk]>0?"var(--color-text-success)":"var(--color-text-tertiary)"}}>
+                  {devueltosDia[pk]>0?`+${pk==="soda"?Math.floor(devueltosDia[pk]/CAJON):devueltosDia[pk]}`:"0"}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* CONFIRMÁ LO QUE TRAÉS DE VUELTA */}
+          <span style={{...s.sectionTitle,padding:"0 0 8px"}}>CONFIRMÁ LO QUE TRAÉS DE VUELTA</span>
+          <div style={{...s.card,margin:"0 0 12px",padding:"10px 12px"}}>
+            <div style={{display:"grid",gridTemplateColumns:"1.5fr 1fr 1fr",gap:4,marginBottom:8}}>
+              {["","Debería tener","Tenés en mano"].map(h=>(
+                <div key={h} style={{fontSize:11,color:h==="Debería tener"?"#5daaff":"var(--color-text-secondary)",textAlign:h?"center":"left",fontWeight:500}}>{h}</div>
+              ))}
+            </div>
+            {[
+              ["Soda\n(vacíos)","soda","vacios"],
+              ["10L\n(sobrante)","b10","llenos"],
+              ["20L\n(sobrante)","b20","llenos"],
+            ].map(([label,pk,tipo])=>{
+              const calcVal=tipo==="vacios"
+                ?(pk==="soda"?Math.floor(vaciosRec[pk]/CAJON):vaciosRec[pk])
+                :(pk==="soda"?Math.floor(sobrantes[pk]/CAJON):sobrantes[pk]);
+              const stateObj=tipo==="vacios"?realesVacios:realesLlenos;
+              const setFn=tipo==="vacios"?setRealesVacios:setRealesLlenos;
+              const realVal=stateObj[pk]!==""?Number(stateObj[pk]):calcVal;
+              const diff=realVal-calcVal;
+              return (
+                <div key={pk} style={{borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:10,marginTop:6}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1.5fr 1fr 1fr",gap:8,alignItems:"center"}}>
+                    <span style={{fontSize:12,color:"var(--color-text-primary)",whiteSpace:"pre-line"}}>{label}</span>
+                    <div style={{textAlign:"center",fontSize:24,fontWeight:500,color:"#5daaff"}}>{calcVal}</div>
+                    <input type="number" min={0}
+                      value={stateObj[pk]}
+                      placeholder={String(calcVal)}
+                      style={{padding:"8px 4px",borderRadius:8,border:"1.5px solid var(--color-border-secondary)",background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",fontSize:20,textAlign:"center",width:"100%",boxSizing:"border-box"}}
+                      onChange={e=>setFn(r=>({...r,[pk]:e.target.value}))}
+                    />
+                  </div>
+                  <div style={{textAlign:"center",marginTop:5,fontSize:12,fontWeight:600,
+                    color:diff===0?"var(--color-text-success)":diff>0?"var(--color-text-warning)":"var(--color-text-danger)"}}>
+                    {diff===0?"sin diferencia":`${diff>0?"+":""}${diff} diferencia`}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* VUELVE A SODERÍA */}
+          <div style={{...s.card,margin:"0 0 16px",background:"var(--color-background-success)",border:"1.5px solid var(--color-text-success)",padding:"14px 16px"}}>
+            <div style={{fontSize:12,fontWeight:600,color:"var(--color-text-success)",marginBottom:10}}>Vuelve a sodería</div>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"0.5px solid rgba(77,217,160,0.2)"}}>
+              <span style={{fontSize:13,color:"var(--color-text-success)"}}>Soda (vacíos)</span>
+              <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-success)"}}>{vaciosVuelta.soda} caj</span>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"0.5px solid rgba(77,217,160,0.2)"}}>
+              <span style={{fontSize:13,color:"var(--color-text-success)"}}>Bidón 10L</span>
+              <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-success)"}}>{llenosVuelta.b10} un</span>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0"}}>
+              <span style={{fontSize:13,color:"var(--color-text-success)"}}>Bidón 20L</span>
+              <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-success)"}}>{llenosVuelta.b20} un</span>
+            </div>
+          </div>
+
+          <button
+            style={{width:"100%",padding:"16px",borderRadius:10,border:"none",
+              background:"var(--color-background-tertiary)",borderTop:"2px solid #f5b942",
+              color:"#f5b942",fontSize:15,fontWeight:700,cursor:"pointer"}}
+            onClick={confirmarCierre}>
+            ✓ Cerrar día y actualizar stock
+          </button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={s.screen}>
       <div style={s.header}>
@@ -795,131 +921,6 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
         ) : (
           <div style={{textAlign:"center",padding:"12px",borderRadius:10,background:"rgba(29,158,117,0.15)",color:"#4dd9a0",fontSize:13,fontWeight:500,marginTop:10}}>
             ✅ Día cerrado — stock actualizado
-          </div>
-        )}
-
-        {/* Modal cierre del día — verificación de stock */}
-        {mostrarCierre&&(
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:999,display:"flex",alignItems:"flex-end",justifyContent:"center"}}
-            onClick={()=>setMostrarCierre(false)}>
-            <div style={{background:"var(--color-background-primary)",borderRadius:"16px 16px 0 0",padding:"20px",width:"100%",maxWidth:480,maxHeight:"85vh",overflowY:"auto"}}
-              onClick={e=>e.stopPropagation()}>
-              <div style={{fontSize:17,fontWeight:700,color:"var(--color-text-primary)",marginBottom:4}}>🔒 Cerrar el día — Verificación de stock</div>
-              <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:14,lineHeight:1.5}}>
-                Al confirmar, los envases vuelven a la sodería y el camión queda en 0.
-              </div>
-
-              {/* Tabla de envases */}
-              <div style={{background:"var(--color-background-secondary)",borderRadius:10,overflow:"hidden",marginBottom:12}}>
-                {/* Header */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"8px 12px",background:"var(--color-background-tertiary)"}}>
-                  {["","Soda (caj)","10L","20L"].map((h,i)=>(
-                    <div key={i} style={{fontSize:10,fontWeight:600,color:"var(--color-text-secondary)",textAlign:i===0?"left":"center",textTransform:"uppercase"}}>{h}</div>
-                  ))}
-                </div>
-                {/* Cargado */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"8px 12px",borderBottom:"0.5px solid var(--color-border-tertiary)",alignItems:"center"}}>
-                  <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>🚚 Cargado</div>
-                  {["soda","b10","b20"].map(pk=>(
-                    <div key={pk} style={{textAlign:"center",fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>
-                      {pk==="soda"?Math.floor(llenosCargados[pk]/CAJON):llenosCargados[pk]}
-                    </div>
-                  ))}
-                </div>
-                {/* Vendido */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"8px 12px",borderBottom:"0.5px solid var(--color-border-tertiary)",alignItems:"center"}}>
-                  <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>📦 Vendido</div>
-                  {["soda","b10","b20"].map(pk=>(
-                    <div key={pk} style={{textAlign:"center",fontSize:14,fontWeight:500,color:"var(--color-text-warning)"}}>
-                      {pk==="soda"?Math.floor(vendidosDia[pk]/CAJON):vendidosDia[pk]}
-                    </div>
-                  ))}
-                </div>
-                {/* Divider */}
-                <div style={{padding:"6px 12px",background:"rgba(77,217,160,0.05)",borderTop:"1px solid rgba(77,217,160,0.2)"}}>
-                  <div style={{fontSize:10,fontWeight:700,color:"#4dd9a0",textTransform:"uppercase",letterSpacing:"0.05em"}}>Vuelve a sodería</div>
-                </div>
-                {/* Llenos sobrantes — confirmá o corregí */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"8px 12px",borderBottom:"0.5px solid var(--color-border-tertiary)",alignItems:"center",gap:4}}>
-                  <div style={{fontSize:12,color:"#4dd9a0",fontWeight:500}}>✅ Llenos</div>
-                  {["soda","b10","b20"].map(pk=>{
-                    const calc=pk==="soda"?Math.floor(sobrantes[pk]/CAJON):sobrantes[pk];
-                    const real=realesLlenos[pk]!==""?Number(realesLlenos[pk]):calc;
-                    const diff=real-calc;
-                    return (
-                      <div key={pk} style={{textAlign:"center"}}>
-                        <div style={{fontSize:11,color:"#4dd9a0",marginBottom:2}}>App: {calc}</div>
-                        <input type="number" min={0} value={realesLlenos[pk]}
-                          placeholder={String(calc)}
-                          style={{width:"100%",padding:"4px",borderRadius:6,border:"0.5px solid #4dd9a0",background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",fontSize:14,textAlign:"center"}}
-                          onChange={e=>setRealesLlenos(r=>({...r,[pk]:e.target.value}))}/>
-                        {diff!==0&&<div style={{fontSize:10,color:diff>0?"var(--color-text-warning)":"var(--color-text-danger)",marginTop:1}}>{diff>0?"+":""}{diff}</div>}
-                      </div>
-                    );
-                  })}
-                </div>
-                {/* Vacíos del día — confirmá o corregí */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"8px 12px",alignItems:"center",gap:4}}>
-                  <div style={{fontSize:12,color:"#f5b942",fontWeight:500}}>📦 Vacíos</div>
-                  {["soda","b10","b20"].map(pk=>{
-                    const calc=pk==="soda"?Math.floor(vaciosRec[pk]/CAJON):vaciosRec[pk];
-                    const real=realesVacios[pk]!==""?Number(realesVacios[pk]):calc;
-                    const diff=real-calc;
-                    return (
-                      <div key={pk} style={{textAlign:"center"}}>
-                        <div style={{fontSize:11,color:"#f5b942",marginBottom:2}}>App: {calc}</div>
-                        <input type="number" min={0} value={realesVacios[pk]}
-                          placeholder={String(calc)}
-                          style={{width:"100%",padding:"4px",borderRadius:6,border:"0.5px solid #f5b942",background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",fontSize:14,textAlign:"center"}}
-                          onChange={e=>setRealesVacios(r=>({...r,[pk]:e.target.value}))}/>
-                        {diff!==0&&<div style={{fontSize:10,color:diff>0?"var(--color-text-warning)":"var(--color-text-danger)",marginTop:1}}>{diff>0?"+":""}{diff}</div>}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Sodería después */}
-              <div style={{background:"var(--color-background-secondary)",borderRadius:10,overflow:"hidden",marginBottom:14}}>
-                <div style={{padding:"8px 12px",background:"rgba(24,95,165,0.15)"}}>
-                  <div style={{fontSize:11,fontWeight:700,color:"var(--color-text-info)",textTransform:"uppercase",letterSpacing:"0.05em"}}>🏭 Sodería después del cierre</div>
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"6px 12px",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-                  {["","Soda (caj)","10L","20L"].map((h,i)=>(
-                    <div key={i} style={{fontSize:10,color:"var(--color-text-tertiary)",textAlign:i===0?"left":"center"}}>{h}</div>
-                  ))}
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"8px 12px",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-                  <div style={{fontSize:12,color:"#4dd9a0"}}>✅ Llenos</div>
-                  {["soda","b10","b20"].map(pk=>(
-                    <div key={pk} style={{textAlign:"center",fontSize:16,fontWeight:700,color:"#4dd9a0"}}>
-                      {pk==="soda"?Math.floor(soderiaPost[pk]/CAJON):soderiaPost[pk]}
-                    </div>
-                  ))}
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"8px 12px"}}>
-                  <div style={{fontSize:12,color:"#f5b942"}}>📦 Vacíos</div>
-                  {["soda","b10","b20"].map(pk=>(
-                    <div key={pk} style={{textAlign:"center",fontSize:16,fontWeight:700,color:"#f5b942"}}>
-                      {pk==="soda"?Math.floor(soderiaVaciosPost[pk]/CAJON):soderiaVaciosPost[pk]}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Camión → 0 */}
-              <div style={{...s.card,margin:"0 0 14px",background:"rgba(240,112,112,0.1)",border:"0.5px solid rgba(240,112,112,0.3)",padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <span style={{fontSize:13,color:"var(--color-text-danger)"}}>🚚 Camión queda en</span>
-                <span style={{fontSize:20,fontWeight:700,color:"var(--color-text-danger)"}}>0</span>
-              </div>
-
-              <div style={{display:"flex",gap:10}}>
-                <button style={{flex:1,padding:"13px",borderRadius:10,border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-secondary)",color:"var(--color-text-secondary)",fontSize:14,cursor:"pointer"}}
-                  onClick={()=>setMostrarCierre(false)}>Cancelar</button>
-                <button style={{flex:2,padding:"13px",borderRadius:10,border:"none",background:"#f5b942",color:"#1a1a1a",fontSize:14,fontWeight:700,cursor:"pointer"}}
-                  onClick={confirmarCierre}>✅ Confirmar cierre</button>
-              </div>
-            </div>
           </div>
         )}
       </div>
