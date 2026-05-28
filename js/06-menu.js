@@ -185,29 +185,51 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
           </React.Fragment>);
         })}
         <div style={s.divider} />
+        {/* Fila principal: 3 columnas */}
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,paddingBottom:8}}>
-          {[
-            ["👥","Clientes",onGestionClientes],
-            ["📦","Stock",onStock],
-            ["🚀","Promoción",onPromocion],
-            ["📅","Agenda",onAgenda],
-            ["📊","Resumen",onResumen],
-            ["💰","Fiados",onFiados],
-            ["⚙️","Config",onConfig],
-          ].map(([ico,lbl,fn])=>(
-            <button key={lbl} onClick={fn} style={{
-              display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,
-              padding:"14px 6px",borderRadius:12,cursor:"pointer",
-              border:"2px solid transparent",
-              background:"var(--color-background-tertiary)",
-              boxShadow:"0 3px 6px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.06) inset",
-              color:"var(--color-text-secondary)",
-              transition:"all 0.15s",
-            }}>
-              <span style={{fontSize:22}}>{ico}</span>
-              <span style={{fontSize:11,fontWeight:500,color:"var(--color-text-primary)",textAlign:"center"}}>{lbl}</span>
+
+          {/* ── Clientes + sub-botones ── */}
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            <button onClick={onGestionClientes} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,padding:"14px 6px",borderRadius:12,cursor:"pointer",border:"2px solid transparent",background:"var(--color-background-tertiary)",boxShadow:"0 3px 6px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.06) inset",color:"var(--color-text-secondary)",transition:"all 0.15s"}}>
+              <span style={{fontSize:22}}>👥</span>
+              <span style={{fontSize:11,fontWeight:500,color:"var(--color-text-primary)",textAlign:"center"}}>Clientes</span>
             </button>
-          ))}
+            <div style={{display:"flex",gap:4}}>
+              <button onClick={onAgenda} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,padding:"7px 2px",borderRadius:9,cursor:"pointer",border:"none",background:"var(--color-background-secondary)",color:"var(--color-text-secondary)"}}>
+                <span style={{fontSize:15}}>📅</span>
+                <span style={{fontSize:9,fontWeight:500,color:"var(--color-text-tertiary)"}}>Agenda</span>
+              </button>
+              <button onClick={onFiados} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,padding:"7px 2px",borderRadius:9,cursor:"pointer",border:"none",background:"var(--color-background-secondary)",color:"var(--color-text-secondary)"}}>
+                <span style={{fontSize:15}}>💰</span>
+                <span style={{fontSize:9,fontWeight:500,color:"var(--color-text-tertiary)"}}>Fiados</span>
+              </button>
+            </div>
+          </div>
+
+          {/* ── Stock + sub-botón Resumen ── */}
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            <button onClick={onStock} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,padding:"14px 6px",borderRadius:12,cursor:"pointer",border:"2px solid transparent",background:"var(--color-background-tertiary)",boxShadow:"0 3px 6px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.06) inset",color:"var(--color-text-secondary)",transition:"all 0.15s"}}>
+              <span style={{fontSize:22}}>📦</span>
+              <span style={{fontSize:11,fontWeight:500,color:"var(--color-text-primary)",textAlign:"center"}}>Stock</span>
+            </button>
+            <button onClick={onResumen} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,padding:"7px 2px",borderRadius:9,cursor:"pointer",border:"none",background:"var(--color-background-secondary)",color:"var(--color-text-secondary)"}}>
+              <span style={{fontSize:15}}>📊</span>
+              <span style={{fontSize:9,fontWeight:500,color:"var(--color-text-tertiary)"}}>Resumen</span>
+            </button>
+          </div>
+
+          {/* ── Promoción y Config apilados ── */}
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            <button onClick={onPromocion} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,padding:"14px 6px",borderRadius:12,cursor:"pointer",border:"2px solid transparent",background:"var(--color-background-tertiary)",boxShadow:"0 3px 6px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.06) inset",color:"var(--color-text-secondary)",transition:"all 0.15s"}}>
+              <span style={{fontSize:22}}>🚀</span>
+              <span style={{fontSize:11,fontWeight:500,color:"var(--color-text-primary)",textAlign:"center"}}>Promoción</span>
+            </button>
+            <button onClick={onConfig} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,padding:"7px 2px",borderRadius:9,cursor:"pointer",border:"none",background:"var(--color-background-secondary)",color:"var(--color-text-secondary)"}}>
+              <span style={{fontSize:15}}>⚙️</span>
+              <span style={{fontSize:9,fontWeight:500,color:"var(--color-text-tertiary)"}}>Config</span>
+            </button>
+          </div>
+
         </div>
       </div>
     </div>
