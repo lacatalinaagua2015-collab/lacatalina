@@ -341,7 +341,7 @@ function DetalleVentasDia({ventas, clientes}) {
   );
 }
 
-function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setStock,syncData,onGuardar,onVolver}) {
+function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setStock,syncData,onGuardar,onVolver,autoCierre}) {
   // Separar ventas del día propio vs ventas de clientes de otro día
   const clientesDia = new Set((clientes||[]).filter(c=>c.dia===dia).map(c=>c.id));
   const ventasPropias  = ventas.filter(v=>clientesDia.has(v.clienteId));
@@ -402,7 +402,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
   }));
   const set = (k,v) => setDatos(d=>({...d,[k]:v}));
   const yaCerrado = !!planilla._diaCerrado;
-  const [mostrarCierre,setMostrarCierre] = useState(false);
+  const [mostrarCierre,setMostrarCierre] = useState(()=> autoCierre && !planilla._diaCerrado);
   const [realesLlenos,setRealesLlenos] = useState({soda:"",b10:"",b20:""});
   const [realesVacios,setRealesVacios] = useState({soda:"",b10:"",b20:""});
 

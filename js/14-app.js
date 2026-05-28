@@ -331,6 +331,15 @@ function App() {
 
   const saveClientes = (v) => { setClientes(v); syncData({clientes:v}); };
   const saveVentas   = (v) => { setVentasRaw(v);   syncData({ventas:v}); };
+
+  // Hook global para que ListaClientes pueda guardar ajustes de envases sin prop drilling
+  React.useEffect(()=>{
+    window._agregarAjusteEnvases = (ajuste) => {
+      const nuevasV = [...estadoRef.current.ventas, ajuste];
+      saveVentas(nuevasV);
+    };
+    return ()=>{ delete window._agregarAjusteEnvases; };
+  }, []);
   const savePlanillasCloud = (v) => { setPlanillas(v); syncData({planillas:v}); };
   const saveStock    = (v) => { setStock(v);    syncData({stock:v}); };
   const saveProductos= (v) => {
@@ -596,16 +605,16 @@ function App() {
     let saldoExtra = calc.saldoDelta;
     if(montoTrans2>0 && opcionSaldo==="mixto_ef") {
       // Registrar transferencia como venta separada vinculada
-      const nTr = nuevaVenta.neto; // mismo neto para no duplicar
       const ventaTr = {
         id:Date.now()+2, clienteId:c.id, cliente:c.nombre,
         dia:diaActual, fechaKey:fechaActual, fecha:new Date().toLocaleString("es-AR"),
         detalle:[{nombre:"Pago mixto · transferencia",cantidad:1,precio:montoTrans2,total:montoTrans2}],
         pago:"transferencia", obs:"[Parte transfer. de pago mixto]", saldoAplicado:0,
-        neto:montoTrans2, bruto:montoTrans2, desc:0, costo:0, ganancia:montoTrans2,
-        pagadoNum:montoTrans2, saldoDelta:montoTrans2, // suma al saldo del cliente
+        neto:montoTrans2, bruto:montoTrans2, desc:0, costo:0, ganancia:0,
+        pagadoNum:montoTrans2, saldoDelta:montoTrans2,
         envPrest:[], envDev:[],
         _esMixtoTrans:true,
+        transConfirmada:true, // ya fue recibida en el momento del pago
       };
       nuevasVentas = [...nuevasVentas, ventaTr];
       saldoExtra += montoTrans2; // la transferencia abona al saldo
@@ -698,7 +707,7 @@ function App() {
           onVolver={()=>irA("menu")} />}
       {pantalla==="diaPrincipal"   && <DiaPrincipal dia={diaActual} onIrClientes={()=>irA("selectorFechaClientes")} onIrPlanilla={()=>irA("selectorFechaPlanilla")} onVolver={()=>irA("menu")} onVerConfirmaciones={()=>irA("confirmacionesDia")} ventasPendientesTransfer={ventas.filter(v=>v.dia===diaActual&&v.pago==="transferencia"&&!v.transConfirmada).length} />}
       {pantalla==="selectorFechaPlanilla" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("planilla");}} onVolver={()=>irA("diaPrincipal")} />}
-      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual)} clientes={clientes} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);irA("selectorFechaPlanilla");}} onVolver={()=>irA("selectorFechaPlanilla")} />}
+      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual)} clientes={clientes} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} autoCierre={!!planillas[`${diaActual}_${fechaActual}`]?.iniciado} onGuardar={d=>{savePlanilla(`${diaActual}_${fechaActual}`,d);irA("selectorFechaPlanilla");}} onVolver={()=>irA("selectorFechaPlanilla")} />}
       {pantalla==="selectorFechaClientes" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("inicioReparto");}} onVolver={()=>irA("diaPrincipal")} />}
       {pantalla==="inicioReparto"  && <InicioReparto dia={diaActual} fecha={fechaActual} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} cargasDia={cargasDia} stock={stockNorm}
         onGuardar={(p,descontar)=>{
@@ -817,7 +826,7 @@ function App() {
           const normalPend=clientesDia.filter(c=>!terminados.has(c.id)&&noVMap[c.id]!=="noesta"&&c.id!==clienteId);
           const noestaPend=clientesDia.filter(c=>noVMap[c.id]==="noesta"&&!terminados.has(c.id)&&c.id!==clienteId);
           const sig=normalPend[0]||noestaPend[0];
-          if(sig){setClienteId(sig.id);irA("detalleCliente");}else irA("clientes");
+          if(sig){setClienteId(sig.id);irA("venta");}else irA("clientes");
         }}
         onNoQuiere={()=>{
           const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo:"noquiso"}];
@@ -829,7 +838,7 @@ function App() {
           const normalPend=clientesDia.filter(c=>!terminados.has(c.id)&&noVMap[c.id]!=="noesta"&&c.id!==clienteId);
           const noestaPend=clientesDia.filter(c=>noVMap[c.id]==="noesta"&&!terminados.has(c.id)&&c.id!==clienteId);
           const sig=normalPend[0]||noestaPend[0];
-          if(sig){setClienteId(sig.id);irA("detalleCliente");}else irA("clientes");
+          if(sig){setClienteId(sig.id);irA("venta");}else irA("clientes");
         }}
         onGuardar={(d,p,m,sa,ep,ed,obs,op)=>{
   registrarVenta(d,p,m,sa,ep,ed,obs,op);
