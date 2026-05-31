@@ -343,30 +343,18 @@ function CargaGPSMasiva({clientes, onActualizar, onVolver}) {
   const [listo, setListo] = React.useState(false);
   const actualizados = React.useRef([...clientes]);
 
-  const cliente = sinGPS[idx];
+  // ⚠ Todos los hooks ANTES de cualquier return condicional
+  const cliente = sinGPS[idx] || null;
   const coordsDelLink = cliente?.maps ? extraerCoordsDeURL(cliente.maps) : null;
 
   React.useEffect(()=>{
+    if(!cliente) return;
     if(coordsDelLink){ setLatVal(String(coordsDelLink.lat)); setLngVal(String(coordsDelLink.lng)); }
     else { setLatVal(""); setLngVal(""); }
   },[idx]);
 
-  if(sinGPS.length===0 || listo) return (
-    <div style={{...s.screen,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:32}}>
-      <div style={{fontSize:48}}>✅</div>
-      <div style={{fontSize:17,fontWeight:600,color:"var(--color-text-primary)",textAlign:"center"}}>¡GPS cargado!</div>
-      <div style={{fontSize:13,color:"var(--color-text-secondary)",textAlign:"center"}}>{guardados} cliente{guardados!==1?"s":""} con GPS guardado.</div>
-      <button style={s.btnPrimary} onClick={onVolver}>Ver mapa →</button>
-    </div>
-  );
-
-  const progreso = Math.round((idx/sinGPS.length)*100);
-  const dir = cliente.calle ? `${cliente.calle} ${cliente.nro||""}`.trim()
-    : cliente.manzana ? `Mz ${cliente.manzana} L ${cliente.lote||""} · ${cliente.barrio||""}`
-    : cliente.barrio||"";
-
   const guardarYSiguiente = (omitir=false) => {
-    if(!omitir) {
+    if(!omitir && cliente) {
       const lat=parseFloat(latVal), lng=parseFloat(lngVal);
       if(!isNaN(lat)&&!isNaN(lng)) {
         const i=actualizados.current.findIndex(c=>c.id===cliente.id);
@@ -379,6 +367,21 @@ function CargaGPSMasiva({clientes, onActualizar, onVolver}) {
     if(idx+1>=sinGPS.length) setListo(true);
     else setIdx(i=>i+1);
   };
+
+  // Pantalla final — siempre al final, nunca antes de hooks
+  if(sinGPS.length===0 || listo || !cliente) return (
+    <div style={{...s.screen,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:32}}>
+      <div style={{fontSize:48}}>✅</div>
+      <div style={{fontSize:17,fontWeight:600,color:"var(--color-text-primary)",textAlign:"center"}}>¡GPS cargado!</div>
+      <div style={{fontSize:13,color:"var(--color-text-secondary)",textAlign:"center"}}>{guardados} cliente{guardados!==1?"s":""} con GPS guardado.</div>
+      <button style={s.btnPrimary} onClick={onVolver}>Ver mapa →</button>
+    </div>
+  );
+
+  const progreso = Math.round((idx/sinGPS.length)*100);
+  const dir = cliente.calle ? `${cliente.calle} ${cliente.nro||""}`.trim()
+    : cliente.manzana ? `Mz ${cliente.manzana} L ${cliente.lote||""} · ${cliente.barrio||""}`
+    : cliente.barrio||"";
 
   return (
     <div style={{...s.screen,display:"flex",flexDirection:"column"}}>
