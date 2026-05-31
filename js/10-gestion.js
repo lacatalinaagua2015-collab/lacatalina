@@ -607,7 +607,15 @@ function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, o
       )}
 
       {/* Mapa */}
-      <div ref={mapRef} style={{flex:1,minHeight:400,display:leafletOk&&clientesFiltrados.length>0?"block":"none"}}/>
+      <div style={{flex:1,position:"relative",display:leafletOk&&clientesFiltrados.length>0?"block":"none"}}>
+        <div ref={mapRef} style={{width:"100%",height:"100%",minHeight:400}}/>
+        {sinCoordenadas>0 && (
+          <button onClick={()=>setModoCarga(true)}
+            style={{position:"absolute",bottom:16,right:16,zIndex:1000,background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:24,padding:"10px 16px",fontSize:13,fontWeight:600,cursor:"pointer",boxShadow:"0 3px 12px rgba(0,0,0,0.4)",display:"flex",alignItems:"center",gap:6}}>
+            📍 Cargar {sinCoordenadas} faltantes
+          </button>
+        )}
+      </div>
     </div>
   );
 }
