@@ -333,80 +333,120 @@ function FormCliente({inicial,onGuardar}) {
 }
 
 
-// ── MigracionGPS — clasifica clientes y extrae coords de links largos ─────────
-function MigracionGPS({clientes, filtroDia, onActualizar}) {
-  const [estado, setEstado] = React.useState("idle");
-  const [resultado, setResultado] = React.useState(null);
+// ── CargaGPSMasiva ────────────────────────────────────────────────────────────
+function CargaGPSMasiva({clientes, onActualizar, onVolver}) {
+  const sinGPS = (clientes||[]).filter(c => !c.lat || !c.lng);
+  const [idx, setIdx] = React.useState(0);
+  const [latVal, setLatVal] = React.useState("");
+  const [lngVal, setLngVal] = React.useState("");
+  const [guardados, setGuardados] = React.useState(0);
+  const [listo, setListo] = React.useState(false);
+  const actualizados = React.useRef([...clientes]);
 
-  const todos = (clientes||[]).filter(c => filtroDia==="todos" || c.dia===filtroDia);
-  const sinGPS        = todos.filter(c => !c.lat);
-  const conLinkLargo  = sinGPS.filter(c => c.maps && !esLinkCorto(c.maps) && extraerCoordsDeURL(c.maps));
-  const conLinkCorto  = sinGPS.filter(c => c.maps && esLinkCorto(c.maps));
-  const sinMaps       = sinGPS.filter(c => !c.maps);
+  const cliente = sinGPS[idx];
+  const coordsDelLink = cliente?.maps ? extraerCoordsDeURL(cliente.maps) : null;
 
-  if(sinGPS.length === 0) return null;
+  React.useEffect(()=>{
+    if(coordsDelLink){ setLatVal(String(coordsDelLink.lat)); setLngVal(String(coordsDelLink.lng)); }
+    else { setLatVal(""); setLngVal(""); }
+  },[idx]);
 
-  const ejecutar = () => {
-    if(!conLinkLargo.length) return;
-    setEstado("corriendo");
-    let ok = 0;
-    const actualizados = [...clientes];
-    conLinkLargo.forEach(c => {
-      const coords = extraerCoordsDeURL(c.maps);
-      if(coords) {
-        const idx = actualizados.findIndex(x=>x.id===c.id);
-        if(idx>=0) actualizados[idx] = {...actualizados[idx], lat:coords.lat, lng:coords.lng};
-        ok++;
-      }
-    });
-    if(ok>0) onActualizar(actualizados);
-    setResultado({ok, cortos:conLinkCorto.length, sinMaps:sinMaps.length});
-    setEstado("listo");
-  };
-
-  if(estado==="idle") return (
-    <div style={{display:"flex",flexDirection:"column",gap:8,alignItems:"center",width:"100%",maxWidth:300}}>
-      {conLinkLargo.length>0 && (
-        <button style={{background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:10,padding:"12px 20px",fontSize:14,fontWeight:600,cursor:"pointer",width:"100%"}}
-          onClick={ejecutar}>
-          📡 Extraer GPS de {conLinkLargo.length} cliente{conLinkLargo.length!==1?"s":""} (link largo)
-        </button>
-      )}
-      {conLinkCorto.length>0 && (
-        <div style={{background:"#2e1f06",borderRadius:8,padding:"10px 12px",width:"100%",boxSizing:"border-box"}}>
-          <div style={{fontSize:12,color:"#f5b942",fontWeight:600,marginBottom:4}}>
-            ⚠ {conLinkCorto.length} cliente{conLinkCorto.length!==1?"s":""} con link corto
-          </div>
-          <div style={{fontSize:11,color:"var(--color-text-secondary)",lineHeight:1.6}}>
-            Los links <b>maps.app.goo.gl</b> no tienen coordenadas.<br/>
-            Editá cada uno y pegá el link largo de Maps<br/>
-            (el que tiene <b>@-26.8..,-65.2..</b> en la URL).
-          </div>
-        </div>
-      )}
-      {sinMaps.length>0 && (
-        <div style={{fontSize:11,color:"var(--color-text-tertiary)",textAlign:"center"}}>
-          + {sinMaps.length} cliente{sinMaps.length!==1?"s":""} sin link de Maps
-        </div>
-      )}
+  if(sinGPS.length===0 || listo) return (
+    <div style={{...s.screen,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:32}}>
+      <div style={{fontSize:48}}>✅</div>
+      <div style={{fontSize:17,fontWeight:600,color:"var(--color-text-primary)",textAlign:"center"}}>¡GPS cargado!</div>
+      <div style={{fontSize:13,color:"var(--color-text-secondary)",textAlign:"center"}}>{guardados} cliente{guardados!==1?"s":""} con GPS guardado.</div>
+      <button style={s.btnPrimary} onClick={onVolver}>Ver mapa →</button>
     </div>
   );
 
-  if(estado==="corriendo") return (
-    <div style={{fontSize:13,color:"#5daaff"}}>⏳ Procesando...</div>
-  );
+  const progreso = Math.round((idx/sinGPS.length)*100);
+  const dir = cliente.calle ? `${cliente.calle} ${cliente.nro||""}`.trim()
+    : cliente.manzana ? `Mz ${cliente.manzana} L ${cliente.lote||""} · ${cliente.barrio||""}`
+    : cliente.barrio||"";
+
+  const guardarYSiguiente = (omitir=false) => {
+    if(!omitir) {
+      const lat=parseFloat(latVal), lng=parseFloat(lngVal);
+      if(!isNaN(lat)&&!isNaN(lng)) {
+        const i=actualizados.current.findIndex(c=>c.id===cliente.id);
+        if(i>=0) actualizados.current[i]={...actualizados.current[i],lat,lng};
+        onActualizar([...actualizados.current]);
+        setGuardados(g=>g+1);
+      }
+    }
+    setLatVal(""); setLngVal("");
+    if(idx+1>=sinGPS.length) setListo(true);
+    else setIdx(i=>i+1);
+  };
 
   return (
-    <div style={{textAlign:"center",display:"flex",flexDirection:"column",gap:6,alignItems:"center"}}>
-      <div style={{fontSize:15,color:"#4dd9a0",fontWeight:600}}>✅ ¡Listo!</div>
-      <div style={{fontSize:13,color:"var(--color-text-secondary)"}}>
-        {resultado.ok} GPS obtenidos correctamente
+    <div style={{...s.screen,display:"flex",flexDirection:"column"}}>
+      <div style={s.header}>
+        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
+        <span style={s.headerTitle}>Cargar GPS · {idx+1}/{sinGPS.length}</span>
       </div>
-      {resultado.cortos>0 && (
-        <div style={{fontSize:12,color:"#f5b942",maxWidth:280,lineHeight:1.5,textAlign:"center"}}>
-          ⚠ {resultado.cortos} cliente{resultado.cortos!==1?"s":""} tienen link corto — editálos y pegá el link largo de Maps.
+      <div style={{height:4,background:"var(--color-background-tertiary)"}}>
+        <div style={{height:"100%",background:"#185FA5",width:`${progreso}%`,transition:"width 0.3s"}}/>
+      </div>
+      <div style={{padding:16,display:"flex",flexDirection:"column",gap:12}}>
+
+        <div style={{...s.card,margin:0}}>
+          <div style={{fontSize:16,fontWeight:600,color:"var(--color-text-primary)",marginBottom:4}}>{cliente.nombre}</div>
+          <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>{cliente.dia} · {dir}</div>
         </div>
-      )}
+
+        {coordsDelLink ? (
+          <div style={{background:"var(--color-background-success)",borderRadius:10,padding:"12px 14px"}}>
+            <div style={{fontSize:13,color:"var(--color-text-success)",fontWeight:600,marginBottom:2}}>✓ Coordenadas extraídas del link automáticamente</div>
+            <div style={{fontSize:12,color:"var(--color-text-success)"}}>{coordsDelLink.lat.toFixed(5)}, {coordsDelLink.lng.toFixed(5)}</div>
+          </div>
+        ) : (
+          <>
+            <div style={{background:"var(--color-background-info)",borderRadius:10,padding:"12px 14px"}}>
+              <div style={{fontSize:13,color:"var(--color-text-info)",fontWeight:600,marginBottom:6}}>📋 Cómo obtener las coordenadas:</div>
+              <div style={{fontSize:12,color:"var(--color-text-secondary)",lineHeight:1.8}}>
+                1. Tocá <b>"Abrir en Maps"</b> abajo<br/>
+                2. <b>Mantené presionado</b> el punto del cliente en el mapa<br/>
+                3. Aparecen los números arriba, ej: <b>-26.86590, -65.21780</b><br/>
+                4. Tocá esos números → <b>Copiar</b><br/>
+                5. Volvé acá y pegá en el campo de abajo
+              </div>
+            </div>
+            {cliente.maps && (
+              <button style={{...s.btnPrimary,background:"#1a7a3a",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}
+                onClick={()=>window.open(cliente.maps,"_blank")}>
+                🗺 Abrir en Google Maps
+              </button>
+            )}
+            <div style={{...s.card,margin:0}}>
+              <label style={{...s.label,fontSize:12,fontWeight:600}}>Pegá las coordenadas acá (ej: -26.86590, -65.21780)</label>
+              <input style={{...s.input,marginTop:4}} placeholder="-26.86590, -65.21780"
+                value={latVal&&lngVal?`${latVal}, ${lngVal}`:latVal}
+                onChange={e=>{
+                  const raw=e.target.value;
+                  const m=raw.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
+                  if(m){setLatVal(m[1]);setLngVal(m[2]);}
+                  else setLatVal(raw);
+                }}
+              />
+              {latVal&&lngVal&&!isNaN(parseFloat(latVal))&&!isNaN(parseFloat(lngVal))&&(
+                <div style={{fontSize:11,color:"#4dd9a0",marginTop:4}}>✓ Latitud: {latVal} · Longitud: {lngVal}</div>
+              )}
+            </div>
+          </>
+        )}
+
+        <div style={{display:"flex",gap:8,marginTop:4}}>
+          <button style={{...s.btn,flex:1,padding:"12px",fontSize:13}} onClick={()=>guardarYSiguiente(true)}>Omitir →</button>
+          <button style={{...s.btnPrimary,flex:2,opacity:(latVal&&lngVal)||coordsDelLink?1:0.4}}
+            disabled={!latVal&&!lngVal&&!coordsDelLink}
+            onClick={()=>guardarYSiguiente(false)}>
+            Guardar y siguiente →
+          </button>
+        </div>
+        <div style={{fontSize:11,color:"var(--color-text-tertiary)",textAlign:"center"}}>{guardados} guardados · {sinGPS.length-idx-1} restantes</div>
+      </div>
     </div>
   );
 }
@@ -417,6 +457,7 @@ function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, o
   const mapInstRef = React.useRef(null);
   const [leafletOk, setLeafletOk] = React.useState(!!window.L);
   const [filtroDia, setFiltroDia] = React.useState(dia||"todos");
+  const [modoCarga, setModoCarga] = React.useState(false);
 
   const ventasHoy = (ventas||[]).filter(v=>v.fechaKey===fecha);
   const noVisHoy  = (noVisitas||[]).filter(v=>v.fecha===fecha);
@@ -426,6 +467,15 @@ function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, o
     return c.lat && c.lng;
   });
   const sinCoordenadas = (clientes||[]).filter(c=>(filtroDia==="todos"||c.dia===filtroDia)&&(!c.lat||!c.lng)).length;
+
+  // Modo carga masiva
+  if(modoCarga) return (
+    <CargaGPSMasiva
+      clientes={clientes}
+      onActualizar={onActualizar}
+      onVolver={()=>setModoCarga(false)}
+    />
+  );
 
   // Cargar Leaflet dinámicamente
   React.useEffect(()=>{
@@ -462,7 +512,7 @@ function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, o
         iconSize:[28,28],iconAnchor:[14,14],popupAnchor:[0,-14]
       });
       const marker = L.marker([c.lat,c.lng],{icon}).addTo(map);
-      const dir = c.calle ? c.calle+" "+( c.nro||"") : c.manzana ? "Mz "+c.manzana+" L "+( c.lote||"") : c.barrio||"";
+      const dir = c.calle ? c.calle+" "+(c.nro||"") : c.manzana ? "Mz "+c.manzana+" L "+(c.lote||"") : c.barrio||"";
       marker.bindPopup(
         `<div style="font-family:sans-serif;min-width:160px">
           <b style="font-size:13px">${c.nombre}</b><br/>
@@ -488,6 +538,12 @@ function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, o
       <div style={s.header}>
         <button style={s.backBtn} onClick={onVolver}>← Volver</button>
         <span style={s.headerTitle}>Mapa de clientes</span>
+        {sinCoordenadas>0 && (
+          <button style={{...s.btn,fontSize:11,padding:"5px 10px",background:"#185FA5",color:"#e2eaf4",border:"none"}}
+            onClick={()=>setModoCarga(true)}>
+            📍 Cargar GPS ({sinCoordenadas})
+          </button>
+        )}
       </div>
 
       {/* Filtro por día */}
@@ -507,10 +563,10 @@ function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, o
       {/* Stats */}
       <div style={{display:"flex",background:"var(--color-background-secondary)",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
         {[
-          {val:clientesFiltrados.length, lbl:"Con GPS",      color:"#5daaff"},
-          {val:entregadosCount,          lbl:"Entregados",   color:"#4dd9a0"},
-          {val:pendientesCount,          lbl:"Pendientes",   color:"#f5b942"},
-          {val:sinCoordenadas,           lbl:"Sin GPS",      color:"var(--color-text-tertiary)"},
+          {val:clientesFiltrados.length, lbl:"Con GPS",    color:"#5daaff"},
+          {val:entregadosCount,          lbl:"Entregados", color:"#4dd9a0"},
+          {val:pendientesCount,          lbl:"Pendientes", color:"#f5b942"},
+          {val:sinCoordenadas,           lbl:"Sin GPS",    color:"var(--color-text-tertiary)"},
         ].map((item,i)=>(
           <div key={i} style={{flex:1,textAlign:"center",padding:"8px 4px",borderRight:i<3?"0.5px solid var(--color-border-tertiary)":"none"}}>
             <div style={{fontSize:16,fontWeight:600,color:item.color}}>{item.val}</div>
@@ -529,29 +585,18 @@ function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, o
         ))}
       </div>
 
-      {/* Banner migración cuando hay clientes sin GPS pero hay mapa */}
-      {sinCoordenadas>0 && clientesFiltrados.length>0 && (
-        <div style={{padding:"10px 14px",background:"var(--color-background-warning)",borderBottom:"0.5px solid var(--color-border-tertiary)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
-          <span style={{fontSize:12,color:"var(--color-text-warning)"}}>⚠ {sinCoordenadas} cliente{sinCoordenadas!==1?"s":""} sin GPS</span>
-          <MigracionGPS clientes={clientes||[]} filtroDia={filtroDia} onActualizar={onActualizar} />
-        </div>
-      )}
-
-      {/* Sin clientes con GPS — con botón de migración masiva */}
+      {/* Sin clientes con GPS */}
       {leafletOk && clientesFiltrados.length===0 && (
-        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,padding:32}}>
+        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:14,padding:32}}>
           <div style={{fontSize:40}}>📍</div>
           <div style={{fontSize:15,fontWeight:500,color:"var(--color-text-primary)",textAlign:"center"}}>Sin clientes con GPS</div>
           <div style={{fontSize:13,color:"var(--color-text-secondary)",textAlign:"center",lineHeight:1.6,maxWidth:280}}>
-            Tenés {sinCoordenadas} cliente{sinCoordenadas!==1?"s":""} con link de Maps sin coordenadas. Tocá el botón para obtener el GPS de todos automáticamente.
+            Tenés {sinCoordenadas} cliente{sinCoordenadas!==1?"s":""} sin coordenadas.<br/>
+            Usá la carga masiva para agregarlas en 10-15 minutos.
           </div>
-          {sinCoordenadas>0 && (
-            <MigracionGPS
-              clientes={clientes||[]}
-              filtroDia={filtroDia}
-              onActualizar={onActualizar}
-            />
-          )}
+          <button style={{...s.btnPrimary,maxWidth:260}} onClick={()=>setModoCarga(true)}>
+            📍 Iniciar carga de GPS ({sinCoordenadas} clientes)
+          </button>
         </div>
       )}
 
