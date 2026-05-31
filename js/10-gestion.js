@@ -333,81 +333,80 @@ function FormCliente({inicial,onGuardar}) {
 }
 
 
-// ── MigracionGPS — resuelve GPS de todos los clientes con link ────────────────
+// ── MigracionGPS — clasifica clientes y extrae coords de links largos ─────────
 function MigracionGPS({clientes, filtroDia, onActualizar}) {
-  const [estado, setEstado] = React.useState("idle"); // idle | corriendo | listo
-  const [progreso, setProgreso] = React.useState({actual:0, total:0, ok:0, error:0});
+  const [estado, setEstado] = React.useState("idle");
+  const [resultado, setResultado] = React.useState(null);
 
-  const clientesConLink = (clientes||[]).filter(c =>
-    (filtroDia==="todos" || c.dia===filtroDia) &&
-    c.maps && !c.lat
-  );
+  const todos = (clientes||[]).filter(c => filtroDia==="todos" || c.dia===filtroDia);
+  const sinGPS        = todos.filter(c => !c.lat);
+  const conLinkLargo  = sinGPS.filter(c => c.maps && !esLinkCorto(c.maps) && extraerCoordsDeURL(c.maps));
+  const conLinkCorto  = sinGPS.filter(c => c.maps && esLinkCorto(c.maps));
+  const sinMaps       = sinGPS.filter(c => !c.maps);
 
-  const ejecutar = async () => {
-    if(!clientesConLink.length) return;
+  if(sinGPS.length === 0) return null;
+
+  const ejecutar = () => {
+    if(!conLinkLargo.length) return;
     setEstado("corriendo");
-    setProgreso({actual:0, total:clientesConLink.length, ok:0, error:0});
-
+    let ok = 0;
     const actualizados = [...clientes];
-    let ok=0, err=0;
-
-    for(let i=0; i<clientesConLink.length; i++) {
-      const c = clientesConLink[i];
-      setProgreso(p=>({...p, actual:i+1}));
-      try {
-        const coords = await resolverLinkMaps(c.maps);
-        if(coords) {
-          const idx = actualizados.findIndex(x=>x.id===c.id);
-          if(idx>=0) actualizados[idx] = {...actualizados[idx], lat:coords.lat, lng:coords.lng};
-          ok++;
-          setProgreso(p=>({...p, ok:p.ok+1}));
-        } else {
-          err++;
-          setProgreso(p=>({...p, error:p.error+1}));
-        }
-      } catch {
-        err++;
-        setProgreso(p=>({...p, error:p.error+1}));
+    conLinkLargo.forEach(c => {
+      const coords = extraerCoordsDeURL(c.maps);
+      if(coords) {
+        const idx = actualizados.findIndex(x=>x.id===c.id);
+        if(idx>=0) actualizados[idx] = {...actualizados[idx], lat:coords.lat, lng:coords.lng};
+        ok++;
       }
-      // Pequeña pausa para no saturar el proxy
-      await new Promise(r=>setTimeout(r,400));
-    }
-
+    });
     if(ok>0) onActualizar(actualizados);
+    setResultado({ok, cortos:conLinkCorto.length, sinMaps:sinMaps.length});
     setEstado("listo");
   };
 
   if(estado==="idle") return (
-    <button style={{background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:10,padding:"12px 24px",fontSize:14,fontWeight:600,cursor:"pointer",marginTop:4}}
-      onClick={ejecutar}>
-      📡 Obtener GPS de {clientesConLink.length} cliente{clientesConLink.length!==1?"s":""}
-    </button>
+    <div style={{display:"flex",flexDirection:"column",gap:8,alignItems:"center",width:"100%",maxWidth:300}}>
+      {conLinkLargo.length>0 && (
+        <button style={{background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:10,padding:"12px 20px",fontSize:14,fontWeight:600,cursor:"pointer",width:"100%"}}
+          onClick={ejecutar}>
+          📡 Extraer GPS de {conLinkLargo.length} cliente{conLinkLargo.length!==1?"s":""} (link largo)
+        </button>
+      )}
+      {conLinkCorto.length>0 && (
+        <div style={{background:"#2e1f06",borderRadius:8,padding:"10px 12px",width:"100%",boxSizing:"border-box"}}>
+          <div style={{fontSize:12,color:"#f5b942",fontWeight:600,marginBottom:4}}>
+            ⚠ {conLinkCorto.length} cliente{conLinkCorto.length!==1?"s":""} con link corto
+          </div>
+          <div style={{fontSize:11,color:"var(--color-text-secondary)",lineHeight:1.6}}>
+            Los links <b>maps.app.goo.gl</b> no tienen coordenadas.<br/>
+            Editá cada uno y pegá el link largo de Maps<br/>
+            (el que tiene <b>@-26.8..,-65.2..</b> en la URL).
+          </div>
+        </div>
+      )}
+      {sinMaps.length>0 && (
+        <div style={{fontSize:11,color:"var(--color-text-tertiary)",textAlign:"center"}}>
+          + {sinMaps.length} cliente{sinMaps.length!==1?"s":""} sin link de Maps
+        </div>
+      )}
+    </div>
   );
 
   if(estado==="corriendo") return (
-    <div style={{textAlign:"center",display:"flex",flexDirection:"column",gap:8,alignItems:"center"}}>
-      <div style={{fontSize:13,color:"#5daaff",fontWeight:500}}>
-        🔍 Procesando {progreso.actual} / {progreso.total}...
-      </div>
-      <div style={{width:220,height:8,background:"var(--color-background-tertiary)",borderRadius:4,overflow:"hidden"}}>
-        <div style={{height:"100%",background:"#185FA5",borderRadius:4,width:`${(progreso.actual/progreso.total)*100}%`,transition:"width 0.3s"}}/>
-      </div>
-      <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>
-        ✓ {progreso.ok} obtenidos · ✗ {progreso.error} no encontrados
-      </div>
-      <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>Puede tardar unos minutos...</div>
-    </div>
+    <div style={{fontSize:13,color:"#5daaff"}}>⏳ Procesando...</div>
   );
 
   return (
     <div style={{textAlign:"center",display:"flex",flexDirection:"column",gap:6,alignItems:"center"}}>
       <div style={{fontSize:15,color:"#4dd9a0",fontWeight:600}}>✅ ¡Listo!</div>
       <div style={{fontSize:13,color:"var(--color-text-secondary)"}}>
-        {progreso.ok} GPS obtenidos · {progreso.error} no resueltos
+        {resultado.ok} GPS obtenidos correctamente
       </div>
-      {progreso.error>0&&<div style={{fontSize:12,color:"var(--color-text-tertiary)",maxWidth:260,lineHeight:1.5}}>
-        Los {progreso.error} no resueltos tienen links cortos que no pudieron expandirse. Podés editarlos y pegar el link largo de Maps (el que tiene números en la URL).
-      </div>}
+      {resultado.cortos>0 && (
+        <div style={{fontSize:12,color:"#f5b942",maxWidth:280,lineHeight:1.5,textAlign:"center"}}>
+          ⚠ {resultado.cortos} cliente{resultado.cortos!==1?"s":""} tienen link corto — editálos y pegá el link largo de Maps.
+        </div>
+      )}
     </div>
   );
 }
