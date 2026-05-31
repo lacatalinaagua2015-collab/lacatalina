@@ -1036,6 +1036,7 @@ function App() {
         ventas={ventas}
         noVisitas={noVisitas}
         onSeleccionar={(c)=>{setClienteId(c.id);irA("detalleDesdeGestion");}}
+        onActualizar={(nuevosClientes)=>saveClientes(nuevosClientes)}
         onVolver={()=>irA("menu")}
       />}
       {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stockNorm} setStock={(s)=>{const ns=normStock(s);setStockRaw(ns);syncData({stock:ns});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} syncData={syncData} onVolver={()=>irA("menu")} ecToken={ecToken} setEcToken={setEcToken} tabInicial={tabConfig} />}
