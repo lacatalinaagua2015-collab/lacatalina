@@ -377,8 +377,13 @@ function CargaGPSMasiva({clientes, onActualizar, onVolver}) {
       if(!isNaN(lat)&&!isNaN(lng)) {
         const i=actualizados.current.findIndex(c=>c.id===cliente.id);
         if(i>=0) actualizados.current[i]={...actualizados.current[i],lat,lng};
-        onActualizar([...actualizados.current]);
-        setGuardados(g=>g+1);
+        const nuevosGuardados = guardados + 1;
+        setGuardados(nuevosGuardados);
+        // Guardar en Firebase cada 5 clientes o si es el último
+        const esUltimo = idx+1 >= sinGPS.length;
+        if(nuevosGuardados % 5 === 0 || esUltimo) {
+          onActualizar([...actualizados.current]);
+        }
       }
     }
     setLatVal(""); setLngVal("");
@@ -470,6 +475,7 @@ function CargaGPSMasiva({clientes, onActualizar, onVolver}) {
         </div>
         <div style={{fontSize:11,color:"var(--color-text-tertiary)",textAlign:"center"}}>
           {guardados} guardados · {sinGPS.length-idx-1} restantes
+          <span style={{marginLeft:8,color:"var(--color-text-tertiary)"}}>· Se sincroniza cada 5</span>
         </div>
       </div>
     </div>
