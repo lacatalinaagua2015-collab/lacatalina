@@ -335,7 +335,7 @@ function FormCliente({inicial,onGuardar}) {
 
 // ── CargaGPSMasiva ────────────────────────────────────────────────────────────
 function CargaGPSMasiva({clientes, onActualizar, onVolver}) {
-  const sinGPS = (clientes||[]).filter(c => !c.lat || !c.lng);
+  const sinGPS = React.useMemo(()=>(clientes||[]).filter(c=>!c.lat||!c.lng),[]);
   const [idx, setIdx] = React.useState(0);
   const [latVal, setLatVal] = React.useState("");
   const [lngVal, setLngVal] = React.useState("");
@@ -343,7 +343,6 @@ function CargaGPSMasiva({clientes, onActualizar, onVolver}) {
   const [listo, setListo] = React.useState(false);
   const actualizados = React.useRef([...clientes]);
 
-  // ⚠ Todos los hooks ANTES de cualquier return condicional
   const cliente = sinGPS[idx] || null;
   const coordsDelLink = cliente?.maps ? extraerCoordsDeURL(cliente.maps) : null;
 
@@ -368,7 +367,6 @@ function CargaGPSMasiva({clientes, onActualizar, onVolver}) {
     else setIdx(i=>i+1);
   };
 
-  // Pantalla final — siempre al final, nunca antes de hooks
   if(sinGPS.length===0 || listo || !cliente) return (
     <div style={{...s.screen,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:32}}>
       <div style={{fontSize:48}}>✅</div>
@@ -382,6 +380,7 @@ function CargaGPSMasiva({clientes, onActualizar, onVolver}) {
   const dir = cliente.calle ? `${cliente.calle} ${cliente.nro||""}`.trim()
     : cliente.manzana ? `Mz ${cliente.manzana} L ${cliente.lote||""} · ${cliente.barrio||""}`
     : cliente.barrio||"";
+  const latOk = latVal&&lngVal&&!isNaN(parseFloat(latVal))&&!isNaN(parseFloat(lngVal));
 
   return (
     <div style={{...s.screen,display:"flex",flexDirection:"column"}}>
@@ -395,60 +394,64 @@ function CargaGPSMasiva({clientes, onActualizar, onVolver}) {
       <div style={{padding:16,display:"flex",flexDirection:"column",gap:12}}>
 
         <div style={{...s.card,margin:0}}>
-          <div style={{fontSize:16,fontWeight:600,color:"var(--color-text-primary)",marginBottom:4}}>{cliente.nombre}</div>
+          <div style={{fontSize:16,fontWeight:600,color:"var(--color-text-primary)",marginBottom:2}}>{cliente.nombre}</div>
           <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>{cliente.dia} · {dir}</div>
+          {cliente.maps&&<div style={{fontSize:10,color:"var(--color-text-tertiary)",marginTop:2,wordBreak:"break-all"}}>{cliente.maps}</div>}
         </div>
 
-        {coordsDelLink ? (
-          <div style={{background:"var(--color-background-success)",borderRadius:10,padding:"12px 14px"}}>
-            <div style={{fontSize:13,color:"var(--color-text-success)",fontWeight:600,marginBottom:2}}>✓ Coordenadas extraídas del link automáticamente</div>
+        {coordsDelLink&&(
+          <div style={{background:"var(--color-background-success)",borderRadius:10,padding:"10px 14px"}}>
+            <div style={{fontSize:13,color:"var(--color-text-success)",fontWeight:600}}>✓ Coordenadas extraídas del link</div>
             <div style={{fontSize:12,color:"var(--color-text-success)"}}>{coordsDelLink.lat.toFixed(5)}, {coordsDelLink.lng.toFixed(5)}</div>
           </div>
-        ) : (
-          <>
-            <div style={{background:"var(--color-background-info)",borderRadius:10,padding:"12px 14px"}}>
-              <div style={{fontSize:13,color:"var(--color-text-info)",fontWeight:600,marginBottom:6}}>📋 Cómo obtener las coordenadas:</div>
-              <div style={{fontSize:12,color:"var(--color-text-secondary)",lineHeight:1.8}}>
-                1. Tocá <b>"Abrir en Maps"</b> abajo<br/>
-                2. <b>Mantené presionado</b> el punto del cliente en el mapa<br/>
-                3. Aparecen los números arriba, ej: <b>-26.86590, -65.21780</b><br/>
-                4. Tocá esos números → <b>Copiar</b><br/>
-                5. Volvé acá y pegá en el campo de abajo
-              </div>
-            </div>
-            {cliente.maps && (
-              <button style={{...s.btnPrimary,background:"#1a7a3a",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}
-                onClick={()=>window.open(cliente.maps,"_blank")}>
-                🗺 Abrir en Google Maps
-              </button>
-            )}
-            <div style={{...s.card,margin:0}}>
-              <label style={{...s.label,fontSize:12,fontWeight:600}}>Pegá las coordenadas acá (ej: -26.86590, -65.21780)</label>
-              <input style={{...s.input,marginTop:4}} placeholder="-26.86590, -65.21780"
-                value={latVal&&lngVal?`${latVal}, ${lngVal}`:latVal}
-                onChange={e=>{
-                  const raw=e.target.value;
-                  const m=raw.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
-                  if(m){setLatVal(m[1]);setLngVal(m[2]);}
-                  else setLatVal(raw);
-                }}
-              />
-              {latVal&&lngVal&&!isNaN(parseFloat(latVal))&&!isNaN(parseFloat(lngVal))&&(
-                <div style={{fontSize:11,color:"#4dd9a0",marginTop:4}}>✓ Latitud: {latVal} · Longitud: {lngVal}</div>
-              )}
-            </div>
-          </>
         )}
 
-        <div style={{display:"flex",gap:8,marginTop:4}}>
+        <div style={{background:"var(--color-background-info)",borderRadius:10,padding:"10px 14px"}}>
+          <div style={{fontSize:12,color:"var(--color-text-info)",fontWeight:600,marginBottom:4}}>📋 Cómo obtener las coordenadas:</div>
+          <div style={{fontSize:11,color:"var(--color-text-secondary)",lineHeight:1.8}}>
+            1. Tocá <b>"Abrir en Maps"</b> abajo<br/>
+            2. <b>Mantené presionado</b> el punto del cliente<br/>
+            3. Aparecen los números arriba: <b>-26.865, -65.217</b><br/>
+            4. Tocá esos números → <b>Copiar</b><br/>
+            5. Volvé acá y pegá abajo
+          </div>
+        </div>
+
+        {cliente.maps&&(
+          <button style={{...s.btnPrimary,background:"#1a7a3a",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}
+            onClick={()=>window.open(cliente.maps,"_blank")}>
+            🗺 Abrir en Google Maps
+          </button>
+        )}
+
+        <div style={{...s.card,margin:0}}>
+          <label style={{...s.label,fontSize:12,fontWeight:600}}>Pegá las coordenadas (ej: -26.86590, -65.21780)</label>
+          <input style={{...s.input,marginTop:4}} placeholder="-26.86590, -65.21780"
+            value={latVal&&lngVal?`${latVal}, ${lngVal}`:latVal}
+            onChange={e=>{
+              const raw=e.target.value;
+              const m=raw.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
+              if(m){setLatVal(m[1]);setLngVal(m[2]);}
+              else setLatVal(raw);
+            }}
+          />
+          {latOk
+            ?<div style={{fontSize:11,color:"#4dd9a0",marginTop:4}}>✓ {latVal}, {lngVal}</div>
+            :<div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:4}}>Pegá los dos números separados por coma</div>
+          }
+        </div>
+
+        <div style={{display:"flex",gap:8}}>
           <button style={{...s.btn,flex:1,padding:"12px",fontSize:13}} onClick={()=>guardarYSiguiente(true)}>Omitir →</button>
-          <button style={{...s.btnPrimary,flex:2,opacity:(latVal&&lngVal)||coordsDelLink?1:0.4}}
-            disabled={!latVal&&!lngVal&&!coordsDelLink}
+          <button style={{...s.btnPrimary,flex:2,opacity:latOk||coordsDelLink?1:0.4}}
+            disabled={!latOk&&!coordsDelLink}
             onClick={()=>guardarYSiguiente(false)}>
             Guardar y siguiente →
           </button>
         </div>
-        <div style={{fontSize:11,color:"var(--color-text-tertiary)",textAlign:"center"}}>{guardados} guardados · {sinGPS.length-idx-1} restantes</div>
+        <div style={{fontSize:11,color:"var(--color-text-tertiary)",textAlign:"center"}}>
+          {guardados} guardados · {sinGPS.length-idx-1} restantes
+        </div>
       </div>
     </div>
   );

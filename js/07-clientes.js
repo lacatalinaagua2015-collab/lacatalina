@@ -2,7 +2,7 @@
 // ◆  07-clientes.js — ListaClientes, DetalleCliente, EditCliente
 // ════════════════════════════════════════════════════════════════════
 
-function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onNoQuiereProspecto,onConfirmarTransfer,onVerProspecto,onEliminarProspecto}) {
+function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onNoQuiereProspecto,onConfirmarTransfer,onVerProspecto,onEliminarProspecto,onAbrirMapa}) {
   const [busqueda,setBusqueda] = useState("");
   const [editandoOrden,setEditandoOrden] = useState(null);
   const [ordenTemp,setOrdenTemp] = useState("");
@@ -257,7 +257,7 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
           <span style={s.badge("success")}>{visitados.size}/{clientes.length} visitados</span>
           {volverAlFinal.length>0&&<span style={s.badge("warning")}>{volverAlFinal.length} volver al final</span>}
           {sinEntrega.length>0&&<span style={s.badge("danger")}>{sinEntrega.length} sin entrega</span>}
-          <button style={{...s.btn,fontSize:11,padding:"3px 10px",marginLeft:"auto"}} onClick={abrirRuta}>🗺 Ruta Maps</button>
+          <button style={{...s.btn,fontSize:11,padding:"3px 10px",marginLeft:"auto"}} onClick={onAbrirMapa}>🗺 Mapa</button>
         </div>
         <p style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:6}}>Tocá el # para editar el número de orden del cliente</p>
       </div>
@@ -737,172 +737,16 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
   );
 }
 
-// ── Extrae lat/lng de una URL larga de Google Maps ──────────────────────────
-// Solo funciona con links LARGOS (los que tienen coordenadas en la URL).
-// Los links cortos (maps.app.goo.gl) NO tienen coordenadas y deben reemplazarse.
-function extraerCoordsDeURL(url) {
-  if(!url) return null;
-  // Patrón más común: @lat,lng en la URL
-  let m = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
-  // ?q=lat,lng
-  m = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
-  // ll=lat,lng
-  m = url.match(/ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
-  // /dir/.../lat,lng/
-  m = url.match(/\/dir\/[^/]*\/(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
-  // Coordenadas de Tucumán sueltas en la URL /-26.xxx,-65.xxx
-  m = url.match(/\/(-2[0-9]\.\d{4,}),(-6[0-9]\.\d{4,})/);
-  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
-  return null;
-}
-
-function esLinkCorto(url) {
-  return url && (url.includes("maps.app.goo.gl") || url.includes("goo.gl/maps"));
-}
-
 function EditCliente({cliente,onGuardar,onEliminarCliente}) {
-  const [datos,setDatos] = useState({...cliente});
-  const [verAyuda,setVerAyuda] = useState(false);
-  const [verLatLng,setVerLatLng] = useState(!!(cliente.lat && cliente.lng && !cliente.maps));
-  const [latManual,setLatManual] = useState(cliente.lat ? String(cliente.lat) : "");
-  const [lngManual,setLngManual] = useState(cliente.lng ? String(cliente.lng) : "");
-  const set = (k,v) => setDatos(d=>({...d,[k]:v}));
-
-  // Detecta el estado del GPS en tiempo real al cambiar el link
-  const estadoGPS = (() => {
-    if(datos.lat && datos.lng) return "ok";
-    if(!datos.maps && !latManual) return "vacio";
-    if(esLinkCorto(datos.maps)) return "corto";
-    if(datos.maps && extraerCoordsDeURL(datos.maps)) return "ok_pendiente"; // tiene coords pero no guardadas aún
-    if(datos.maps) return "sin_coords"; // link largo pero sin coords (raro)
-    return "vacio";
-  })();
-
-  const handleCambioMaps = (val) => {
-    // Cuando cambia el link, limpiar coords anteriores para recalcular
-    setDatos(d=>({...d, maps:val, lat:null, lng:null}));
-  };
-
-  const handleGuardar = () => {
-    let datosFinales = {...datos};
-
-    // 1. Intentar extraer coords del link de maps
-    if(datos.maps) {
-      const coords = extraerCoordsDeURL(datos.maps);
-      if(coords) datosFinales = {...datosFinales, lat:coords.lat, lng:coords.lng};
-    }
-    // 2. Si tiene lat/lng manual, usar esas (tienen prioridad si el link no tiene coords)
-    if(latManual && lngManual) {
-      const lat = parseFloat(latManual), lng = parseFloat(lngManual);
-      if(!isNaN(lat) && !isNaN(lng)) datosFinales = {...datosFinales, lat, lng};
-    }
-
-    onGuardar(datosFinales);
-  };
-
+  const [datos,setDatos]=useState({...cliente});
+  const set=(k,v)=>setDatos(d=>({...d,[k]:v}));
   return (
     <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:16}}>
       <div><label style={s.label}>Día de reparto</label>
-        <select style={s.select} value={datos.dia} onChange={e=>set("dia",e.target.value)}>
-          {DIAS.map(d=><option key={d} value={d}>{d}</option>)}
-        </select>
+        <select style={s.select} value={datos.dia} onChange={e=>set("dia",e.target.value)}>{DIAS.map(d=><option key={d} value={d}>{d}</option>)}</select>
       </div>
-      {[["nombre","Nombre y apellido"],["barrio","Barrio"],["manzana","Manzana"],["lote","Lote"],["sector","Sector"],["calle","Calle"],["nro","Número"],["telefono","Teléfono (sin 0 ni 15)"]].map(([k,l])=>(
-        <div key={k}><label style={s.label}>{l}</label>
-          <input style={s.input} value={datos[k]||""} onChange={e=>set(k,e.target.value)} placeholder={l} />
-        </div>
-      ))}
-
-      {/* ── Sección GPS ── */}
-      <div style={{background:"var(--color-background-tertiary)",borderRadius:10,padding:"10px 12px",border:"0.5px solid var(--color-border-secondary)"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-          <label style={{...s.label,marginBottom:0,fontSize:12,fontWeight:600}}>📍 Ubicación GPS</label>
-          {/* Indicador de estado */}
-          {(estadoGPS==="ok"||estadoGPS==="ok_pendiente") &&
-            <span style={{fontSize:10,color:"#4dd9a0",fontWeight:600}}>✓ GPS listo</span>}
-          {estadoGPS==="corto" &&
-            <span style={{fontSize:10,color:"#f07070",fontWeight:600}}>⚠ Link corto — sin GPS</span>}
-          {estadoGPS==="vacio" &&
-            <span style={{fontSize:10,color:"var(--color-text-tertiary)"}}>Sin GPS</span>}
-        </div>
-
-        {/* Campo link Maps */}
-        <label style={s.label}>Link de Google Maps</label>
-        <input style={{...s.input, marginBottom:4}}
-          value={datos.maps||""}
-          placeholder="https://www.google.com/maps/place/.../@-26.86..."
-          onChange={e=>handleCambioMaps(e.target.value)}
-        />
-
-        {/* Mensaje de ayuda según estado */}
-        {estadoGPS==="corto" && (
-          <div style={{background:"#2e1f06",borderRadius:8,padding:"8px 10px",marginTop:4}}>
-            <div style={{fontSize:12,color:"#f5b942",fontWeight:600,marginBottom:4}}>
-              ⚠ Este es un link corto — no tiene coordenadas
-            </div>
-            <div style={{fontSize:11,color:"var(--color-text-secondary)",lineHeight:1.6}}>
-              Necesitás el <b>link largo</b> de Maps. Para obtenerlo:<br/>
-              1. Abrí Maps y buscá la dirección del cliente<br/>
-              2. Tocá los <b>3 puntitos ⋮</b> o el botón <b>Compartir</b><br/>
-              3. Copiá el link que empieza con <b>google.com/maps/place/</b><br/>
-              4. Ese link tiene los números <b>@-26.8..,-65.2..</b> — eso es el GPS ✅
-            </div>
-            <button style={{...s.btn,marginTop:6,fontSize:11,padding:"4px 10px"}}
-              onClick={()=>datos.maps && window.open(datos.maps,"_blank")}>
-              Abrir este link en Maps →
-            </button>
-          </div>
-        )}
-
-        {(estadoGPS==="ok"||estadoGPS==="ok_pendiente") && datos.maps && (
-          <div style={{fontSize:11,color:"#4dd9a0",marginTop:2}}>
-            Coordenadas detectadas en el link ✓
-            {datos.lat && <span style={{color:"var(--color-text-tertiary)",marginLeft:6}}>
-              ({datos.lat.toFixed(5)}, {datos.lng?.toFixed(5)})
-            </span>}
-          </div>
-        )}
-
-        {/* Alternativa: ingresar lat/lng manualmente */}
-        <button style={{...s.btn,fontSize:11,padding:"4px 10px",marginTop:8,width:"100%",textAlign:"center"}}
-          onClick={()=>setVerLatLng(v=>!v)}>
-          {verLatLng ? "▲ Ocultar lat/lng manual" : "▼ Ingresar lat/lng manualmente (alternativa)"}
-        </button>
-
-        {verLatLng && (
-          <div style={{marginTop:8}}>
-            <div style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:6,lineHeight:1.5}}>
-              También podés ingresar las coordenadas a mano.<br/>
-              En Google Maps, tocá y mantenés presionado sobre el punto → aparecen los números arriba.<br/>
-              Ejemplo: <b>-26.86590</b> (Latitud) y <b>-65.21780</b> (Longitud)
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              <div>
-                <label style={s.label}>Latitud</label>
-                <input style={s.input} value={latManual} placeholder="-26.86590"
-                  onChange={e=>setLatManual(e.target.value)} />
-              </div>
-              <div>
-                <label style={s.label}>Longitud</label>
-                <input style={s.input} value={lngManual} placeholder="-65.21780"
-                  onChange={e=>setLngManual(e.target.value)} />
-              </div>
-            </div>
-            {latManual && lngManual && !isNaN(parseFloat(latManual)) && !isNaN(parseFloat(lngManual)) && (
-              <div style={{fontSize:11,color:"#4dd9a0",marginTop:4}}>✓ Coordenadas válidas</div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {[["foto","Link foto del domicilio (Google Drive, etc)"]].map(([k,l])=>(
-        <div key={k}><label style={s.label}>{l}</label>
-          <input style={s.input} value={datos[k]||""} onChange={e=>set(k,e.target.value)} placeholder={l} />
-        </div>
+      {[["nombre","Nombre y apellido"],["barrio","Barrio"],["manzana","Manzana"],["lote","Lote"],["sector","Sector"],["calle","Calle"],["nro","Número"],["telefono","Teléfono (sin 0 ni 15)"],["maps","Link Google Maps"],["foto","Link foto del domicilio (Google Drive, etc)"]].map(([k,l])=>(
+        <div key={k}><label style={s.label}>{l}</label><input style={s.input} value={datos[k]||""} onChange={e=>set(k,e.target.value)} placeholder={l} /></div>
       ))}
       <div>
         <label style={s.label}>Notas rápidas (timbre roto, perro, cobrar deuda, etc.)</label>
@@ -930,9 +774,7 @@ function EditCliente({cliente,onGuardar,onEliminarCliente}) {
         <img src={datos.foto} alt="Domicilio" style={{width:"100%",borderRadius:8,maxHeight:160,objectFit:"cover"}} />
         <div style={{position:"absolute",bottom:6,right:8,background:"rgba(0,0,0,0.55)",color:"#fff",fontSize:11,borderRadius:6,padding:"2px 8px"}}>🔍 Ampliar</div>
       </div>}
-      <button style={{...s.btnPrimary,opacity:guardando?0.7:1}} onClick={handleGuardar} disabled={guardando}>
-        {guardando ? "⏳ Guardando..." : "Guardar cambios"}
-      </button>
+      <button style={s.btnPrimary} onClick={()=>onGuardar(datos)}>Guardar cambios</button>
       <div style={{marginTop:16,paddingTop:12,borderTop:"0.5px solid var(--color-border-tertiary)"}}>
         <button style={{...s.btnDanger,width:"100%",padding:"10px",fontSize:13}}
           onClick={()=>{if(window.confirm(`¿Eliminar a ${datos.nombre}? Se borrarán también todas sus ventas.`))onEliminarCliente();}}>
