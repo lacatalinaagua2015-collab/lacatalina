@@ -737,15 +737,122 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
   );
 }
 
+// ── Extrae lat/lng de una URL de Google Maps ────────────────────────────────
+// Soporta:
+//   - links largos: google.com/maps/place/.../@-26.88,-65.21,...
+//   - links con ?q=-26.88,-65.21
+//   - links con /dir/...-26.88,-65.21.../
+//   - links cortos: maps.app.goo.gl/... (se resuelven via api.allorigins.win)
+function extraerCoordsDeURL(url) {
+  if(!url) return null;
+  // Patrón @lat,lng
+  let m = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
+  // Patrón ?q=lat,lng
+  m = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
+  // Patrón /dir/.../lat,lng,
+  m = url.match(/\/dir\/[^/]*\/(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
+  // Patrón ll=lat,lng
+  m = url.match(/ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
+  return null;
+}
+
+async function resolverLinkMaps(url) {
+  if(!url) return null;
+  // Primero intentar extraer directo (link largo)
+  const directo = extraerCoordsDeURL(url);
+  if(directo) return directo;
+  // Si es link corto, resolverlo via proxy público
+  if(url.includes("maps.app.goo.gl") || url.includes("goo.gl")) {
+    try {
+      const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+      const res = await fetch(proxy, {signal: AbortSignal.timeout(8000)});
+      const data = await res.json();
+      // allorigins devuelve la URL final en data.status.url
+      const finalUrl = data?.status?.url || "";
+      const coords = extraerCoordsDeURL(finalUrl);
+      if(coords) return coords;
+      // También buscar en el contenido HTML devuelto
+      const html = data?.contents || "";
+      const mHtml = html.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+      if(mHtml) return {lat:parseFloat(mHtml[1]),lng:parseFloat(mHtml[2])};
+    } catch(e) {
+      console.warn("No se pudo resolver link corto:", e);
+    }
+  }
+  return null;
+}
+
 function EditCliente({cliente,onGuardar,onEliminarCliente}) {
   const [datos,setDatos]=useState({...cliente});
+  const [guardando,setGuardando]=useState(false);
+  const [estadoGPS,setEstadoGPS]=useState(
+    cliente.lat && cliente.lng ? "ok" : cliente.maps ? "pendiente" : "vacio"
+  );
   const set=(k,v)=>setDatos(d=>({...d,[k]:v}));
+
+  const handleGuardar = async () => {
+    setGuardando(true);
+    let datosFinales = {...datos};
+
+    // Si cambió el link de maps, intentar extraer coordenadas
+    const mapsActual = datos.maps||"";
+    const mapsAnterior = cliente.maps||"";
+    const latAnterior = cliente.lat;
+    const necesitaResolverGPS = mapsActual && (
+      mapsActual !== mapsAnterior ||   // cambió el link
+      !latAnterior                      // no tenía coordenadas antes
+    );
+
+    if(necesitaResolverGPS) {
+      setEstadoGPS("resolviendo");
+      const coords = await resolverLinkMaps(mapsActual);
+      if(coords) {
+        datosFinales = {...datosFinales, lat:coords.lat, lng:coords.lng};
+        setEstadoGPS("ok");
+      } else {
+        setEstadoGPS("error");
+        // Guardar igual aunque no se pudo resolver GPS
+      }
+    }
+
+    onGuardar(datosFinales);
+    setGuardando(false);
+  };
+
   return (
     <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:16}}>
       <div><label style={s.label}>Día de reparto</label>
         <select style={s.select} value={datos.dia} onChange={e=>set("dia",e.target.value)}>{DIAS.map(d=><option key={d} value={d}>{d}</option>)}</select>
       </div>
-      {[["nombre","Nombre y apellido"],["barrio","Barrio"],["manzana","Manzana"],["lote","Lote"],["sector","Sector"],["calle","Calle"],["nro","Número"],["telefono","Teléfono (sin 0 ni 15)"],["maps","Link Google Maps"],["foto","Link foto del domicilio (Google Drive, etc)"]].map(([k,l])=>(
+      {[["nombre","Nombre y apellido"],["barrio","Barrio"],["manzana","Manzana"],["lote","Lote"],["sector","Sector"],["calle","Calle"],["nro","Número"],["telefono","Teléfono (sin 0 ni 15)"]].map(([k,l])=>(
+        <div key={k}><label style={s.label}>{l}</label><input style={s.input} value={datos[k]||""} onChange={e=>set(k,e.target.value)} placeholder={l} /></div>
+      ))}
+
+      {/* Campo Maps con indicador de GPS */}
+      <div>
+        <label style={s.label}>Link Google Maps</label>
+        <input style={s.input} value={datos.maps||""} placeholder="https://maps.app.goo.gl/..."
+          onChange={e=>{
+            set("maps",e.target.value);
+            // Si borraron el link, resetear coordenadas
+            if(!e.target.value){ setDatos(d=>({...d,maps:"",lat:null,lng:null})); setEstadoGPS("vacio"); }
+            else setEstadoGPS("pendiente");
+          }}
+        />
+        <div style={{marginTop:4,fontSize:11,display:"flex",alignItems:"center",gap:5}}>
+          {estadoGPS==="ok"     && <><span style={{color:"#4dd9a0"}}>✓ GPS listo</span>{datos.lat&&<span style={{color:"var(--color-text-tertiary)"}}>({datos.lat?.toFixed(5)}, {datos.lng?.toFixed(5)})</span>}</>}
+          {estadoGPS==="pendiente" && <span style={{color:"#f5b942"}}>⏳ GPS se extrae al guardar</span>}
+          {estadoGPS==="resolviendo" && <span style={{color:"#5daaff"}}>🔍 Obteniendo coordenadas...</span>}
+          {estadoGPS==="error"  && <span style={{color:"#f07070"}}>⚠ No se pudo obtener GPS. Pegá el link largo de Maps (el que tiene coordenadas en la URL)</span>}
+          {estadoGPS==="vacio"  && <span style={{color:"var(--color-text-tertiary)"}}>Sin link de Maps</span>}
+        </div>
+      </div>
+
+      {[["foto","Link foto del domicilio (Google Drive, etc)"]].map(([k,l])=>(
         <div key={k}><label style={s.label}>{l}</label><input style={s.input} value={datos[k]||""} onChange={e=>set(k,e.target.value)} placeholder={l} /></div>
       ))}
       <div>
@@ -774,7 +881,9 @@ function EditCliente({cliente,onGuardar,onEliminarCliente}) {
         <img src={datos.foto} alt="Domicilio" style={{width:"100%",borderRadius:8,maxHeight:160,objectFit:"cover"}} />
         <div style={{position:"absolute",bottom:6,right:8,background:"rgba(0,0,0,0.55)",color:"#fff",fontSize:11,borderRadius:6,padding:"2px 8px"}}>🔍 Ampliar</div>
       </div>}
-      <button style={s.btnPrimary} onClick={()=>onGuardar(datos)}>Guardar cambios</button>
+      <button style={{...s.btnPrimary,opacity:guardando?0.7:1}} onClick={handleGuardar} disabled={guardando}>
+        {guardando ? "⏳ Guardando..." : "Guardar cambios"}
+      </button>
       <div style={{marginTop:16,paddingTop:12,borderTop:"0.5px solid var(--color-border-tertiary)"}}>
         <button style={{...s.btnDanger,width:"100%",padding:"10px",fontSize:13}}
           onClick={()=>{if(window.confirm(`¿Eliminar a ${datos.nombre}? Se borrarán también todas sus ventas.`))onEliminarCliente();}}>

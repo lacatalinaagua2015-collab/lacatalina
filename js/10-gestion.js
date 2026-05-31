@@ -333,8 +333,87 @@ function FormCliente({inicial,onGuardar}) {
 }
 
 
+// ── MigracionGPS — resuelve GPS de todos los clientes con link ────────────────
+function MigracionGPS({clientes, filtroDia, onActualizar}) {
+  const [estado, setEstado] = React.useState("idle"); // idle | corriendo | listo
+  const [progreso, setProgreso] = React.useState({actual:0, total:0, ok:0, error:0});
+
+  const clientesConLink = (clientes||[]).filter(c =>
+    (filtroDia==="todos" || c.dia===filtroDia) &&
+    c.maps && !c.lat
+  );
+
+  const ejecutar = async () => {
+    if(!clientesConLink.length) return;
+    setEstado("corriendo");
+    setProgreso({actual:0, total:clientesConLink.length, ok:0, error:0});
+
+    const actualizados = [...clientes];
+    let ok=0, err=0;
+
+    for(let i=0; i<clientesConLink.length; i++) {
+      const c = clientesConLink[i];
+      setProgreso(p=>({...p, actual:i+1}));
+      try {
+        const coords = await resolverLinkMaps(c.maps);
+        if(coords) {
+          const idx = actualizados.findIndex(x=>x.id===c.id);
+          if(idx>=0) actualizados[idx] = {...actualizados[idx], lat:coords.lat, lng:coords.lng};
+          ok++;
+          setProgreso(p=>({...p, ok:p.ok+1}));
+        } else {
+          err++;
+          setProgreso(p=>({...p, error:p.error+1}));
+        }
+      } catch {
+        err++;
+        setProgreso(p=>({...p, error:p.error+1}));
+      }
+      // Pequeña pausa para no saturar el proxy
+      await new Promise(r=>setTimeout(r,400));
+    }
+
+    if(ok>0) onActualizar(actualizados);
+    setEstado("listo");
+  };
+
+  if(estado==="idle") return (
+    <button style={{background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:10,padding:"12px 24px",fontSize:14,fontWeight:600,cursor:"pointer",marginTop:4}}
+      onClick={ejecutar}>
+      📡 Obtener GPS de {clientesConLink.length} cliente{clientesConLink.length!==1?"s":""}
+    </button>
+  );
+
+  if(estado==="corriendo") return (
+    <div style={{textAlign:"center",display:"flex",flexDirection:"column",gap:8,alignItems:"center"}}>
+      <div style={{fontSize:13,color:"#5daaff",fontWeight:500}}>
+        🔍 Procesando {progreso.actual} / {progreso.total}...
+      </div>
+      <div style={{width:220,height:8,background:"var(--color-background-tertiary)",borderRadius:4,overflow:"hidden"}}>
+        <div style={{height:"100%",background:"#185FA5",borderRadius:4,width:`${(progreso.actual/progreso.total)*100}%`,transition:"width 0.3s"}}/>
+      </div>
+      <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>
+        ✓ {progreso.ok} obtenidos · ✗ {progreso.error} no encontrados
+      </div>
+      <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>Puede tardar unos minutos...</div>
+    </div>
+  );
+
+  return (
+    <div style={{textAlign:"center",display:"flex",flexDirection:"column",gap:6,alignItems:"center"}}>
+      <div style={{fontSize:15,color:"#4dd9a0",fontWeight:600}}>✅ ¡Listo!</div>
+      <div style={{fontSize:13,color:"var(--color-text-secondary)"}}>
+        {progreso.ok} GPS obtenidos · {progreso.error} no resueltos
+      </div>
+      {progreso.error>0&&<div style={{fontSize:12,color:"var(--color-text-tertiary)",maxWidth:260,lineHeight:1.5}}>
+        Los {progreso.error} no resueltos tienen links cortos que no pudieron expandirse. Podés editarlos y pegar el link largo de Maps (el que tiene números en la URL).
+      </div>}
+    </div>
+  );
+}
+
 // ── MapaClientes ──────────────────────────────────────────────────────────────
-function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, onVolver}) {
+function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, onVolver, onActualizar}) {
   const mapRef = React.useRef(null);
   const mapInstRef = React.useRef(null);
   const [leafletOk, setLeafletOk] = React.useState(!!window.L);
@@ -451,14 +530,29 @@ function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, o
         ))}
       </div>
 
-      {/* Sin clientes con GPS */}
+      {/* Banner migración cuando hay clientes sin GPS pero hay mapa */}
+      {sinCoordenadas>0 && clientesFiltrados.length>0 && (
+        <div style={{padding:"10px 14px",background:"var(--color-background-warning)",borderBottom:"0.5px solid var(--color-border-tertiary)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+          <span style={{fontSize:12,color:"var(--color-text-warning)"}}>⚠ {sinCoordenadas} cliente{sinCoordenadas!==1?"s":""} sin GPS</span>
+          <MigracionGPS clientes={clientes||[]} filtroDia={filtroDia} onActualizar={onActualizar} />
+        </div>
+      )}
+
+      {/* Sin clientes con GPS — con botón de migración masiva */}
       {leafletOk && clientesFiltrados.length===0 && (
         <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,padding:32}}>
           <div style={{fontSize:40}}>📍</div>
           <div style={{fontSize:15,fontWeight:500,color:"var(--color-text-primary)",textAlign:"center"}}>Sin clientes con GPS</div>
           <div style={{fontSize:13,color:"var(--color-text-secondary)",textAlign:"center",lineHeight:1.6,maxWidth:280}}>
-            Para ver clientes en el mapa, editá cada cliente y agregá el link de Google Maps. La app extrae las coordenadas automáticamente.
+            Tenés {sinCoordenadas} cliente{sinCoordenadas!==1?"s":""} con link de Maps sin coordenadas. Tocá el botón para obtener el GPS de todos automáticamente.
           </div>
+          {sinCoordenadas>0 && (
+            <MigracionGPS
+              clientes={clientes||[]}
+              filtroDia={filtroDia}
+              onActualizar={onActualizar}
+            />
+          )}
         </div>
       )}
 
