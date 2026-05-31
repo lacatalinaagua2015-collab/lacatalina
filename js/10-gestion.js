@@ -464,23 +464,15 @@ function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, o
 
   const ventasHoy = (ventas||[]).filter(v=>v.fechaKey===fecha);
   const noVisHoy  = (noVisitas||[]).filter(v=>v.fecha===fecha);
-
   const clientesFiltrados = (clientes||[]).filter(c=>{
     if(filtroDia!=="todos" && c.dia!==filtroDia) return false;
     return c.lat && c.lng;
   });
   const sinCoordenadas = (clientes||[]).filter(c=>(filtroDia==="todos"||c.dia===filtroDia)&&(!c.lat||!c.lng)).length;
+  const entregadosCount = clientesFiltrados.filter(c=>ventasHoy.some(v=>v.clienteId===c.id)).length;
+  const pendientesCount = clientesFiltrados.filter(c=>!ventasHoy.some(v=>v.clienteId===c.id)&&!noVisHoy.some(v=>v.clienteId===c.id)).length;
 
-  // Modo carga masiva
-  if(modoCarga) return (
-    <CargaGPSMasiva
-      clientes={clientes}
-      onActualizar={onActualizar}
-      onVolver={()=>setModoCarga(false)}
-    />
-  );
-
-  // Cargar Leaflet dinámicamente
+  // ── TODOS los hooks ANTES de cualquier return condicional ──
   React.useEffect(()=>{
     if(window.L){ setLeafletOk(true); return; }
     const link = document.createElement("link");
@@ -493,8 +485,8 @@ function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, o
     document.head.appendChild(script);
   },[]);
 
-  // Inicializar/actualizar mapa
   React.useEffect(()=>{
+    if(modoCarga) return; // no inicializar mapa en modo carga
     if(!leafletOk || !mapRef.current) return;
     if(mapInstRef.current){ mapInstRef.current.remove(); mapInstRef.current=null; }
     const L = window.L;
@@ -531,22 +523,22 @@ function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, o
     else map.setView([-26.82,-65.2],13);
 
     return ()=>{ if(mapInstRef.current){ mapInstRef.current.remove(); mapInstRef.current=null; } };
-  },[leafletOk, filtroDia, clientesFiltrados.length]);
+  },[leafletOk, modoCarga, filtroDia, clientesFiltrados.length]);
 
-  const entregadosCount = clientesFiltrados.filter(c=>ventasHoy.some(v=>v.clienteId===c.id)).length;
-  const pendientesCount = clientesFiltrados.filter(c=>!ventasHoy.some(v=>v.clienteId===c.id)&&!noVisHoy.some(v=>v.clienteId===c.id)).length;
+  // return condicional DESPUÉS de todos los hooks
+  if(modoCarga) return (
+    <CargaGPSMasiva
+      clientes={clientes}
+      onActualizar={onActualizar}
+      onVolver={()=>setModoCarga(false)}
+    />
+  );
 
   return (
     <div style={{...s.screen, display:"flex", flexDirection:"column"}}>
       <div style={s.header}>
         <button style={s.backBtn} onClick={onVolver}>← Volver</button>
         <span style={s.headerTitle}>Mapa de clientes</span>
-        {sinCoordenadas>0 && (
-          <button style={{...s.btn,fontSize:11,padding:"5px 10px",background:"#185FA5",color:"#e2eaf4",border:"none"}}
-            onClick={()=>setModoCarga(true)}>
-            📍 Cargar GPS ({sinCoordenadas})
-          </button>
-        )}
       </div>
 
       {/* Filtro por día */}
