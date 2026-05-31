@@ -333,6 +333,25 @@ function FormCliente({inicial,onGuardar}) {
 }
 
 
+// ── Helpers GPS (también definidos en 07-clientes.js) ────────────────────────
+function extraerCoordsDeURL(url) {
+  if(!url) return null;
+  let m = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
+  m = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
+  m = url.match(/ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
+  m = url.match(/\/dir\/[^/]*\/(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
+  m = url.match(/\/(-2[0-9]\.\d{4,}),(-6[0-9]\.\d{4,})/);
+  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
+  return null;
+}
+function esLinkCorto(url) {
+  return url && (url.includes("maps.app.goo.gl") || url.includes("goo.gl/maps"));
+}
+
 // ── CargaGPSMasiva ────────────────────────────────────────────────────────────
 function CargaGPSMasiva({clientes, onActualizar, onVolver}) {
   const sinGPS = React.useMemo(()=>(clientes||[]).filter(c=>!c.lat||!c.lng),[]);
