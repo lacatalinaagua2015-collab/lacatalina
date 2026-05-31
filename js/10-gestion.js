@@ -332,3 +332,146 @@ function FormCliente({inicial,onGuardar}) {
   );
 }
 
+
+// ── MapaClientes ──────────────────────────────────────────────────────────────
+function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, onVolver}) {
+  const mapRef = React.useRef(null);
+  const mapInstRef = React.useRef(null);
+  const [leafletOk, setLeafletOk] = React.useState(!!window.L);
+  const [filtroDia, setFiltroDia] = React.useState(dia||"todos");
+
+  const ventasHoy = (ventas||[]).filter(v=>v.fechaKey===fecha);
+  const noVisHoy  = (noVisitas||[]).filter(v=>v.fecha===fecha);
+
+  const clientesFiltrados = (clientes||[]).filter(c=>{
+    if(filtroDia!=="todos" && c.dia!==filtroDia) return false;
+    return c.lat && c.lng;
+  });
+  const sinCoordenadas = (clientes||[]).filter(c=>(filtroDia==="todos"||c.dia===filtroDia)&&(!c.lat||!c.lng)).length;
+
+  // Cargar Leaflet dinámicamente
+  React.useEffect(()=>{
+    if(window.L){ setLeafletOk(true); return; }
+    const link = document.createElement("link");
+    link.rel="stylesheet";
+    link.href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+    document.head.appendChild(link);
+    const script = document.createElement("script");
+    script.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    script.onload=()=>setLeafletOk(true);
+    document.head.appendChild(script);
+  },[]);
+
+  // Inicializar/actualizar mapa
+  React.useEffect(()=>{
+    if(!leafletOk || !mapRef.current) return;
+    if(mapInstRef.current){ mapInstRef.current.remove(); mapInstRef.current=null; }
+    const L = window.L;
+    const map = L.map(mapRef.current, {zoomControl:true, scrollWheelZoom:true});
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+      attribution:"© OpenStreetMap", maxZoom:19
+    }).addTo(map);
+    mapInstRef.current = map;
+
+    const bounds = [];
+    clientesFiltrados.forEach(c=>{
+      const entregado = ventasHoy.some(v=>v.clienteId===c.id);
+      const noVis     = noVisHoy.some(v=>v.clienteId===c.id);
+      const color = entregado?"#4dd9a0":noVis?"#f07070":"#5daaff";
+      const icon = L.divIcon({
+        className:"",
+        html:`<div style="width:28px;height:28px;border-radius:50%;background:${color};border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">${c.orden||"·"}</div>`,
+        iconSize:[28,28],iconAnchor:[14,14],popupAnchor:[0,-14]
+      });
+      const marker = L.marker([c.lat,c.lng],{icon}).addTo(map);
+      const dir = c.calle ? c.calle+" "+( c.nro||"") : c.manzana ? "Mz "+c.manzana+" L "+( c.lote||"") : c.barrio||"";
+      marker.bindPopup(
+        `<div style="font-family:sans-serif;min-width:160px">
+          <b style="font-size:13px">${c.nombre}</b><br/>
+          <span style="font-size:11px;color:#666">${c.dia} · Orden ${c.orden||"-"}</span><br/>
+          ${dir}<br/>
+          ${entregado?"<span style='color:#059669;font-weight:600'>✓ Entregado</span>":noVis?"<span style='color:#dc2626'>✗ No visitado</span>":"<span style='color:#2563eb'>Pendiente</span>"}
+        </div>`
+      );
+      bounds.push([c.lat, c.lng]);
+    });
+
+    if(bounds.length>0) map.fitBounds(bounds,{padding:[30,30]});
+    else map.setView([-26.82,-65.2],13);
+
+    return ()=>{ if(mapInstRef.current){ mapInstRef.current.remove(); mapInstRef.current=null; } };
+  },[leafletOk, filtroDia, clientesFiltrados.length]);
+
+  const entregadosCount = clientesFiltrados.filter(c=>ventasHoy.some(v=>v.clienteId===c.id)).length;
+  const pendientesCount = clientesFiltrados.filter(c=>!ventasHoy.some(v=>v.clienteId===c.id)&&!noVisHoy.some(v=>v.clienteId===c.id)).length;
+
+  return (
+    <div style={{...s.screen, display:"flex", flexDirection:"column"}}>
+      <div style={s.header}>
+        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
+        <span style={s.headerTitle}>Mapa de clientes</span>
+      </div>
+
+      {/* Filtro por día */}
+      <div style={{display:"flex",gap:6,padding:"8px 14px",overflowX:"auto",background:"var(--color-background-secondary)",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+        {["todos",...DIAS].map(d=>(
+          <button key={d}
+            style={{...s.btn,padding:"5px 12px",fontSize:12,flexShrink:0,
+              background:filtroDia===d?"#185FA5":"var(--color-background-tertiary)",
+              color:filtroDia===d?"#e2eaf4":"var(--color-text-secondary)",
+              border:filtroDia===d?"none":"0.5px solid var(--color-border-secondary)"}}
+            onClick={()=>setFiltroDia(d)}>
+            {d==="todos"?"Todos":d}
+          </button>
+        ))}
+      </div>
+
+      {/* Stats */}
+      <div style={{display:"flex",background:"var(--color-background-secondary)",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+        {[
+          {val:clientesFiltrados.length, lbl:"Con GPS",      color:"#5daaff"},
+          {val:entregadosCount,          lbl:"Entregados",   color:"#4dd9a0"},
+          {val:pendientesCount,          lbl:"Pendientes",   color:"#f5b942"},
+          {val:sinCoordenadas,           lbl:"Sin GPS",      color:"var(--color-text-tertiary)"},
+        ].map((item,i)=>(
+          <div key={i} style={{flex:1,textAlign:"center",padding:"8px 4px",borderRight:i<3?"0.5px solid var(--color-border-tertiary)":"none"}}>
+            <div style={{fontSize:16,fontWeight:600,color:item.color}}>{item.val}</div>
+            <div style={{fontSize:9,color:"var(--color-text-secondary)"}}>{item.lbl}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Leyenda */}
+      <div style={{display:"flex",gap:14,padding:"6px 14px",background:"var(--color-background-secondary)",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+        {[["#4dd9a0","Entregado"],["#5daaff","Pendiente"],["#f07070","No visitado"]].map(([color,lbl])=>(
+          <div key={lbl} style={{display:"flex",alignItems:"center",gap:4}}>
+            <div style={{width:10,height:10,borderRadius:"50%",background:color}}/>
+            <span style={{fontSize:10,color:"var(--color-text-secondary)"}}>{lbl}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Sin clientes con GPS */}
+      {leafletOk && clientesFiltrados.length===0 && (
+        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,padding:32}}>
+          <div style={{fontSize:40}}>📍</div>
+          <div style={{fontSize:15,fontWeight:500,color:"var(--color-text-primary)",textAlign:"center"}}>Sin clientes con GPS</div>
+          <div style={{fontSize:13,color:"var(--color-text-secondary)",textAlign:"center",lineHeight:1.6,maxWidth:280}}>
+            Para ver clientes en el mapa, editá cada cliente y agregá el link de Google Maps. La app extrae las coordenadas automáticamente.
+          </div>
+        </div>
+      )}
+
+      {/* Cargando Leaflet */}
+      {!leafletOk && (
+        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:8}}>
+          <div style={{fontSize:28}}>🗺</div>
+          <div style={{fontSize:13,color:"var(--color-text-secondary)"}}>Cargando mapa...</div>
+        </div>
+      )}
+
+      {/* Mapa */}
+      <div ref={mapRef} style={{flex:1,minHeight:400,display:leafletOk&&clientesFiltrados.length>0?"block":"none"}}/>
+    </div>
+  );
+}

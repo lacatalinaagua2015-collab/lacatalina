@@ -2,7 +2,7 @@
 // ◆  06-menu.js — MenuDias, DiaPrincipal, PlanillaDelDia, InicioReparto
 // ════════════════════════════════════════════════════════════════════
 
-function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onStock,onAgenda,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,onVerConfirmaciones,clientes,ventas,stock,zonasReparto,onSetZona,onDiaHoy,onDiaResumen,noVisitas,onFiados}) {
+function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,onStock,onAgenda,onVolver,darkMode,onToggleDark,transferenciasPendientes,recordatoriosActivos,onConfirmarRecordatorio,onVerConfirmaciones,clientes,ventas,stock,zonasReparto,onSetZona,onDiaHoy,onDiaResumen,noVisitas,onFiados,onMapaClientes}) {
   const [editandoZona, setEditandoZona] = React.useState(null);
   const hoyDiaNombre = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"][new Date().getDay()];
   // Usar hora LOCAL para evitar bug de zona horaria (Argentina UTC-3)
@@ -202,6 +202,12 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
               <button onClick={onFiados} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,padding:"7px 2px",borderRadius:9,cursor:"pointer",border:"none",background:"var(--color-background-secondary)",color:"var(--color-text-secondary)"}}>
                 <span style={{fontSize:15}}>💰</span>
                 <span style={{fontSize:9,fontWeight:500,color:"var(--color-text-tertiary)"}}>Fiados</span>
+              </button>
+            </div>
+            <div style={{display:"flex",gap:4}}>
+              <button onClick={onMapaClientes} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,padding:"7px 2px",borderRadius:9,cursor:"pointer",border:"none",background:"var(--color-background-secondary)",color:"var(--color-text-secondary)"}}>
+                <span style={{fontSize:15}}>{"\u{1F5FA}"}</span>
+                <span style={{fontSize:9,fontWeight:500,color:"var(--color-text-tertiary)"}}>Mapa</span>
               </button>
             </div>
           </div>

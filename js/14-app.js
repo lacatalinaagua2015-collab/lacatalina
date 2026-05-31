@@ -703,7 +703,8 @@ function App() {
           onDiaHoy={(dia,fechaKey)=>{setDiaActual(dia);setFechaActual(fechaKey);setFechaObj(new Date(fechaKey+"T12:00:00"));irA("inicioReparto");}}
           onDiaResumen={(dia,fechaKey)=>{setDiaActual(dia);setFechaActual(fechaKey);setFechaObj(new Date(fechaKey+"T12:00:00"));irA("planilla");}}
           noVisitas={noVisitas||[]}
-          onFiados={()=>irA("fiadosPendientes")} />}
+          onFiados={()=>irA("fiadosPendientes")}
+        onMapaClientes={()=>irA("mapaClientes")} />}
       {pantalla==="confirmacionesDia" && <ConfirmacionesDia
           dia={diaActual}
           ventas={ventas.filter(v=>v.dia===diaActual&&v.pago==="transferencia")}
@@ -1027,6 +1028,15 @@ function App() {
           </div>
         );
       })()}
+      {pantalla==="mapaClientes"    && <MapaClientes
+        clientes={clientes}
+        dia={diaActual}
+        fecha={fechaActual}
+        ventas={ventas}
+        noVisitas={noVisitas}
+        onSeleccionar={(c)=>{setClienteId(c.id);irA("detalleDesdeGestion");}}
+        onVolver={()=>irA("menu")}
+      />}
       {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stockNorm} setStock={(s)=>{const ns=normStock(s);setStockRaw(ns);syncData({stock:ns});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} syncData={syncData} onVolver={()=>irA("menu")} ecToken={ecToken} setEcToken={setEcToken} tabInicial={tabConfig} />}
     </div>
     {/* Botón flotante de escala — fuera del zoom para que no se afecte */}
