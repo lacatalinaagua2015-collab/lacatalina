@@ -340,6 +340,51 @@ function App() {
     };
     return ()=>{ delete window._agregarAjusteEnvases; };
   }, []);
+
+  // Hooks globales: respaldo COMPLETO descargable + restaurar
+  React.useEffect(()=>{
+    // Descargar un archivo .json con TODOS los datos
+    window._descargarRespaldo = () => {
+      const mantVeh = (()=>{ try { return JSON.parse(localStorage.getItem("cat_mant_vehiculo_v1")||"[]"); } catch { return []; } })();
+      const histPrecios = (()=>{ try { return JSON.parse(localStorage.getItem("lc_hist_precios")||"[]"); } catch { return []; } })();
+      const data = { ...estadoRef.current, mantVeh, histPrecios,
+        _respaldo:true, _app:"la-catalina", _fecha:new Date().toISOString() };
+      const blob = new Blob([JSON.stringify(data,null,2)], {type:"application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const f = new Date().toLocaleDateString("es-AR").replace(/\//g,"-");
+      a.href = url; a.download = `respaldo-completo_la-catalina_${f}.json`;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(url), 1000);
+    };
+    // Restaurar desde un objeto de datos (ya parseado del .json)
+    window._restaurarRespaldo = (data) => {
+      if(!data || typeof data!=="object") { alert("El archivo no es un respaldo válido."); return false; }
+      try {
+        if(data.clientes!==undefined)   setClientes(data.clientes||[]);
+        if(data.ventas!==undefined)     setVentasRaw(data.ventas||[]);
+        if(data.planillas!==undefined)  setPlanillas(data.planillas||{});
+        if(data.stock){
+          const ds=data.stock;
+          const ns = ds.soderia ? ds : {soderia:{sifon:ds.sifon||0,bidon10:ds.bidon10||0,bidon20:ds.bidon20||0},casa:{sifon:0,bidon10:0,bidon20:0},camion:{sifon:0,bidon10:0,bidon20:0}};
+          setStock(ns);
+        }
+        if(data.productos!==undefined)  setProductos(data.productos||[]);
+        if(data.noVisitas!==undefined)  setNoVisitas(data.noVisitas||[]);
+        if(data.prospectos!==undefined) setProspectos(data.prospectos||[]);
+        if(data.recordatorios!==undefined) setRecordatorios(data.recordatorios||[]);
+        if(data.mantVeh!==undefined)    localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh||[]));
+        if(data.histPrecios!==undefined) localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios||[]));
+        if(data.zonasReparto!==undefined) setZonasReparto(data.zonasReparto||{});
+        // Subir lo restaurado a la nube
+        try { cloudSave({ ...estadoRef.current, ...data }); } catch {}
+        return true;
+      } catch(e){ alert("Error al restaurar: "+e.message); return false; }
+    };
+    return ()=>{ delete window._descargarRespaldo; delete window._restaurarRespaldo; };
+  }, []);
+
   const savePlanillasCloud = (v) => { setPlanillas(v); syncData({planillas:v}); };
   const saveStock    = (v) => { setStock(v);    syncData({stock:v}); };
   const saveProductos= (v) => {
@@ -704,7 +749,8 @@ function App() {
           onDiaResumen={(dia,fechaKey)=>{setDiaActual(dia);setFechaActual(fechaKey);setFechaObj(new Date(fechaKey+"T12:00:00"));irA("planilla");}}
           noVisitas={noVisitas||[]}
           onFiados={()=>irA("fiadosPendientes")}
-        onMapaClientes={()=>irA("mapaClientes")} />}
+        onMapaClientes={()=>irA("mapaClientes")}
+        onDormidos={()=>irA("clientesDormidos")} />}
       {pantalla==="confirmacionesDia" && <ConfirmacionesDia
           dia={diaActual}
           ventas={ventas.filter(v=>v.dia===diaActual&&v.pago==="transferencia")}
@@ -767,6 +813,7 @@ function App() {
           saveNoVisitas(nv);
         }}
         onAbrirMapa={()=>irA("mapaClientes")}
+        onPlanilla={()=>irA("planilla")}
         />}
       {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>irA("venta")} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
           onNoEstaCliente={()=>{
@@ -989,6 +1036,7 @@ function App() {
         saveVentas([...ventas,vt]);
         saveClientes(clientes.map(c=>c.id===clienteId?{...c,saldo:saldoDespues}:c));
       }} onVolver={()=>irA("menu")} />}
+      {pantalla==="clientesDormidos" && <ClientesDormidos clientes={clientes} ventas={ventas} onVolver={()=>irA("menu")} onSeleccionar={c=>{setClienteId(c.id);setDiaActual(c.dia);irA("detalleCliente");}} />}
       {/* Modal resumen del día al completarse */}
       {modalResumenDia&&(()=>{
         const {dia,fechaKey}=modalResumenDia;
@@ -1036,7 +1084,6 @@ function App() {
         ventas={ventas}
         noVisitas={noVisitas}
         onSeleccionar={(c)=>{setClienteId(c.id);irA("detalleDesdeGestion");}}
-        onActualizar={(nuevosClientes)=>saveClientes(nuevosClientes)}
         onVolver={()=>irA("menu")}
       />}
       {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stockNorm} setStock={(s)=>{const ns=normStock(s);setStockRaw(ns);syncData({stock:ns});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} syncData={syncData} onVolver={()=>irA("menu")} ecToken={ecToken} setEcToken={setEcToken} tabInicial={tabConfig} />}

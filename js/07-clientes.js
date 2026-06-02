@@ -2,7 +2,7 @@
 // ◆  07-clientes.js — ListaClientes, DetalleCliente, EditCliente
 // ════════════════════════════════════════════════════════════════════
 
-function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onNoQuiereProspecto,onConfirmarTransfer,onVerProspecto,onEliminarProspecto,onAbrirMapa}) {
+function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onNoQuiereProspecto,onConfirmarTransfer,onVerProspecto,onEliminarProspecto,onAbrirMapa,onPlanilla}) {
   const [busqueda,setBusqueda] = useState("");
   const [editandoOrden,setEditandoOrden] = useState(null);
   const [ordenTemp,setOrdenTemp] = useState("");
@@ -46,6 +46,40 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
     const dest=encodeURIComponent(cp[cp.length-1].maps);
     const wps=cp.slice(0,-1).map(c=>encodeURIComponent(c.maps)).join("|");
     window.open(`https://www.google.com/maps/dir/?api=1${wps?`&waypoints=${wps}`:""}&destination=${dest}&travelmode=driving`,"_blank");
+  };
+
+  // Saca coordenadas (lat,lng) de un link de Google Maps si las tiene adentro
+  const extraerCoords = (url)=>{
+    if(!url) return null; let m;
+    m=url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);                 if(m) return {lat:+m[1],lng:+m[2]};
+    m=url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);             if(m) return {lat:+m[1],lng:+m[2]};
+    m=url.match(/[?&](?:q|ll|destination)=(-?\d+\.\d+),(-?\d+\.\d+)/); if(m) return {lat:+m[1],lng:+m[2]};
+    m=url.match(/(-?\d{1,2}\.\d{4,}),\s*(-?\d{1,3}\.\d{4,})/); if(m) return {lat:+m[1],lng:+m[2]};
+    return null;
+  };
+
+  // Ruta óptima: ordena los pendientes por cercanía (vecino más cercano) y abre Google Maps
+  const abrirRutaOptima = ()=>{
+    const conMaps = pendientes.filter(c=>c.maps);
+    const conCoords = conMaps.map(c=>({c, co:extraerCoords(c.maps)})).filter(x=>x.co);
+    if(conCoords.length<2){
+      alert("Para la ruta óptima necesito al menos 2 clientes pendientes cuyo link de Maps tenga las coordenadas adentro. Si tus links no las tienen, usá la ruta normal (🗺).");
+      return;
+    }
+    const rest=[...conCoords];
+    const orden=[rest.shift()];
+    while(rest.length){
+      const last=orden[orden.length-1].co;
+      let bi=0,bd=Infinity;
+      rest.forEach((x,i)=>{const d=(x.co.lat-last.lat)**2+(x.co.lng-last.lng)**2; if(d<bd){bd=d;bi=i;}});
+      orden.push(rest.splice(bi,1)[0]);
+    }
+    const pts=orden.slice(0,10).map(x=>`${x.co.lat},${x.co.lng}`);
+    const origin=pts[0], dest=pts[pts.length-1];
+    const wps=pts.slice(1,-1).join("|");
+    window.open(`https://www.google.com/maps/dir/?api=1&origin=${origin}${wps?`&waypoints=${encodeURIComponent(wps)}`:""}&destination=${dest}&travelmode=driving`,"_blank");
+    const afuera=conMaps.length-conCoords.length;
+    if(afuera>0) setTimeout(()=>alert(`Nota: ${afuera} cliente(s) quedaron afuera de la ruta óptima porque su link de Maps no trae coordenadas.`),400);
   };
 
   const guardarOrden=(c)=>{
@@ -257,7 +291,8 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
           <span style={s.badge("success")}>{visitados.size}/{clientes.length} visitados</span>
           {volverAlFinal.length>0&&<span style={s.badge("warning")}>{volverAlFinal.length} volver al final</span>}
           {sinEntrega.length>0&&<span style={s.badge("danger")}>{sinEntrega.length} sin entrega</span>}
-          <button style={{...s.btn,fontSize:11,padding:"3px 10px",marginLeft:"auto"}} onClick={onAbrirMapa}>🗺 Mapa</button>
+          <button style={{...s.btn,fontSize:11,padding:"3px 10px",marginLeft:"auto"}} onClick={abrirRutaOptima}>🧭 Ruta óptima</button>
+          <button style={{...s.btn,fontSize:11,padding:"3px 10px"}} onClick={onAbrirMapa}>🗺 Mapa</button>
         </div>
         <p style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:6}}>Tocá el # para editar el número de orden del cliente</p>
       </div>
@@ -314,6 +349,22 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
             </div>
           ))}
         </>
+      )}
+
+      {/* Botón verde: aparece solo cuando TODOS los clientes están registrados → lleva a la planilla del día */}
+      {onPlanilla && clientes.length>0 && visitados.size>=clientes.length && (
+        <div style={{padding:"18px 16px 8px"}}>
+          <button
+            style={{
+              width:"100%", background:"#0a5c3a", color:"#e2eaf4",
+              border:"1.5px solid #4dd9a0", borderRadius:12, padding:"15px 20px",
+              fontSize:15, fontWeight:600, cursor:"pointer",
+              display:"flex", alignItems:"center", justifyContent:"center", gap:8
+            }}
+            onClick={onPlanilla}>
+            ✅ Todos registrados · Ir a la planilla del día →
+          </button>
+        </div>
       )}
     </div>
   );
@@ -835,6 +886,70 @@ function FiadosPendientes({clientes,onCobrar,onVolver}) {
               💰 Cobrar deuda
             </button>
           )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ClientesDormidos({clientes,ventas,onVolver,onSeleccionar}) {
+  const [semanas,setSemanas]=React.useState(2);
+  const hoy=new Date();
+  // Última compra real por cliente (ignora cobros y ajustes)
+  const ultima={};
+  (ventas||[]).forEach(v=>{
+    if(v._esCobro||v._esAjuste||v._esAjusteEnvases||v._esMixtoTrans) return;
+    const fk=v.fechaKey; if(!fk) return;
+    if(!ultima[v.clienteId]||fk>ultima[v.clienteId]) ultima[v.clienteId]=fk;
+  });
+  const diasDesde=(fk)=>{ if(!fk) return Infinity; const d=new Date(fk+"T12:00:00"); return Math.floor((hoy-d)/86400000); };
+  const lista=(clientes||[])
+    .map(c=>{ const fk=ultima[c.id]; return {...c, ultimaFecha:fk, dias:diasDesde(fk)}; })
+    .filter(c=>c.dias>=semanas*7)
+    .sort((a,b)=>b.dias-a.dias);
+  const textoTiempo=(c)=>{
+    if(c.dias===Infinity) return "Sin compras registradas";
+    const sem=Math.floor(c.dias/7);
+    return `Hace ${sem} semana${sem!==1?"s":""}`+(c.ultimaFecha?` · últ. ${c.ultimaFecha}`:"");
+  };
+  return (
+    <div style={s.screen}>
+      <div style={s.header}>
+        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
+        <div style={{flex:1}}>
+          <div style={s.headerTitle}>😴 Clientes dormidos</div>
+          <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{lista.length} cliente{lista.length!==1?"s":""} sin comprar hace {semanas}+ semanas</div>
+        </div>
+      </div>
+      <div style={{padding:"10px 14px 4px",display:"flex",gap:6,alignItems:"center"}}>
+        <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>Mostrar sin comprar hace:</span>
+        {[2,3,4,8].map(n=>(
+          <button key={n} onClick={()=>setSemanas(n)}
+            style={{padding:"5px 10px",fontSize:12,borderRadius:8,cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",
+              background:semanas===n?"#185FA5":"var(--color-background-tertiary)",color:semanas===n?"#e2eaf4":"var(--color-text-secondary)",fontWeight:semanas===n?600:400}}>
+            {n}+ sem
+          </button>
+        ))}
+      </div>
+      {lista.length===0&&<div style={{padding:40,textAlign:"center",color:"var(--color-text-success)",fontSize:15}}>✅ ¡Ningún cliente dormido con ese filtro!</div>}
+      {lista.map(c=>(
+        <div key={c.id} style={{...s.card,margin:"6px 14px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+            <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>onSeleccionar&&onSeleccionar(c)}>
+              <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>{c.nombre}</div>
+              <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>
+                {c.dia}{c.barrio?" · "+c.barrio:""}{c.calle?` · ${c.calle} ${c.nro||""}`:c.manzana?` · Mz ${c.manzana} L ${c.lote}`:""}
+              </div>
+              <div style={{fontSize:12,fontWeight:600,color:c.dias>=28?"var(--color-text-danger)":"var(--color-text-warning)",marginTop:4}}>
+                ⏳ {textoTiempo(c)}
+              </div>
+              {c.saldo<0&&<div style={{fontSize:11,color:"var(--color-text-danger)",marginTop:3}}>Debe {fmt(Math.abs(c.saldo))}</div>}
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0,alignItems:"center"}}>
+              {c.telefono&&<a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:22,textDecoration:"none"}} title="WhatsApp">💬</a>}
+              {c.maps&&<a href={c.maps} target="_blank" rel="noreferrer" style={{fontSize:22,textDecoration:"none"}} title="Mapa">📍</a>}
+            </div>
+          </div>
         </div>
       ))}
     </div>

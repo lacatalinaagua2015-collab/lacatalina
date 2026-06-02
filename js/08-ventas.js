@@ -317,6 +317,19 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
   const saldoDisp=cliente.saldo>0?cliente.saldo:0;
   const saldoApl=(usarSaldo&&pago!=="fiado")?Math.min(saldoDisp,neto):0;
   const aPagar=neto-saldoApl;
+  // Deuda anterior del cliente (si el saldo es negativo) y total combinado a cobrar
+  const deudaPrevia=cliente.saldo<0?Math.abs(cliente.saldo):0;
+  const pagaTodo=deudaPrevia>0&&pago!=="fiado"&&opcionSaldo==="todo";
+  const totalACobrar=pagaTodo?deudaPrevia+aPagar:aPagar;
+  // Cuando se elige "Paga deuda + compra", autocompletar el monto con el total combinado
+  React.useEffect(()=>{
+    if(pago==="fiado") return;
+    if(opcionSaldo==="todo"&&deudaPrevia>0){
+      setMonto(String(Math.round(deudaPrevia+aPagar)));
+    } else if(opcionSaldo==="compra"){
+      setMonto("");
+    }
+  },[opcionSaldo,aPagar,deudaPrevia,pago]);
   const ER=({list,setList,i})=>(
     <div style={{...s.row,marginBottom:6}}>
       <select style={{...s.select,flex:2}} value={list[i].prod} onChange={e=>{const n=[...list];n[i].prod=e.target.value;setList(n);}}>
@@ -399,7 +412,7 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
                 <input style={s.input} type="number" placeholder="0" value={montoEfec} onChange={e=>{
                   const ef = e.target.value;
                   setMontoEfec(ef);
-                  const resto = aPagar - (Number(ef)||0);
+                  const resto = totalACobrar - (Number(ef)||0);
                   setMontoTrans(resto > 0 ? String(Math.round(resto)) : "");
                 }} />
               </div>
@@ -410,9 +423,9 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
             </div>
             {Number(montoEfec||0)+Number(montoTrans||0)>0&&(
               <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>
-                Total pagado: {fmt(Number(montoEfec||0)+Number(montoTrans||0))} de {fmt(aPagar)}
-                {(Number(montoEfec||0)+Number(montoTrans||0))<aPagar&&
-                  <span style={{color:"var(--color-text-warning)"}}> · Queda {fmt(aPagar-Number(montoEfec||0)-Number(montoTrans||0))} de saldo</span>}
+                Total pagado: {fmt(Number(montoEfec||0)+Number(montoTrans||0))} de {fmt(totalACobrar)}
+                {(Number(montoEfec||0)+Number(montoTrans||0))<totalACobrar&&
+                  <span style={{color:"var(--color-text-warning)"}}> · Queda {fmt(totalACobrar-Number(montoEfec||0)-Number(montoTrans||0))} de saldo</span>}
               </div>
             )}
             {Number(montoTrans||0)>0&&(
@@ -461,10 +474,10 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
           </div>
         )}
 
-        {pago!=="fiado"&&(
+        {pago!=="fiado"&&pago!=="mixto"&&(
           <div style={{marginBottom:12}}>
             <label style={s.label}>
-              {opcionSaldo==="parcial"?"Monto que paga (parcial)":opcionSaldo==="todo"?`Total a cobrar (deuda + compra):`:"Monto cobrado (vacío = ${fmt(aPagar)} exacto)"}
+              {opcionSaldo==="parcial"?"Monto que paga (parcial)":opcionSaldo==="todo"?"Total a cobrar (deuda + compra):":`Monto cobrado (vacío = ${fmt(aPagar)} exacto)`}
             </label>
             <input style={s.input} type="number"
               placeholder={opcionSaldo==="todo"?String(Math.round(Math.abs(cliente.saldo)+aPagar)):String(Math.round(aPagar))}
@@ -476,22 +489,42 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
           {bruto>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Subtotal</span><span style={{fontSize:13,color:"var(--color-text-primary)"}}>{fmt(bruto)}</span></div>}
           {desc>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Descuento 2.5%</span><span style={{fontSize:13,color:"var(--color-text-danger)"}}>−{fmt(desc)}</span></div>}
           {saldoApl>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Saldo a favor</span><span style={{fontSize:13,color:"var(--color-text-success)"}}>−{fmt(saldoApl)}</span></div>}
+          {pagaTodo&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:13,color:"var(--color-text-danger)"}}>Deuda anterior</span><span style={{fontSize:13,color:"var(--color-text-danger)"}}>+{fmt(deudaPrevia)}</span></div>}
           <div style={{borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:10,marginTop:6,display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
             <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>A cobrar</span>
-            <span style={{fontSize:26,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(aPagar)}</span>
+            <span style={{fontSize:26,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(totalACobrar)}</span>
           </div>
         </div>
         <button style={{...s.btnPrimary,marginBottom:10,opacity:detalle.length===0?0.45:1}} disabled={detalle.length===0} onClick={()=>{
+          // Aviso para no perder envases cargados a medias (cantidad sin producto, o producto sin cantidad)
+          const envIncompleto = [...envPrest, ...envDev].some(e=>{
+            const tieneProd = !!e.prod;
+            const tieneCant = String(e.cant||"").trim()!=="" && Number(e.cant)>0;
+            return (tieneProd && !tieneCant) || (!tieneProd && tieneCant);
+          });
+          if(envIncompleto){
+            alert("⚠️ Hay un envase cargado a medias: falta elegir el producto o poner la cantidad. Completalo o borrá esa fila antes de registrar, así no se pierde la devolución o el préstamo.");
+            return;
+          }
           if(pago==="mixto"){
             const ef=Number(montoEfec||0), tr=Number(montoTrans||0);
             const totalPagado=ef+tr;
-            const saldoDelta=totalPagado-aPagar;
+            // Aviso por posible error de tipeo (un cero de más)
+            if(totalACobrar>0 && totalPagado>totalACobrar*3 && totalPagado>totalACobrar+10000){
+              if(!window.confirm(`Estás cobrando ${fmt(totalPagado)}, bastante más que el total a cobrar (${fmt(totalACobrar)}). ¿Está bien?`)) return;
+            }
+            const saldoDelta=totalPagado-totalACobrar;
             if(ef>0) onGuardar(detalle,"contado",String(ef),saldoApl,envPrest,envDev,obs,"mixto_ef",tr,saldoDelta);
             else if(tr>0) onGuardar(detalle,"transferencia",String(tr),saldoApl,envPrest,envDev,obs,"mixto_tr",ef,saldoDelta);
           } else {
             const montoFinal = opcionSaldo==="todo"&&!monto
               ? String(Math.round(Math.abs(cliente.saldo)+aPagar))
               : monto;
+            // Aviso por posible error de tipeo (un cero de más)
+            const pagadoNum=Number(montoFinal)||0;
+            if(pago!=="fiado" && totalACobrar>0 && pagadoNum>totalACobrar*3 && pagadoNum>totalACobrar+10000){
+              if(!window.confirm(`Estás cobrando ${fmt(pagadoNum)}, bastante más que el total a cobrar (${fmt(totalACobrar)}). ¿Está bien?`)) return;
+            }
             onGuardar(detalle,pago,montoFinal,saldoApl,envPrest,envDev,obs,opcionSaldo);
           }
         }}>

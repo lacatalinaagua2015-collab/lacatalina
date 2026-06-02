@@ -333,25 +333,6 @@ function FormCliente({inicial,onGuardar}) {
 }
 
 
-// ── Helpers GPS (también definidos en 07-clientes.js) ────────────────────────
-function extraerCoordsDeURL(url) {
-  if(!url) return null;
-  let m = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
-  m = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
-  m = url.match(/ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
-  m = url.match(/\/dir\/[^/]*\/(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
-  m = url.match(/\/(-2[0-9]\.\d{4,}),(-6[0-9]\.\d{4,})/);
-  if(m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
-  return null;
-}
-function esLinkCorto(url) {
-  return url && (url.includes("maps.app.goo.gl") || url.includes("goo.gl/maps"));
-}
-
 // ── CargaGPSMasiva ────────────────────────────────────────────────────────────
 function CargaGPSMasiva({clientes, onActualizar, onVolver}) {
   const sinGPS = React.useMemo(()=>(clientes||[]).filter(c=>!c.lat||!c.lng),[]);
@@ -377,13 +358,8 @@ function CargaGPSMasiva({clientes, onActualizar, onVolver}) {
       if(!isNaN(lat)&&!isNaN(lng)) {
         const i=actualizados.current.findIndex(c=>c.id===cliente.id);
         if(i>=0) actualizados.current[i]={...actualizados.current[i],lat,lng};
-        const nuevosGuardados = guardados + 1;
-        setGuardados(nuevosGuardados);
-        // Guardar en Firebase cada 5 clientes o si es el último
-        const esUltimo = idx+1 >= sinGPS.length;
-        if(nuevosGuardados % 5 === 0 || esUltimo) {
-          onActualizar([...actualizados.current]);
-        }
+        onActualizar([...actualizados.current]);
+        setGuardados(g=>g+1);
       }
     }
     setLatVal(""); setLngVal("");
@@ -475,38 +451,19 @@ function CargaGPSMasiva({clientes, onActualizar, onVolver}) {
         </div>
         <div style={{fontSize:11,color:"var(--color-text-tertiary)",textAlign:"center"}}>
           {guardados} guardados · {sinGPS.length-idx-1} restantes
-          <span style={{marginLeft:8,color:"var(--color-text-tertiary)"}}>· Se sincroniza cada 5</span>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Algoritmo vecino más cercano (Nearest Neighbor TSP) ──────────────────────
-function calcularRutaOptima(clientes) {
-  if(clientes.length <= 1) return clientes;
-  const dist = (a,b) => Math.hypot(a.lat-b.lat, a.lng-b.lng);
-  const restantes = [...clientes];
-  const ruta = [restantes.shift()]; // empezar con el primero
-  while(restantes.length > 0) {
-    const ultimo = ruta[ruta.length-1];
-    let minDist = Infinity, minIdx = 0;
-    restantes.forEach((c,i)=>{ const d=dist(ultimo,c); if(d<minDist){minDist=d;minIdx=i;} });
-    ruta.push(restantes.splice(minIdx,1)[0]);
-  }
-  return ruta;
-}
-
 // ── MapaClientes ──────────────────────────────────────────────────────────────
 function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, onVolver, onActualizar}) {
   const mapRef = React.useRef(null);
   const mapInstRef = React.useRef(null);
-  const rutaLineRef = React.useRef(null);
   const [leafletOk, setLeafletOk] = React.useState(!!window.L);
   const [filtroDia, setFiltroDia] = React.useState(dia||"todos");
   const [modoCarga, setModoCarga] = React.useState(false);
-  const [modoRuta, setModoRuta] = React.useState(false); // pantalla de previa de ruta
-  const [mostrarRuta, setMostrarRuta] = React.useState(false); // línea en el mapa
 
   const ventasHoy = (ventas||[]).filter(v=>v.fechaKey===fecha);
   const noVisHoy  = (noVisitas||[]).filter(v=>v.fecha===fecha);
@@ -518,10 +475,7 @@ function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, o
   const entregadosCount = clientesFiltrados.filter(c=>ventasHoy.some(v=>v.clienteId===c.id)).length;
   const pendientesCount = clientesFiltrados.filter(c=>!ventasHoy.some(v=>v.clienteId===c.id)&&!noVisHoy.some(v=>v.clienteId===c.id)).length;
 
-  // Ruta óptima calculada
-  const rutaOptima = React.useMemo(()=>calcularRutaOptima([...clientesFiltrados]),[clientesFiltrados.length, filtroDia]);
-
-  // ── Hooks ANTES de cualquier return condicional ──
+  // ── TODOS los hooks ANTES de cualquier return condicional ──
   React.useEffect(()=>{
     if(window.L){ setLeafletOk(true); return; }
     const link = document.createElement("link");
@@ -535,7 +489,7 @@ function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, o
   },[]);
 
   React.useEffect(()=>{
-    if(modoCarga||modoRuta) return;
+    if(modoCarga) return; // no inicializar mapa en modo carga
     if(!leafletOk || !mapRef.current) return;
     if(mapInstRef.current){ mapInstRef.current.remove(); mapInstRef.current=null; }
     const L = window.L;
@@ -546,76 +500,40 @@ function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, o
     mapInstRef.current = map;
 
     const bounds = [];
-    const listaRuta = mostrarRuta ? rutaOptima : clientesFiltrados;
-
-    listaRuta.forEach((c, rutaIdx)=>{
+    clientesFiltrados.forEach(c=>{
       const entregado = ventasHoy.some(v=>v.clienteId===c.id);
       const noVis     = noVisHoy.some(v=>v.clienteId===c.id);
       const color = entregado?"#4dd9a0":noVis?"#f07070":"#5daaff";
-      const num = mostrarRuta ? rutaIdx+1 : (c.orden||"·");
       const icon = L.divIcon({
         className:"",
-        html:`<div style="width:30px;height:30px;border-radius:50%;background:${color};border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">${num}</div>`,
-        iconSize:[30,30],iconAnchor:[15,15],popupAnchor:[0,-16]
+        html:`<div style="width:28px;height:28px;border-radius:50%;background:${color};border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">${c.orden||"·"}</div>`,
+        iconSize:[28,28],iconAnchor:[14,14],popupAnchor:[0,-14]
       });
       const marker = L.marker([c.lat,c.lng],{icon}).addTo(map);
       const dir = c.calle ? c.calle+" "+(c.nro||"") : c.manzana ? "Mz "+c.manzana+" L "+(c.lote||"") : c.barrio||"";
-      const estado = entregado
-        ? "<span style='color:#059669;font-weight:600'>✓ Entregado</span>"
-        : noVis ? "<span style='color:#dc2626;font-weight:600'>✗ No visitado</span>"
-        : "<span style='color:#2563eb;font-weight:600'>⏳ Pendiente</span>";
-
-      // Popup con botón Entregar
-      const popupId = `popup_btn_${c.id}`;
       marker.bindPopup(
-        `<div style="font-family:sans-serif;min-width:170px;padding:4px 0">
-          <div style="font-size:14px;font-weight:700;margin-bottom:2px">${c.nombre}</div>
-          <div style="font-size:11px;color:#666;margin-bottom:4px">${c.dia} · ${dir}</div>
-          <div style="margin-bottom:8px">${estado}</div>
-          ${!entregado?`<button id="${popupId}" style="background:#185FA5;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;width:100%">Entregar →</button>`:""}
+        `<div style="font-family:sans-serif;min-width:160px">
+          <b style="font-size:13px">${c.nombre}</b><br/>
+          <span style="font-size:11px;color:#666">${c.dia} · Orden ${c.orden||"-"}</span><br/>
+          ${dir}<br/>
+          ${entregado?"<span style='color:#059669;font-weight:600'>✓ Entregado</span>":noVis?"<span style='color:#dc2626'>✗ No visitado</span>":"<span style='color:#2563eb'>Pendiente</span>"}
         </div>`
       );
-      marker.on("popupopen",()=>{
-        const btn = document.getElementById(popupId);
-        if(btn) btn.onclick = ()=>{ map.closePopup(); onSeleccionar(c); };
-      });
       bounds.push([c.lat, c.lng]);
     });
-
-    // Línea de ruta
-    if(mostrarRuta && rutaOptima.length > 1) {
-      const coords = rutaOptima.map(c=>[c.lat,c.lng]);
-      rutaLineRef.current = L.polyline(coords, {color:"#185FA5",weight:3,opacity:0.7,dashArray:"8,6"}).addTo(map);
-    }
 
     if(bounds.length>0) map.fitBounds(bounds,{padding:[30,30]});
     else map.setView([-26.82,-65.2],13);
 
-    return ()=>{ if(mapInstRef.current){ mapInstRef.current.remove(); mapInstRef.current=null; rutaLineRef.current=null; } };
-  },[leafletOk, modoCarga, modoRuta, filtroDia, clientesFiltrados.length, mostrarRuta]);
+    return ()=>{ if(mapInstRef.current){ mapInstRef.current.remove(); mapInstRef.current=null; } };
+  },[leafletOk, modoCarga, filtroDia, clientesFiltrados.length]);
 
-  // Returns condicionales DESPUÉS de todos los hooks
+  // return condicional DESPUÉS de todos los hooks
   if(modoCarga) return (
-    <CargaGPSMasiva clientes={clientes} onActualizar={onActualizar} onVolver={()=>setModoCarga(false)} />
-  );
-
-  if(modoRuta) return (
-    <PreviaRuta
-      rutaOptima={rutaOptima}
-      ventasHoy={ventasHoy}
-      noVisHoy={noVisHoy}
-      onAplicar={()=>{
-        // Aplica el nuevo orden a los clientes del día
-        const actualizados = [...clientes];
-        rutaOptima.forEach((c,i)=>{
-          const idx = actualizados.findIndex(x=>x.id===c.id);
-          if(idx>=0) actualizados[idx]={...actualizados[idx], orden:i+1};
-        });
-        onActualizar(actualizados);
-        setModoRuta(false);
-        setMostrarRuta(true);
-      }}
-      onVolver={()=>setModoRuta(false)}
+    <CargaGPSMasiva
+      clientes={clientes}
+      onActualizar={onActualizar}
+      onVolver={()=>setModoCarga(false)}
     />
   );
 
@@ -624,18 +542,13 @@ function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, o
       <div style={s.header}>
         <button style={s.backBtn} onClick={onVolver}>← Volver</button>
         <span style={s.headerTitle}>Mapa de clientes</span>
-        {clientesFiltrados.length>1 && (
-          <button style={{...s.btn,fontSize:11,padding:"5px 10px",background:"var(--color-background-info)",color:"var(--color-text-info)",border:"none"}}
-            onClick={()=>setModoRuta(true)}>
-            🗺 Ruta óptima
-          </button>
-        )}
       </div>
 
       {/* Filtro por día */}
       <div style={{display:"flex",gap:6,padding:"8px 14px",overflowX:"auto",background:"var(--color-background-secondary)",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
         {["todos",...DIAS].map(d=>(
-          <button key={d} style={{...s.btn,padding:"5px 12px",fontSize:12,flexShrink:0,
+          <button key={d}
+            style={{...s.btn,padding:"5px 12px",fontSize:12,flexShrink:0,
               background:filtroDia===d?"#185FA5":"var(--color-background-tertiary)",
               color:filtroDia===d?"#e2eaf4":"var(--color-text-secondary)",
               border:filtroDia===d?"none":"0.5px solid var(--color-border-secondary)"}}
@@ -660,22 +573,14 @@ function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, o
         ))}
       </div>
 
-      {/* Leyenda + toggle ruta */}
-      <div style={{display:"flex",alignItems:"center",gap:14,padding:"6px 14px",background:"var(--color-background-secondary)",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+      {/* Leyenda */}
+      <div style={{display:"flex",gap:14,padding:"6px 14px",background:"var(--color-background-secondary)",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
         {[["#4dd9a0","Entregado"],["#5daaff","Pendiente"],["#f07070","No visitado"]].map(([color,lbl])=>(
           <div key={lbl} style={{display:"flex",alignItems:"center",gap:4}}>
             <div style={{width:10,height:10,borderRadius:"50%",background:color}}/>
             <span style={{fontSize:10,color:"var(--color-text-secondary)"}}>{lbl}</span>
           </div>
         ))}
-        {clientesFiltrados.length>1 && (
-          <button style={{...s.btn,fontSize:10,padding:"3px 8px",marginLeft:"auto",
-            background:mostrarRuta?"#185FA5":"var(--color-background-tertiary)",
-            color:mostrarRuta?"#e2eaf4":"var(--color-text-secondary)",border:"none"}}
-            onClick={()=>setMostrarRuta(r=>!r)}>
-            {mostrarRuta?"Ocultar ruta":"Ver ruta"}
-          </button>
-        )}
       </div>
 
       {/* Sin clientes con GPS */}
@@ -683,12 +588,17 @@ function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, o
         <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:14,padding:32}}>
           <div style={{fontSize:40}}>📍</div>
           <div style={{fontSize:15,fontWeight:500,color:"var(--color-text-primary)",textAlign:"center"}}>Sin clientes con GPS</div>
+          <div style={{fontSize:13,color:"var(--color-text-secondary)",textAlign:"center",lineHeight:1.6,maxWidth:280}}>
+            Tenés {sinCoordenadas} cliente{sinCoordenadas!==1?"s":""} sin coordenadas.<br/>
+            Usá la carga masiva para agregarlas en 10-15 minutos.
+          </div>
           <button style={{...s.btnPrimary,maxWidth:260}} onClick={()=>setModoCarga(true)}>
             📍 Iniciar carga de GPS ({sinCoordenadas} clientes)
           </button>
         </div>
       )}
 
+      {/* Cargando Leaflet */}
       {!leafletOk && (
         <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:8}}>
           <div style={{fontSize:28}}>🗺</div>
@@ -702,52 +612,9 @@ function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, o
         {sinCoordenadas>0 && (
           <button onClick={()=>setModoCarga(true)}
             style={{position:"absolute",bottom:16,right:16,zIndex:1000,background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:24,padding:"10px 16px",fontSize:13,fontWeight:600,cursor:"pointer",boxShadow:"0 3px 12px rgba(0,0,0,0.4)",display:"flex",alignItems:"center",gap:6}}>
-            📍 {sinCoordenadas} sin GPS
+            📍 Cargar {sinCoordenadas} faltantes
           </button>
         )}
-      </div>
-    </div>
-  );
-}
-
-// ── PreviaRuta — muestra el orden sugerido antes de aplicarlo ─────────────────
-function PreviaRuta({rutaOptima, ventasHoy, noVisHoy, onAplicar, onVolver}) {
-  return (
-    <div style={{...s.screen,display:"flex",flexDirection:"column"}}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>Ruta óptima sugerida</span>
-      </div>
-      <div style={{padding:"10px 14px",background:"var(--color-background-info)",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-        <div style={{fontSize:13,color:"var(--color-text-info)",lineHeight:1.6}}>
-          Este orden minimiza la distancia total del recorrido usando el algoritmo del vecino más cercano.
-          Podés aplicarlo para reordenar tus clientes del día, o volver sin cambios.
-        </div>
-      </div>
-      <div style={{flex:1,overflowY:"auto",paddingBottom:80}}>
-        {rutaOptima.map((c,i)=>{
-          const entregado = ventasHoy.some(v=>v.clienteId===c.id);
-          const noVis = noVisHoy.some(v=>v.clienteId===c.id);
-          const dir = c.calle ? c.calle+" "+(c.nro||"") : c.manzana ? "Mz "+c.manzana+" L "+(c.lote||"") : c.barrio||"";
-          return (
-            <div key={c.id} style={{...s.card,margin:"6px 14px",display:"flex",alignItems:"center",gap:12}}>
-              <div style={{width:32,height:32,borderRadius:"50%",background:"#185FA5",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,flexShrink:0}}>
-                {i+1}
-              </div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nombre}</div>
-                <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>{c.dia} · {dir}</div>
-              </div>
-              {entregado&&<span style={s.badge("success")}>✓</span>}
-              {noVis&&<span style={s.badge("danger")}>✗</span>}
-              {c.orden&&c.orden!==i+1&&<span style={{fontSize:10,color:"var(--color-text-tertiary)"}}>antes: {c.orden}</span>}
-            </div>
-          );
-        })}
-      </div>
-      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,padding:"12px 16px",background:"var(--color-background-secondary)",borderTop:"0.5px solid var(--color-border-tertiary)",display:"flex",gap:8,zIndex:20}}>
-        <button style={{...s.btn,flex:1,padding:"12px"}} onClick={onVolver}>Cancelar</button>
-        <button style={{...s.btnPrimary,flex:2}} onClick={onAplicar}>✓ Aplicar este orden</button>
       </div>
     </div>
   );
