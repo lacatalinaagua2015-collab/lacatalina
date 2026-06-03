@@ -291,7 +291,7 @@ function DetalleTransferencias({ventas, ventasPendTrans}) {
   );
 }
 
-function DetalleVentasDia({ventas, clientes}) {
+function DetalleVentasDia({ventas, clientes, noVisitas, fecha}) {
   const [abierto, setAbierto] = React.useState(false);
   return (
     <div style={{margin:"0 0 8px",borderRadius:12,overflow:"hidden",border:"1.5px solid #185FA5",background:"var(--color-background-info)"}}>

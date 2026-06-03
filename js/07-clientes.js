@@ -32,7 +32,8 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
     else onRegistrarNoVisita(id,motivo);
   };
 
-  const clientesOrdenados = [...clientes].sort((a,b)=>(a.orden||9999)-(b.orden||9999));
+  const clientesReales = clientes.filter(c=>!c._esProspecto);
+  const clientesOrdenados = [...clientesReales].sort((a,b)=>(a.orden||9999)-(b.orden||9999));
   const filtrados  = clientesOrdenados.filter(c=>c.nombre.toLowerCase().includes(busqueda.toLowerCase()));
   const pendientesNormales = filtrados.filter(c=>!visitados.has(c.id)&&noVMap[c.id]!=="noesta");
   const volverAlFinal      = filtrados.filter(c=>noVMap[c.id]==="noesta"&&!atendidos.has(c.id));
@@ -195,10 +196,10 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
               )}
             </div>
           </div>
-          <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0,alignItems:"center"}}>
-            {c.maps     && <a href={c.maps} target="_blank" rel="noreferrer" style={{fontSize:20,textDecoration:"none"}}>📍</a>}
-            {c.telefono && <a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:20,textDecoration:"none"}}>💬</a>}
-            <span style={{fontSize:20,cursor:"pointer",lineHeight:1}} title="Foto domicilio" onClick={e=>{e.stopPropagation();setFotoOpen(true);}}>📷</span>
+          <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0,alignItems:"center"}}>
+            {c.maps     && <a href={c.maps} target="_blank" rel="noreferrer" style={{fontSize:17,textDecoration:"none",width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:9,background:"var(--color-background-tertiary)",border:"0.5px solid var(--color-border-secondary)"}}>📍</a>}
+            {c.telefono && <a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:17,textDecoration:"none",width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:9,background:"var(--color-background-tertiary)",border:"0.5px solid var(--color-border-secondary)"}}>💬</a>}
+            <span style={{fontSize:17,cursor:"pointer",width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:9,background:"var(--color-background-tertiary)",border:"0.5px solid var(--color-border-secondary)"}} title="Foto domicilio" onClick={e=>{e.stopPropagation();setFotoOpen(true);}}>📷</span>
           </div>
         </div>
         {(!visitados.has(c.id)||est==="noesta")&&!atendido&&(
@@ -288,7 +289,7 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
       <div style={{padding:"10px 16px 6px"}}>
         <input style={s.input} placeholder="Buscar cliente..." value={busqueda} onChange={e=>setBusqueda(e.target.value)} />
         <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap",alignItems:"center"}}>
-          <span style={s.badge("success")}>{visitados.size}/{clientes.length} visitados</span>
+          <span style={s.badge("success")}>{clientesReales.filter(c=>visitados.has(c.id)).length}/{clientesReales.length} visitados</span>
           {volverAlFinal.length>0&&<span style={s.badge("warning")}>{volverAlFinal.length} volver al final</span>}
           {sinEntrega.length>0&&<span style={s.badge("danger")}>{sinEntrega.length} sin entrega</span>}
           <button style={{...s.btn,fontSize:11,padding:"3px 10px",marginLeft:"auto"}} onClick={abrirRutaOptima}>🧭 Ruta óptima</button>
@@ -352,7 +353,7 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
       )}
 
       {/* Botón verde: aparece solo cuando TODOS los clientes están registrados → lleva a la planilla del día */}
-      {onPlanilla && clientes.length>0 && visitados.size>=clientes.length && (
+      {onPlanilla && clientesReales.length>0 && clientesReales.filter(c=>visitados.has(c.id)).length>=clientesReales.length && (
         <div style={{padding:"18px 16px 8px"}}>
           <button
             style={{

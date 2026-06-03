@@ -711,6 +711,24 @@ function App() {
   };
   const eliminarCliente = (clienteId) => {
     const eliminado = clientes.find(c=>c.id===clienteId);
+    if(eliminado){
+      const env = {sifon:Number(eliminado.sifon)||0, bidon10:Number(eliminado.bidon10)||0, bidon20:Number(eliminado.bidon20)||0};
+      const totalEnv = env.sifon+env.bidon10+env.bidon20;
+      if(totalEnv>0){
+        const det = [env.sifon&&`${env.sifon} Sifón 1.5L`, env.bidon10&&`${env.bidon10} Bidón 10L`, env.bidon20&&`${env.bidon20} Bidón 20L`].filter(Boolean).join(" · ");
+        const devolvio = window.confirm(`"${eliminado.nombre}" tiene envases en su poder:\n${det}\n\n¿Los devolvió?\n\n• Aceptar = SÍ, los devolvió → se suman al stock (Casa)\n• Cancelar = NO → se dan por perdidos`);
+        if(devolvio){
+          setStock(prev=>{
+            const s = JSON.parse(JSON.stringify(prev));
+            s.casa.sifon   = (s.casa.sifon||0)   + env.sifon;
+            s.casa.bidon10 = (s.casa.bidon10||0) + env.bidon10;
+            s.casa.bidon20 = (s.casa.bidon20||0) + env.bidon20;
+            syncData({stock:s});
+            return s;
+          });
+        }
+      }
+    }
     let nc = clientes.filter(c=>c.id!==clienteId);
     if(eliminado) nc = renumerarTrasEliminar(nc, eliminado);
     saveClientes(nc);
