@@ -343,12 +343,20 @@ function DetalleVentasDia({ventas, clientes}) {
               transferencia:{bg:v.transConfirmada?"var(--color-background-success)":"var(--color-background-warning)",color:v.transConfirmada?"var(--color-text-success)":"#f5b942",txt:v.transConfirmada?"Transfer. ✅":"Transfer. 🔴"},
               fiado:{bg:"var(--color-background-warning)",color:"var(--color-text-warning)",txt:"Fiado"},
             }[v.pago]||{bg:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",txt:v.pago};
+            const cli=(clientes||[]).find(x=>x.id===v.clienteId);
+            const dir=cli?((cli.calle?`${cli.calle} ${cli.nro||""}`:cli.manzana?`Mz ${cli.manzana} L ${cli.lote}`:"")+(cli.barrio?` · ${cli.barrio}`:"")):"";
+            const deudaPagada=Math.max(0,(v.pagadoNum||0)-(v.neto||0));
+            const fmtEnv=(arr)=>(arr||[]).filter(e=>e.prod&&Number(e.cant)>0).map(e=>`${e.cant} ${e.prod}`).join(", ");
+            const prestStr=fmtEnv(v.envPrest);
+            const devStr=fmtEnv(v.envDev);
             return (
               <div key={v.id} style={{padding:"10px 16px",borderBottom:idx<ventas.length-1?"0.5px solid var(--color-border-tertiary)":"none"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
-                  <div style={{flex:1}}>
+                  <div style={{flex:1,minWidth:0}}>
                     <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>{v.cliente}</span>
+                    {cli&&cli._esProspecto&&<span style={{marginLeft:6,fontSize:10,padding:"1px 6px",borderRadius:4,background:"#2e1f06",color:"#f5b942",fontWeight:600}}>🚀 Prospecto</span>}
                     <span style={{marginLeft:6,fontSize:10,padding:"1px 6px",borderRadius:4,background:pagoBadge.bg,color:pagoBadge.color,fontWeight:600}}>{pagoBadge.txt}</span>
+                    {dir&&<div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>📍 {dir}</div>}
                   </div>
                   <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(v.neto||0)}</span>
                 </div>
@@ -358,10 +366,12 @@ function DetalleVentasDia({ventas, clientes}) {
                     <span style={{fontSize:12,color:"var(--color-text-tertiary)"}}>{fmt(d.total)}</span>
                   </div>
                 ))}
-                {(v.saldoAplicado>0||((v.pagadoNum||0)-(v.neto||0))>0)&&(
-                  <div style={{display:"flex",gap:10,padding:"3px 0 0 8px",marginTop:2,borderTop:"0.5px solid var(--color-border-tertiary)"}}>
-                    {v.saldoAplicado>0&&<span style={{fontSize:11,color:"var(--color-text-success)"}}>Saldo aplicado: −{fmt(v.saldoAplicado)}</span>}
-                    {((v.pagadoNum||0)-(v.neto||0))>0&&<span style={{fontSize:11,color:"var(--color-text-success)"}}>Pagó de más: +{fmt((v.pagadoNum||0)-(v.neto||0))}</span>}
+                {(v.saldoAplicado>0||deudaPagada>0||prestStr||devStr)&&(
+                  <div style={{display:"flex",flexDirection:"column",gap:2,padding:"3px 0 0 8px",marginTop:2,borderTop:"0.5px solid var(--color-border-tertiary)"}}>
+                    {v.saldoAplicado>0&&<span style={{fontSize:11,color:"var(--color-text-success)"}}>Saldo a favor aplicado: −{fmt(v.saldoAplicado)}</span>}
+                    {deudaPagada>0&&<span style={{fontSize:11,color:"var(--color-text-success)"}}>💵 Pagó deuda: +{fmt(deudaPagada)}</span>}
+                    {prestStr&&<span style={{fontSize:11,color:"#f5b942"}}>📦 Prestó: {prestStr}</span>}
+                    {devStr&&<span style={{fontSize:11,color:"var(--color-text-info)"}}>↩️ Devolvió: {devStr}</span>}
                   </div>
                 )}
               </div>
