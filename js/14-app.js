@@ -12,10 +12,10 @@ function ClientesTabs({activo, onIr}) {
     ["mapa","🗺","Mapa","mapaClientes"],
   ];
   return (
-    <div style={{display:"flex",gap:4,overflowX:"auto",padding:"8px 10px",borderBottom:"0.5px solid var(--color-border-tertiary)",background:"var(--color-background-secondary)"}}>
+    <div style={{display:"flex",gap:4,padding:"8px 8px",borderBottom:"0.5px solid var(--color-border-tertiary)",background:"var(--color-background-secondary)"}}>
       {tabs.map(([id,ico,lbl,pant])=>(
         <button key={id} onClick={()=>activo!==id&&onIr&&onIr(pant)}
-          style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"6px 10px",borderRadius:9,cursor:"pointer",flexShrink:0,
+          style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"6px 2px",borderRadius:9,cursor:"pointer",
             border:"none",background:activo===id?"var(--color-background-tertiary)":"transparent",
             borderBottom:activo===id?"2px solid var(--color-accent)":"2px solid transparent"}}>
           <span style={{fontSize:16}}>{ico}</span>
@@ -732,8 +732,11 @@ function App() {
     let nc = clientes.filter(c=>c.id!==clienteId);
     if(eliminado) nc = renumerarTrasEliminar(nc, eliminado);
     saveClientes(nc);
-    const nv = ventas.filter(v=>v.clienteId!==clienteId);
-    saveVentas(nv);
+    saveVentas(ventas.filter(v=>v.clienteId!==clienteId));
+    // Borrado completo: sacarlo también de prospectos, no-visitas y recordatorios
+    saveProspectos((prospectos||[]).filter(p=>p.id!==clienteId));
+    saveNoVisitas((noVisitas||[]).filter(v=>v.clienteId!==clienteId));
+    saveRecordatorios((recordatorios||[]).filter(r=>r.clienteId!==clienteId));
     irA("clientes");
   };
 
@@ -987,7 +990,9 @@ function App() {
           noVisitas={(noVisitas||[]).filter(v=>v.clienteId===prosp.id)}
           dia={diaActual} fecha={fechaActual} productos={productos}
           onVenta={()=>{
-            saveClientes([...clientes,{...prosp,saldo:0,_esProspecto:true}]);
+            if(!clientes.find(c=>c.id===prosp.id)){
+              saveClientes([...clientes,{...prosp,saldo:0,_esProspecto:true}]);
+            }
             saveProspectos((prospectos||[]).map(x=>x.id===prosp.id?{...x,estado:"convertido"}:x));
             irA("venta");
           }}
@@ -1009,11 +1014,9 @@ function App() {
         irA("promocion");
       }} onVolver={()=>irA("menu")} /></React.Fragment>}
       {pantalla==="gestionClientes" && <React.Fragment><ClientesTabs activo="todos" onIr={irA}/><GestionClientes clientes={clientes} onReordenarTodo={(lista)=>saveClientes(lista)} onEditar={(id,cambios)=>{saveClientes(clientes.map(c=>c.id===id?{...c,...cambios}:c));}} onEliminar={(id)=>{
-        if(window.confirm("¿Eliminar cliente?")){
-          const eliminado=clientes.find(c=>c.id===id);
-          let nc=clientes.filter(c=>c.id!==id);
-          if(eliminado) nc=renumerarTrasEliminar(nc,eliminado);
-          saveClientes(nc);
+        if(window.confirm("¿Eliminar cliente? Se quitará de todas las listas (clientes, ventas, prospectos, no-visitas y recordatorios).")){
+          eliminarCliente(id);
+          irA("gestionClientes");
         }}} onNuevo={(datos)=>{
         const orden = datos.orden;
         let nuevos;

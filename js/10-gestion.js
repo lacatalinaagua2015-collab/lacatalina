@@ -22,6 +22,7 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
   },[ventas]);
 
   const filtrados = clientes
+    .filter(c=>!c._esProspecto)
     .filter(c=>filtroDia==="todos"||c.dia===filtroDia)
     .filter(c=>c.nombre.toLowerCase().includes(busqueda.toLowerCase())||
                (c.barrio||"").toLowerCase().includes(busqueda.toLowerCase())||
