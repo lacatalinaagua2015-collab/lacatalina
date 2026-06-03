@@ -347,13 +347,38 @@ function DetalleVentasDia({ventas, clientes}) {
               </div>
             );
           })}
+          {(()=>{
+            const ventaIds = new Set(ventas.map(v=>v.clienteId));
+            const noComp = (noVisitas||[]).filter(n=>n.fecha===fecha && !ventaIds.has(n.clienteId) && n.motivo!=="salteado");
+            if(noComp.length===0) return null;
+            const lbl = (m)=> m==="noquiso" ? {t:"No quiso",c:"var(--color-text-danger)",ic:"🚫"} : {t:"No estaba",c:"var(--color-text-warning)",ic:"🔄"};
+            return (
+              <div style={{borderTop:"0.5px solid var(--color-border-tertiary)"}}>
+                <div style={{padding:"8px 16px 4px",fontSize:11,fontWeight:600,color:"var(--color-text-tertiary)",textTransform:"uppercase",letterSpacing:"0.05em"}}>No compraron ({noComp.length})</div>
+                {noComp.map((n,i)=>{
+                  const p = (clientes||[]).find(x=>x.id===n.clienteId) || {};
+                  const info = lbl(n.motivo);
+                  const dir = (p.calle?`${p.calle} ${p.nro||""}`:p.manzana?`Mz ${p.manzana} L ${p.lote}`:"")+(p.barrio?` · ${p.barrio}`:"");
+                  return (
+                    <div key={"nv"+i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 16px",borderTop:i>0?"0.5px solid var(--color-border-tertiary)":"none"}}>
+                      <div style={{minWidth:0}}>
+                        <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>{p.nombre||"Cliente"}</span>
+                        {dir&&<div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>📍 {dir}</div>}
+                      </div>
+                      <span style={{fontSize:11,fontWeight:600,color:info.c,flexShrink:0}}>{info.ic} {info.t}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
   );
 }
 
-function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setStock,syncData,onGuardar,onVolver,autoCierre,onAutoGuardar}) {
+function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setStock,syncData,onGuardar,onVolver,autoCierre,onAutoGuardar,noVisitas}) {
   // Separar ventas del día propio vs ventas de clientes de otro día
   const clientesDia = new Set((clientes||[]).filter(c=>c.dia===dia).map(c=>c.id));
   const ventasPropias  = ventas.filter(v=>clientesDia.has(v.clienteId));
@@ -804,7 +829,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
 
         {/* Detalle de ventas — primero y abierto por defecto */}
         {todasVentasDia.length>0
-          ? <DetalleVentasDia ventas={todasVentasDia} clientes={clientes} />
+          ? <DetalleVentasDia ventas={todasVentasDia} clientes={clientes} noVisitas={noVisitas} fecha={fecha} />
           : <div style={{...s.card,margin:"0 0 8px",padding:"12px 16px",background:"var(--color-background-tertiary)"}}>
               <span style={{fontSize:13,color:"var(--color-text-tertiary)"}}>📋 Sin ventas registradas para este día</span>
             </div>

@@ -790,7 +790,7 @@ function App() {
           // Si es cierre de d\xc3\xada, no navega: setMostrarCierre(false) vuelve a la planilla normal
         }}
         onAutoGuardar={d=>savePlanilla(`${diaActual}_${fechaActual}`,d)}
-        onVolver={()=>irA("selectorFechaPlanilla")} />}
+        onVolver={()=>irA("selectorFechaPlanilla")} noVisitas={noVisitas} />}
       {pantalla==="selectorFechaClientes" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("inicioReparto");}} onVolver={()=>irA("diaPrincipal")} />}
       {pantalla==="inicioReparto"  && <InicioReparto dia={diaActual} fecha={fechaActual} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} cargasDia={cargasDia} stock={stockNorm}
         onGuardar={(p,descontar)=>{
