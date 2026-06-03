@@ -2,6 +2,30 @@
 // ◆  14-app.js — Componente App principal
 // ════════════════════════════════════════════════════════════════════
 
+// Barra de pestañas del hub de Clientes (Todos · Prospectos · Fiados · Dormidos · Mapa)
+function ClientesTabs({activo, onIr}) {
+  const tabs = [
+    ["todos","👥","Todos","gestionClientes"],
+    ["prospectos","🚀","Prospectos","promocion"],
+    ["fiados","💰","Fiados","fiadosPendientes"],
+    ["dormidos","😴","Dormidos","clientesDormidos"],
+    ["mapa","🗺","Mapa","mapaClientes"],
+  ];
+  return (
+    <div style={{display:"flex",gap:4,overflowX:"auto",padding:"8px 10px",borderBottom:"0.5px solid var(--color-border-tertiary)",background:"var(--color-background-secondary)"}}>
+      {tabs.map(([id,ico,lbl,pant])=>(
+        <button key={id} onClick={()=>activo!==id&&onIr&&onIr(pant)}
+          style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"6px 10px",borderRadius:9,cursor:"pointer",flexShrink:0,
+            border:"none",background:activo===id?"var(--color-background-tertiary)":"transparent",
+            borderBottom:activo===id?"2px solid var(--color-accent)":"2px solid transparent"}}>
+          <span style={{fontSize:16}}>{ico}</span>
+          <span style={{fontSize:10,fontWeight:activo===id?600:400,color:activo===id?"var(--color-text-primary)":"var(--color-text-tertiary)"}}>{lbl}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function App() {
   const [pantalla, setPantalla]   = useState(()=>{
     const h = window.location.hash.slice(1)||"portada";
