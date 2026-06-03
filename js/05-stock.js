@@ -48,6 +48,8 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
 
       <div style={{padding:"10px 14px 40px"}}>
 
+        <div style={{fontSize:11,color:"var(--color-text-info)",margin:"0 0 10px",padding:"7px 11px",background:"var(--color-background-info)",borderRadius:8}}>ℹ️ El <b>sifón</b> se cuenta en <b>unidades sueltas</b> (6 unidades = 1 cajón).</div>
+
         {/* SODERÍA */}
         <div style={{...s.card,margin:"0 0 10px"}}>
           <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",marginBottom:9}}>🏭 Sodería <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:11}}>· de acá sale el camión</span></div>
@@ -61,7 +63,7 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
                 <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{lbl}</span>
                 <input type="number" value={ll} onChange={e=>setLoc("soderia",k,e.target.value)} style={inNum} />
                 <input type="number" value={va} onChange={e=>setLoc("soderia_vacios",k,e.target.value)} style={inNum} />
-                <span style={{textAlign:"center",fontSize:13,color:"var(--color-text-secondary)",fontWeight:500}}>{ll+va}</span>
+                <span style={{textAlign:"center",fontSize:13,color:"var(--color-text-secondary)",fontWeight:500}}>{ll+va}{k==="sifon"&&<span style={{display:"block",fontSize:9,color:"var(--color-text-tertiary)",fontWeight:400}}>{Math.floor((ll+va)/6)} caj</span>}</span>
               </div>
             );
           })}
@@ -73,7 +75,7 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
             {PRODS.map(([k,lbl])=>(
               <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"var(--color-background-tertiary)",borderRadius:8,padding:"6px 9px"}}>
-                <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{lbl.replace(" 1.5L","")}</span>
+                <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{lbl.replace(" 1.5L","")}{k==="sifon"&&<span style={{fontSize:9,color:"var(--color-text-tertiary)",display:"block"}}>{Math.floor((stock.casa?.sifon||0)/6)} caj</span>}</span>
                 <input type="number" value={stock.casa?.[k]||0} onChange={e=>setLoc("casa",k,e.target.value)} style={{...inNum,width:48}} />
               </div>
             ))}
@@ -84,7 +86,7 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
         <div style={{...s.card,margin:"0 0 10px"}}>
           <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",marginBottom:7}}>👥 En clientes <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:11}}>· prestados</span></div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
-            <span style={{background:"var(--color-background-tertiary)",borderRadius:6,padding:"3px 8px",fontSize:12,color:"var(--color-text-secondary)"}}>Sifón <b style={{color:"var(--color-text-primary)"}}>{totClientes.sifon}</b></span>
+            <span style={{background:"var(--color-background-tertiary)",borderRadius:6,padding:"3px 8px",fontSize:12,color:"var(--color-text-secondary)"}}>Sifón <b style={{color:"var(--color-text-primary)"}}>{totClientes.sifon}</b> <span style={{fontSize:10,color:"var(--color-text-tertiary)"}}>({Math.floor(totClientes.sifon/6)} caj)</span></span>
             <span style={{background:"var(--color-background-tertiary)",borderRadius:6,padding:"3px 8px",fontSize:12,color:"var(--color-text-secondary)"}}>10L <b style={{color:"var(--color-text-primary)"}}>{totClientes.bidon10}</b></span>
             <span style={{background:"var(--color-background-tertiary)",borderRadius:6,padding:"3px 8px",fontSize:12,color:"var(--color-text-secondary)"}}>20L <b style={{color:"var(--color-text-primary)"}}>{totClientes.bidon20}</b></span>
             <span style={{background:"var(--color-background-tertiary)",borderRadius:6,padding:"3px 8px",fontSize:12,color:"var(--color-text-secondary)"}}>Disp <b style={{color:"var(--color-text-primary)"}}>{totClientes.dispenser}</b></span>
@@ -140,7 +142,7 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
             {[["soda","Sifón"],["b10","Bidón 10L"],["b20","Bidón 20L"],["disp","Dispenser"]].map(([k,lbl])=>(
               <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"var(--color-background-tertiary)",borderRadius:8,padding:"6px 9px"}}>
-                <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{lbl.replace("Bidón ","").replace(" 1.5L","")}</span>
+                <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{lbl.replace("Bidón ","").replace(" 1.5L","")}{k==="soda"&&<span style={{fontSize:9,color:"var(--color-text-tertiary)",display:"block"}}>{Math.floor(((cargasDia?.[diaCarga]?.soda)||0)/6)} caj</span>}</span>
                 <input type="number" value={(cargasDia?.[diaCarga]?.[k])||0} onChange={e=>setCarga(diaCarga,k,e.target.value)} style={{...inNum,width:48}} />
               </div>
             ))}
