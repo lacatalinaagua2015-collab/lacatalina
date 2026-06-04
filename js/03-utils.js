@@ -91,3 +91,14 @@ function comprimirFoto(file, maxW=800, quality=0.75) {
   });
 }
 
+
+// Extrae coordenadas (lat,lng) de un link/texto de Google Maps. Devuelve {lat,lng} o null.
+function extraerCoordsDeURL(url) {
+  if(!url || typeof url !== "string") return null;
+  let m;
+  m = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);            if(m) return {lat:+m[1], lng:+m[2]};
+  m = url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);         if(m) return {lat:+m[1], lng:+m[2]};
+  m = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);        if(m) return {lat:+m[1], lng:+m[2]};
+  m = url.match(/(-?\d+\.\d+)[,;\s]+(-?\d+\.\d+)/);        if(m) return {lat:+m[1], lng:+m[2]};
+  return null;
+}
