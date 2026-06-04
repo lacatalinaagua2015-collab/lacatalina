@@ -105,7 +105,7 @@ function AgendaScreen({recordatorios,clientes,onConfirmar,onEliminar,onNuevo,onI
               {/* Acciones */}
               <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
                 {c?.telefono&&<a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:20,textDecoration:"none"}}>💬</a>}
-                {c?.maps&&<a href={c.maps} target="_blank" rel="noreferrer" style={{fontSize:20,textDecoration:"none"}}>📍</a>}
+                {(c?.maps||(c?.lat&&c?.lng))&&<a href={c.maps||`https://www.google.com/maps?q=${c.lat},${c.lng}`} target="_blank" rel="noreferrer" style={{fontSize:20,textDecoration:"none"}}>📍</a>}
               </div>
             </div>
             <div style={{display:"flex",gap:6,marginTop:10,paddingTop:8,borderTop:"0.5px solid var(--color-border-tertiary)"}}>
