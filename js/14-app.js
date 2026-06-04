@@ -1133,6 +1133,7 @@ function App() {
         fecha={fechaActual}
         ventas={ventas}
         noVisitas={noVisitas}
+        onActualizar={saveClientes}
         onSeleccionar={(c)=>{setClienteId(c.id);irA("detalleDesdeGestion");}}
         onVolver={()=>irA("menu")}
       /></React.Fragment>}

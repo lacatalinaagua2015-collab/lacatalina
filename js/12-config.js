@@ -303,6 +303,37 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
             </label>
           </div>
 
+          {/* Recuperar clientes fantasma huérfanos */}
+          <div style={{...s.card,margin:"0 0 12px",borderLeft:"3px solid #4dd9a0"}}>
+            <div style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)",marginBottom:4}}>🧹 Recuperar clientes ocultos</div>
+            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:10,lineHeight:1.5}}>
+              Clientes que quedaron marcados como prospecto pero ya no están en la lista de prospectos (no aparecen en ninguna lista). Esto los convierte en clientes normales.
+            </div>
+            {(()=>{
+              const huerfanos=(clientes||[]).filter(c=>c._esProspecto && !(prospectos||[]).some(p=>p.id===c.id));
+              return (
+                <button
+                  disabled={huerfanos.length===0}
+                  style={{...s.btnPrimary,width:"100%",padding:"11px",opacity:huerfanos.length===0?0.4:1}}
+                  onClick={()=>{
+                    if(huerfanos.length===0) return;
+                    if(!window.confirm(`Se van a recuperar ${huerfanos.length} cliente(s) que estaban ocultos. Pasarán a tu lista de clientes normales. ¿Continuar?`)) return;
+                    const nuevos=(clientes||[]).map(c=>{
+                      if(c._esProspecto && !(prospectos||[]).some(p=>p.id===c.id)){
+                        const {_esProspecto, ...resto}=c;
+                        return resto;
+                      }
+                      return c;
+                    });
+                    setClientes(nuevos);
+                    alert(`✅ ${huerfanos.length} cliente(s) recuperado(s). Ahora aparecen en la lista de clientes.`);
+                  }}>
+                  {huerfanos.length===0 ? "No hay clientes ocultos para recuperar" : `🧹 Recuperar ${huerfanos.length} cliente(s) oculto(s)`}
+                </button>
+              );
+            })()}
+          </div>
+
           {/* Forzar sincronización */}
           <button style={{...s.btn,width:"100%",padding:"11px",background:"#EF9F27",color:"#fff",border:"none",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer"}}
             onClick={()=>{if(window.confirm("¿Subir todos los datos a la nube?")){
