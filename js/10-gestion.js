@@ -336,7 +336,7 @@ function FormCliente({inicial,onGuardar}) {
 
 // ── CargaGPSMasiva ────────────────────────────────────────────────────────────
 function CargaGPSMasiva({clientes, onActualizar, onVolver}) {
-  const sinGPS = React.useMemo(()=>(clientes||[]).filter(c=>!c._esProspecto && (!c.lat||!c.lng)),[]);
+  const sinGPS = React.useMemo(()=>(clientes||[]).filter(c=>!c.lat||!c.lng),[]);
   const [idx, setIdx] = React.useState(0);
   const [latVal, setLatVal] = React.useState("");
   const [lngVal, setLngVal] = React.useState("");
