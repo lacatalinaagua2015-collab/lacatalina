@@ -6,7 +6,6 @@
 function ClientesTabs({activo, onIr}) {
   const tabs = [
     ["todos","👥","Todos","gestionClientes"],
-    ["prospectos","🚀","Prospectos","promocion"],
     ["fiados","💰","Fiados","fiadosPendientes"],
     ["dormidos","😴","Dormidos","clientesDormidos"],
     ["mapa","🗺","Mapa","mapaClientes"],
@@ -737,11 +736,14 @@ function App() {
     let nc = clientes.filter(c=>c.id!==clienteId);
     if(eliminado) nc = renumerarTrasEliminar(nc, eliminado);
     saveClientes(nc);
-    saveVentas(ventas.filter(v=>v.clienteId!==clienteId));
-    // Borrado completo: sacarlo también de prospectos, no-visitas y recordatorios
-    saveProspectos((prospectos||[]).filter(p=>p.id!==clienteId));
-    saveNoVisitas((noVisitas||[]).filter(v=>v.clienteId!==clienteId));
-    saveRecordatorios((recordatorios||[]).filter(r=>r.clienteId!==clienteId));
+    // Si el id corresponde a un PROSPECTO (cliente fantasma), NO borrar el prospecto
+    // ni sus ventas/registros: el prospecto y su historial deben sobrevivir.
+    const esProspecto = (prospectos||[]).some(p=>p.id===clienteId);
+    if(!esProspecto){
+      saveVentas(ventas.filter(v=>v.clienteId!==clienteId));
+      saveNoVisitas((noVisitas||[]).filter(v=>v.clienteId!==clienteId));
+      saveRecordatorios((recordatorios||[]).filter(r=>r.clienteId!==clienteId));
+    }
     irA("clientes");
   };
 

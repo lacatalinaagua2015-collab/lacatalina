@@ -303,55 +303,6 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
       {listos.length>0&&<><span style={s.sectionTitle}>Entregado ({listos.length})</span>{listos.map(c=><Card key={c.id} c={c}/>)}</>}
       {sinEntrega.length>0&&<><span style={s.sectionTitle}>Sin entrega ({sinEntrega.length})</span>{sinEntrega.map(c=><Card key={c.id} c={c}/>)}</>}
 
-      {/* Prospectos del día — al final de la lista */}
-      {prospectosDelDia.length>0&&(
-        <>
-          <span style={{...s.sectionTitle,color:"#f5b942"}}>🚀 Prospectos en promoción ({prospectosDelDia.length})</span>
-          {prospectosDelDia.map(p=>(
-            <div key={p.id} style={{...s.card,borderLeft:"3px solid #f5b942",opacity:visitadosProspectos.has(p.id)?0.7:1,cursor:"pointer"}}
-              onClick={()=>onVerProspecto&&onVerProspecto(p)}>
-              <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
-                <div style={{width:34,height:34,borderRadius:8,background:"#2e1f06",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:600,color:"#f5b942",flexShrink:0}}>P</div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:500,fontSize:14,color:"var(--color-text-primary)"}}>{p.nombre}</div>
-                  <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:2}}>
-                    {p.barrio}{p.calle?` · ${p.calle} ${p.nro||""}`:p.manzana?` · Mz ${p.manzana} L ${p.lote}`:""}
-                  </div>
-                  <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:4}}>
-                    {p.sifon>0&&<span style={s.tag}>Sifón×{p.sifon}</span>}
-                    {p.bidon10>0&&<span style={s.tag}>10L×{p.bidon10}</span>}
-                    {p.bidon20>0&&<span style={s.tag}>20L×{p.bidon20}</span>}
-                    {p.dispenser>0&&<span style={{...s.tag,color:"#5daaff"}}>Disp×{p.dispenser}</span>}
-                    {ventasProspectos.has(p.id)&&<span style={s.badge("success")}>✓ Registrado</span>}
-                  </div>
-                </div>
-                <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0}}>
-                  {p.maps&&<a href={p.maps} target="_blank" rel="noreferrer" style={{fontSize:18,textDecoration:"none"}} onClick={e=>e.stopPropagation()}>📍</a>}
-                  {p.telefono&&<a href={`https://wa.me/54${p.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:18,textDecoration:"none"}} onClick={e=>e.stopPropagation()}>💬</a>}
-                  <button style={{fontSize:11,color:"var(--color-text-danger)",background:"none",border:"none",cursor:"pointer",padding:2}}
-                    onClick={e=>{e.stopPropagation();onEliminarProspecto&&onEliminarProspecto(p.id);}}>🗑</button>
-                </div>
-              </div>
-              {!visitadosProspectos.has(p.id)&&(
-                <div style={{display:"flex",gap:6,marginTop:8,justifyContent:"flex-end"}}>
-                  <button style={{background:"var(--color-background-warning)",color:"var(--color-text-warning)",border:"0.5px solid var(--color-border-warning)",borderRadius:8,padding:"5px 10px",fontSize:11,cursor:"pointer"}}
-                    onClick={()=>onNoEstaProspecto&&onNoEstaProspecto(p.id)}>No estaba</button>
-                  <button style={{background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"0.5px solid var(--color-border-danger)",borderRadius:8,padding:"5px 10px",fontSize:11,cursor:"pointer"}}
-                    onClick={()=>onNoQuiereProspecto&&onNoQuiereProspecto(p.id)}>No quiere</button>
-                  <button style={{background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:8,padding:"5px 12px",fontSize:12,cursor:"pointer",fontWeight:500}}
-                    onClick={()=>onVentaProspecto&&onVentaProspecto(p)}>Registrar entrega →</button>
-                </div>
-              )}
-              {visitadosProspectos.has(p.id)&&noVMapProspectos[p.id]==="noquiso"&&(
-                <div style={{marginTop:6,textAlign:"right"}}>
-                  <span style={s.badge("danger")}>🙅 No quiso</span>
-                </div>
-              )}
-            </div>
-          ))}
-        </>
-      )}
-
       {/* Botón verde: aparece solo cuando TODOS los clientes están registrados → lleva a la planilla del día */}
       {onPlanilla && clientesReales.length>0 && clientesReales.filter(c=>visitados.has(c.id)).length>=clientesReales.length && (
         <div style={{padding:"18px 16px 8px"}}>
