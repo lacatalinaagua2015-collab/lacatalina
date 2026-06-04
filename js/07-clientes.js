@@ -197,7 +197,7 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
             </div>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0,alignItems:"center"}}>
-            {c.maps     && <a href={c.maps} target="_blank" rel="noreferrer" style={{fontSize:17,textDecoration:"none",width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:9,background:"var(--color-background-tertiary)",border:"0.5px solid var(--color-border-secondary)"}}>📍</a>}
+            {(c.maps||(c.lat&&c.lng))     && <a href={c.maps||`https://www.google.com/maps?q=${c.lat},${c.lng}`} target="_blank" rel="noreferrer" style={{fontSize:17,textDecoration:"none",width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:9,background:"var(--color-background-tertiary)",border:"0.5px solid var(--color-border-secondary)"}}>📍</a>}
             {c.telefono && <a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:17,textDecoration:"none",width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:9,background:"var(--color-background-tertiary)",border:"0.5px solid var(--color-border-secondary)"}}>💬</a>}
             <span style={{fontSize:17,cursor:"pointer",width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:9,background:"var(--color-background-tertiary)",border:"0.5px solid var(--color-border-secondary)"}} title="Foto domicilio" onClick={e=>{e.stopPropagation();setFotoOpen(true);}}>📷</span>
           </div>
@@ -439,7 +439,7 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
               {cliente.notas&&<div style={{fontSize:12,color:"var(--color-text-warning)",marginTop:3}}>📝 {cliente.notas}</div>}
             </div>
             <div style={{display:"flex",gap:10,alignItems:"center"}}>
-              {cliente.maps     && <a href={cliente.maps} target="_blank" rel="noreferrer" style={{fontSize:26,textDecoration:"none"}}>📍</a>}
+              {(cliente.maps||(cliente.lat&&cliente.lng))     && <a href={cliente.maps||`https://www.google.com/maps?q=${cliente.lat},${cliente.lng}`} target="_blank" rel="noreferrer" style={{fontSize:26,textDecoration:"none"}}>📍</a>}
               {cliente.telefono && <a href={`https://wa.me/54${cliente.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:26,textDecoration:"none"}}>💬</a>}
 
             </div>
@@ -899,7 +899,7 @@ function ClientesDormidos({clientes,ventas,onVolver,onSeleccionar}) {
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0,alignItems:"center"}}>
               {c.telefono&&<a href={`https://wa.me/54${c.telefono}`} target="_blank" rel="noreferrer" style={{fontSize:22,textDecoration:"none"}} title="WhatsApp">💬</a>}
-              {c.maps&&<a href={c.maps} target="_blank" rel="noreferrer" style={{fontSize:22,textDecoration:"none"}} title="Mapa">📍</a>}
+              {(c.maps||(c.lat&&c.lng))&&<a href={c.maps||`https://www.google.com/maps?q=${c.lat},${c.lng}`} target="_blank" rel="noreferrer" style={{fontSize:22,textDecoration:"none"}} title="Mapa">📍</a>}
             </div>
           </div>
         </div>
