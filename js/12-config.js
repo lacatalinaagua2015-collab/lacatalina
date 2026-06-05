@@ -238,9 +238,97 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
       {tab==="datos"&&(
         <div style={{padding:16,display:"flex",flexDirection:"column",gap:12}}>
 
-          {/* Espacio utilizado */}
+          {/* RESPALDO */}
           <div style={{...s.card,margin:0}}>
-            <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:8}}>💾 Espacio utilizado</div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+              <span style={{fontSize:18}}>💾</span>
+              <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)"}}>Respaldo</span>
+            </div>
+            <p style={{fontSize:12,color:"var(--color-text-tertiary)",margin:"0 0 12px",lineHeight:1.5}}>
+              Guardá todos tus datos en un archivo. Descargalo seguido y guardalo en otro lado (mail, Drive). Si perdés el celular, lo restaurás y recuperás todo.
+            </p>
+            <button style={{...s.btnPrimary,width:"100%",marginBottom:8}} onClick={()=>{
+              if(typeof window._descargarRespaldo==="function") window._descargarRespaldo();
+              else alert("No se pudo generar el respaldo. Recargá la app e intentá de nuevo.");
+            }}>
+              💾 Descargar respaldo (.json)
+            </button>
+            <div style={{display:"flex",gap:8}}>
+              <label style={{...s.btn,flex:1,padding:"10px",display:"block",textAlign:"center",cursor:"pointer",boxSizing:"border-box",fontSize:12}}>
+                ♻️ Restaurar
+                <input type="file" accept=".json,application/json" style={{display:"none"}} onChange={(e)=>{
+                  const file=e.target.files&&e.target.files[0];
+                  if(!file) return;
+                  if(!window.confirm("⚠️ Restaurar va a REEMPLAZAR todos los datos actuales por los del archivo. ¿Seguro?")){ e.target.value=""; return; }
+                  const reader=new FileReader();
+                  reader.onload=(ev)=>{
+                    try{
+                      const data=JSON.parse(ev.target.result);
+                      const ok=window._restaurarRespaldo&&window._restaurarRespaldo(data);
+                      if(ok) alert("✅ Respaldo restaurado. Revisá que esté todo en orden.");
+                    }catch(err){ alert("El archivo no es un respaldo válido (.json). "+err.message); }
+                    e.target.value="";
+                  };
+                  reader.readAsText(file);
+                }} />
+              </label>
+              <button style={{...s.btn,flex:1,padding:"10px",fontSize:12}} onClick={()=>exportarExcel(clientes,ventas,productos,planillas)}>
+                📊 Exportar Excel
+              </button>
+            </div>
+          </div>
+
+          {/* MANTENIMIENTO DE DATOS */}
+          <div style={{...s.card,margin:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+              <span style={{fontSize:18}}>🔧</span>
+              <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)"}}>Mantenimiento de datos</span>
+            </div>
+            {(()=>{
+              const fantasmas=(clientes||[]).filter(c=>c._esProspecto);
+              const idsClientes=new Set((clientes||[]).map(c=>c.id));
+              const sinCliente=(prospectos||[]).filter(p=>!idsClientes.has(p.id));
+              const total=fantasmas.length+sinCliente.length;
+              return (
+                <button
+                  disabled={total===0}
+                  style={{...s.btn,width:"100%",padding:"10px",marginBottom:8,opacity:total===0?0.4:1,fontSize:13}}
+                  onClick={()=>{
+                    if(total===0) return;
+                    if(!window.confirm(`Se van a pasar ${total} ex-prospecto(s) a tu lista de clientes. ¿Continuar?`)) return;
+                    let nuevos=(clientes||[]).map(c=>{ if(c._esProspecto){const {_esProspecto, ...r}=c; return r;} return c; });
+                    const ids=new Set(nuevos.map(c=>c.id));
+                    (prospectos||[]).forEach(p=>{
+                      if(!ids.has(p.id)){
+                        nuevos.push({
+                          id:p.id, nombre:p.nombre, dia:p.dia||"Lunes",
+                          barrio:p.barrio||"", calle:p.calle||"", nro:p.nro||"",
+                          manzana:p.manzana||"", lote:p.lote||"",
+                          sifon:p.sifon||0, bidon10:p.bidon10||0, bidon20:p.bidon20||0, dispenser:p.dispenser||0,
+                          telefono:p.telefono||"", maps:p.maps||""
+                        });
+                        ids.add(p.id);
+                      }
+                    });
+                    setClientes(nuevos);
+                    alert(`✅ ${total} ex-prospecto(s) pasados a clientes.`);
+                  }}>
+                  {total===0 ? "✅ No hay clientes ocultos" : `🔄 Recuperar ${total} cliente(s) oculto(s)`}
+                </button>
+              );
+            })()}
+            <button style={{...s.btn,width:"100%",padding:"10px",fontSize:13}}
+              onClick={()=>{if(window.confirm("¿Subir todos los datos a la nube?")){
+                cloudSave({clientes,ventas,planillas,stock,productos,noVisitas:(noVisitas||[]),prospectos:(prospectos||[])})
+                  .then(()=>alert("✅ Datos sincronizados."))
+                  .catch(()=>alert("❌ Error. Verificá tu conexión."));
+              }}}>
+              🔄 Forzar sincronización
+            </button>
+          </div>
+
+          {/* ESPACIO USADO */}
+          <div style={{...s.card,margin:0}}>
             {(()=>{
               let total=0;
               try{for(let k in localStorage){if(localStorage.hasOwnProperty(k)){total+=((localStorage[k]||'').length*2);}}}catch(e){}
@@ -250,9 +338,9 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
               const fotos=clientes.filter(c=>c.foto&&c.foto.startsWith('data:')).length;
               return (
                 <div>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                    <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>{kb} KB de ~5.000 KB</span>
-                    <span style={{fontSize:13,fontWeight:600,color}}>{pct}%</span>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                    <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-secondary)"}}>💾 Espacio usado</span>
+                    <span style={{fontSize:12,color:"var(--color-text-tertiary)"}}>{kb} KB · {pct}%</span>
                   </div>
                   <div style={{height:8,background:"var(--color-background-tertiary)",borderRadius:4,overflow:"hidden"}}>
                     <div style={{height:"100%",width:pct+"%",background:color,borderRadius:4,transition:"width 0.3s"}}/>
@@ -264,137 +352,56 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
             })()}
           </div>
 
-          {/* Exportar backup */}
-          <button style={s.btnPrimary} onClick={()=>exportarExcel(clientes,ventas,productos,planillas)}>
-            📥 Exportar backup · {clientes.length} clientes · {ventas.length} ventas
-          </button>
-
-          {/* Respaldo completo descargable (.json) */}
-          <div style={{borderTop:"1px solid var(--color-border-secondary)",marginTop:12,paddingTop:12}}>
-            <div style={{fontSize:13,fontWeight:700,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>
-              💾 Respaldo completo
-            </div>
-            <p style={{fontSize:12,color:"var(--color-text-tertiary)",marginBottom:10}}>
-              Guarda TODOS tus datos en un archivo. Descargalo seguido y guardalo en otro lado (mail, Drive, etc.). Si perdés el celular o se borra la app, lo restaurás y recuperás todo.
-            </p>
-            <button style={{...s.btnPrimary,marginBottom:8}} onClick={()=>{
-              if(typeof window._descargarRespaldo==="function") window._descargarRespaldo();
-              else alert("No se pudo generar el respaldo. Recargá la app e intentá de nuevo.");
-            }}>
-              💾 Descargar respaldo completo (.json)
-            </button>
-            <label style={{...s.btn,width:"100%",padding:"11px",display:"block",textAlign:"center",cursor:"pointer",boxSizing:"border-box"}}>
-              ♻️ Restaurar desde un respaldo
-              <input type="file" accept=".json,application/json" style={{display:"none"}} onChange={(e)=>{
-                const file=e.target.files&&e.target.files[0];
-                if(!file) return;
-                if(!window.confirm("⚠️ Restaurar va a REEMPLAZAR todos los datos actuales por los del archivo. ¿Seguro?")){ e.target.value=""; return; }
-                const reader=new FileReader();
-                reader.onload=(ev)=>{
-                  try{
-                    const data=JSON.parse(ev.target.result);
-                    const ok=window._restaurarRespaldo&&window._restaurarRespaldo(data);
-                    if(ok) alert("✅ Respaldo restaurado. Revisá que esté todo en orden.");
-                  }catch(err){ alert("El archivo no es un respaldo válido (.json). "+err.message); }
-                  e.target.value="";
-                };
-                reader.readAsText(file);
-              }} />
-            </label>
-          </div>
-
-          {/* Recuperar clientes fantasma huérfanos */}
-          <div style={{...s.card,margin:"0 0 12px",borderLeft:"3px solid #4dd9a0"}}>
-            <div style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)",marginBottom:4}}>🧹 Recuperar clientes ocultos</div>
-            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:10,lineHeight:1.5}}>
-              Clientes que quedaron marcados como prospecto pero ya no están en la lista de prospectos (no aparecen en ninguna lista). Esto los convierte en clientes normales.
-            </div>
-            {(()=>{
-              const huerfanos=(clientes||[]).filter(c=>c._esProspecto && !(prospectos||[]).some(p=>p.id===c.id));
-              return (
-                <button
-                  disabled={huerfanos.length===0}
-                  style={{...s.btnPrimary,width:"100%",padding:"11px",opacity:huerfanos.length===0?0.4:1}}
-                  onClick={()=>{
-                    if(huerfanos.length===0) return;
-                    if(!window.confirm(`Se van a recuperar ${huerfanos.length} cliente(s) que estaban ocultos. Pasarán a tu lista de clientes normales. ¿Continuar?`)) return;
-                    const nuevos=(clientes||[]).map(c=>{
-                      if(c._esProspecto && !(prospectos||[]).some(p=>p.id===c.id)){
-                        const {_esProspecto, ...resto}=c;
-                        return resto;
-                      }
-                      return c;
-                    });
-                    setClientes(nuevos);
-                    alert(`✅ ${huerfanos.length} cliente(s) recuperado(s). Ahora aparecen en la lista de clientes.`);
-                  }}>
-                  {huerfanos.length===0 ? "No hay clientes ocultos para recuperar" : `🧹 Recuperar ${huerfanos.length} cliente(s) oculto(s)`}
-                </button>
-              );
-            })()}
-          </div>
-
-          {/* Forzar sincronización */}
-          <button style={{...s.btn,width:"100%",padding:"11px",background:"#EF9F27",color:"#fff",border:"none",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer"}}
-            onClick={()=>{if(window.confirm("¿Subir todos los datos a la nube?")){
-              cloudSave({clientes,ventas,planillas,stock,productos,noVisitas:(noVisitas||[]),prospectos:(prospectos||[])})
-                .then(()=>alert("✅ Datos sincronizados."))
-                .catch(()=>alert("❌ Error. Verificá tu conexión."));
-            }}}>
-            🔄 Forzar sincronización
-          </button>
-
-          {/* Emma Control */}
-          <div style={{borderTop:"1px solid var(--color-border-secondary)",paddingTop:12}}>
-            <div style={{fontSize:13,fontWeight:700,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:10}}>
-              🔗 Vincular con Emma Control
-            </div>
-            <div style={{fontSize:12,color:"var(--color-text-secondary)",lineHeight:1.6,marginBottom:10}}>
-              Los ingresos y gastos del día se envían automáticamente al cerrar el reparto.
-            </div>
-            <input value={ecToken}
-              onChange={e=>{const v=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,10);setEcToken(v);localStorage.setItem('lc_ec_token',v);}}
-              placeholder="Ej: EC4A8F2D"
-              style={{width:'100%',background:"var(--color-background-tertiary)",
-                border:`2px solid ${ecToken?"var(--color-accent)":"var(--color-border-secondary)"}`,
-                borderRadius:10,padding:'12px 14px',fontSize:18,color:"var(--color-text-primary)",
-                fontFamily:'monospace',letterSpacing:'0.15em',fontWeight:700,outline:'none',
-                textTransform:'uppercase',marginBottom:10}}
-            />
-            {ecToken&&ecToken.length>=8?(
-              <div style={{display:'flex',alignItems:'center',gap:8,background:"rgba(16,158,100,0.12)",border:"0.5px solid rgba(16,158,100,0.3)",borderRadius:10,padding:'10px 14px',marginBottom:10}}>
-                <span style={{fontSize:18}}>✅</span>
-                <div>
-                  <div style={{fontSize:13,fontWeight:600,color:"#10d07a"}}>Vinculado con Emma Control</div>
-                  <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>Los datos se enviarán al cerrar el día</div>
+          {/* EMMA CONTROL (plegable) */}
+          <details style={{...s.card,margin:0}}>
+            <summary style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)",cursor:"pointer"}}>🔗 Vincular con Emma Control</summary>
+            <div style={{marginTop:10}}>
+              <div style={{fontSize:12,color:"var(--color-text-secondary)",lineHeight:1.6,marginBottom:10}}>
+                Los ingresos y gastos del día se envían automáticamente al cerrar el reparto.
+              </div>
+              <input value={ecToken}
+                onChange={e=>{const v=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,10);setEcToken(v);localStorage.setItem('lc_ec_token',v);}}
+                placeholder="Ej: EC4A8F2D"
+                style={{width:'100%',background:"var(--color-background-tertiary)",
+                  border:`2px solid ${ecToken?"var(--color-accent)":"var(--color-border-secondary)"}`,
+                  borderRadius:10,padding:'12px 14px',fontSize:18,color:"var(--color-text-primary)",
+                  fontFamily:'monospace',letterSpacing:'0.15em',fontWeight:700,outline:'none',boxSizing:'border-box',
+                  textTransform:'uppercase',marginBottom:10}}
+              />
+              {ecToken&&ecToken.length>=8?(
+                <div style={{display:'flex',alignItems:'center',gap:8,background:"rgba(16,158,100,0.12)",border:"0.5px solid rgba(16,158,100,0.3)",borderRadius:10,padding:'10px 14px',marginBottom:10}}>
+                  <span style={{fontSize:18}}>✅</span>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:600,color:"#10d07a"}}>Vinculado con Emma Control</div>
+                    <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>Los datos se enviarán al cerrar el día</div>
+                  </div>
                 </div>
-              </div>
-            ):(
-              <div style={{display:'flex',alignItems:'center',gap:8,background:"var(--color-background-tertiary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:10,padding:'10px 14px',marginBottom:10}}>
-                <span style={{fontSize:18}}>⚪</span>
-                <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>Sin vincular — ingresá el código para activar</div>
-              </div>
-            )}
-            {ecToken&&(
-              <button onClick={()=>{if(window.confirm('¿Desvincular Emma Control?')){setEcToken('');localStorage.removeItem('lc_ec_token');}}}
-                style={{background:'none',border:'0.5px solid rgba(240,82,82,0.4)',borderRadius:8,padding:'8px 14px',color:'#f05252',fontSize:12,cursor:'pointer',width:'100%'}}>
-                🗑️ Desvincular
-              </button>
-            )}
-          </div>
+              ):(
+                <div style={{display:'flex',alignItems:'center',gap:8,background:"var(--color-background-tertiary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:10,padding:'10px 14px',marginBottom:10}}>
+                  <span style={{fontSize:18}}>⚪</span>
+                  <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>Sin vincular — ingresá el código para activar</div>
+                </div>
+              )}
+              {ecToken&&(
+                <button onClick={()=>{if(window.confirm('¿Desvincular Emma Control?')){setEcToken('');localStorage.removeItem('lc_ec_token');}}}
+                  style={{background:'none',border:'0.5px solid rgba(240,82,82,0.4)',borderRadius:8,padding:'8px 14px',color:'#f05252',fontSize:12,cursor:'pointer',width:'100%'}}>
+                  🗑️ Desvincular
+                </button>
+              )}
+            </div>
+          </details>
 
           {/* Soporte */}
-          <div style={{borderTop:"1px solid var(--color-border-secondary)",paddingTop:12}}>
-            <a href="https://wa.me/5493813399962?text=Hola%2C+necesito+ayuda+con+La+Catalina"
-              target="_blank" rel="noopener"
-              style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,
-                padding:"13px",borderRadius:10,background:"#0a2e1f",
-                border:"1px solid #4dd9a0",color:"#4dd9a0",fontSize:14,fontWeight:600,textDecoration:"none"}}>
-              💬 Soporte por WhatsApp
-            </a>
-          </div>
+          <a href="https://wa.me/5493813399962?text=Hola%2C+necesito+ayuda+con+La+Catalina"
+            target="_blank" rel="noopener"
+            style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+              padding:"13px",borderRadius:10,background:"#0a2e1f",
+              border:"1px solid #4dd9a0",color:"#4dd9a0",fontSize:14,fontWeight:600,textDecoration:"none"}}>
+            💬 Soporte por WhatsApp
+          </a>
         </div>
       )}
+
       {tab==="vehiculo"&&(
         <div style={{padding:16}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
