@@ -500,8 +500,9 @@ function App() {
     }
     // CIERRE AUTOMÁTICO DEL STOCK — se ejecuta una sola vez por día
     const camionCerradoKey = `lc_cam_${planillaKey}`;
-    if(planillaActual.iniciado && !localStorage.getItem(camionCerradoKey)) {
+    if(planillaActual.iniciado && !planillaActual._stockCerrado && !localStorage.getItem(camionCerradoKey)) {
       localStorage.setItem(camionCerradoKey, "1");
+      savePlanilla(planillaKey, {...nueva, _stockCerrado:true});
       const prodMap = {"Bidón 10L":"b10","Bidón 20L":"b20","Sifón 1.5L":"soda","Dispenser":"disp"};
       // Cuánto salió en el camión (según planilla de inicio de reparto)
       const llenos = {
