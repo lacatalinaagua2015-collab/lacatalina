@@ -25,6 +25,8 @@ function ClientesTabs({activo, onIr}) {
   );
 }
 
+let _catIdSeq = 0;
+function nuevoIdCat(){ _catIdSeq = (_catIdSeq + 1) % 1000; return Date.now()*1000 + _catIdSeq; }
 function App() {
   const [pantalla, setPantalla]   = useState(()=>{
     const h = window.location.hash.slice(1)||"portada";
@@ -748,6 +750,44 @@ function App() {
     irA("clientes");
   };
 
+  const unificarDuplicados = () => {
+    const norm = (s)=>(s||"").toString().trim().toLowerCase().replace(/\s+/g," ");
+    const grupos = {};
+    (clientes||[]).forEach(c=>{ const k=norm(c.nombre)+"|"+(c.dia||""); (grupos[k]=grupos[k]||[]).push(c); });
+    const remap = {};
+    let fusionados = [];
+    let dupGrupos = 0;
+    const completos = (c)=>Object.values(c).filter(v=>v!==""&&v!==null&&v!==undefined&&v!==0).length;
+    Object.values(grupos).forEach(grupo=>{
+      if(grupo.length===1){ fusionados.push(grupo[0]); return; }
+      dupGrupos++;
+      const base = grupo.reduce((a,b)=> completos(b)>completos(a)?b:a);
+      const merged = {...base};
+      merged.saldo = grupo.reduce((a,c)=>a+(Number(c.saldo)||0),0);
+      grupo.forEach(c=>{ if(c.id!==merged.id) remap[c.id]=merged.id; });
+      fusionados.push(merged);
+    });
+    const usados = new Set();
+    fusionados = fusionados.map(c=>{
+      let id=c.id;
+      if(usados.has(id)){ const nid=nuevoIdCat(); remap[id]=nid; id=nid; }
+      usados.add(id);
+      return {...c,id};
+    });
+    if(dupGrupos===0 && Object.keys(remap).length===0){ window.alert("✅ No se encontraron clientes duplicados."); return; }
+    if(!window.confirm("Se encontraron "+dupGrupos+" cliente(s) duplicado(s).\n\nSe unifican en uno solo, juntando sus ventas y sumando los saldos. Después conviene que revises los saldos.\n\n¿Continuar?")) return;
+    const rid = (x)=> remap[x]!==undefined?remap[x]:x;
+    const nVentas = (ventasRaw||[]).map(v=>({...v,clienteId:rid(v.clienteId)}));
+    const nNoVis  = (noVisitas||[]).map(v=>({...v,clienteId:rid(v.clienteId)}));
+    const nRec    = (recordatorios||[]).map(r=>({...r,clienteId:rid(r.clienteId)}));
+    setClientes(fusionados);
+    setVentasRaw(nVentas);
+    setNoVisitas(nNoVis);
+    setRecordatorios(nRec);
+    syncData({clientes:fusionados, ventas:nVentas, noVisitas:nNoVis, recordatorios:nRec});
+    window.alert("✅ Listo. Se unificaron "+dupGrupos+" cliente(s). Revisá los saldos por las dudas.");
+  };
+
   const eliminarVenta = (ventaId) => {
     const v = ventas.find(x=>x.id===ventaId); if(!v) return;
     const nv = ventas.filter(x=>x.id!==ventaId);
@@ -986,7 +1026,7 @@ function App() {
           if(orden&&clientes.some(c=>c.dia===datos.dia&&(c.orden||0)===Number(orden))){
             base=clientes.map(c=>c.dia===datos.dia&&(c.orden||0)>=Number(orden)?{...c,orden:(c.orden||0)+1}:c);
           }
-          const nc=[...base,{...datos,id:Date.now(),saldo:0,dispenser:datos.dispenser||0}]
+          const nc=[...base,{...datos,id:nuevoIdCat(),saldo:0,dispenser:datos.dispenser||0}]
             .sort((a,b)=>DIAS.indexOf(a.dia)-DIAS.indexOf(b.dia)||(a.orden||9999)-(b.orden||9999));
           saveClientes(nc);irA("clientes");
         }} onVolver={()=>irA("clientes")} />}
@@ -1021,7 +1061,7 @@ function App() {
         saveProspectos(prospectos.map(x=>x.id===p.id?{...x,estado:"convertido"}:x));
         irA("promocion");
       }} onVolver={()=>irA("menu")} /></React.Fragment>}
-      {pantalla==="gestionClientes" && <React.Fragment><ClientesTabs activo="todos" onIr={irA}/><GestionClientes clientes={clientes} onReordenarTodo={(lista)=>saveClientes(lista)} onEditar={(id,cambios)=>{saveClientes(clientes.map(c=>c.id===id?{...c,...cambios}:c));}} onEliminar={(id)=>{
+      {pantalla==="gestionClientes" && <React.Fragment><ClientesTabs activo="todos" onIr={irA}/><div style={{padding:"8px 12px 0"}}><button onClick={unificarDuplicados} style={{width:"100%",padding:"10px",borderRadius:8,border:"1px solid var(--color-border-secondary)",background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",fontWeight:600,cursor:"pointer",fontSize:13}}>🔧 Unificar clientes duplicados</button></div><GestionClientes clientes={clientes} onReordenarTodo={(lista)=>saveClientes(lista)} onEditar={(id,cambios)=>{saveClientes(clientes.map(c=>c.id===id?{...c,...cambios}:c));}} onEliminar={(id)=>{
         if(window.confirm("¿Eliminar cliente? Se quitará de todas las listas (clientes, ventas, prospectos, no-visitas y recordatorios).")){
           eliminarCliente(id);
           irA("gestionClientes");
@@ -1032,7 +1072,7 @@ function App() {
           // Shift all clients with same day and order >= new order
           nuevos = clientes.map(c=>c.dia===datos.dia&&(c.orden||0)>=orden?{...c,orden:(c.orden||0)+1}:c);
         } else { nuevos = [...clientes]; }
-        saveClientes([...nuevos,{...datos,id:Date.now(),saldo:0,dispenser:datos.dispenser||0}].sort((a,b)=>DIAS.indexOf(a.dia)-DIAS.indexOf(b.dia)||(a.orden||9999)-(b.orden||9999)));
+        saveClientes([...nuevos,{...datos,id:nuevoIdCat(),saldo:0,dispenser:datos.dispenser||0}].sort((a,b)=>DIAS.indexOf(a.dia)-DIAS.indexOf(b.dia)||(a.orden||9999)-(b.orden||9999)));
       }} onVolver={()=>irA("menu")} onRegistrarVenta={(c)=>{
           setClienteId(c.id);
           // Asegurar que fechaActual esté seteado a hoy
