@@ -13,13 +13,36 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
   // Calcular envases extra por cliente
   const extraEnvases = React.useMemo(()=>{
     const m={};
+    const KP={"Sifón 1.5L":"sifon","Bidón 10L":"bidon10","Bidón 20L":"bidon20","Dispenser":"dispenser"};
     (ventas||[]).forEach(v=>{
-      if(!m[v.clienteId]) m[v.clienteId]={sifon:0,bidon10:0,bidon20:0};
-      (v.envPrest||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)m[v.clienteId][k]+=Number(e.cant)||0;});
-      (v.envDev||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)m[v.clienteId][k]-=Number(e.cant)||0;});
+      if(!m[v.clienteId]) m[v.clienteId]={sifon:0,bidon10:0,bidon20:0,dispenser:0};
+      (v.envPrest||[]).forEach(e=>{const k=KP[e.prod];if(k)m[v.clienteId][k]+=Number(e.cant)||0;});
+      (v.envDev||[]).forEach(e=>{const k=KP[e.prod];if(k)m[v.clienteId][k]-=Number(e.cant)||0;});
     });
     return m;
   },[ventas]);
+
+  // ── Editor rápido de envases (fijos + prestados) con confirmación ──
+  const ENV_KEYS=["sifon","bidon10","bidon20","dispenser"];
+  const [envEditId,setEnvEditId]=useState(null);
+  const [envDraft,setEnvDraft]=useState(null);
+  const abrirEnv=(c)=>{
+    const ex=extraEnvases[c.id]||{}, aj=c.envAjuste||{};
+    setEnvDraft({
+      fijos:Object.fromEntries(ENV_KEYS.map(k=>[k,Number(c[k])||0])),
+      prest:Object.fromEntries(ENV_KEYS.map(k=>[k,(ex[k]||0)+(aj[k]||0)])),
+    });
+    setEnvEditId(c.id);
+  };
+  const cerrarEnv=()=>{setEnvEditId(null);setEnvDraft(null);};
+  const confirmarEnv=(c)=>{
+    const ex=extraEnvases[c.id]||{};
+    onEditar(c.id,{
+      ...Object.fromEntries(ENV_KEYS.map(k=>[k,Math.max(0,envDraft.fijos[k])])),
+      envAjuste:Object.fromEntries(ENV_KEYS.map(k=>[k,envDraft.prest[k]-(ex[k]||0)])),
+    });
+    cerrarEnv();
+  };
 
   const filtrados = clientes
     .filter(c=>!c._esProspecto)
@@ -103,39 +126,6 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
                 inicial={c}
                 onGuardar={(datos)=>{onEditar(c.id,datos);setEditandoId(null);}}
               />
-              {/* Ajuste de envases EXTRA prestados (editable) */}
-              {(()=>{
-                const ex = extraEnvases[c.id]||{sifon:0,bidon10:0,bidon20:0};
-                // total actual prestado = calculado desde ventas + ajuste manual
-                // el usuario edita el TOTAL directamente; envAjuste = total - ex
-                const aj = c.envAjuste||{sifon:0,bidon10:0,bidon20:0};
-                const total = {sifon:ex.sifon+(aj.sifon||0),bidon10:ex.bidon10+(aj.bidon10||0),bidon20:ex.bidon20+(aj.bidon20||0)};
-                const setTotal=(k,val)=>{
-                  const n=Number(val)||0;
-                  onEditar(c.id,{envAjuste:{...aj,[k]:n-(ex[k]||0)}});
-                };
-                return (
-                  <div style={{...s.card,margin:"4px 0",background:"var(--color-background-tertiary)",padding:"10px 12px",borderLeft:"3px solid var(--color-border-warning)"}}>
-                    <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-warning)",marginBottom:4}}>📦 Envases extra prestados al cliente</div>
-                    <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginBottom:8}}>Editá directamente la cantidad que tiene en su poder. Ponelo en 0 si ya los devolvió todos.</div>
-                    <div style={{display:"flex",gap:8}}>
-                      {[["sifon","Sifón"],["bidon10","10L"],["bidon20","20L"]].map(([k,l])=>(
-                        <div key={k} style={{flex:1,textAlign:"center"}}>
-                          <label style={{...s.label,textAlign:"center",fontSize:11}}>{l}</label>
-                          <input
-                            style={{...s.inputNum,textAlign:"center",fontSize:18,fontWeight:700,
-                              color:total[k]>0?"var(--color-text-warning)":total[k]<0?"var(--color-text-success)":"var(--color-text-tertiary)"}}
-                            type="number"
-                            value={total[k]}
-                            onChange={e=>setTotal(k,e.target.value)}
-                          />
-                          <div style={{fontSize:9,color:"var(--color-text-tertiary)",marginTop:3}}>{total[k]>0?"prestado":total[k]<0?"devuelto de más":"ok"}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
             </>
           ) : (
             <>
@@ -182,10 +172,38 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8,borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:8}}>
                 <button style={{...s.btnDanger,fontSize:11,padding:"4px 12px"}} onClick={e=>{e.stopPropagation();onEliminar(c.id);}}>Eliminar</button>
                 <div style={{display:"flex",gap:6}}>
+                  <button style={{...s.btn,fontSize:11,padding:"4px 10px",background:envEditId===c.id?"#2e1f06":undefined,color:envEditId===c.id?"#f5b942":undefined,border:envEditId===c.id?"1px solid #f5b942":undefined}}
+                    onClick={e=>{e.stopPropagation();envEditId===c.id?cerrarEnv():abrirEnv(c);}}>♻️ Envases</button>
                   {onRegistrarVenta&&<button style={{...s.btn,fontSize:11,padding:"4px 12px",background:"#185FA5",color:"#e2eaf4",border:"none"}} onClick={e=>{e.stopPropagation();onRegistrarVenta(c);}}>📦 Venta</button>}
                   <button style={{...s.btn,fontSize:11,padding:"4px 12px"}} onClick={e=>{e.stopPropagation();setEditandoId(c.id);}}>Editar</button>
                 </div>
               </div>
+              {/* Panel rápido de envases — nada se guarda hasta tocar Confirmar */}
+              {envEditId===c.id&&envDraft&&(
+                <div style={{marginTop:8,background:"var(--color-background-tertiary)",borderRadius:8,padding:"8px 10px"}} onClick={e=>e.stopPropagation()}>
+                  <div style={{display:"grid",gridTemplateColumns:"82px 1fr 1fr 1fr 1fr",gap:4,fontSize:10,color:"var(--color-text-tertiary)",marginBottom:4}}>
+                    <span></span><span style={{textAlign:"center"}}>Sifón</span><span style={{textAlign:"center"}}>10L</span><span style={{textAlign:"center"}}>20L</span><span style={{textAlign:"center"}}>Disp</span>
+                  </div>
+                  {[["fijos","🏠 Fijos"],["prest","📦 Prestados"]].map(([t,l])=>(
+                    <div key={t} style={{display:"grid",gridTemplateColumns:"82px 1fr 1fr 1fr 1fr",gap:4,alignItems:"center",marginBottom:4}}>
+                      <span style={{fontSize:11,color:t==="prest"?"var(--color-text-warning)":"var(--color-text-secondary)"}}>{l}</span>
+                      {ENV_KEYS.map(k=>(
+                        <input key={k} type="number" value={envDraft[t][k]}
+                          onChange={e=>{const n=Math.round(Number(e.target.value)||0);setEnvDraft(d=>({...d,[t]:{...d[t],[k]:n}}));}}
+                          style={{...s.inputNum,padding:"6px 2px",fontSize:14,textAlign:"center",
+                            fontWeight:t==="prest"&&envDraft[t][k]!==0?600:400,
+                            color:t==="prest"?(envDraft[t][k]>0?"var(--color-text-warning)":envDraft[t][k]<0?"var(--color-text-success)":"var(--color-text-primary)"):"var(--color-text-primary)"}} />
+                      ))}
+                    </div>
+                  ))}
+                  <div style={{fontSize:10,color:"var(--color-text-tertiary)",margin:"2px 0 6px"}}>Prestados = total extra que tiene hoy · 0 = devolvió todo</div>
+                  <div style={{display:"flex",gap:6}}>
+                    <button style={{...s.btn,flex:1,fontSize:12}} onClick={cerrarEnv}>Cancelar</button>
+                    <button style={{flex:2,background:"#1d9e75",color:"#fff",border:"none",borderRadius:8,padding:"9px",fontSize:13,fontWeight:600,cursor:"pointer"}}
+                      onClick={()=>confirmarEnv(c)}>✓ Confirmar</button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
