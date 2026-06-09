@@ -36,6 +36,34 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
     totClientes.dispenser+=Number(c.dispenser)||0;
   });
 
+  // ── ARQUEO: envases EXTRA prestados por cliente (calculado desde ventas) ──
+  const KEY_PROD={"Sifón 1.5L":"sifon","Bidón 10L":"bidon10","Bidón 20L":"bidon20","Dispenser":"dispenser"};
+  const extraPorCliente=React.useMemo(()=>{
+    const m={};
+    (ventas||[]).forEach(v=>{
+      if(!m[v.clienteId]) m[v.clienteId]={sifon:0,bidon10:0,bidon20:0,dispenser:0};
+      (v.envPrest||[]).forEach(e=>{const k=KEY_PROD[e.prod];if(k)m[v.clienteId][k]+=Number(e.cant)||0;});
+      (v.envDev||[]).forEach(e=>{const k=KEY_PROD[e.prod];if(k)m[v.clienteId][k]-=Number(e.cant)||0;});
+    });
+    return m;
+  },[ventas]);
+  // Prestado TOTAL de un cliente = lo calculado de ventas + el ajuste manual (envAjuste)
+  const prestadoDe=(c,k)=>((extraPorCliente[c.id]?.[k])||0)+((c.envAjuste?.[k])||0);
+  // Al editar, el usuario escribe el TOTAL que el cliente tiene → guardamos envAjuste = total − calculado
+  const setClientePrestado=(id,k,val)=>{
+    const n=Math.round(Number(val)||0);
+    setClientes((clientes||[]).map(c=>{
+      if(c.id!==id) return c;
+      const ex=(extraPorCliente[id]?.[k])||0;
+      return {...c, envAjuste:{...(c.envAjuste||{}), [k]: n-ex}};
+    }));
+  };
+  const [modoArqueo,setModoArqueo]=React.useState("fijos");   // fijos | prestados
+  const [buscaArqueo,setBuscaArqueo]=React.useState("");
+  const [diaArqueo,setDiaArqueo]=React.useState("todos");
+  const totPrestados={sifon:0,bidon10:0,bidon20:0,dispenser:0};
+  clientesReales.forEach(c=>{["sifon","bidon10","bidon20","dispenser"].forEach(k=>{totPrestados[k]+=prestadoDe(c,k);});});
+
   const inNum={...s.inputNum,padding:"5px 2px",fontSize:13};
 
   return (
@@ -82,30 +110,88 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
           </div>
         </div>
 
-        {/* EN CLIENTES */}
+        {/* EN CLIENTES — ARQUEO GENERAL */}
         <div style={{...s.card,margin:"0 0 10px"}}>
-          <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",marginBottom:7}}>👥 En clientes <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:11}}>· prestados</span></div>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
-            <span style={{background:"var(--color-background-tertiary)",borderRadius:6,padding:"3px 8px",fontSize:12,color:"var(--color-text-secondary)"}}>Sifón <b style={{color:"var(--color-text-primary)"}}>{totClientes.sifon}</b> <span style={{fontSize:10,color:"var(--color-text-tertiary)"}}>({Math.floor(totClientes.sifon/6)} caj)</span></span>
-            <span style={{background:"var(--color-background-tertiary)",borderRadius:6,padding:"3px 8px",fontSize:12,color:"var(--color-text-secondary)"}}>10L <b style={{color:"var(--color-text-primary)"}}>{totClientes.bidon10}</b></span>
-            <span style={{background:"var(--color-background-tertiary)",borderRadius:6,padding:"3px 8px",fontSize:12,color:"var(--color-text-secondary)"}}>20L <b style={{color:"var(--color-text-primary)"}}>{totClientes.bidon20}</b></span>
-            <span style={{background:"var(--color-background-tertiary)",borderRadius:6,padding:"3px 8px",fontSize:12,color:"var(--color-text-secondary)"}}>Disp <b style={{color:"var(--color-text-primary)"}}>{totClientes.dispenser}</b></span>
-          </div>
+          <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",marginBottom:7}}>👥 En clientes <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:11}}>· fijos + prestados</span></div>
+          {/* Tabla de totales */}
+          {(()=>{
+            const totGeneral={sifon:totClientes.sifon+totPrestados.sifon,bidon10:totClientes.bidon10+totPrestados.bidon10,bidon20:totClientes.bidon20+totPrestados.bidon20,dispenser:totClientes.dispenser+totPrestados.dispenser};
+            const filas=[["🏠 Fijos",totClientes,"var(--color-text-primary)"],["📦 Prestados",totPrestados,"var(--color-text-warning)"],["Σ Total",totGeneral,"var(--color-text-info)"]];
+            return (
+              <div style={{marginBottom:8,background:"var(--color-background-tertiary)",borderRadius:8,padding:"7px 9px"}}>
+                <div style={{display:"grid",gridTemplateColumns:"80px 1fr 1fr 1fr 1fr",gap:4,fontSize:10,color:"var(--color-text-tertiary)",marginBottom:3}}>
+                  <span></span><span style={{textAlign:"center"}}>Sifón</span><span style={{textAlign:"center"}}>10L</span><span style={{textAlign:"center"}}>20L</span><span style={{textAlign:"center"}}>Disp</span>
+                </div>
+                {filas.map(([l,t,col],i)=>(
+                  <div key={l} style={{display:"grid",gridTemplateColumns:"80px 1fr 1fr 1fr 1fr",gap:4,padding:"3px 0",borderTop:i===2?"0.5px solid var(--color-border-secondary)":"none",alignItems:"center"}}>
+                    <span style={{color:"var(--color-text-secondary)",fontSize:11}}>{l}</span>
+                    {["sifon","bidon10","bidon20","dispenser"].map(k=>(
+                      <span key={k} style={{textAlign:"center",fontSize:13,fontWeight:i===2?600:400,color:col}}>
+                        {t[k]||0}
+                        {k==="sifon"&&i===2&&<span style={{display:"block",fontSize:9,color:"var(--color-text-tertiary)",fontWeight:400}}>{Math.floor((t[k]||0)/6)} caj</span>}
+                      </span>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           <button onClick={()=>setClientesAbierto(o=>!o)} style={{...s.btn,width:"100%",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span>✏️ Detalle por cliente ({clientesReales.length})</span><span>{clientesAbierto?"▲":"▼"}</span>
+            <span>📋 Arqueo por cliente ({clientesReales.length})</span><span>{clientesAbierto?"▲":"▼"}</span>
           </button>
           {clientesAbierto&&(
             <div style={{marginTop:8}}>
+              {/* Modo: fijos / prestados */}
+              <div style={{display:"flex",gap:6,marginBottom:6}}>
+                {[["fijos","🏠 Fijos (habituales)"],["prestados","📦 Prestados (extra)"]].map(([v,l])=>(
+                  <button key={v} onClick={()=>setModoArqueo(v)}
+                    style={{...s.btn,flex:1,fontSize:12,padding:"8px 4px",
+                      background:modoArqueo===v?"#185FA5":"var(--color-background-tertiary)",
+                      color:modoArqueo===v?"#e2eaf4":"var(--color-text-secondary)",
+                      border:modoArqueo===v?"none":"0.5px solid var(--color-border-secondary)"}}>{l}</button>
+                ))}
+              </div>
+              <div style={{fontSize:10,color:"var(--color-text-tertiary)",marginBottom:8,lineHeight:1.5}}>
+                {modoArqueo==="fijos"
+                  ? "Envases habituales que el cliente tiene siempre en su poder. Editá directo el número."
+                  : "Envases EXTRA prestados. Editá el TOTAL que tiene hoy en su poder · 0 = devolvió todo · negativo = devolvió de más."}
+              </div>
+              {/* Buscador + filtro por día */}
+              <input style={{...s.input,marginBottom:6,fontSize:13}} placeholder="🔍 Buscar cliente..." value={buscaArqueo} onChange={e=>setBuscaArqueo(e.target.value)} />
+              <div style={{display:"flex",gap:4,marginBottom:8,flexWrap:"wrap"}}>
+                {["todos",...DIAS].map(d=>(
+                  <button key={d} onClick={()=>setDiaArqueo(d)}
+                    style={{fontSize:10,padding:"3px 9px",borderRadius:6,border:"none",cursor:"pointer",
+                      background:diaArqueo===d?"#185FA5":"var(--color-background-tertiary)",
+                      color:diaArqueo===d?"#e2eaf4":"var(--color-text-secondary)",fontWeight:diaArqueo===d?600:400}}>
+                    {d==="todos"?"Todos":d.slice(0,3)}
+                  </button>
+                ))}
+              </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 42px 42px 42px 42px",gap:4,fontSize:10,color:"var(--color-text-tertiary)",marginBottom:5}}>
                 <span></span><span style={{textAlign:"center"}}>Sif</span><span style={{textAlign:"center"}}>10L</span><span style={{textAlign:"center"}}>20L</span><span style={{textAlign:"center"}}>Disp</span>
               </div>
-              {clientesReales.sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(c=>(
+              {clientesReales
+                .filter(c=>diaArqueo==="todos"||c.dia===diaArqueo)
+                .filter(c=>(c.nombre||"").toLowerCase().includes(buscaArqueo.toLowerCase()))
+                .sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""))
+                .map(c=>(
                 <div key={c.id} style={{display:"grid",gridTemplateColumns:"1fr 42px 42px 42px 42px",gap:4,alignItems:"center",marginBottom:4}}>
-                  <span style={{fontSize:12,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nombre}</span>
-                  <input type="number" value={c.sifon||0} onChange={e=>setClienteEnv(c.id,"sifon",e.target.value)} style={{...inNum,padding:"4px 2px",fontSize:12}} />
-                  <input type="number" value={c.bidon10||0} onChange={e=>setClienteEnv(c.id,"bidon10",e.target.value)} style={{...inNum,padding:"4px 2px",fontSize:12}} />
-                  <input type="number" value={c.bidon20||0} onChange={e=>setClienteEnv(c.id,"bidon20",e.target.value)} style={{...inNum,padding:"4px 2px",fontSize:12}} />
-                  <input type="number" value={c.dispenser||0} onChange={e=>setClienteEnv(c.id,"dispenser",e.target.value)} style={{...inNum,padding:"4px 2px",fontSize:12}} />
+                  <span style={{fontSize:12,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    {c.nombre}
+                    <span style={{display:"block",fontSize:9,color:"var(--color-text-tertiary)"}}>{c.dia}</span>
+                  </span>
+                  {modoArqueo==="fijos"
+                    ? ["sifon","bidon10","bidon20","dispenser"].map(k=>(
+                        <input key={k} type="number" value={c[k]||0} onChange={e=>setClienteEnv(c.id,k,e.target.value)} style={{...inNum,padding:"4px 2px",fontSize:12}} />
+                      ))
+                    : ["sifon","bidon10","bidon20","dispenser"].map(k=>{
+                        const val=prestadoDe(c,k);
+                        return <input key={k} type="number" value={val} onChange={e=>setClientePrestado(c.id,k,e.target.value)}
+                          style={{...inNum,padding:"4px 2px",fontSize:12,fontWeight:val!==0?600:400,
+                            color:val>0?"var(--color-text-warning)":val<0?"var(--color-text-success)":"var(--color-text-tertiary)"}} />;
+                      })
+                  }
                 </div>
               ))}
             </div>

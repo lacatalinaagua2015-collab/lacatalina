@@ -848,22 +848,22 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
               <span style={{fontSize:13,fontWeight:500,color:`var(--color-text-${c})`}}>{v}</span>
             </div>
           ))}
-          {/* Cobros de deuda — separados por forma de pago */}
+          {/* Cobros de deuda — informativos: YA están incluidos en efectivo/transferencia */}
           {cobSaldosEfec>0&&(
-            <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-              <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>+ Cobro deuda · efectivo</span>
-              <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-success)"}}>{fmt(cobSaldosEfec)}</span>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0 5px 12px",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+              <span style={{fontSize:12,color:"var(--color-text-tertiary)",fontStyle:"italic"}}>↳ incluye cobro deuda · efectivo</span>
+              <span style={{fontSize:12,fontWeight:500,color:"var(--color-text-success)",fontStyle:"italic"}}>{fmt(cobSaldosEfec)}</span>
             </div>
           )}
           {cobSaldosTrans>0&&(
-            <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-              <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>+ Cobro deuda · transferencia</span>
-              <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-info)"}}>{fmt(cobSaldosTrans)}</span>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0 5px 12px",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+              <span style={{fontSize:12,color:"var(--color-text-tertiary)",fontStyle:"italic"}}>↳ incluye cobro deuda · transferencia</span>
+              <span style={{fontSize:12,fontWeight:500,color:"var(--color-text-info)",fontStyle:"italic"}}>{fmt(cobSaldosTrans)}</span>
             </div>
           )}
           <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0 2px"}}>
             <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Total cobrado</span>
-            <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(cobEfectivo+cobTransBruto+cobSaldos)}</span>
+            <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(cobEfectivo+cobTransBruto)}</span>
           </div>
         </div>
 
@@ -1070,7 +1070,7 @@ function InicioReparto({dia,fecha,planilla,productos,cargasDia,stock,onGuardar,o
                 ...planilla,
                 iniciado:true,
                 productos: Object.fromEntries(
-                  Object.entries(cajones).map(([k,v])=>[k,{
+                  Object.entries(llenos).map(([k,v])=>[k,{
                     ...(planilla?.productos?.[k]||{}),
                     llenos:v
                   }])
