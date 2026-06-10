@@ -2,7 +2,7 @@
 // ◆  07-clientes.js — ListaClientes, DetalleCliente, EditCliente
 // ════════════════════════════════════════════════════════════════════
 
-function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onNoQuiereProspecto,onConfirmarTransfer,onVerProspecto,onEliminarProspecto,onAbrirMapa,onPlanilla}) {
+function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onEditarCliente,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onNoQuiereProspecto,onConfirmarTransfer,onVerProspecto,onEliminarProspecto,onAbrirMapa,onPlanilla}) {
   const [busqueda,setBusqueda] = useState("");
   const [editandoOrden,setEditandoOrden] = useState(null);
   const [ordenTemp,setOrdenTemp] = useState("");
@@ -91,47 +91,16 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
 
   const Card=({c})=>{
     const [fotoOpen,setFotoOpen] = React.useState(false);
-    const [envasesOpen,setEnvasesOpen] = React.useState(false);
-    const [ajusteEnv,setAjusteEnv] = React.useState({sifon:"",bidon10:"",bidon20:""});
     const atendido=atendidos.has(c.id), est=noVMap[c.id];
     const bc=atendido?"#1D9E75":est==="noesta"?"#EF9F27":(est==="noesta2"||est==="noquiso")?"#E24B4A":"var(--color-border-tertiary)";
-    // Envases extra que tiene el cliente (historial completo, no solo hoy)
+    // Envases extra que tiene el cliente (historial completo + ajuste manual envAjuste)
     const envExtra={sifon:0,bidon10:0,bidon20:0};
     (todasVentas||ventas).filter(v=>v.clienteId===c.id).forEach(v=>{
       (v.envPrest||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)envExtra[k]+=Number(e.cant)||0;});
       (v.envDev||[]).forEach(e=>{const k=e.prod==="Sifón 1.5L"?"sifon":e.prod==="Bidón 10L"?"bidon10":e.prod==="Bidón 20L"?"bidon20":null;if(k)envExtra[k]-=Number(e.cant)||0;});
     });
-
-    const guardarAjusteEnvases = () => {
-      // Registra un ajuste manual como una venta de tipo _esAjusteEnvases
-      const ahora = Date.now();
-      const envDevNuevos = [];
-      const envPrestNuevos = [];
-      [["sifon","Sifón 1.5L"],["bidon10","Bidón 10L"],["bidon20","Bidón 20L"]].forEach(([k,nombre])=>{
-        const v = Number(ajusteEnv[k]||0);
-        if(v>0) envDevNuevos.push({prod:nombre,cant:String(v)});   // devueltos: reducen lo que tiene
-        if(v<0) envPrestNuevos.push({prod:nombre,cant:String(-v)}); // prestados: aumentan lo que tiene
-      });
-      if(!envDevNuevos.length && !envPrestNuevos.length) { setEnvasesOpen(false); return; }
-      const ajuste = {
-        id:ahora, clienteId:c.id, cliente:c.nombre,
-        dia:"", fechaKey:new Date().toISOString().slice(0,10),
-        fecha:new Date().toLocaleString("es-AR"),
-        detalle:[{nombre:"Ajuste manual de envases",cantidad:1,precio:0,total:0}],
-        pago:"contado", obs:"[Ajuste manual de envases desde lista]", saldoAplicado:0,
-        neto:0,bruto:0,desc:0,costo:0,ganancia:0,pagadoNum:0,saldoDelta:0,
-        envPrest:envPrestNuevos, envDev:envDevNuevos,
-        _esAjusteEnvases:true,
-      };
-      onReordenar([...clientes]); // trigger para que el padre refresque; el ajuste lo guardamos por fuera
-      // Guardamos usando onReordenar como canal de actualizacion de clientes, pero necesitamos guardar la venta
-      // Para esto usamos un evento custom si está disponible, o simplemente notificamos
-      if(typeof window._agregarAjusteEnvases === "function") {
-        window._agregarAjusteEnvases(ajuste);
-      }
-      setAjusteEnv({sifon:"",bidon10:"",bidon20:""});
-      setEnvasesOpen(false);
-    };
+    const ajC=c.envAjuste||{};
+    envExtra.sifon+=Number(ajC.sifon)||0; envExtra.bidon10+=Number(ajC.bidon10)||0; envExtra.bidon20+=Number(ajC.bidon20)||0;
     return (
       <>
       <div style={{...s.card,borderLeft:`3px solid ${bc}`,opacity:(visitados.has(c.id))?0.65:est==="noesta"?0.85:1}}>
@@ -184,14 +153,11 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
               {est==="noquiso"  && <span style={s.badge("danger")}>No quiso</span>}
               {c.saldo<0   && <span style={s.badge("danger")}>Debe {fmt(Math.abs(c.saldo))}</span>}
               {c.saldo>0   && <span style={s.badge("success")}>A favor {fmt(c.saldo)}</span>}
-              {(envExtra.sifon>0||envExtra.bidon10>0||envExtra.bidon20>0) && (
-                <span style={{...s.tag,color:"#f5b942",fontWeight:600,cursor:"pointer",borderBottom:"1.5px dashed #f5b942"}}
-                  title="Tocá para ajustar envases"
-                  onClick={e=>{e.stopPropagation();setAjusteEnv({sifon:"",bidon10:"",bidon20:""});setEnvasesOpen(true);}}>
-                  🔁{envExtra.sifon>0?` Sif×${envExtra.sifon}`:""}
-                     {envExtra.bidon10>0?` 10L×${envExtra.bidon10}`:""}
-                     {envExtra.bidon20>0?` 20L×${envExtra.bidon20}`:""}
-                  ✏️
+              {(envExtra.sifon!==0||envExtra.bidon10!==0||envExtra.bidon20!==0) && (
+                <span style={{...s.tag,color:"#f5b942",fontWeight:600}}>
+                  🔁{envExtra.sifon!==0?` Sif×${envExtra.sifon}`:""}
+                     {envExtra.bidon10!==0?` 10L×${envExtra.bidon10}`:""}
+                     {envExtra.bidon20!==0?` 20L×${envExtra.bidon20}`:""}
                 </span>
               )}
             </div>
@@ -219,6 +185,7 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
             <button style={{...s.btn,fontSize:12,padding:"4px 10px"}} onClick={()=>onQuitarNoVisita(c.id)}>Desmarcar</button>
           </div>
         )}
+        {onEditarCliente&&<PieEnvases c={c} ventas={todasVentas||ventas} onEditar={onEditarCliente} />}
       </div>
       {fotoOpen&&(
         <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.92)",zIndex:2000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20}} onClick={e=>{e.stopPropagation();setFotoOpen(false);}}>
@@ -240,39 +207,6 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
             {c.foto&&<button style={{background:"#3a2020",color:"#e05c5c",padding:"10px 14px",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer",border:"none"}} onClick={()=>{onReordenar(clientes.map(x=>x.id===c.id?{...x,foto:""}:x));setFotoOpen(false);}}>🗑</button>}
           </div>
           <span style={{color:"#aaa",fontSize:11,marginTop:14}}>Tocá fuera para cerrar</span>
-        </div>
-      )}
-      {envasesOpen&&(
-        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.85)",zIndex:2000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20}}
-          onClick={e=>{if(e.target===e.currentTarget)setEnvasesOpen(false);}}>
-          <div style={{background:"var(--color-background-secondary)",borderRadius:16,padding:20,width:"100%",maxWidth:340}} onClick={e=>e.stopPropagation()}>
-            <div style={{fontSize:15,fontWeight:600,color:"var(--color-text-primary)",marginBottom:4}}>✏️ Ajustar envases · {c.nombre}</div>
-            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:14,lineHeight:1.5}}>
-              Actual: {envExtra.sifon>0?`Sif×${envExtra.sifon} `:""}
-                      {envExtra.bidon10>0?`10L×${envExtra.bidon10} `:""}
-                      {envExtra.bidon20>0?`20L×${envExtra.bidon20}`:""}
-              <br/>Ingresá números <b>positivos</b> para registrar devolución, <b>negativos</b> para prestar más.
-            </div>
-            {[["sifon","Sifón 1.5L",envExtra.sifon],["bidon10","Bidón 10L",envExtra.bidon10],["bidon20","Bidón 20L",envExtra.bidon20]].map(([k,lbl,actual])=>(
-              <div key={k} style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>{lbl}</div>
-                  <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>Tiene: {actual} en poder</div>
-                </div>
-                <div style={{display:"flex",alignItems:"center",gap:6}}>
-                  <button style={{...s.btn,padding:"5px 14px",fontSize:18}} onClick={()=>setAjusteEnv(a=>({...a,[k]:String((Number(a[k])||0)-1)}))}>−</button>
-                  <input type="number" value={ajusteEnv[k]} onChange={e=>setAjusteEnv(a=>({...a,[k]:e.target.value}))}
-                    placeholder="0"
-                    style={{width:54,textAlign:"center",padding:"6px 4px",borderRadius:8,border:"1.5px solid var(--color-border-secondary)",background:"var(--color-background-tertiary)",color:Number(ajusteEnv[k]||0)>0?"#4dd9a0":Number(ajusteEnv[k]||0)<0?"#f07070":"var(--color-text-primary)",fontSize:16,fontWeight:600}} />
-                  <button style={{...s.btn,padding:"5px 14px",fontSize:18}} onClick={()=>setAjusteEnv(a=>({...a,[k]:String((Number(a[k])||0)+1)}))}>+</button>
-                </div>
-              </div>
-            ))}
-            <div style={{display:"flex",gap:8,marginTop:8}}>
-              <button style={{...s.btn,flex:1,padding:"11px"}} onClick={()=>setEnvasesOpen(false)}>Cancelar</button>
-              <button style={{...s.btnPrimary,flex:2}} onClick={guardarAjusteEnvases}>Guardar ajuste</button>
-            </div>
-          </div>
         </div>
       )}
       </>
@@ -359,6 +293,10 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
             {editandoCliente?"Cancelar":"Editar"}
           </button>
         </div>
+      </div>
+      {/* Pie de envases unificado (mismo de todas las listas) */}
+      <div style={{...s.card,paddingTop:2}}>
+        <PieEnvases c={cliente} ventas={ventas} onEditar={(id,cambios)=>onEditar(cambios)} />
       </div>
       {mostrarPagoSaldo&&(
         <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.7)",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
@@ -789,7 +727,7 @@ function EditCliente({cliente,onGuardar,onEliminarCliente}) {
 }
 
 
-function FiadosPendientes({clientes,onCobrar,onVolver}) {
+function FiadosPendientes({clientes,ventas,onCobrar,onVolver,onEditarCliente}) {
   const [pagando,setPagando]=React.useState(null); // clienteId
   const [monto,setMonto]=React.useState('');
   const [pago,setPago]=React.useState('contado');
@@ -838,13 +776,14 @@ function FiadosPendientes({clientes,onCobrar,onVolver}) {
               💰 Cobrar deuda
             </button>
           )}
+          {onEditarCliente&&<PieEnvases c={c} ventas={ventas} onEditar={onEditarCliente} />}
         </div>
       ))}
     </div>
   );
 }
 
-function ClientesDormidos({clientes,ventas,onVolver,onSeleccionar}) {
+function ClientesDormidos({clientes,ventas,onVolver,onSeleccionar,onEditarCliente}) {
   const [semanas,setSemanas]=React.useState(2);
   const hoy=new Date();
   // Última compra real por cliente (ignora cobros y ajustes)
@@ -902,6 +841,7 @@ function ClientesDormidos({clientes,ventas,onVolver,onSeleccionar}) {
               {(c.maps||(c.lat&&c.lng))&&<a href={c.maps||`https://www.google.com/maps?q=${c.lat},${c.lng}`} target="_blank" rel="noreferrer" style={{fontSize:22,textDecoration:"none"}} title="Mapa">📍</a>}
             </div>
           </div>
+          {onEditarCliente&&<PieEnvases c={c} ventas={ventas} onEditar={onEditarCliente} />}
         </div>
       ))}
     </div>
