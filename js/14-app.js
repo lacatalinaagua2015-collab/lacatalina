@@ -111,6 +111,8 @@ function App() {
     });
   };
   const [planillas, setPlanillas] = useLS("cat_planillas_v1", {});
+  // Cargas de salida por día — declarado acá arriba para que estadoRef pueda incluirlo y viaje a Firebase
+  const [cargasDia, setCargasDia] = useLS("cat_cargas_dia_v1", CARGA_DIA_DEFAULT);
   // Firebase — credentials embedded in SDK config above
   const apiKey = "firebase";
   const binId  = "firebase";
@@ -197,14 +199,15 @@ function App() {
       if (data.mantVeh?.length)    localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh));
       if (data.histPrecios?.length) localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios));
       if (data.zonasReparto && Object.keys(data.zonasReparto).length) setZonasReparto(data.zonasReparto);
+      if (data.cargasDia && Object.keys(data.cargasDia).length) setCargasDia(data.cargasDia);
       setSyncStatus("saved");
       setTimeout(()=>setSyncStatus("idle"), 2000);
     });
   }, []);
 
   // Ref siempre actualizado — evita datos viejos en el debounce
-  const estadoRef = React.useRef({clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios,prospectos});
-  React.useEffect(()=>{ estadoRef.current={clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios,prospectos,zonasReparto}; });
+  const estadoRef = React.useRef({clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios,prospectos,cargasDia});
+  React.useEffect(()=>{ estadoRef.current={clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios,prospectos,zonasReparto,cargasDia}; });
 
   // Auto backup DIARIO a localStorage
   React.useEffect(()=>{
@@ -405,6 +408,7 @@ function App() {
         if(data.mantVeh!==undefined)    localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh||[]));
         if(data.histPrecios!==undefined) localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios||[]));
         if(data.zonasReparto!==undefined) setZonasReparto(data.zonasReparto||{});
+        if(data.cargasDia && Object.keys(data.cargasDia).length) setCargasDia(data.cargasDia);
         // Subir lo restaurado a la nube
         try { cloudSave({ ...estadoRef.current, ...data }); } catch {}
         return true;
@@ -423,8 +427,7 @@ function App() {
     localStorage.setItem("lc_hist_precios", JSON.stringify(histPrecios.slice(-50)));
     setProductos(v); syncData({productos:v});
   };
-  const [cargasDia, setCargasDia] = useLS("cat_cargas_dia_v1", CARGA_DIA_DEFAULT);
-  const saveCargasDia = (v) => { setCargasDia(v); try{localStorage.setItem("cat_cargas_dia_v1",JSON.stringify(v));}catch{} };
+  const saveCargasDia = (v) => { setCargasDia(v); try{localStorage.setItem("cat_cargas_dia_v1",JSON.stringify(v));}catch{} syncData({cargasDia:v}); };
   const saveNoVisitas= (v) => { setNoVisitas(v); try{localStorage.setItem("cat_novisitas_v1",JSON.stringify(v));}catch{} };
   const saveProspectos=(v)=>{ setProspectos(v); try{localStorage.setItem("cat_prospectos_v1",JSON.stringify(v));}catch{} syncData({prospectos:v}); };
 
