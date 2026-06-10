@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════
-// ◆  07-clientes.js — ListaClientes, DetalleCliente, EditCliente
+// ◆  07-clientes.js — ListaClientes, DetalleCliente (formulario: FormCliente unificado en 03-utils)
 // ════════════════════════════════════════════════════════════════════
 
 function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onEditarCliente,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onNoQuiereProspecto,onConfirmarTransfer,onVerProspecto,onEliminarProspecto,onAbrirMapa,onPlanilla}) {
@@ -293,10 +293,6 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
             {editandoCliente?"Cancelar":"Editar"}
           </button>
         </div>
-      </div>
-      {/* Pie de envases unificado (mismo de todas las listas) */}
-      <div style={{...s.card,paddingTop:2}}>
-        <PieEnvases c={cliente} ventas={ventas} onEditar={(id,cambios)=>onEditar(cambios)} />
       </div>
       {mostrarPagoSaldo&&(
         <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.7)",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
@@ -602,6 +598,11 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
               <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>▾</span>
             </summary>
             <div style={{marginTop:4}}>
+              {/* Editor unificado: el mismo ♻️ Envases de todas las listas */}
+              <div style={{...s.card,margin:"0 0 10px",paddingTop:2}}>
+                <PieEnvases c={cliente} ventas={ventas} onEditar={(id,cambios)=>onEditar(cambios)}
+                  izquierda={<span style={{fontSize:12,color:"var(--color-text-secondary)"}}>Ajustar fijos y prestados</span>} />
+              </div>
               {(()=>{
                 const pkEnv={"Sifón 1.5L":"sifon","Bidón 10L":"bidon10","Bidón 20L":"bidon20"};
                 const extra={sifon:0,bidon10:0,bidon20:0};
@@ -672,60 +673,11 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
             </div>
           </details>
         </>}
-        {editandoCliente && <EditCliente cliente={cliente} onGuardar={cambios=>{onEditar(cambios);setEditandoCliente(false);}} onEliminarCliente={onEliminarCliente} />}
+        {editandoCliente && <FormCliente inicial={cliente} textoGuardar="Guardar cambios" onGuardar={cambios=>{onEditar(cambios);setEditandoCliente(false);}} onEliminarCliente={onEliminarCliente} />}
       </div>
     </div>
   );
 }
-
-function EditCliente({cliente,onGuardar,onEliminarCliente}) {
-  const [datos,setDatos]=useState({...cliente});
-  const set=(k,v)=>setDatos(d=>({...d,[k]:v}));
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:16}}>
-      <div><label style={s.label}>Día de reparto</label>
-        <select style={s.select} value={datos.dia} onChange={e=>set("dia",e.target.value)}>{DIAS.map(d=><option key={d} value={d}>{d}</option>)}</select>
-      </div>
-      {[["nombre","Nombre y apellido"],["barrio","Barrio"],["manzana","Manzana"],["lote","Lote"],["sector","Sector"],["calle","Calle"],["nro","Número"],["telefono","Teléfono (sin 0 ni 15)"],["maps","Link Google Maps"],["foto","Link foto del domicilio (Google Drive, etc)"]].map(([k,l])=>(
-        <div key={k}><label style={s.label}>{l}</label><input style={s.input} value={datos[k]||""} onChange={e=>set(k,e.target.value)} placeholder={l} /></div>
-      ))}
-      <div>
-        <label style={s.label}>Notas rápidas (timbre roto, perro, cobrar deuda, etc.)</label>
-        <input style={s.input} value={datos.notas||""} onChange={e=>set("notas",e.target.value)} placeholder="ej: timbre roto, cobrar $2000..." />
-      </div>
-      <span style={{...s.label,fontSize:13,marginTop:4}}>Envases habituales</span>
-      <div style={s.grid3}>
-        {[["sifon","Sifón"],["bidon10","10L"],["bidon20","20L"]].map(([k,l])=>(
-          <div key={k}><label style={{...s.label,textAlign:"center"}}>{l}</label>
-            <input style={{...s.input,textAlign:"center"}} type="number" min={0} value={datos[k]||0} onChange={e=>set(k,Number(e.target.value))} />
-          </div>
-        ))}
-      </div>
-      <div>
-        <label style={s.label}>Dispenser en comodato</label>
-        <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <button style={{...s.btn,padding:"5px 16px",fontSize:20,lineHeight:1}} onClick={()=>set("dispenser",Math.max(0,(datos.dispenser||0)-1))}>−</button>
-          <span style={{fontSize:20,fontWeight:500,minWidth:32,textAlign:"center",color:"var(--color-text-primary)"}}>{datos.dispenser||0}</span>
-          <button style={{...s.btn,padding:"5px 16px",fontSize:20,lineHeight:1}} onClick={()=>set("dispenser",(datos.dispenser||0)+1)}>+</button>
-          <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>unidades prestadas</span>
-        </div>
-      </div>
-      <div><label style={s.label}>Saldo (corrección manual)</label><input style={s.input} type="number" value={datos.saldo||0} onChange={e=>set("saldo",Number(e.target.value))} /></div>
-      {datos.foto&&<div style={{position:"relative",cursor:"zoom-in"}} onClick={()=>setMostrarFotoGrande(true)}>
-        <img src={datos.foto} alt="Domicilio" style={{width:"100%",borderRadius:8,maxHeight:160,objectFit:"cover"}} />
-        <div style={{position:"absolute",bottom:6,right:8,background:"rgba(0,0,0,0.55)",color:"#fff",fontSize:11,borderRadius:6,padding:"2px 8px"}}>🔍 Ampliar</div>
-      </div>}
-      <button style={s.btnPrimary} onClick={()=>onGuardar(datos)}>Guardar cambios</button>
-      <div style={{marginTop:16,paddingTop:12,borderTop:"0.5px solid var(--color-border-tertiary)"}}>
-        <button style={{...s.btnDanger,width:"100%",padding:"10px",fontSize:13}}
-          onClick={()=>{if(window.confirm(`¿Eliminar a ${datos.nombre}? Se borrarán también todas sus ventas.`))onEliminarCliente();}}>
-          Eliminar cliente permanentemente
-        </button>
-      </div>
-    </div>
-  );
-}
-
 
 function FiadosPendientes({clientes,ventas,onCobrar,onVolver,onEditarCliente}) {
   const [pagando,setPagando]=React.useState(null); // clienteId
