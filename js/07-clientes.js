@@ -34,7 +34,7 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
 
   const clientesReales = clientes.filter(c=>!c._esProspecto);
   const clientesOrdenados = [...clientesReales].sort((a,b)=>(a.orden||9999)-(b.orden||9999));
-  const filtrados  = clientesOrdenados.filter(c=>c.nombre.toLowerCase().includes(busqueda.toLowerCase()));
+  const filtrados  = clientesOrdenados.filter(c=>buscarCliente(c,busqueda)>0);
   const pendientesNormales = filtrados.filter(c=>!visitados.has(c.id)&&noVMap[c.id]!=="noesta");
   const volverAlFinal      = filtrados.filter(c=>noVMap[c.id]==="noesta"&&!atendidos.has(c.id));
   const pendientes         = [...pendientesNormales, ...volverAlFinal];
@@ -221,7 +221,7 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
         <button style={{...s.btn,padding:"6px 12px",fontSize:13}} onClick={onNuevoCliente}>+ Nuevo</button>
       </div>
       <div style={{padding:"10px 16px 6px"}}>
-        <input style={s.input} placeholder="Buscar cliente..." value={busqueda} onChange={e=>setBusqueda(e.target.value)} />
+        <input style={s.input} placeholder="Buscar por domicilio o nombre..." value={busqueda} onChange={e=>setBusqueda(e.target.value)} />
         <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap",alignItems:"center"}}>
           <span style={s.badge("success")}>{clientesReales.filter(c=>visitados.has(c.id)).length}/{clientesReales.length} visitados</span>
           {volverAlFinal.length>0&&<span style={s.badge("warning")}>{volverAlFinal.length} volver al final</span>}

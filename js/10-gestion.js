@@ -25,10 +25,13 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
   const filtrados = clientes
     .filter(c=>!c._esProspecto)
     .filter(c=>filtroDia==="todos"||c.dia===filtroDia)
-    .filter(c=>c.nombre.toLowerCase().includes(busqueda.toLowerCase())||
-               (c.barrio||"").toLowerCase().includes(busqueda.toLowerCase())||
-               (c.telefono||"").includes(busqueda))
+    .filter(c=>buscarCliente(c,busqueda)>0)
     .sort((a,b)=>{
+    // Con búsqueda activa: primero las coincidencias por DOMICILIO
+    if(busqueda.trim()){
+      const dif=buscarCliente(b,busqueda)-buscarCliente(a,busqueda);
+      if(dif!==0) return dif;
+    }
     if(a.dia!==b.dia) return DIAS.indexOf(a.dia)-DIAS.indexOf(b.dia);
     return (a.orden||9999)-(b.orden||9999);
   });
@@ -47,7 +50,7 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
 
       {/* Filtros */}
       <div style={{padding:"10px 14px 6px"}}>
-        <input style={s.input} placeholder="Buscar por nombre, barrio o teléfono..." value={busqueda} onChange={e=>setBusqueda(e.target.value)} />
+        <input style={s.input} placeholder="Buscar por domicilio, nombre o teléfono..." value={busqueda} onChange={e=>setBusqueda(e.target.value)} />
         <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap",alignItems:"center"}}>
           {["todos",...DIAS].map(d=>(
             <button key={d} style={{...s.btn,fontSize:11,padding:"3px 10px",

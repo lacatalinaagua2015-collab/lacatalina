@@ -173,7 +173,7 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
               </div>
               {clientesReales
                 .filter(c=>diaArqueo==="todos"||c.dia===diaArqueo)
-                .filter(c=>(c.nombre||"").toLowerCase().includes(buscaArqueo.toLowerCase()))
+                .filter(c=>buscarCliente(c,buscaArqueo)>0)
                 .sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""))
                 .map(c=>(
                 <div key={c.id} style={{display:"grid",gridTemplateColumns:"1fr 42px 42px 42px 42px",gap:4,alignItems:"center",marginBottom:4}}>
