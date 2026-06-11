@@ -744,23 +744,42 @@ function App() {
     irA("clientes");
   };
 
-  const unificarDuplicados = () => {
+  // ── Unificación de duplicados SEGURA: prioriza el DOMICILIO ──
+  // Mismo nombre+día pero domicilios distintos = probablemente personas diferentes → viene desmarcado
+  const [dupPreview, setDupPreview] = useState(null);
+  const domKeyDup = (c)=>{
+    const n=(s)=>(s||"").toString().trim().toLowerCase().replace(/\s+/g," ");
+    return n([c.calle,c.nro,c.manzana,c.lote,c.barrio,c.sector].filter(Boolean).join(" "));
+  };
+  const detectarDuplicados = () => {
     const norm = (s)=>(s||"").toString().trim().toLowerCase().replace(/\s+/g," ");
     const grupos = {};
     (clientes||[]).forEach(c=>{ const k=norm(c.nombre)+"|"+(c.dia||""); (grupos[k]=grupos[k]||[]).push(c); });
-    const remap = {};
-    let fusionados = [];
-    let dupGrupos = 0;
-    const completos = (c)=>Object.values(c).filter(v=>v!==""&&v!==null&&v!==undefined&&v!==0).length;
-    Object.values(grupos).forEach(grupo=>{
-      if(grupo.length===1){ fusionados.push(grupo[0]); return; }
-      dupGrupos++;
-      const base = grupo.reduce((a,b)=> completos(b)>completos(a)?b:a);
-      const merged = {...base};
-      merged.saldo = grupo.reduce((a,c)=>a+(Number(c.saldo)||0),0);
-      grupo.forEach(c=>{ if(c.id!==merged.id) remap[c.id]=merged.id; });
-      fusionados.push(merged);
+    const lista = Object.values(grupos).filter(g=>g.length>1).map(g=>{
+      const doms = g.map(domKeyDup);
+      const conDom = doms.filter(Boolean);
+      // Mismo domicilio solo si TODOS tienen domicilio cargado y todos coinciden
+      const mismoDomicilio = conDom.length===doms.length && conDom.length>0 && conDom.every(d=>d===conDom[0]);
+      return { miembros:g, mismoDomicilio, sel:mismoDomicilio };
     });
+    if(lista.length===0){ window.alert("✅ No se encontraron clientes con el mismo nombre y día."); return; }
+    setDupPreview(lista);
+  };
+  const ejecutarUnificacion = () => {
+    const seleccion = (dupPreview||[]).filter(g=>g.sel);
+    if(seleccion.length===0){ setDupPreview(null); return; }
+    const remap = {};
+    const completos = (c)=>Object.values(c).filter(v=>v!==""&&v!==null&&v!==undefined&&v!==0).length;
+    const idsAEliminar = new Set();
+    const reemplazos = {};
+    seleccion.forEach(({miembros})=>{
+      const base = miembros.reduce((a,b)=> completos(b)>completos(a)?b:a);
+      const merged = {...base, saldo: miembros.reduce((a,c)=>a+(Number(c.saldo)||0),0)};
+      miembros.forEach(c=>{ if(c.id!==base.id){ remap[c.id]=base.id; idsAEliminar.add(c.id); } });
+      reemplazos[base.id]=merged;
+    });
+    let fusionados = clientes.filter(c=>!idsAEliminar.has(c.id)).map(c=>reemplazos[c.id]||c);
+    // Reparar IDs repetidos si los hubiera (corrupción de datos)
     const usados = new Set();
     fusionados = fusionados.map(c=>{
       let id=c.id;
@@ -768,8 +787,6 @@ function App() {
       usados.add(id);
       return {...c,id};
     });
-    if(dupGrupos===0 && Object.keys(remap).length===0){ window.alert("✅ No se encontraron clientes duplicados."); return; }
-    if(!window.confirm("Se encontraron "+dupGrupos+" cliente(s) duplicado(s).\n\nSe unifican en uno solo, juntando sus ventas y sumando los saldos. Después conviene que revises los saldos.\n\n¿Continuar?")) return;
     const rid = (x)=> remap[x]!==undefined?remap[x]:x;
     const nVentas = (ventasRaw||[]).map(v=>({...v,clienteId:rid(v.clienteId)}));
     const nNoVis  = (noVisitas||[]).map(v=>({...v,clienteId:rid(v.clienteId)}));
@@ -779,7 +796,8 @@ function App() {
     setNoVisitas(nNoVis);
     setRecordatorios(nRec);
     syncData({clientes:fusionados, ventas:nVentas, noVisitas:nNoVis, recordatorios:nRec});
-    window.alert("✅ Listo. Se unificaron "+dupGrupos+" cliente(s). Revisá los saldos por las dudas.");
+    setDupPreview(null);
+    window.alert("✅ Listo. Se unificaron "+seleccion.length+" grupo(s). Revisá los saldos por las dudas.");
   };
 
   const eliminarVenta = (ventaId) => {
@@ -1055,7 +1073,43 @@ function App() {
         saveProspectos(prospectos.map(x=>x.id===p.id?{...x,estado:"convertido"}:x));
         irA("promocion");
       }} onVolver={()=>irA("menu")} /></React.Fragment>}
-      {pantalla==="gestionClientes" && <React.Fragment><ClientesTabs activo="todos" onIr={irA}/><div style={{padding:"8px 12px 0"}}><button onClick={unificarDuplicados} style={{width:"100%",padding:"10px",borderRadius:8,border:"1px solid var(--color-border-secondary)",background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",fontWeight:600,cursor:"pointer",fontSize:13}}>🔧 Unificar clientes duplicados</button></div><GestionClientes clientes={clientes} onReordenarTodo={(lista)=>saveClientes(lista)} onEditar={(id,cambios)=>{saveClientes(clientes.map(c=>c.id===id?{...c,...cambios}:c));}} onEliminar={(id)=>{
+      {pantalla==="gestionClientes" && <React.Fragment><ClientesTabs activo="todos" onIr={irA}/><div style={{padding:"8px 12px 0"}}><button onClick={detectarDuplicados} style={{width:"100%",padding:"10px",borderRadius:8,border:"1px solid var(--color-border-secondary)",background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",fontWeight:600,cursor:"pointer",fontSize:13}}>🔧 Unificar clientes duplicados</button>
+      {dupPreview&&(
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.85)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"var(--color-background-secondary)",borderRadius:14,padding:16,width:"100%",maxWidth:440,maxHeight:"85vh",overflowY:"auto"}}>
+            <div style={{fontSize:15,fontWeight:600,marginBottom:4,color:"var(--color-text-primary)"}}>🔧 Vista previa de unificación</div>
+            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:10,lineHeight:1.5}}>
+              Solo se unifican los grupos que marques. Los que tienen <b>domicilios distintos</b> vienen desmarcados porque probablemente son personas diferentes.
+            </div>
+            {dupPreview.map((g,i)=>(
+              <div key={i} style={{border:"1px solid "+(g.mismoDomicilio?"var(--color-border-secondary)":"#f5b942"),borderRadius:10,padding:"8px 10px",marginBottom:8,background:g.sel?"var(--color-background-info)":"var(--color-background-tertiary)"}}>
+                <label style={{display:"flex",gap:8,alignItems:"flex-start",cursor:"pointer"}}>
+                  <input type="checkbox" checked={g.sel} onChange={()=>setDupPreview(p=>p.map((x,j)=>j===i?{...x,sel:!x.sel}:x))} style={{marginTop:3,width:16,height:16}}/>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-primary)"}}>{g.miembros[0].nombre} · {g.miembros[0].dia}</div>
+                    {!g.mismoDomicilio&&<div style={{fontSize:11,color:"#f5b942",margin:"3px 0"}}>⚠️ Domicilios distintos o incompletos — verificá antes de marcar</div>}
+                    {g.miembros.map(m=>{
+                      const nv=(ventasRaw||[]).filter(v=>v.clienteId===m.id).length;
+                      return (
+                        <div key={m.id} style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:3}}>
+                          • {[m.calle?`${m.calle} ${m.nro||""}`.trim():"",m.manzana?`Mz ${m.manzana}${m.lote?` L ${m.lote}`:""}`:"",m.barrio||""].filter(Boolean).join(" · ")||"(sin domicilio)"}
+                          <span style={{color:"var(--color-text-tertiary)"}}> · {nv} ventas · saldo {fmt(m.saldo||0)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </label>
+              </div>
+            ))}
+            <div style={{display:"flex",gap:8,marginTop:10}}>
+              <button style={{flex:1,padding:"11px",borderRadius:8,border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",fontSize:13,cursor:"pointer"}} onClick={()=>setDupPreview(null)}>Cancelar</button>
+              <button style={{flex:2,padding:"11px",borderRadius:8,border:"none",background:dupPreview.filter(g=>g.sel).length?"#1d9e75":"#3a4a5a",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}} onClick={ejecutarUnificacion}>
+                ✓ Unificar marcados ({dupPreview.filter(g=>g.sel).length})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}</div><GestionClientes clientes={clientes} onReordenarTodo={(lista)=>saveClientes(lista)} onEditar={(id,cambios)=>{saveClientes(clientes.map(c=>c.id===id?{...c,...cambios}:c));}} onEliminar={(id)=>{
         if(window.confirm("¿Eliminar cliente? Se quitará de todas las listas (clientes, ventas, prospectos, no-visitas y recordatorios).")){
           eliminarCliente(id);
           irA("gestionClientes");
