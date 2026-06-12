@@ -829,7 +829,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
 
         {/* Detalle de ventas — primero y abierto por defecto */}
         {todasVentasDia.length>0
-          ? <DetalleVentasDia ventas={todasVentasDia} clientes={clientes} noVisitas={noVisitas} fecha={fecha} />
+          ? <DetalleVentasDia ventas={todasVentasDia.filter(v=>!v._esMixtoTrans)} clientes={clientes} noVisitas={noVisitas} fecha={fecha} />
           : <div style={{...s.card,margin:"0 0 8px",padding:"12px 16px",background:"var(--color-background-tertiary)"}}>
               <span style={{fontSize:13,color:"var(--color-text-tertiary)"}}>📋 Sin ventas registradas para este día</span>
             </div>

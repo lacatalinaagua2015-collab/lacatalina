@@ -267,12 +267,15 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
   const [mostrarFotoGrande,setMostrarFotoGrande] = useState(false);
   const [razonAjuste,setRazonAjuste] = useState("");
   const recActivos = (recordatorios||[]).filter(r=>r.clienteId===cliente.id&&!r.confirmado);
-  const historial = [...ventas].sort((a,b)=>(b.fechaKey||"").localeCompare(a.fechaKey||"")||(b.id||0)-(a.id||0));
-  const ventaHoy  = fecha ? ventas.find(v=>v.fechaKey===fecha&&!v._esCobro&&!v._esAjuste) : null;
+  // Las partes-transferencia de pagos mixtos NO son ventas: no se listan ni se cuentan acá
+  // (la venta principal ya muestra el desglose [Mixto: ef + tr]; la transferencia se confirma en el panel del día)
+  const ventasSinMixtoTr = ventas.filter(v=>!v._esMixtoTrans);
+  const historial = [...ventasSinMixtoTr].sort((a,b)=>(b.fechaKey||"").localeCompare(a.fechaKey||"")||(b.id||0)-(a.id||0));
+  const ventaHoy  = fecha ? ventasSinMixtoTr.find(v=>v.fechaKey===fecha&&!v._esCobro&&!v._esAjuste) : null;
   const initials  = cliente.nombre.split(" ").slice(0,2).map(w=>w[0]||"").join("").toUpperCase();
-  const totalComprado = ventas.reduce((a,v)=>a+(v.neto||0),0);
-  const promedioVenta = ventas.length>0 ? Math.round(totalComprado/ventas.length) : 0;
-  const ventasUltimos30 = ventas.filter(v=>{
+  const totalComprado = ventasSinMixtoTr.reduce((a,v)=>a+(v.neto||0),0);
+  const promedioVenta = ventasSinMixtoTr.length>0 ? Math.round(totalComprado/ventasSinMixtoTr.length) : 0;
+  const ventasUltimos30 = ventasSinMixtoTr.filter(v=>{
     const fk=v.fechaKey||""; if(!fk) return false;
     const d=new Date(fk); const hoy=new Date();
     return (hoy-d)/86400000<=30;
@@ -399,7 +402,7 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
             <div style={s.metricCard}>
               <div style={s.metricLabel}>Total histórico</div>
               <div style={s.metricVal}>{fmt(totalComprado)}</div>
-              <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>{ventas.length} compras</div>
+              <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>{ventasSinMixtoTr.length} compras</div>
             </div>
           </div>
 
