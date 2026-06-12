@@ -643,6 +643,7 @@ function App() {
   // ── FIN NOTIFICACIONES ─────────────────────────────────────────────────────
 
   const registrarVenta = (detalle, pago, montoPagado, saldoAplicado, envPrest, envDev, obs, opcionSaldo, montoTrans2, saldoDeltaMixto) => {
+    montoTrans2 = Number(montoTrans2)||0; // defensa: siempre número (el desglose mixto depende de esto)
     const c = cliente;
     // Auto-detectar envases prestados (solo si no es cobro de deuda)
     const envAutoDetect = [];
@@ -1017,8 +1018,9 @@ function App() {
           const sig=normalPend[0]||noestaPend[0];
           if(sig){setClienteId(sig.id);irA("venta");}else irA("clientes");
         }}
-        onGuardar={(d,p,m,sa,ep,ed,obs,op)=>{
-  registrarVenta(d,p,m,sa,ep,ed,obs,op);
+        onGuardar={(...args)=>{
+  // Pasa TODOS los argumentos (incluye el desglose del pago mixto: montoTrans2 y saldoDelta)
+  registrarVenta(...args);
   // Auto-advance to next pending client (noesta = volver al final, no saltar a ellos)
   const clientesDia = clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
   const visitadosIds = new Set([
