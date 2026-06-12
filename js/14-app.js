@@ -803,11 +803,33 @@ function App() {
 
   const eliminarVenta = (ventaId) => {
     const v = ventas.find(x=>x.id===ventaId); if(!v) return;
-    const nv = ventas.filter(x=>x.id!==ventaId);
+    const eraMixta = (Number(v.montoTrans)||0)>0;
+    let ajusteSaldoExtra = 0;
+    let nv = ventas.filter(x=>{
+      if(x.id===ventaId) return false;
+      // Cascada: borrar también la parte-transferencia ligada a ESTA venta
+      const ligada = x._esMixtoTrans && (
+        x._mixtoDe===ventaId ||
+        (x._mixtoDe===undefined && eraMixta && x.clienteId===v.clienteId && x.fechaKey===v.fechaKey)
+      );
+      if(ligada && (Number(x.saldoDelta)||0)!==0) ajusteSaldoExtra += Number(x.saldoDelta);
+      return !ligada;
+    });
+    // Limpieza: partes-transferencia huérfanas (su venta principal ya no existe)
+    nv = nv.filter(x=>!(x._esMixtoTrans && x._mixtoDe!==undefined && !nv.some(y=>y.id===x._mixtoDe)));
     saveVentas(nv);
     const c = clientes.find(x=>x.id===v.clienteId);
-    if(c){ const nc=clientes.map(x=>x.id===c.id?{...x,saldo:c.saldo-v.saldoDelta}:x); saveClientes(nc); }
+    if(c){ const nc=clientes.map(x=>x.id===c.id?{...x,saldo:c.saldo-v.saldoDelta-ajusteSaldoExtra}:x); saveClientes(nc); }
   };
+
+  // Limpieza automática: partes-transferencia cuya venta principal ya fue eliminada
+  React.useEffect(()=>{
+    const huerfanas = ventas.filter(v=>v._esMixtoTrans && v._mixtoDe!==undefined && !ventas.some(x=>x.id===v._mixtoDe));
+    if(huerfanas.length>0){
+      const ids=new Set(huerfanas.map(v=>v.id));
+      saveVentas(ventas.filter(v=>!ids.has(v.id)));
+    }
+  }, [ventas]);
 
   const editarVenta = (ventaId, detalle, pago, montoPagado, saldoAplicado, obs, montoTrans2) => {
     const vV = ventas.find(v=>v.id===ventaId); if(!vV) return;
