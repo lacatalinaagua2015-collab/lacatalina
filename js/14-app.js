@@ -688,7 +688,7 @@ function App() {
         neto:montoTrans2, bruto:montoTrans2, desc:0, costo:0, ganancia:0,
         pagadoNum:montoTrans2, saldoDelta:0, // sin impacto en saldo
         envPrest:[], envDev:[],
-        _esMixtoTrans:true,
+        _esMixtoTrans:true, _mixtoDe:nuevaVenta.id,
         transConfirmada:false, // aparece como transferencia pendiente de confirmar
       };
       nuevasVentas = [...nuevasVentas, ventaTr];
@@ -811,25 +811,36 @@ function App() {
   const editarVenta = (ventaId, detalle, pago, montoPagado, saldoAplicado, obs, montoTrans2) => {
     const vV = ventas.find(v=>v.id===ventaId); if(!vV) return;
     const c  = clientes.find(x=>x.id===vV.clienteId);
-    const pagoReal = pago==="mixto"?"contado":pago;
-    const calc = calcVenta(detalle, pagoReal, montoPagado, saldoAplicado, productos);
-    // Remove old transfer venta if existed (from previous mixto edit)
-    let nev = ventas.filter(v=>!(v.obs==="[Parte transfer. de pago mixto]"&&v.clienteId===vV.clienteId&&v.fechaKey===vV.fechaKey));
-    nev = nev.map(v=>v.id===ventaId?{...vV,detalle,pago:pagoReal,obs,saldoAplicado:saldoAplicado||0,...calc}:v);
+    const esMixto = pago==="mixto";
+    const ef = Number(montoPagado)||0, tr = esMixto?(Number(montoTrans2)||0):0;
+    const pagoReal = esMixto?"contado":pago;
+    // MIXTO: el cálculo usa el TOTAL pagado (ef+tr), igual que al registrar → el saldo queda bien
+    const calc = calcVenta(detalle, pagoReal, esMixto?String(ef+tr):montoPagado, saldoAplicado, productos);
+    const obsLimpia = (obs||"").replace(/\s*\[Mixto:[^\]]*\]/g,"");
+    const obsFinal  = esMixto&&tr>0 ? obsLimpia+` [Mixto: ef $${ef} + tr $${tr}]` : obsLimpia;
+    const eraMixta  = (Number(vV.montoTrans)||0)>0;
     let saldoExtra = c ? (c.saldo - vV.saldoDelta + calc.saldoDelta) : 0;
-    // If mixto, add transfer venta
-    if(pago==="mixto"&&montoTrans2>0){
+    // Quitar SOLO la parte-transferencia ligada a ESTA venta (no las de otras ventas mixtas del día)
+    let nev = ventas.filter(v=>{
+      const ligada = v._esMixtoTrans && (
+        v._mixtoDe===ventaId ||
+        (v._mixtoDe===undefined && eraMixta && v.clienteId===vV.clienteId && v.fechaKey===vV.fechaKey)
+      );
+      if(ligada && (Number(v.saldoDelta)||0)!==0) saldoExtra -= Number(v.saldoDelta); // compensar partes viejas que tocaban saldo
+      return !ligada;
+    });
+    nev = nev.map(v=>v.id===ventaId?{...vV,detalle,pago:pagoReal,obs:obsFinal,saldoAplicado:saldoAplicado||0,...calc,montoEfec:esMixto?ef:0,montoTrans:tr}:v);
+    if(esMixto&&tr>0){
       const ventaTr = {
         id:Date.now()+2, clienteId:vV.clienteId, cliente:vV.cliente,
         dia:vV.dia, fechaKey:vV.fechaKey, fecha:vV.fecha,
-        detalle:[{nombre:"Pago mixto · transferencia",cantidad:1,precio:montoTrans2,total:montoTrans2}],
+        detalle:[{nombre:"Pago mixto · transferencia",cantidad:1,precio:tr,total:tr}],
         pago:"transferencia", obs:"[Parte transfer. de pago mixto]", saldoAplicado:0,
-        neto:montoTrans2, bruto:montoTrans2, desc:0, costo:0, ganancia:montoTrans2,
-        pagadoNum:montoTrans2, saldoDelta:montoTrans2, envPrest:[], envDev:[],
-        _esMixtoTrans:true,
+        neto:tr, bruto:tr, desc:0, costo:0, ganancia:0,
+        pagadoNum:tr, saldoDelta:0, envPrest:[], envDev:[],
+        _esMixtoTrans:true, _mixtoDe:ventaId, transConfirmada:false,
       };
       nev = [...nev, ventaTr];
-      saldoExtra += montoTrans2;
     }
     saveVentas(nev);
     if(c){ const nc=clientes.map(x=>x.id===c.id?{...x,saldo:saldoExtra}:x); saveClientes(nc); }
@@ -1182,7 +1193,7 @@ function App() {
       {modalResumenDia&&(()=>{
         const {dia,fechaKey}=modalResumenDia;
         const vDia=ventas.filter(v=>v.fechaKey===fechaKey&&v.dia===dia&&!v._esCobro&&!v._esAjuste);
-        const efectivo=vDia.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
+        const efectivo=vDia.filter(v=>v.pago==="contado").reduce((a,v)=>a+(((Number(v.montoTrans)||0)>0)?(Number(v.montoEfec)||0):(v.pagadoNum||v.neto||0)),0);
         const transTot=vDia.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
         const transConf=vDia.filter(v=>v.pago==="transferencia"&&v.transConfirmada).reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
         const transPend=transTot-transConf;

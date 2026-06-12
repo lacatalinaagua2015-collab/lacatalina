@@ -418,7 +418,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
   const extraFiado    = ventasExtraDia.filter(v=>v.pago==="fiado").reduce((a,v)=>a+(v.neto||0),0);
   const extraTotal    = extraEfectivo + extraTrans + extraFiado;
   // Cobranza — todas las ventas del día (propias + otros días)
-  const cobEfectivo   = todasVentasDia.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
+  const cobEfectivo   = todasVentasDia.filter(v=>v.pago==="contado").reduce((a,v)=>a+(((Number(v.montoTrans)||0)>0)?(Number(v.montoEfec)||0):(v.pagadoNum||v.neto||0)),0);
   const cobTransBruto = todasVentasDia.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
   const cobTransDesc  = Math.round(cobTransBruto*0.025);
   const cobTransNeto  = cobTransBruto - cobTransDesc;

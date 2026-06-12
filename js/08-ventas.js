@@ -3,12 +3,13 @@
 // ════════════════════════════════════════════════════════════════════
 
 function EditVenta({venta,productos,onGuardar,onCancelar}) { // onGuardar(detalle,pago,monto,saldoApl,obs,montoTrans2)
+  const esMixtaOrig = (Number(venta.montoTrans)||0)>0; // venta mixta guardada: pago "contado" + desglose
   const [cantidades,setCantidades]=useState(()=>{const m={};productos.forEach(p=>{m[p.nombre]=0;});venta.detalle.forEach(d=>{m[d.nombre]=d.cantidad;});return m;});
-  const [pago,setPago]=useState(venta.pago||"contado");
+  const [pago,setPago]=useState(esMixtaOrig?"mixto":(venta.pago||"contado"));
   const [monto,setMonto]=useState(()=>String(venta.pagadoNum||venta.neto||""));
-  const [montoEfec,setMontoEfec]=useState("");
-  const [montoTrans,setMontoTrans]=useState("");
-  const [obs,setObs]=useState(venta.obs||"");
+  const [montoEfec,setMontoEfec]=useState(esMixtaOrig?String(venta.montoEfec||""):"");
+  const [montoTrans,setMontoTrans]=useState(esMixtaOrig?String(venta.montoTrans||""):"");
+  const [obs,setObs]=useState((venta.obs||"").replace(/\s*\[Mixto:[^\]]*\]/g,""));
   const detalle=productos.map(p=>({nombre:p.nombre,cantidad:cantidades[p.nombre]||0,precio:p.precio,total:(cantidades[p.nombre]||0)*p.precio})).filter(d=>d.cantidad>0);
   const bruto=detalle.reduce((a,d)=>a+d.total,0);
   const neto=bruto;
@@ -68,8 +69,8 @@ function EditVenta({venta,productos,onGuardar,onCancelar}) { // onGuardar(detall
         <button style={{...s.btnPrimary,flex:2,padding:"10px"}} onClick={()=>{
           if(pago==="mixto"){
             const ef=Number(montoEfec||0), tr=Number(montoTrans||0);
-            onGuardar(detalle,"mixto",String(ef),venta.saldoAplicado||0,
-              `[Mixto: ef $${ef} + tr $${tr}]`,tr);
+            if(ef+tr===0){ alert("⚠️ Completá el desglose: cuánto en efectivo y cuánto por transferencia."); return; }
+            onGuardar(detalle,"mixto",String(ef),venta.saldoAplicado||0,obs,tr);
           } else {
             onGuardar(detalle,pago,pago==="fiado"?"":monto,venta.saldoAplicado||0,obs);
           }
