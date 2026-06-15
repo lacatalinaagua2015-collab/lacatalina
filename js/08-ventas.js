@@ -159,7 +159,7 @@ function VehiculoMantModal({onGuardar,onCerrar}) {
 }
 
 function RecordatorioModal({cliente,onGuardar,onCerrar}) {
-  const hoy = new Date();
+  const hoy = new Date(Date.now()-3*60*60*1000);
   const [fecha,setFecha] = React.useState(hoy.toISOString().slice(0,10));
   const [hora,setHora]   = React.useState("10:00");
   const [tipo,setTipo]   = React.useState("visita"); // visita | cobro
