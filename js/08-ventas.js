@@ -198,7 +198,7 @@ function RecordatorioModal({cliente,onGuardar,onCerrar}) {
           <button style={{...s.btn,flex:1}} onClick={onCerrar}>Cancelar</button>
           <button style={{...s.btnPrimary,flex:2}} onClick={()=>{
             if(!motivo.trim()){alert("Ingresá el detalle");return;}
-            onGuardar({fecha,hora,tipo,motivo:motivo.trim()});
+            onGuardar({id:Date.now(),fecha,hora,tipo,motivo:motivo.trim(),confirmado:false});
           }}>Guardar recordatorio</button>
         </div>
       </div>
