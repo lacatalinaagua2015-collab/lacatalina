@@ -327,6 +327,7 @@ function DetalleVentasDia({ventas, clientes, noVisitas, fecha}) {
                     {cli&&cli._esProspecto&&<span style={{marginLeft:6,fontSize:10,padding:"1px 6px",borderRadius:4,background:"#2e1f06",color:"#f5b942",fontWeight:600}}>🚀 Prospecto</span>}
                     <span style={{marginLeft:6,fontSize:10,padding:"1px 6px",borderRadius:4,background:pagoBadge.bg,color:pagoBadge.color,fontWeight:600}}>{pagoBadge.txt}</span>
                     {dir&&<div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>📍 {dir}</div>}
+                    {v.fecha&&<div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>🕐 {fmtFechaHoraVenta(v.fecha)}</div>}
                   </div>
                   <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(v.neto||0)}</span>
                 </div>

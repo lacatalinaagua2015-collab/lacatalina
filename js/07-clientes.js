@@ -528,7 +528,7 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
                     <span style={{fontSize:18}}>{esNoEsta?"🚪":"🙅"}</span>
                     <div>
                       <div style={{fontSize:13,fontWeight:600,color:esNoEsta?"#f59e0b":"#ef4444"}}>{esNoEsta?"No estaba en casa":"No quiso comprar"}</div>
-                      <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{item.fechaKey} · {item.dia}</div>
+                      <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{(fmtFechaHoraVenta(item.creado)||item.fechaKey)} · {item.dia}</div>
                     </div>
                   </div>
                 );
@@ -542,7 +542,7 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
                     <span style={{fontSize:18}}>💳</span>
                     <div style={{flex:1}}>
                       <div style={{fontSize:13,fontWeight:700,color:"#10b981"}}>Cobro de deuda</div>
-                      <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:1}}>{v.fechaKey} · {v.pago}</div>
+                      <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:1}}>{(fmtFechaHoraVenta(v.fecha)||v.fechaKey)} · {v.pago}</div>
                       {v.saldoAntes!==undefined&&<div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>Saldo antes: {fmt(v.saldoAntes)} → después: {fmt(v.saldoDespues)}</div>}
                     </div>
                   </div>
@@ -559,7 +559,7 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
                     <div style={{flex:1}}>
                       <div style={{fontSize:13,fontWeight:700,color:"#818cf8"}}>Ajuste de saldo</div>
                       <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:2}}>{v.obs?.replace("Ajuste: ","")}</div>
-                      <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:1}}>{v.fechaKey}</div>
+                      <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:1}}>{(fmtFechaHoraVenta(v.fecha)||v.fechaKey)}</div>
                       {v.saldoAntes!==undefined&&<div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>Saldo: {fmt(v.saldoAntes)} → {fmt(v.saldoDespues)}</div>}
                     </div>
                   </div>
@@ -574,7 +574,7 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,alignItems:"center"}}>
                       <div style={{display:"flex",gap:6,alignItems:"center"}}>
                         <span style={{fontSize:16}}>🛒</span>
-                        <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{v.fechaKey||v.dia}</span>
+                        <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{fmtFechaHoraVenta(v.fecha)||v.fechaKey||v.dia}</span>
                       </div>
                       <span style={{fontSize:15,fontWeight:700,color:"#3b82f6"}}>{fmt(v.neto)}</span>
                     </div>

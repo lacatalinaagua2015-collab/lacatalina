@@ -1,6 +1,18 @@
 // ════════════════════════════════════════════════════════════════════
-// ◆  03-utils.js — debounceSave, useLS, calcVenta, comprimirFoto
+// ◆  03-utils.js — debounceSave, useLS, calcVenta, comprimirFoto, fmtFechaHoraVenta
 // ════════════════════════════════════════════════════════════════════
+
+// ── Muestra la fecha y hora real del teléfono de un registro (ej: "19/6/2026 · 14:30", sin segundos) ──
+function fmtFechaHoraVenta(f) {
+  if (!f) return "";
+  const limpio = String(f).replace(",", " ").replace(/\s+/g, " ").trim();
+  const partes = limpio.split(" ");
+  const fecha = partes[0] || "";
+  let hora = partes[1] || "";
+  const hm = hora.split(":");
+  if (hm.length >= 2) hora = hm[0].padStart(2, "0") + ":" + hm[1];
+  return hora ? (fecha + " · " + hora) : fecha;
+}
 
 function debounceSave(fn) {
   _saveQueue = fn;
