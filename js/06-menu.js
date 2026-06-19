@@ -381,8 +381,8 @@ function DetalleVentasDia({ventas, clientes, noVisitas, fecha}) {
 function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setStock,syncData,onGuardar,onVolver,autoCierre,onAutoGuardar,noVisitas}) {
   // Separar ventas del día propio vs ventas de clientes de otro día
   const clientesDia = new Set((clientes||[]).filter(c=>c.dia===dia).map(c=>c.id));
-  const ventasPropias  = ventas.filter(v=>clientesDia.has(v.clienteId));
-  const ventasExtraDia = ventas.filter(v=>!clientesDia.has(v.clienteId)&&(!v.dia||v.dia===dia)&&v.fechaKey===fecha);
+  const ventasPropias  = ventas.filter(v=>clientesDia.has(v.clienteId)&&v.fechaKey===fecha);
+  const ventasExtraDia = ventas.filter(v=>!clientesDia.has(v.clienteId)&&v.fechaKey===fecha);
   // Auto-calcular desde ventas del dia
   const CAJON_SODA = 6;
   const getProdCosto = (nombre) => { const p=(productos||[]).find(x=>x.nombre===nombre); return p?(p.costo||0):0; };
@@ -418,7 +418,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
   const extraFiado    = ventasExtraDia.filter(v=>v.pago==="fiado").reduce((a,v)=>a+(v.neto||0),0);
   const extraTotal    = extraEfectivo + extraTrans + extraFiado;
   // Cobranza — todas las ventas del día (propias + otros días)
-  const cobEfectivo   = todasVentasDia.filter(v=>v.pago==="contado").reduce((a,v)=>a+(((Number(v.montoTrans)||0)>0)?(Number(v.montoEfec)||0):(v.pagadoNum||v.neto||0)),0);
+  const cobEfectivo   = todasVentasDia.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
   const cobTransBruto = todasVentasDia.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
   const cobTransDesc  = Math.round(cobTransBruto*0.025);
   const cobTransNeto  = cobTransBruto - cobTransDesc;
@@ -829,7 +829,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
 
         {/* Detalle de ventas — primero y abierto por defecto */}
         {todasVentasDia.length>0
-          ? <DetalleVentasDia ventas={todasVentasDia.filter(v=>!v._esMixtoTrans)} clientes={clientes} noVisitas={noVisitas} fecha={fecha} />
+          ? <DetalleVentasDia ventas={todasVentasDia} clientes={clientes} noVisitas={noVisitas} fecha={fecha} />
           : <div style={{...s.card,margin:"0 0 8px",padding:"12px 16px",background:"var(--color-background-tertiary)"}}>
               <span style={{fontSize:13,color:"var(--color-text-tertiary)"}}>📋 Sin ventas registradas para este día</span>
             </div>
@@ -848,22 +848,22 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
               <span style={{fontSize:13,fontWeight:500,color:`var(--color-text-${c})`}}>{v}</span>
             </div>
           ))}
-          {/* Cobros de deuda — informativos: YA están incluidos en efectivo/transferencia */}
+          {/* Cobros de deuda — separados por forma de pago */}
           {cobSaldosEfec>0&&(
-            <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0 5px 12px",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-              <span style={{fontSize:12,color:"var(--color-text-tertiary)",fontStyle:"italic"}}>↳ incluye cobro deuda · efectivo</span>
-              <span style={{fontSize:12,fontWeight:500,color:"var(--color-text-success)",fontStyle:"italic"}}>{fmt(cobSaldosEfec)}</span>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+              <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>+ Cobro deuda · efectivo</span>
+              <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-success)"}}>{fmt(cobSaldosEfec)}</span>
             </div>
           )}
           {cobSaldosTrans>0&&(
-            <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0 5px 12px",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-              <span style={{fontSize:12,color:"var(--color-text-tertiary)",fontStyle:"italic"}}>↳ incluye cobro deuda · transferencia</span>
-              <span style={{fontSize:12,fontWeight:500,color:"var(--color-text-info)",fontStyle:"italic"}}>{fmt(cobSaldosTrans)}</span>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+              <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>+ Cobro deuda · transferencia</span>
+              <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-info)"}}>{fmt(cobSaldosTrans)}</span>
             </div>
           )}
           <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0 2px"}}>
             <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Total cobrado</span>
-            <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(cobEfectivo+cobTransBruto)}</span>
+            <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(cobEfectivo+cobTransBruto+cobSaldos)}</span>
           </div>
         </div>
 
@@ -1070,7 +1070,7 @@ function InicioReparto({dia,fecha,planilla,productos,cargasDia,stock,onGuardar,o
                 ...planilla,
                 iniciado:true,
                 productos: Object.fromEntries(
-                  Object.entries(llenos).map(([k,v])=>[k,{
+                  Object.entries(cajones).map(([k,v])=>[k,{
                     ...(planilla?.productos?.[k]||{}),
                     llenos:v
                   }])
