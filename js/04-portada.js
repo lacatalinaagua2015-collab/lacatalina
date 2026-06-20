@@ -42,10 +42,10 @@ function formatFecha(d) {
 }
 
 function fechaKey(d) {
-  return d.toISOString().slice(0,10);
+  return d.toLocaleDateString("en-CA");
 }
 
-function hoyKey() { return new Date().toISOString().slice(0,10); }
+function hoyKey() { return new Date().toLocaleDateString("en-CA"); }
 
 function SelectorFecha({dia,planillas,ventas,noVisitas,onSeleccionar,onVolver}) {
   const fechas = getFechasDelAnio(dia);
@@ -170,89 +170,6 @@ function SyncBar({status, isOnline}) {
   return (
     <div style={{background:c.bg,color:c.color,textAlign:"center",fontSize:12,padding:"6px",fontWeight:500}}>
       {c.txt}
-    </div>
-  );
-}
-
-function SetupNube({onSetup}) {
-  const [paso, setPaso] = useState(1);
-  // No API config needed with Firebase
-  const [cargando, setCargando] = useState(false);
-  const [error, setError] = useState("");
-
-  const conectar = async () => {
-    if (!apiKey.trim()) { setError("Pegá tu API Key primero"); return; }
-    setCargando(true); setError("");
-    try {
-      const binId = await cloudCreate(apiKey.trim());
-      localStorage.setItem("cat_apikey", JSON.stringify(apiKey.trim()));
-      localStorage.setItem("cat_binid",  JSON.stringify(binId));
-      onSetup(apiKey.trim(), binId);
-    } catch(e) {
-      setError("API Key incorrecta o sin conexión. Revisá la clave e intentá de nuevo.");
-    }
-    setCargando(false);
-  };
-
-  return (
-    <div style={{maxWidth:480,margin:"0 auto",minHeight:"100vh",background:"var(--color-background-primary)",padding:24,display:"flex",flexDirection:"column",gap:16}}>
-      <div style={{textAlign:"center",paddingTop:32,paddingBottom:8}}>
-        <div style={{fontSize:40,marginBottom:12}}>☁️</div>
-        <h1 style={{fontSize:20,fontWeight:500,color:"var(--color-text-primary)",marginBottom:6}}>Configurar guardado en la nube</h1>
-        <p style={{fontSize:14,color:"var(--color-text-secondary)",lineHeight:1.6}}>Necesitás hacer esto una sola vez. Después todo se guarda automáticamente.</p>
-      </div>
-
-      <div style={{background:"var(--color-background-secondary)",borderRadius:12,padding:16,display:"flex",flexDirection:"column",gap:10}}>
-        <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
-          <div style={{width:24,height:24,borderRadius:"50%",background:"#185FA5",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:600,flexShrink:0}}>1</div>
-          <div>
-            <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Entrá a jsonbin.io</div>
-            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:2}}>Abrí una nueva pestaña y andá a jsonbin.io</div>
-            <a href="https://jsonbin.io" target="_blank" rel="noreferrer" style={{fontSize:13,color:"#185FA5",fontWeight:500}}>Abrir jsonbin.io →</a>
-          </div>
-        </div>
-        <div style={{borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:10,display:"flex",alignItems:"flex-start",gap:10}}>
-          <div style={{width:24,height:24,borderRadius:"50%",background:"#185FA5",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:600,flexShrink:0}}>2</div>
-          <div style={{fontSize:14,color:"var(--color-text-primary)"}}>
-            <span style={{fontWeight:500}}>Registrate gratis</span>
-            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:2,lineHeight:1.6}}>
-              Tocá <b>Sign Up</b> · Usá tu email · Confirmá el email si te pide
-            </div>
-          </div>
-        </div>
-        <div style={{borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:10,display:"flex",alignItems:"flex-start",gap:10}}>
-          <div style={{width:24,height:24,borderRadius:"50%",background:"#185FA5",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:600,flexShrink:0}}>3</div>
-          <div style={{fontSize:14,color:"var(--color-text-primary)"}}>
-            <span style={{fontWeight:500}}>Copiá tu API Key</span>
-            <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:2,lineHeight:1.6}}>
-              Una vez adentro andá a <b>API Keys</b> en el menú → <b>+ Create Access Key</b> → nombrarla <b>reparto-app</b> → copiá la clave larga que aparece
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <label style={{fontSize:13,color:"var(--color-text-secondary)",marginBottom:6,display:"block"}}>Pegá tu API Key acá</label>
-        <textarea
-          style={{width:"100%",padding:"10px",border:"0.5px solid var(--color-border-secondary)",borderRadius:8,fontSize:13,background:"var(--color-background-secondary)",color:"var(--color-text-primary)",outline:"none",minHeight:70,resize:"none",boxSizing:"border-box",lineHeight:1.5}}
-          placeholder="$2b$10$xxxxxxxxxxxxxxxxxx..."
-          value={apiKey}
-          onChange={e=>setApiKey(e.target.value)}
-        />
-        {error && <div style={{fontSize:13,color:"var(--color-text-danger)",marginTop:6}}>{error}</div>}
-      </div>
-
-      <button
-        style={{background:"#185FA5",color:"#fff",border:"none",borderRadius:8,padding:"14px",fontSize:15,fontWeight:500,cursor:"pointer",opacity:cargando?0.7:1}}
-        onClick={conectar}
-        disabled={cargando}
-      >
-        {cargando ? "Conectando..." : "Conectar y comenzar"}
-      </button>
-
-      <p style={{fontSize:12,color:"var(--color-text-tertiary)",textAlign:"center",lineHeight:1.6}}>
-        Tus datos se guardan en tu cuenta privada de JSONBin. Es gratis y seguro. Solo vos tenés acceso.
-      </p>
     </div>
   );
 }

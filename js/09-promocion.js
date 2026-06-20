@@ -188,7 +188,7 @@ function Promocion({prospectos,onSave,onConvertir,onVolver}) {
   const [subVista,setSubVista]   = useState("menu"); // menu | dia | detalle | nuevo | comodato
   const [selId,setSelId]         = useState(null);
 
-  const hoyISO = new Date().toISOString().slice(0,10);
+  const hoyISO = new Date().toLocaleDateString("en-CA");
 
   const compras    = (p) => (p.visitas||[]).filter(v=>v.resultado==="compro").length;
   const semanas    = (p) => Math.floor((Date.now()-new Date(p.fechaInicio||hoyISO).getTime())/(7*24*3600*1000));

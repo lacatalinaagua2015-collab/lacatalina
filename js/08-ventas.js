@@ -88,7 +88,7 @@ function VehiculoMantModal({onGuardar,onCerrar}) {
   const [costo,setCosto] = React.useState("");
   const [proximo,setProximo] = React.useState("");
   const [proximaFechaISO,setProximaFechaISO] = React.useState("");
-  const [fechaISO,setFechaISO] = React.useState(new Date().toISOString().slice(0,10));
+  const [fechaISO,setFechaISO] = React.useState(new Date().toLocaleDateString("en-CA"));
   const fechaDisplay = fechaISO ? new Date(fechaISO+'T12:00:00').toLocaleDateString("es-AR") : "";
   const tipos = [
     {id:"aceite",    label:"🛢 Cambio de aceite",         color:"#f5b942"},

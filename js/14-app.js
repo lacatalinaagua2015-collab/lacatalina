@@ -212,7 +212,7 @@ function App() {
   // Auto backup DIARIO a localStorage
   React.useEffect(()=>{
     const ultimoBackup = localStorage.getItem("lc_ultimo_backup");
-    const hoy = new Date().toISOString().slice(0,10);
+    const hoy = new Date().toLocaleDateString("en-CA");
     if(ultimoBackup===hoy) return; // ya se hizo hoy
     try {
       localStorage.setItem("lc_backup_"+hoy, JSON.stringify({clientes,ventas,planillas}));
@@ -326,7 +326,7 @@ function App() {
       let ms = hoy18 - ahora; if(ms<0) ms += 24*60*60*1000;
       return setTimeout(()=>{
         if(Notification.permission==="granted"){
-          const hoyKey = new Date().toISOString().slice(0,10);
+          const hoyKey = new Date().toLocaleDateString("en-CA");
           if(!localStorage.getItem(`notif_cierre_${hoyKey}`)){
             new Notification("🚚 Sistema de Reparto",{body:"Son las 18:00 — ¿Ya cerraste el día?",icon:"/icon-192.png",tag:"cierre-dia"});
             localStorage.setItem(`notif_cierre_${hoyKey}`,"1");
@@ -346,7 +346,7 @@ function App() {
         const diffDias = Math.round((proxFecha-hoy)/(1000*60*60*24));
         if(diffDias===3||diffDias===2||diffDias===1){
           const nk = `notif_mant_${m.proximaFechaISO}_${m.tipo}`;
-          const hoyKey = new Date().toISOString().slice(0,10);
+          const hoyKey = new Date().toLocaleDateString("en-CA");
           if(!localStorage.getItem(`${nk}_${hoyKey}`)){
             const tipoLabel={aceite:"Cambio de aceite",preventivo:"Mantenimiento preventivo",embrague:"Cambio de embrague",reparacion:"Reparación",otro:"Mantenimiento"}[m.tipo]||m.tipo;
             new Notification("🔧 Vencimiento de mantenimiento",{body:`${tipoLabel} vence en ${diffDias} día${diffDias>1?"s":""}${m.descripcion?" — "+m.descripcion:""}`,icon:"/icon-192.png",tag:nk});
@@ -589,7 +589,7 @@ function App() {
       if(!('Notification' in window) || Notification.permission !== 'granted') return;
       const now = new Date();
       const hhmm = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-      const hoy = now.toISOString().slice(0,10);
+      const hoy = now.toLocaleDateString("en-CA");
 
       // 1. Transferencias pendientes a las 13:00 y 19:00
       if(hhmm === '13:00' || hhmm === '19:00') {
@@ -1159,7 +1159,7 @@ function App() {
       }} onVolver={()=>irA("menu")} onRegistrarVenta={(c)=>{
           setClienteId(c.id);
           // Asegurar que fechaActual esté seteado a hoy
-          const hoyKey = new Date().toISOString().slice(0,10);
+          const hoyKey = new Date().toLocaleDateString("en-CA");
           if(!fechaActual) setFechaActual(hoyKey);
           // Si no hay diaActual, usar el día del cliente como fallback
           if(!diaActual) setDiaActual(c.dia);
@@ -1173,7 +1173,7 @@ function App() {
               const saldoAntes=cliente.saldo||0;
               const saldoDespues=saldoAntes+monto;
               const det=[{nombre:"Cobro de deuda",cantidad:1,precio:0,total:0}];
-              const fk=fechaActual||new Date().toISOString().slice(0,10);
+              const fk=fechaActual||new Date().toLocaleDateString("en-CA");
               const vt={id:Date.now(),clienteId:cliente.id,cliente:cliente.nombre,
                 dia:diaActual||cliente.dia,fechaKey:fk,fecha:new Date().toLocaleString("es-AR"),
                 detalle:det,pago,obs:`Cobro de deuda $${monto.toLocaleString("es-AR")} (${pago})`,saldoAplicado:0,
@@ -1206,7 +1206,7 @@ function App() {
         if(!cl) return;
         const saldoAntes=cl.saldo||0;
         const saldoDespues=saldoAntes+monto;
-        const vt={id:Date.now(),clienteId:cl.id,cliente:cl.nombre,dia:cl.dia,fechaKey:new Date().toISOString().slice(0,10),fecha:new Date().toLocaleString("es-AR"),
+        const vt={id:Date.now(),clienteId:cl.id,cliente:cl.nombre,dia:cl.dia,fechaKey:new Date().toLocaleDateString("en-CA"),fecha:new Date().toLocaleString("es-AR"),
           detalle:[{nombre:"Cobro de deuda",cantidad:1,precio:monto,total:monto}],pago,obs:`Cobro de deuda ${fmt(monto)} (${pago})`,
           neto:monto,bruto:monto,desc:0,costo:monto,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],saldoAntes,saldoDespues,_esCobro:true};
         saveVentas([...ventas,vt]);
