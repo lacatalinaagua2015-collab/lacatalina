@@ -32,8 +32,9 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
     else onRegistrarNoVisita(id,motivo);
   };
 
-  const clientesReales = clientes.filter(c=>!c._esProspecto);
-  const clientesOrdenados = [...clientesReales].sort((a,b)=>(a.orden||9999)-(b.orden||9999));
+  // Memoizados: solo se recalculan si cambia la lista de clientes (no al escribir en el buscador, etc.)
+  const clientesReales = React.useMemo(() => clientes.filter(c=>!c._esProspecto), [clientes]);
+  const clientesOrdenados = React.useMemo(() => [...clientesReales].sort((a,b)=>(a.orden||9999)-(b.orden||9999)), [clientesReales]);
   const filtrados  = clientesOrdenados.filter(c=>buscarCliente(c,busqueda)>0);
   const pendientesNormales = filtrados.filter(c=>!visitados.has(c.id)&&noVMap[c.id]!=="noesta");
   const volverAlFinal      = filtrados.filter(c=>noVMap[c.id]==="noesta"&&!atendidos.has(c.id));
