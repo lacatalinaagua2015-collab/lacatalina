@@ -43,6 +43,7 @@ function App() {
   const [fechaActual, setFechaActual] = useLS("cat_fecha_actual", ""); // ISO date key YYYY-MM-DD
   const [fechaObj, setFechaObj]   = useState(null);
   const [clienteId, setClienteId] = useState(null);
+  const [pinOk, setPinOk] = React.useState(false);
   const [noVisitas, setNoVisitas] = useLS("cat_novisitas_v1", []);
   const [prospectos, setProspectos] = useLS("cat_prospectos_v1", []);
   const [recordatorios, setRecordatorios] = useLS("cat_recordatorios_v1", []);
@@ -860,6 +861,8 @@ function App() {
     saveVentas(nev);
     if(c){ const nc=clientes.map(x=>x.id===c.id?{...x,saldo:saldoExtra}:x); saveClientes(nc); }
   };
+
+  if(!pinOk) return <PantallaBloqueoLC onOk={()=>setPinOk(true)} />;
 
   return (
     <div style={{position:"relative"}}>
