@@ -1001,7 +1001,7 @@ function App() {
             saveClientes(clientes.map(x=>x.id===cl.id?{...x,saldo:saldoDespues}:x));
           }}
           onGuardarAjuste={(vt)=>{saveVentas([...ventas,vt]);}} />}
-      {pantalla==="venta"          && cliente && <NuevaVenta key={clienteId} cliente={cliente} productos={productos} fecha={fechaActual}
+      {pantalla==="venta"          && cliente && <NuevaVenta key={clienteId} cliente={cliente} productos={productos} fecha={fechaActual} ventasCliente={ventasDelCliente}
         progressData={(()=>{
           const clientesDia=clientes.filter(c=>c.dia===diaActual);
           const ventasHoy=ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste);
