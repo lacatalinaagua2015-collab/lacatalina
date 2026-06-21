@@ -320,22 +320,6 @@ function App() {
       if (Notification.permission === "granted") await suscribirPush();
     };
     pedirPermiso();
-    const programar18hs = () => {
-      const ahora = new Date();
-      const hoy18 = new Date(ahora.getFullYear(),ahora.getMonth(),ahora.getDate(),18,0,0);
-      let ms = hoy18 - ahora; if(ms<0) ms += 24*60*60*1000;
-      return setTimeout(()=>{
-        if(Notification.permission==="granted"){
-          const hoyKey = new Date().toLocaleDateString("en-CA");
-          if(!localStorage.getItem(`notif_cierre_${hoyKey}`)){
-            new Notification("🚚 Sistema de Reparto",{body:"Son las 18:00 — ¿Ya cerraste el día?",icon:"/icon-192.png",tag:"cierre-dia"});
-            localStorage.setItem(`notif_cierre_${hoyKey}`,"1");
-          }
-        }
-        programar18hs();
-      }, ms);
-    };
-    const t18 = programar18hs();
     const chequearMantenimiento = () => {
       if(Notification.permission!=="granted") return;
       const mantList = (()=>{ try{ return JSON.parse(localStorage.getItem("cat_mant_vehiculo_v1")||"[]"); }catch{ return []; } })();
@@ -357,7 +341,7 @@ function App() {
     };
     chequearMantenimiento();
     const tMant = setInterval(chequearMantenimiento, 60*60*1000);
-    return ()=>{ clearTimeout(t18); clearInterval(tMant); };
+    return ()=>{ clearInterval(tMant); };
   },[]);
 
   const saveClientes = (v) => { setClientes(v); syncData({clientes:v}); };
@@ -613,15 +597,17 @@ function App() {
         }
       }
 
-      // 2. Cierre del día a la hora configurada
-      if(hhmm === horaNotifCierre && diaActual) {
-        const planKey = `${diaActual}_${hoy}`;
+      // 2. Cierre del día — solo si HOY es día de reparto, hubo actividad y la planilla quedó sin cerrar
+      const diaHoy = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"][now.getDay()];
+      if(hhmm === horaNotifCierre && DIAS.includes(diaHoy)) {
+        const planKey = `${diaHoy}_${hoy}`;
         const plan = planillas[planKey];
+        const huboReparto = (plan && plan.iniciado) || (ventas||[]).some(v => v.fechaKey === hoy && v.dia === diaHoy);
         const sinCerrar = !plan || (plan.efectivo === '' && plan.fiado === '');
-        if(sinCerrar) {
+        if(huboReparto && sinCerrar) {
           showNotif(
             '📋 Cierre del día pendiente',
-            `Son las ${horaNotifCierre}. Todavía no cerraste la planilla de ${diaActual}.`,
+            `Son las ${horaNotifCierre}. Todavía no cerraste la planilla de ${diaHoy}.`,
             `cierre_${hoy}`
           );
         }
