@@ -862,7 +862,7 @@ function App() {
     if(c){ const nc=clientes.map(x=>x.id===c.id?{...x,saldo:saldoExtra}:x); saveClientes(nc); }
   };
 
-  if(!pinOk) return <PantallaBloqueoLC onOk={()=>setPinOk(true)} />;
+  if(!pinOk) return <PantallaBloqueoLC onOk={()=>{ setPinOk(true); if(pantalla==="portada") irA("menu"); }} />;
 
   return (
     <div style={{position:"relative"}}>

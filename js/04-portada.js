@@ -217,8 +217,17 @@ function PantallaBloqueoLC({onOk}) {
   const [error, setError] = React.useState("");
   const [faseEnrolar, setFaseEnrolar] = React.useState(false);
   const [bioMsg, setBioMsg] = React.useState("");
+  const [mostrarPin, setMostrarPin] = React.useState(modoSetup); // setup siempre muestra PIN
+  const [fallosBio, setFallosBio] = React.useState(0);
   const puedeBio = lcBioSoportado();
   const bioOn = lcBioEnrolado();
+
+  // Intento automático de huella al montar (solo si ya está enrolada)
+  React.useEffect(()=>{
+    if(!modoSetup && puedeBio && bioOn){
+      lcBioVerificar().then(ok=>{ if(ok) onOk(); }).catch(()=>{ setFallosBio(1); setMostrarPin(true); setBioMsg("Usá tu PIN para entrar."); });
+    }
+  },[]);
 
   const finalizar = () => {
     if(puedeBio && !lcBioEnrolado() && !lcBioRechazado()) { setPin(""); setFaseEnrolar(true); }
@@ -237,43 +246,70 @@ function PantallaBloqueoLC({onOk}) {
   };
   const presionar = (d) => { if(pin.length>=4) return; const nuevo=pin+d; setPin(nuevo); setError(""); if(nuevo.length===4) completar(nuevo); };
   const borrar = () => { setPin(p=>p.slice(0,-1)); setError(""); };
-  const entrarConHuella = async () => { setBioMsg(""); try { if(await lcBioVerificar()) onOk(); } catch(e){ setBioMsg("No se pudo leer la huella. Usá tu PIN."); } };
+
+  const intentarHuellaDeNuevo = async () => {
+    setBioMsg(""); setError("");
+    try {
+      if(await lcBioVerificar()) onOk();
+    } catch(e){
+      const nf = fallosBio + 1;
+      setFallosBio(nf);
+      if(nf >= 3) { setBioMsg("Demasiados intentos. Ingresá tu PIN."); setMostrarPin(true); }
+      else { setBioMsg(`No se reconoció. Intentos restantes: ${3-nf}`); }
+    }
+  };
+
   const activarHuella = async () => { setBioMsg(""); try { await lcBioRegistrar(); onOk(); } catch(e){ setBioMsg("No se pudo activar. Entrás con tu PIN."); setTimeout(onOk,1200); } };
   const saltarHuella = () => { try{localStorage.setItem("lc_bio_no","1");}catch(e){} onOk(); };
 
-  const titulo = modoSetup ? (setupPaso===1 ? "Cre\u00e1 un PIN de 4 d\u00edgitos" : "Repet\u00ed el PIN") : "Ingres\u00e1 tu PIN";
+  const titulo = modoSetup ? (setupPaso===1 ? "Creá un PIN de 4 dígitos" : "Repetí el PIN") : "Ingresá tu PIN";
   const btnStyle = (color) => ({ width:72, height:72, borderRadius:"50%", border:"none", cursor:"pointer", fontSize:24, fontWeight:600, display:"flex", alignItems:"center", justifyContent:"center", background: color || "var(--color-background-secondary,#1a2b3c)", color:"var(--color-text-primary,#e2eaf4)", boxShadow:"0 2px 8px rgba(0,0,0,0.3)" });
 
   return (
     <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"var(--color-background-primary,#0f1923)",padding:24}}>
       <div style={{textAlign:"center",marginBottom:32}}>
-        <div style={{fontSize:44,marginBottom:8}}>{"\uD83D\uDCA7"}</div>
+        <div style={{fontSize:44,marginBottom:8}}>💧</div>
         <h2 style={{fontSize:20,fontWeight:700,color:"var(--color-text-primary,#e2eaf4)",margin:0}}>La Catalina</h2>
-        <p style={{fontSize:13,color:"var(--color-text-secondary,#7a9ab8)",marginTop:4}}>{titulo}</p>
+        {mostrarPin && <p style={{fontSize:13,color:"var(--color-text-secondary,#7a9ab8)",marginTop:4}}>{titulo}</p>}
       </div>
-      <div style={{display:"flex",gap:16,marginBottom:28}}>
-        {[0,1,2,3].map(i=>(<div key={i} style={{width:16,height:16,borderRadius:"50%",background:i<pin.length?"#185FA5":"rgba(255,255,255,0.15)",boxShadow:i<pin.length?"0 0 8px rgba(24,95,165,0.6)":"none"}} />))}
-      </div>
-      {error && (<p style={{color:"#f07070",fontSize:13,marginBottom:18,textAlign:"center"}}>{error}</p>)}
-      {bioMsg && (<p style={{color:"#f5b942",fontSize:13,marginBottom:16,textAlign:"center"}}>{bioMsg}</p>)}
+
+      {/* Fase enrolar huella */}
       {faseEnrolar ? (
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14,maxWidth:280}}>
-          <div style={{fontSize:46}}>{"\uD83D\uDC46"}</div>
-          <p style={{fontSize:16,color:"var(--color-text-primary,#e2eaf4)",textAlign:"center",margin:0,fontWeight:600}}>{"\u00bfEntrar con tu huella la pr\u00f3xima vez?"}</p>
-          <p style={{fontSize:12,color:"var(--color-text-secondary,#7a9ab8)",textAlign:"center",margin:0,lineHeight:1.5}}>{"M\u00e1s r\u00e1pido. Tu PIN sigue funcionando por si lo necesit\u00e1s."}</p>
+          <div style={{fontSize:46}}>👆</div>
+          <p style={{fontSize:16,color:"var(--color-text-primary,#e2eaf4)",textAlign:"center",margin:0,fontWeight:600}}>¿Entrar con tu huella la próxima vez?</p>
+          <p style={{fontSize:12,color:"var(--color-text-secondary,#7a9ab8)",textAlign:"center",margin:0,lineHeight:1.5}}>Más rápido. Tu PIN sigue funcionando por si lo necesitás.</p>
           <button style={{background:"#185FA5",color:"#fff",border:"none",borderRadius:10,padding:"12px 20px",fontSize:15,fontWeight:600,cursor:"pointer",width:210}} onClick={activarHuella}>Activar huella</button>
           <button style={{background:"none",border:"none",color:"var(--color-text-secondary,#7a9ab8)",fontSize:13,cursor:"pointer"}} onClick={saltarHuella}>Ahora no</button>
         </div>
+
+      /* Esperando huella automática */
+      ) : !mostrarPin && bioOn ? (
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
+          <div style={{fontSize:56}}>👆</div>
+          <p style={{fontSize:15,color:"var(--color-text-secondary,#7a9ab8)",textAlign:"center"}}>Verificando huella...</p>
+          {bioMsg && <p style={{color:"#f5b942",fontSize:13,textAlign:"center"}}>{bioMsg}</p>}
+          {fallosBio > 0 && fallosBio < 3 && (
+            <button style={{background:"#185FA5",color:"#fff",border:"none",borderRadius:10,padding:"10px 20px",fontSize:14,cursor:"pointer"}} onClick={intentarHuellaDeNuevo}>Reintentar huella</button>
+          )}
+          <button style={{background:"none",border:"none",color:"var(--color-text-tertiary,#4a6a85)",fontSize:13,cursor:"pointer",marginTop:8}} onClick={()=>setMostrarPin(true)}>Usar PIN</button>
+        </div>
+
+      /* Teclado PIN */
       ) : (
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,72px)",gap:12}}>
-        {[1,2,3,4,5,6,7,8,9].map(n=>(<button key={n} style={btnStyle()} onClick={()=>presionar(String(n))}>{n}</button>))}
-        <div />
-        <button style={btnStyle()} onClick={()=>presionar("0")}>0</button>
-        <button style={{...btnStyle("rgba(240,112,112,0.15)"),color:"#f07070"}} onClick={borrar}>{"\u232B"}</button>
-      </div>
-      )}
-      {!faseEnrolar && !modoSetup && bioOn && (
-        <button style={{marginTop:22,background:"var(--color-background-secondary,#1a2b3c)",border:"0.5px solid var(--color-border-secondary,rgba(255,255,255,0.13))",borderRadius:10,padding:"11px 20px",fontSize:14,fontWeight:600,color:"var(--color-text-primary,#e2eaf4)",cursor:"pointer",display:"flex",alignItems:"center",gap:8}} onClick={entrarConHuella}>{"\uD83D\uDC46 Entrar con huella"}</button>
+        <>
+          <div style={{display:"flex",gap:16,marginBottom:28}}>
+            {[0,1,2,3].map(i=>(<div key={i} style={{width:16,height:16,borderRadius:"50%",background:i<pin.length?"#185FA5":"rgba(255,255,255,0.15)",boxShadow:i<pin.length?"0 0 8px rgba(24,95,165,0.6)":"none"}} />))}
+          </div>
+          {error && <p style={{color:"#f07070",fontSize:13,marginBottom:18,textAlign:"center"}}>{error}</p>}
+          {bioMsg && <p style={{color:"#f5b942",fontSize:13,marginBottom:16,textAlign:"center"}}>{bioMsg}</p>}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,72px)",gap:12}}>
+            {[1,2,3,4,5,6,7,8,9].map(n=>(<button key={n} style={btnStyle()} onClick={()=>presionar(String(n))}>{n}</button>))}
+            <div />
+            <button style={btnStyle()} onClick={()=>presionar("0")}>0</button>
+            <button style={{...btnStyle("rgba(240,112,112,0.15)"),color:"#f07070"}} onClick={borrar}>⌫</button>
+          </div>
+        </>
       )}
       <p style={{fontSize:11,color:"var(--color-text-tertiary,#4a6a85)",marginTop:24,textAlign:"center"}}>La Catalina</p>
     </div>
