@@ -43,7 +43,6 @@ function App() {
   const [fechaActual, setFechaActual] = useLS("cat_fecha_actual", ""); // ISO date key YYYY-MM-DD
   const [fechaObj, setFechaObj]   = useState(null);
   const [clienteId, setClienteId] = useState(null);
-  const [pinOk, setPinOk] = React.useState(false);
   const [noVisitas, setNoVisitas] = useLS("cat_novisitas_v1", []);
   const [prospectos, setProspectos] = useLS("cat_prospectos_v1", []);
   const [recordatorios, setRecordatorios] = useLS("cat_recordatorios_v1", []);
@@ -210,20 +209,52 @@ function App() {
   const estadoRef = React.useRef({clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios,prospectos,cargasDia});
   React.useEffect(()=>{ estadoRef.current={clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios,prospectos,zonasReparto,cargasDia}; });
 
-  // Auto backup DIARIO a localStorage
+  // ── AUTO-BACKUP mejorado ────────────────────────────────────────────────
+  // Guarda cada 10 minutos (no solo al arrancar) y mantiene los últimos 3 días
   React.useEffect(()=>{
-    const ultimoBackup = localStorage.getItem("lc_ultimo_backup");
-    const hoy = new Date().toLocaleDateString("en-CA");
-    if(ultimoBackup===hoy) return; // ya se hizo hoy
-    try {
-      localStorage.setItem("lc_backup_"+hoy, JSON.stringify({clientes,ventas,planillas}));
-      localStorage.setItem("lc_ultimo_backup", hoy);
-      // Mantener solo el último backup (el de ayer)
-      const keys = Object.keys(localStorage).filter(k=>k.startsWith("lc_backup_")).sort().reverse();
-      keys.slice(1).forEach(k=>localStorage.removeItem(k));
-      console.log("Auto-backup diario guardado:", hoy);
-    } catch(e){ console.warn("Auto-backup falló:", e); }
-  },[]);
+    const hacerBackup = () => {
+      try {
+        const hoy = new Date().toLocaleDateString("en-CA");
+        const payload = JSON.stringify({clientes,ventas,planillas});
+        localStorage.setItem("lc_backup_"+hoy, payload);
+        localStorage.setItem("lc_ultimo_backup", hoy);
+        // Mantener solo los últimos 3 días de backup
+        const keys = Object.keys(localStorage).filter(k=>k.startsWith("lc_backup_")).sort().reverse();
+        keys.slice(3).forEach(k=>localStorage.removeItem(k));
+        console.log("Auto-backup guardado:", hoy, new Date().toLocaleTimeString());
+      } catch(e){ console.warn("Auto-backup falló:", e); }
+    };
+    hacerBackup(); // inmediato al cargar
+    const intervalo = setInterval(hacerBackup, 10 * 60 * 1000); // cada 10 minutos
+    return () => clearInterval(intervalo);
+  },[clientes, ventas, planillas]);
+
+  // ── LIMPIEZA AUTOMÁTICA de ventas antiguas ──────────────────────────────
+  // Archiva a Firebase y elimina localmente ventas de más de 3 meses
+  React.useEffect(()=>{
+    if(!ventas.length) return;
+    const hoy = new Date();
+    const limite = new Date(hoy.getFullYear(), hoy.getMonth()-3, hoy.getDate());
+    const limiteKey = limite.toLocaleDateString("en-CA");
+    const viejas = ventas.filter(v=>v.fechaKey && v.fechaKey < limiteKey);
+    if(!viejas.length) return;
+    // Archivar las viejas en Firebase antes de borrarlas localmente
+    if(window.db) {
+      const col = window.db.collection("lc2");
+      const archivoKey = "archivo_ventas_"+limiteKey;
+      col.doc(archivoKey).set({d: viejas, archivadasEl: hoy.toISOString()})
+        .then(()=>{
+          // Solo borrar localmente si se guardaron en Firebase
+          const ventasRecientes = ventas.filter(v=>!v.fechaKey || v.fechaKey >= limiteKey);
+          if(ventasRecientes.length < ventas.length) {
+            console.log("Limpieza automática: archivadas "+viejas.length+" ventas antiguas en Firebase");
+            setVentasRaw(ventasRecientes);
+            syncData({ventas: ventasRecientes});
+          }
+        })
+        .catch(e=>console.warn("No se pudieron archivar ventas antiguas:", e));
+    }
+  },[]); // solo al arrancar
 
   const syncData = (overrides={}) => {
     if(!window.db) return;
@@ -321,6 +352,22 @@ function App() {
       if (Notification.permission === "granted") await suscribirPush();
     };
     pedirPermiso();
+    const programar18hs = () => {
+      const ahora = new Date();
+      const hoy18 = new Date(ahora.getFullYear(),ahora.getMonth(),ahora.getDate(),18,0,0);
+      let ms = hoy18 - ahora; if(ms<0) ms += 24*60*60*1000;
+      return setTimeout(()=>{
+        if(Notification.permission==="granted"){
+          const hoyKey = new Date().toISOString().slice(0,10);
+          if(!localStorage.getItem(`notif_cierre_${hoyKey}`)){
+            new Notification("🚚 Sistema de Reparto",{body:"Son las 18:00 — ¿Ya cerraste el día?",icon:"/icon-192.png",tag:"cierre-dia"});
+            localStorage.setItem(`notif_cierre_${hoyKey}`,"1");
+          }
+        }
+        programar18hs();
+      }, ms);
+    };
+    const t18 = programar18hs();
     const chequearMantenimiento = () => {
       if(Notification.permission!=="granted") return;
       const mantList = (()=>{ try{ return JSON.parse(localStorage.getItem("cat_mant_vehiculo_v1")||"[]"); }catch{ return []; } })();
@@ -331,7 +378,7 @@ function App() {
         const diffDias = Math.round((proxFecha-hoy)/(1000*60*60*24));
         if(diffDias===3||diffDias===2||diffDias===1){
           const nk = `notif_mant_${m.proximaFechaISO}_${m.tipo}`;
-          const hoyKey = new Date().toLocaleDateString("en-CA");
+          const hoyKey = new Date().toISOString().slice(0,10);
           if(!localStorage.getItem(`${nk}_${hoyKey}`)){
             const tipoLabel={aceite:"Cambio de aceite",preventivo:"Mantenimiento preventivo",embrague:"Cambio de embrague",reparacion:"Reparación",otro:"Mantenimiento"}[m.tipo]||m.tipo;
             new Notification("🔧 Vencimiento de mantenimiento",{body:`${tipoLabel} vence en ${diffDias} día${diffDias>1?"s":""}${m.descripcion?" — "+m.descripcion:""}`,icon:"/icon-192.png",tag:nk});
@@ -342,7 +389,7 @@ function App() {
     };
     chequearMantenimiento();
     const tMant = setInterval(chequearMantenimiento, 60*60*1000);
-    return ()=>{ clearInterval(tMant); };
+    return ()=>{ clearTimeout(t18); clearInterval(tMant); };
   },[]);
 
   const saveClientes = (v) => { setClientes(v); syncData({clientes:v}); };
@@ -397,9 +444,7 @@ function App() {
   const saveStock    = (v) => { setStock(v);    syncData({stock:v}); };
   const saveProductos= (v) => {
     // Registrar cambio de precio en historial
-    const d = new Date();
-    const pad = n => String(n).padStart(2,"0");
-    const hoy = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const hoy = new Date().toISOString().slice(0,16);
     const histPrecios = JSON.parse(localStorage.getItem("lc_hist_precios")||"[]");
     histPrecios.push({fecha:hoy, productos:v.map(p=>({nombre:p.nombre,precio:p.precio,costo:p.costo}))});
     localStorage.setItem("lc_hist_precios", JSON.stringify(histPrecios.slice(-50)));
@@ -410,10 +455,6 @@ function App() {
   const saveProspectos=(v)=>{ setProspectos(v); try{localStorage.setItem("cat_prospectos_v1",JSON.stringify(v));}catch{} syncData({prospectos:v}); };
 
   const cliente = clientes.find(c=>c.id===clienteId)||null;
-  // Memoizados: estos filtros recorren TODAS las ventas. Solo se recalculan si cambian
-  // las ventas (o el cliente/fecha), no en cada render suelto de la app.
-  const ventasDelCliente = React.useMemo(() => cliente ? ventas.filter(v=>v.clienteId===cliente.id) : [], [ventas, cliente]);
-  const ventasDelDiaPlanilla = React.useMemo(() => ventas.filter(v=>v.fechaKey===fechaActual), [ventas, fechaActual]);
   const irA = (p) => {
     const needsDia = ["diaPrincipal","selectorFechaClientes","selectorFechaPlanilla","inicioReparto","clientes","detalleCliente","venta","planilla"]; // historial does NOT need dia
     if(needsDia.includes(p) && !diaActual) { setPantalla("menu"); window.history.pushState({pantalla:"menu"},'','#menu'); window.scrollTo(0,0); return; }
@@ -580,7 +621,7 @@ function App() {
       if(!('Notification' in window) || Notification.permission !== 'granted') return;
       const now = new Date();
       const hhmm = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-      const hoy = now.toLocaleDateString("en-CA");
+      const hoy = now.toISOString().slice(0,10);
 
       // 1. Transferencias pendientes a las 13:00 y 19:00
       if(hhmm === '13:00' || hhmm === '19:00') {
@@ -598,17 +639,15 @@ function App() {
         }
       }
 
-      // 2. Cierre del día — solo si HOY es día de reparto, hubo actividad y la planilla quedó sin cerrar
-      const diaHoy = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"][now.getDay()];
-      if(hhmm === horaNotifCierre && DIAS.includes(diaHoy)) {
-        const planKey = `${diaHoy}_${hoy}`;
+      // 2. Cierre del día a la hora configurada
+      if(hhmm === horaNotifCierre && diaActual) {
+        const planKey = `${diaActual}_${hoy}`;
         const plan = planillas[planKey];
-        const huboReparto = (plan && plan.iniciado) || (ventas||[]).some(v => v.fechaKey === hoy && v.dia === diaHoy);
         const sinCerrar = !plan || (plan.efectivo === '' && plan.fiado === '');
-        if(huboReparto && sinCerrar) {
+        if(sinCerrar) {
           showNotif(
             '📋 Cierre del día pendiente',
-            `Son las ${horaNotifCierre}. Todavía no cerraste la planilla de ${diaHoy}.`,
+            `Son las ${horaNotifCierre}. Todavía no cerraste la planilla de ${diaActual}.`,
             `cierre_${hoy}`
           );
         }
@@ -862,8 +901,6 @@ function App() {
     if(c){ const nc=clientes.map(x=>x.id===c.id?{...x,saldo:saldoExtra}:x); saveClientes(nc); }
   };
 
-  if(!pinOk) return <PantallaBloqueoLC onOk={()=>{ setPinOk(true); if(pantalla==="portada") irA("menu"); }} />;
-
   return (
     <div style={{position:"relative"}}>
     <div style={{...s.app, zoom: SCALES[scaleIdx]}}>
@@ -893,7 +930,7 @@ function App() {
           onVolver={()=>irA("menu")} />}
       {pantalla==="diaPrincipal"   && <DiaPrincipal dia={diaActual} onIrClientes={()=>irA("selectorFechaClientes")} onIrPlanilla={()=>irA("selectorFechaPlanilla")} onVolver={()=>irA("menu")} onVerConfirmaciones={()=>irA("confirmacionesDia")} ventasPendientesTransfer={ventas.filter(v=>v.dia===diaActual&&v.pago==="transferencia"&&!v.transConfirmada).length} />}
       {pantalla==="selectorFechaPlanilla" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("planilla");}} onVolver={()=>irA("diaPrincipal")} />}
-      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventasDelDiaPlanilla} clientes={clientes} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} autoCierre={!!planillas[`${diaActual}_${fechaActual}`]?.iniciado}
+      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual)} clientes={clientes} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} autoCierre={!!planillas[`${diaActual}_${fechaActual}`]?.iniciado}
         onGuardar={d=>{
           savePlanilla(`${diaActual}_${fechaActual}`,d);
           if(!d._diaCerrado) irA("selectorFechaPlanilla");
@@ -925,7 +962,7 @@ function App() {
       {pantalla==="clientes"       && <ListaClientes clientes={clientes.filter(c=>c.dia===diaActual)} dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual)} todasVentas={ventas} noVisitas={(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual)} onEditarCliente={(id,cambios)=>{saveClientes(clientes.map(c=>c.id===id?{...c,...cambios}:c));}} onSeleccionar={c=>{setClienteId(c.id);irA("detalleCliente");}} onNuevoCliente={()=>irA("nuevoCliente")} onVolver={()=>irA("selectorFechaClientes")} onReordenar={lista=>{
           const otros=clientes.filter(c=>c.dia!==diaActual);
           saveClientes([...otros,...lista]);
-        }} onRegistrarNoVisita={(clienteId,motivo)=>{const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,creado:new Date().toLocaleString("es-AR"),motivo}];saveNoVisitas(nv);}} onQuitarNoVisita={(clienteId)=>{const nv=(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual));saveNoVisitas(nv);}}
+        }} onRegistrarNoVisita={(clienteId,motivo)=>{const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo}];saveNoVisitas(nv);}} onQuitarNoVisita={(clienteId)=>{const nv=(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual));saveNoVisitas(nv);}}
         onConfirmarTransfer={(clienteId,ventaId)=>{
           const nv=ventas.map(v=>v.id===ventaId?{...v,transConfirmada:!v.transConfirmada}:v);
           saveVentas(nv);
@@ -943,15 +980,15 @@ function App() {
           irA("venta");
         }}
         onNoEstaProspecto={(id)=>{
-          const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:id,dia:diaActual,fecha:fechaActual,creado:new Date().toLocaleString("es-AR"),motivo:"noesta"}];
+          const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:id,dia:diaActual,fecha:fechaActual,motivo:"noesta"}];
           saveNoVisitas(nv);
         }}
         onAbrirMapa={()=>irA("mapaClientes")}
         onPlanilla={()=>irA("planilla")}
         />}
-      {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventasDelCliente} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>irA("venta")} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
+      {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>irA("venta")} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
           onNoEstaCliente={()=>{
-            const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,creado:new Date().toLocaleString("es-AR"),motivo:"noesta"}];
+            const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noesta"}];
             saveNoVisitas(nv);
             const clientesDia=clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
             const ventasIds=new Set(ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId));
@@ -963,7 +1000,7 @@ function App() {
             if(sig){setClienteId(sig.id);irA("detalleCliente");}else irA("clientes");
           }}
           onNoQuiereCliente={()=>{
-            const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,creado:new Date().toLocaleString("es-AR"),motivo:"noquiso"}];
+            const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noquiso"}];
             saveNoVisitas(nv);
             const clientesDia=clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
             const ventasIds=new Set(ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId));
@@ -990,7 +1027,7 @@ function App() {
             saveClientes(clientes.map(x=>x.id===cl.id?{...x,saldo:saldoDespues}:x));
           }}
           onGuardarAjuste={(vt)=>{saveVentas([...ventas,vt]);}} />}
-      {pantalla==="venta"          && cliente && <NuevaVenta key={clienteId} cliente={cliente} productos={productos} fecha={fechaActual} ventasCliente={ventasDelCliente}
+      {pantalla==="venta"          && cliente && <NuevaVenta key={clienteId} cliente={cliente} productos={productos} fecha={fechaActual}
         progressData={(()=>{
           const clientesDia=clientes.filter(c=>c.dia===diaActual);
           const ventasHoy=ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste);
@@ -1011,7 +1048,7 @@ function App() {
         onNoEsta={()=>{
           const prev=(noVisitas||[]).find(v=>v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual);
           const motivo=prev?.motivo==="noesta"?"noesta2":"noesta";
-          const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,creado:new Date().toLocaleString("es-AR"),motivo}];
+          const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo}];
           saveNoVisitas(nv);
           const clientesDia=clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
           const ventasIds=new Set(ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId));
@@ -1024,7 +1061,7 @@ function App() {
           if(sig){setClienteId(sig.id);irA("venta");}else irA("clientes");
         }}
         onNoQuiere={()=>{
-          const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,creado:new Date().toLocaleString("es-AR"),motivo:"noquiso"}];
+          const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo:"noquiso"}];
           saveNoVisitas(nv);
           const clientesDia=clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
           const ventasIds=new Set(ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste).map(v=>v.clienteId));
@@ -1050,7 +1087,7 @@ function App() {
   else irA("clientes");
 }}
         onSaltar={()=>{
-          const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,creado:new Date().toLocaleString("es-AR"),motivo:"salteado"}];
+          const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo:"salteado"}];
           saveNoVisitas(nv);
           // Auto-avanzar al siguiente cliente pendiente
           const visitadosIds=new Set([
@@ -1154,13 +1191,13 @@ function App() {
       }} onVolver={()=>irA("menu")} onRegistrarVenta={(c)=>{
           setClienteId(c.id);
           // Asegurar que fechaActual esté seteado a hoy
-          const hoyKey = new Date().toLocaleDateString("en-CA");
+          const hoyKey = new Date().toISOString().slice(0,10);
           if(!fechaActual) setFechaActual(hoyKey);
           // Si no hay diaActual, usar el día del cliente como fallback
           if(!diaActual) setDiaActual(c.dia);
           irA("venta");
         }} onVerDetalle={(c)=>{setClienteId(c.id);irA("detalleDesdeGestion");}} ventas={ventas} /></React.Fragment>}
-      {pantalla==="detalleDesdeGestion" && cliente && <DetalleCliente cliente={cliente} ventas={ventasDelCliente} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual||cliente.dia} fecha={fechaActual} productos={productos} onVenta={()=>{setDiaActual(cliente.dia);const hoy=new Date().toLocaleDateString("en-CA");setFechaActual(hoy);setFechaObj(new Date(hoy+"T12:00:00"));irA("venta");}} onVolver={()=>irA("gestionClientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>{eliminarCliente(cliente.id);irA("gestionClientes");}}
+      {pantalla==="detalleDesdeGestion" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual||cliente.dia} fecha={fechaActual} productos={productos} onVenta={()=>{setDiaActual(cliente.dia);const hoy=new Date().toISOString().slice(0,10);if(!fechaActual)setFechaActual(hoy);irA("venta");}} onVolver={()=>irA("gestionClientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>{eliminarCliente(cliente.id);irA("gestionClientes");}}
           onNoEstaCliente={()=>{}} onNoQuiereCliente={()=>{}}
           recordatorios={recordatorios} onGuardarRecordatorio={(r)=>saveRecordatorios([...(recordatorios||[]),r])} onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
           onCobrarSaldo={(monto,pago)=>{
@@ -1168,7 +1205,7 @@ function App() {
               const saldoAntes=cliente.saldo||0;
               const saldoDespues=saldoAntes+monto;
               const det=[{nombre:"Cobro de deuda",cantidad:1,precio:0,total:0}];
-              const fk=fechaActual||new Date().toLocaleDateString("en-CA");
+              const fk=fechaActual||new Date().toISOString().slice(0,10);
               const vt={id:Date.now(),clienteId:cliente.id,cliente:cliente.nombre,
                 dia:diaActual||cliente.dia,fechaKey:fk,fecha:new Date().toLocaleString("es-AR"),
                 detalle:det,pago,obs:`Cobro de deuda $${monto.toLocaleString("es-AR")} (${pago})`,saldoAplicado:0,
@@ -1201,7 +1238,7 @@ function App() {
         if(!cl) return;
         const saldoAntes=cl.saldo||0;
         const saldoDespues=saldoAntes+monto;
-        const vt={id:Date.now(),clienteId:cl.id,cliente:cl.nombre,dia:cl.dia,fechaKey:new Date().toLocaleDateString("en-CA"),fecha:new Date().toLocaleString("es-AR"),
+        const vt={id:Date.now(),clienteId:cl.id,cliente:cl.nombre,dia:cl.dia,fechaKey:new Date().toISOString().slice(0,10),fecha:new Date().toLocaleString("es-AR"),
           detalle:[{nombre:"Cobro de deuda",cantidad:1,precio:monto,total:monto}],pago,obs:`Cobro de deuda ${fmt(monto)} (${pago})`,
           neto:monto,bruto:monto,desc:0,costo:monto,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],saldoAntes,saldoDespues,_esCobro:true};
         saveVentas([...ventas,vt]);

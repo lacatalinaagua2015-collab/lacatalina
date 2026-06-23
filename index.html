@@ -148,7 +148,9 @@ self.addEventListener('notificationclick',e=>{
 
     function cloudSave(data) {
       if(!window.db) return Promise.resolve(false);
-      var col = window.db.collection("lc2");
+      return (window._authReady || Promise.resolve(null)).then(function(user) {
+        if(!user) return false;
+        var col = window.db.collection("lc2");
       var saves = [
         col.doc("config").set({
           planillas: data.planillas || {},
@@ -180,6 +182,7 @@ self.addEventListener('notificationclick',e=>{
       var pr = data.prospectos || [];
       saves.push(col.doc("prospectos").set({d:pr}));
       return Promise.all(saves).then(function(){return true;}).catch(function(e){console.error("Save err",e);return false;});
+      }); // cierre _authReady.then
     }
 
     function cloudLoad() {
