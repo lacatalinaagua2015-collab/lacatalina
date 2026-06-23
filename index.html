@@ -79,6 +79,10 @@ self.addEventListener('notificationclick',e=>{
         firebase.initializeApp(firebaseConfig);
       }
       window.db = firebase.firestore();
+      // Esperar auth antes de cualquier operación Firestore
+      window._authReady = new Promise(function(resolve) {
+        firebase.auth().onAuthStateChanged(function(user) { resolve(user); });
+      });
       firebase.auth().signInAnonymously().catch(function(e){ console.warn("Auth anónima:", e); });
 
       // Firebase secundario: Emma Control (para enviar datos de integración)
@@ -180,7 +184,9 @@ self.addEventListener('notificationclick',e=>{
 
     function cloudLoad() {
       if(!window.db) return Promise.resolve(null);
-      var col = window.db.collection("lc2");
+      return (window._authReady || Promise.resolve(null)).then(function(user) {
+        if(!user) return null;
+        var col = window.db.collection("lc2");
       return Promise.all([
         col.doc("config").get(),
         col.doc("clientes_meta").get(),
@@ -211,6 +217,7 @@ self.addEventListener('notificationclick',e=>{
           return data;
         });
       }).catch(function(e){console.error("Load err",e);return null;});
+    }); // cierre _authReady.then
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
