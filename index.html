@@ -63,6 +63,7 @@ self.addEventListener('notificationclick',e=>{
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   
   <script>
     var firebaseConfig = {
@@ -78,6 +79,7 @@ self.addEventListener('notificationclick',e=>{
         firebase.initializeApp(firebaseConfig);
       }
       window.db = firebase.firestore();
+      firebase.auth().signInAnonymously().catch(function(e){ console.warn("Auth anónima:", e); });
 
       // Firebase secundario: Emma Control (para enviar datos de integración)
       var ecConfig = {
