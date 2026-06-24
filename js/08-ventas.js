@@ -294,17 +294,17 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
     } catch(e){}
   };
   // 🔁 Buscar la última venta con productos de entrega para pre-cargar cantidades automáticamente
-  const nombresEntrega = productos.filter(p=>!p.esDispenser).map(p=>p.nombre);
+  const nombresEntrega = (productos||[]).filter(p=>!p.esDispenser).map(p=>p.nombre);
   const ultimaConProd = (()=>{
     const conProd=(ventasCliente||[]).filter(v=>Array.isArray(v.detalle)&&v.detalle.some(d=>(d.cantidad||0)>0&&!d._esDispRoto&&nombresEntrega.includes(d.nombre)));
     return conProd.length?[...conProd].sort((a,b)=>(b.id||0)-(a.id||0))[0]:null;
   })();
   const [cantidades,setCantidades]=useState(()=>{
-    const m={};productos.forEach(p=>{m[p.nombre]=0;});
-    if(ultimaConProd) ultimaConProd.detalle.forEach(d=>{if(!d._esDispRoto&&nombresEntrega.includes(d.nombre))m[d.nombre]=d.cantidad||0;});
+    const m={};(productos||[]).forEach(p=>{m[p.nombre]=0;});
+    if(ultimaConProd)(ultimaConProd.detalle||[]).forEach(d=>{if(!d._esDispRoto&&nombresEntrega.includes(d.nombre))m[d.nombre]=d.cantidad||0;});
     return m;
   });
-  const [repetido,setRepetido]=useState(()=>!!ultimaConProd&&Object.values({...ultimaConProd.detalle.reduce((a,d)=>{if(!d._esDispRoto&&nombresEntrega.includes(d.nombre))a[d.nombre]=d.cantidad||0;return a;},{})}).some(v=>v>0));
+  const [repetido,setRepetido]=useState(()=>!!ultimaConProd&&(ultimaConProd.detalle||[]).some(d=>!d._esDispRoto&&nombresEntrega.includes(d.nombre)&&(d.cantidad||0)>0));
   const [pago,setPago]=useState("contado");
   const [monto,setMonto]=useState("");
   const [montoEfec,setMontoEfec]=useState(""); // pago mixto: parte efectivo

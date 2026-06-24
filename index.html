@@ -79,11 +79,10 @@ self.addEventListener('notificationclick',e=>{
         firebase.initializeApp(firebaseConfig);
       }
       window.db = firebase.firestore();
-      // Esperar auth antes de cualquier operación Firestore
-      window._authReady = new Promise(function(resolve) {
-        firebase.auth().onAuthStateChanged(function(user) { resolve(user); });
-      });
-      firebase.auth().signInAnonymously().catch(function(e){ console.warn("Auth anónima:", e); });
+      // Esperar que el login anónimo COMPLETE antes de hacer requests a Firestore
+      window._authReady = firebase.auth().signInAnonymously()
+        .then(function(cred){ return cred.user; })
+        .catch(function(e){ console.warn("Auth anónima:", e); return null; });
 
       // Firebase secundario: Emma Control (para enviar datos de integración)
       var ecConfig = {
