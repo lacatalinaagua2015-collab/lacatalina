@@ -88,7 +88,7 @@ function VehiculoMantModal({onGuardar,onCerrar}) {
   const [costo,setCosto] = React.useState("");
   const [proximo,setProximo] = React.useState("");
   const [proximaFechaISO,setProximaFechaISO] = React.useState("");
-  const [fechaISO,setFechaISO] = React.useState(new Date().toLocaleDateString("en-CA"));
+  const [fechaISO,setFechaISO] = React.useState(new Date().toISOString().slice(0,10));
   const fechaDisplay = fechaISO ? new Date(fechaISO+'T12:00:00').toLocaleDateString("es-AR") : "";
   const tipos = [
     {id:"aceite",    label:"🛢 Cambio de aceite",         color:"#f5b942"},
@@ -293,7 +293,7 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
       });
     } catch(e){}
   };
-  // 🔁 Buscar la última venta con productos de entrega (no cobros, no roturas de dispenser) para repetirla automáticamente
+  // 🔁 Buscar la última venta con productos de entrega para pre-cargar cantidades automáticamente
   const nombresEntrega = productos.filter(p=>!p.esDispenser).map(p=>p.nombre);
   const ultimaConProd = (()=>{
     const conProd=(ventasCliente||[]).filter(v=>Array.isArray(v.detalle)&&v.detalle.some(d=>(d.cantidad||0)>0&&!d._esDispRoto&&nombresEntrega.includes(d.nombre)));
@@ -301,10 +301,10 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
   })();
   const [cantidades,setCantidades]=useState(()=>{
     const m={};productos.forEach(p=>{m[p.nombre]=0;});
-    if(ultimaConProd)ultimaConProd.detalle.forEach(d=>{if(!d._esDispRoto&&(d.nombre in m)&&nombresEntrega.includes(d.nombre))m[d.nombre]=d.cantidad;});
+    if(ultimaConProd) ultimaConProd.detalle.forEach(d=>{if(!d._esDispRoto&&nombresEntrega.includes(d.nombre))m[d.nombre]=d.cantidad||0;});
     return m;
   });
-  const [repetido,setRepetido]=useState(!!ultimaConProd);
+  const [repetido,setRepetido]=useState(()=>!!ultimaConProd&&Object.values({...ultimaConProd.detalle.reduce((a,d)=>{if(!d._esDispRoto&&nombresEntrega.includes(d.nombre))a[d.nombre]=d.cantidad||0;return a;},{})}).some(v=>v>0));
   const [pago,setPago]=useState("contado");
   const [monto,setMonto]=useState("");
   const [montoEfec,setMontoEfec]=useState(""); // pago mixto: parte efectivo
@@ -400,7 +400,8 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
         {repetido&&(
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,background:"var(--color-background-info)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:8,padding:"8px 12px",marginBottom:10}}>
             <span style={{fontSize:12,color:"var(--color-text-info)",fontWeight:500}}>🔁 Repetido de la última venta</span>
-            <button style={{...s.btn,padding:"4px 12px",fontSize:12}} onClick={()=>{setCantidades(q=>{const m={};Object.keys(q).forEach(k=>m[k]=0);return m;});setRepetido(false);}}>Vaciar</button>
+            <button style={{background:"none",border:"1px solid var(--color-border-secondary)",borderRadius:6,padding:"3px 10px",fontSize:12,color:"var(--color-text-secondary)",cursor:"pointer"}}
+              onClick={()=>{const m={};productos.forEach(p=>{m[p.nombre]=0;});setCantidades(m);setRepetido(false);}}>Vaciar</button>
           </div>
         )}
         {prodEntrega.map(p=>(
