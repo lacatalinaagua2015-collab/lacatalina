@@ -359,7 +359,7 @@ function App() {
       let ms = hoy18 - ahora; if(ms<0) ms += 24*60*60*1000;
       return setTimeout(()=>{
         if(Notification.permission==="granted"){
-          const hoyKey = new Date().toLocaleDateString("en-CA");
+          const hoyKey = new Date().toISOString().slice(0,10);
           if(!localStorage.getItem(`notif_cierre_${hoyKey}`)){
             new Notification("🚚 Sistema de Reparto",{body:"Son las 18:00 — ¿Ya cerraste el día?",icon:"/icon-192.png",tag:"cierre-dia"});
             localStorage.setItem(`notif_cierre_${hoyKey}`,"1");
@@ -379,7 +379,7 @@ function App() {
         const diffDias = Math.round((proxFecha-hoy)/(1000*60*60*24));
         if(diffDias===3||diffDias===2||diffDias===1){
           const nk = `notif_mant_${m.proximaFechaISO}_${m.tipo}`;
-          const hoyKey = new Date().toLocaleDateString("en-CA");
+          const hoyKey = new Date().toISOString().slice(0,10);
           if(!localStorage.getItem(`${nk}_${hoyKey}`)){
             const tipoLabel={aceite:"Cambio de aceite",preventivo:"Mantenimiento preventivo",embrague:"Cambio de embrague",reparacion:"Reparación",otro:"Mantenimiento"}[m.tipo]||m.tipo;
             new Notification("🔧 Vencimiento de mantenimiento",{body:`${tipoLabel} vence en ${diffDias} día${diffDias>1?"s":""}${m.descripcion?" — "+m.descripcion:""}`,icon:"/icon-192.png",tag:nk});
@@ -622,7 +622,7 @@ function App() {
       if(!('Notification' in window) || Notification.permission !== 'granted') return;
       const now = new Date();
       const hhmm = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-      const hoy = now.toLocaleDateString("en-CA");
+      const hoy = now.toISOString().slice(0,10);
 
       // 1. Transferencias pendientes a las 13:00 y 19:00
       if(hhmm === '13:00' || hhmm === '19:00') {
@@ -1031,7 +1031,6 @@ function App() {
           }}
           onGuardarAjuste={(vt)=>{saveVentas([...ventas,vt]);}} />}
       {pantalla==="venta"          && cliente && <NuevaVenta key={clienteId} cliente={cliente} productos={productos} fecha={fechaActual}
-        ventasCliente={ventas.filter(v=>v.clienteId===cliente.id)}
         progressData={(()=>{
           const clientesDia=clientes.filter(c=>c.dia===diaActual);
           const ventasHoy=ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste);
@@ -1195,13 +1194,13 @@ function App() {
       }} onVolver={()=>irA("menu")} onRegistrarVenta={(c)=>{
           setClienteId(c.id);
           // Asegurar que fechaActual esté seteado a hoy
-          const hoyKey = new Date().toLocaleDateString("en-CA");
+          const hoyKey = new Date().toISOString().slice(0,10);
           if(!fechaActual) setFechaActual(hoyKey);
           // Si no hay diaActual, usar el día del cliente como fallback
           if(!diaActual) setDiaActual(c.dia);
           irA("venta");
         }} onVerDetalle={(c)=>{setClienteId(c.id);irA("detalleDesdeGestion");}} ventas={ventas} /></React.Fragment>}
-      {pantalla==="detalleDesdeGestion" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual||cliente.dia} fecha={fechaActual} productos={productos} onVenta={()=>{setDiaActual(cliente.dia);const hoy=new Date().toLocaleDateString("en-CA");if(!fechaActual)setFechaActual(hoy);irA("venta");}} onVolver={()=>irA("gestionClientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>{eliminarCliente(cliente.id);irA("gestionClientes");}}
+      {pantalla==="detalleDesdeGestion" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual||cliente.dia} fecha={fechaActual} productos={productos} onVenta={()=>{setDiaActual(cliente.dia);const hoy=new Date().toISOString().slice(0,10);if(!fechaActual)setFechaActual(hoy);irA("venta");}} onVolver={()=>irA("gestionClientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>{eliminarCliente(cliente.id);irA("gestionClientes");}}
           onNoEstaCliente={()=>{}} onNoQuiereCliente={()=>{}}
           recordatorios={recordatorios} onGuardarRecordatorio={(r)=>saveRecordatorios([...(recordatorios||[]),r])} onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
           onCobrarSaldo={(monto,pago)=>{
@@ -1209,7 +1208,7 @@ function App() {
               const saldoAntes=cliente.saldo||0;
               const saldoDespues=saldoAntes+monto;
               const det=[{nombre:"Cobro de deuda",cantidad:1,precio:0,total:0}];
-              const fk=fechaActual||new Date().toLocaleDateString("en-CA");
+              const fk=fechaActual||new Date().toISOString().slice(0,10);
               const vt={id:Date.now(),clienteId:cliente.id,cliente:cliente.nombre,
                 dia:diaActual||cliente.dia,fechaKey:fk,fecha:new Date().toLocaleString("es-AR"),
                 detalle:det,pago,obs:`Cobro de deuda $${monto.toLocaleString("es-AR")} (${pago})`,saldoAplicado:0,
@@ -1242,7 +1241,7 @@ function App() {
         if(!cl) return;
         const saldoAntes=cl.saldo||0;
         const saldoDespues=saldoAntes+monto;
-        const vt={id:Date.now(),clienteId:cl.id,cliente:cl.nombre,dia:cl.dia,fechaKey:new Date().toLocaleDateString("en-CA"),fecha:new Date().toLocaleString("es-AR"),
+        const vt={id:Date.now(),clienteId:cl.id,cliente:cl.nombre,dia:cl.dia,fechaKey:new Date().toISOString().slice(0,10),fecha:new Date().toLocaleString("es-AR"),
           detalle:[{nombre:"Cobro de deuda",cantidad:1,precio:monto,total:monto}],pago,obs:`Cobro de deuda ${fmt(monto)} (${pago})`,
           neto:monto,bruto:monto,desc:0,costo:monto,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],saldoAntes,saldoDespues,_esCobro:true};
         saveVentas([...ventas,vt]);
