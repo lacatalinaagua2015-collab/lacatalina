@@ -296,12 +296,20 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
   // 🔁 Pre-cargar cantidades de la última venta del cliente
   const nombresEntrega = (productos||[]).filter(p=>!p.esDispenser).map(p=>p.nombre);
   const ultimaConProd = (()=>{
-    const conProd=(ventasCliente||[]).filter(v=>Array.isArray(v.detalle)&&v.detalle.some(d=>(d.cantidad||0)>0&&!d._esDispRoto&&nombresEntrega.includes(d.nombre)));
-    return conProd.length?[...conProd].sort((a,b)=>(b.id||0)-(a.id||0))[0]:null;
+    const todas = (ventasCliente||[]);
+    // Buscar la más reciente que tenga productos entregados (sin importar si detalle es array u objeto)
+    const conProd = todas.filter(v=>{
+      const det = Array.isArray(v.detalle) ? v.detalle : (v.detalle ? Object.values(v.detalle) : []);
+      return det.some(d=>(d.cantidad||0)>0 && !d._esDispRoto && nombresEntrega.includes(d.nombre));
+    });
+    return conProd.length ? [...conProd].sort((a,b)=>(b.id||0)-(a.id||0))[0] : null;
   })();
   const [cantidades,setCantidades]=useState(()=>{
     const m={};(productos||[]).forEach(p=>{m[p.nombre]=0;});
-    if(ultimaConProd)(ultimaConProd.detalle||[]).forEach(d=>{if(!d._esDispRoto&&nombresEntrega.includes(d.nombre))m[d.nombre]=d.cantidad||0;});
+    if(ultimaConProd){
+      const det = Array.isArray(ultimaConProd.detalle) ? ultimaConProd.detalle : Object.values(ultimaConProd.detalle||{});
+      det.forEach(d=>{if(!d._esDispRoto&&nombresEntrega.includes(d.nombre))m[d.nombre]=d.cantidad||0;});
+    }
     return m;
   });
   const [repetido,setRepetido]=useState(()=>!!ultimaConProd);
@@ -311,11 +319,15 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
     if(ventasClienteRef.current===ventasCliente||repetido) return;
     ventasClienteRef.current = ventasCliente;
     const nombres=(productos||[]).filter(p=>!p.esDispenser).map(p=>p.nombre);
-    const conProd=(ventasCliente||[]).filter(v=>Array.isArray(v.detalle)&&v.detalle.some(d=>(d.cantidad||0)>0&&!d._esDispRoto&&nombres.includes(d.nombre)));
+    const conProd=(ventasCliente||[]).filter(v=>{
+      const det=Array.isArray(v.detalle)?v.detalle:Object.values(v.detalle||{});
+      return det.some(d=>(d.cantidad||0)>0&&!d._esDispRoto&&nombres.includes(d.nombre));
+    });
     if(!conProd.length) return;
     const ultima=[...conProd].sort((a,b)=>(b.id||0)-(a.id||0))[0];
     const m={};(productos||[]).forEach(p=>{m[p.nombre]=0;});
-    (ultima.detalle||[]).forEach(d=>{if(!d._esDispRoto&&nombres.includes(d.nombre))m[d.nombre]=d.cantidad||0;});
+    const det=Array.isArray(ultima.detalle)?ultima.detalle:Object.values(ultima.detalle||{});
+    det.forEach(d=>{if(!d._esDispRoto&&nombres.includes(d.nombre))m[d.nombre]=d.cantidad||0;});
     setCantidades(m); setRepetido(true);
   },[ventasCliente]);
   const [pago,setPago]=useState("contado");
