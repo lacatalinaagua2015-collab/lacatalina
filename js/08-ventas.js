@@ -305,6 +305,21 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
     return m;
   });
   const [repetido,setRepetido]=useState(()=>!!ultimaConProd&&(ultimaConProd.detalle||[]).some(d=>!d._esDispRoto&&nombresEntrega.includes(d.nombre)&&(d.cantidad||0)>0));
+
+  // Si los datos llegan después del montaje, actualizar la pre-carga
+  const ventasClienteRef = React.useRef(ventasCliente);
+  React.useEffect(()=>{
+    if(ventasClienteRef.current===ventasCliente) return; // no cambió
+    ventasClienteRef.current = ventasCliente;
+    if(repetido) return; // ya estaba pre-cargado, no pisar
+    const nombres = (productos||[]).filter(p=>!p.esDispenser).map(p=>p.nombre);
+    const conProd=(ventasCliente||[]).filter(v=>Array.isArray(v.detalle)&&v.detalle.some(d=>(d.cantidad||0)>0&&!d._esDispRoto&&nombres.includes(d.nombre)));
+    if(!conProd.length) return;
+    const ultima = [...conProd].sort((a,b)=>(b.id||0)-(a.id||0))[0];
+    const m={};(productos||[]).forEach(p=>{m[p.nombre]=0;});
+    (ultima.detalle||[]).forEach(d=>{if(!d._esDispRoto&&nombres.includes(d.nombre))m[d.nombre]=d.cantidad||0;});
+    if(Object.values(m).some(v=>v>0)){ setCantidades(m); setRepetido(true); }
+  },[ventasCliente]);
   const [pago,setPago]=useState("contado");
   const [monto,setMonto]=useState("");
   const [montoEfec,setMontoEfec]=useState(""); // pago mixto: parte efectivo
