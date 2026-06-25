@@ -940,7 +940,9 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
             </div>
             {/* Todas las transferencias del día — colapsable */}
             {(()=>{
-              const transDelDia = todasVentasDia.filter(v=>v.pago==="transferencia");
+              // Transferencias puras del día + parte transferencia de pagos mixtos
+              const mixtoTransDia = ventas.filter(v=>v._esMixtoTrans&&v.fechaKey===fecha);
+              const transDelDia = [...todasVentasDia.filter(v=>v.pago==="transferencia"), ...mixtoTransDia];
               if(!transDelDia.length) return null;
               return <DetalleTransferencias ventas={transDelDia} ventasPendTrans={ventasPendTrans} />;
             })()}
