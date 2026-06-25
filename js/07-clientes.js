@@ -32,9 +32,8 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
     else onRegistrarNoVisita(id,motivo);
   };
 
-  // Memoizados: solo se recalculan si cambia la lista de clientes (no al escribir en el buscador, etc.)
-  const clientesReales = React.useMemo(() => clientes.filter(c=>!c._esProspecto), [clientes]);
-  const clientesOrdenados = React.useMemo(() => [...clientesReales].sort((a,b)=>(a.orden||9999)-(b.orden||9999)), [clientesReales]);
+  const clientesReales = clientes.filter(c=>!c._esProspecto);
+  const clientesOrdenados = [...clientesReales].sort((a,b)=>(a.orden||9999)-(b.orden||9999));
   const filtrados  = clientesOrdenados.filter(c=>buscarCliente(c,busqueda)>0);
   const pendientesNormales = filtrados.filter(c=>!visitados.has(c.id)&&noVMap[c.id]!=="noesta");
   const volverAlFinal      = filtrados.filter(c=>noVMap[c.id]==="noesta"&&!atendidos.has(c.id));
@@ -477,7 +476,7 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
                   <span style={s.badge("success")}>{fmt(ventaHoy.neto)}</span>
                 </div>
                 <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:4}}>
-                  {ventaHoy.detalle.map(d=>`${d.nombre} ×${d.cantidad}`).join(" · ")} · {ventaHoy.pago}
+                  {ventaHoy.detalle.map(d=>`${d.nombre} ×${d.cantidad}`).join(" · ")} · {(Number(ventaHoy.montoTrans)||0)>0&&(Number(ventaHoy.montoEfec)||0)>0?`Mixto · ef ${fmt(ventaHoy.montoEfec)} + tr ${fmt(ventaHoy.montoTrans)}`:ventaHoy.pago}
                 </div>
               </div>
             : <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
@@ -529,7 +528,7 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
                     <span style={{fontSize:18}}>{esNoEsta?"🚪":"🙅"}</span>
                     <div>
                       <div style={{fontSize:13,fontWeight:600,color:esNoEsta?"#f59e0b":"#ef4444"}}>{esNoEsta?"No estaba en casa":"No quiso comprar"}</div>
-                      <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{(fmtFechaHoraVenta(item.creado)||item.fechaKey)} · {item.dia}</div>
+                      <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{item.fechaKey} · {item.dia}</div>
                     </div>
                   </div>
                 );
@@ -543,7 +542,7 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
                     <span style={{fontSize:18}}>💳</span>
                     <div style={{flex:1}}>
                       <div style={{fontSize:13,fontWeight:700,color:"#10b981"}}>Cobro de deuda</div>
-                      <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:1}}>{(fmtFechaHoraVenta(v.fecha)||v.fechaKey)} · {v.pago}</div>
+                      <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:1}}>{v.fechaKey} · {v.pago}</div>
                       {v.saldoAntes!==undefined&&<div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>Saldo antes: {fmt(v.saldoAntes)} → después: {fmt(v.saldoDespues)}</div>}
                     </div>
                   </div>
@@ -560,7 +559,7 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
                     <div style={{flex:1}}>
                       <div style={{fontSize:13,fontWeight:700,color:"#818cf8"}}>Ajuste de saldo</div>
                       <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:2}}>{v.obs?.replace("Ajuste: ","")}</div>
-                      <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:1}}>{(fmtFechaHoraVenta(v.fecha)||v.fechaKey)}</div>
+                      <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:1}}>{v.fechaKey}</div>
                       {v.saldoAntes!==undefined&&<div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>Saldo: {fmt(v.saldoAntes)} → {fmt(v.saldoDespues)}</div>}
                     </div>
                   </div>
@@ -575,14 +574,17 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,alignItems:"center"}}>
                       <div style={{display:"flex",gap:6,alignItems:"center"}}>
                         <span style={{fontSize:16}}>🛒</span>
-                        <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{fmtFechaHoraVenta(v.fecha)||v.fechaKey||v.dia}</span>
+                        <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{v.fechaKey||v.dia}</span>
                       </div>
                       <span style={{fontSize:15,fontWeight:700,color:"#3b82f6"}}>{fmt(v.neto)}</span>
                     </div>
                     <div style={{fontSize:13,color:"var(--color-text-primary)",marginBottom:2,paddingLeft:22}}>{v.detalle.map(d=>`${d.nombre} ×${d.cantidad}`).join(" · ")}</div>
                     <div style={{fontSize:11,color:"var(--color-text-secondary)",paddingLeft:22,marginBottom:6}}>
-                      {v.pago}{v.desc>0?` · desc. ${fmt(v.desc)}`:""}{v.saldoAplicado>0?` · saldo apl. ${fmt(v.saldoAplicado)}`:""}{v.obs?` · ${v.obs}`:""}
-                    </div>
+                      {(()=>{
+                        const esMixto=(Number(v.montoTrans)||0)>0&&(Number(v.montoEfec)||0)>0;
+                        if(esMixto) return `Mixto · ef ${fmt(v.montoEfec)} + tr ${fmt(v.montoTrans)}`;
+                        return v.pago;
+                      })()}{v.desc>0?` · desc. ${fmt(v.desc)}`:""}{v.saldoAplicado>0?` · saldo apl. ${fmt(v.saldoAplicado)}`:""}{v.obs?` · ${v.obs.replace(/\s*\[Mixto:[^\]]*\]/g,"")}`:""}</div>
                     <div style={{display:"flex",justifyContent:"flex-end",gap:6}}>
                       <button style={{...s.btn,fontSize:11,padding:"3px 8px"}} onClick={()=>setEditandoVentaId(v.id)}>Editar</button>
                       <button style={{...s.btnDanger,fontSize:11,padding:"3px 8px"}} onClick={()=>{if(window.confirm(`¿Eliminar venta de ${fmt(v.neto)}?`))onEliminarVenta(v.id);}}>Eliminar</button>
