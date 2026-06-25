@@ -327,7 +327,6 @@ function DetalleVentasDia({ventas, clientes, noVisitas, fecha}) {
                     {cli&&cli._esProspecto&&<span style={{marginLeft:6,fontSize:10,padding:"1px 6px",borderRadius:4,background:"#2e1f06",color:"#f5b942",fontWeight:600}}>🚀 Prospecto</span>}
                     <span style={{marginLeft:6,fontSize:10,padding:"1px 6px",borderRadius:4,background:pagoBadge.bg,color:pagoBadge.color,fontWeight:600}}>{pagoBadge.txt}</span>
                     {dir&&<div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>📍 {dir}</div>}
-                    {v.fecha&&<div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>🕐 {fmtFechaHoraVenta(v.fecha)}</div>}
                   </div>
                   <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(v.neto||0)}</span>
                 </div>
@@ -382,8 +381,8 @@ function DetalleVentasDia({ventas, clientes, noVisitas, fecha}) {
 function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setStock,syncData,onGuardar,onVolver,autoCierre,onAutoGuardar,noVisitas}) {
   // Separar ventas del día propio vs ventas de clientes de otro día
   const clientesDia = new Set((clientes||[]).filter(c=>c.dia===dia).map(c=>c.id));
-  const ventasPropias  = ventas.filter(v=>clientesDia.has(v.clienteId)&&v.fechaKey===fecha);
-  const ventasExtraDia = ventas.filter(v=>!clientesDia.has(v.clienteId)&&v.fechaKey===fecha);
+  const ventasPropias  = ventas.filter(v=>clientesDia.has(v.clienteId)&&v.fechaKey===fecha&&!v._esMixtoTrans);
+  const ventasExtraDia = ventas.filter(v=>!clientesDia.has(v.clienteId)&&v.fechaKey===fecha&&!v._esMixtoTrans);
   // Auto-calcular desde ventas del dia
   const CAJON_SODA = 6;
   const getProdCosto = (nombre) => { const p=(productos||[]).find(x=>x.nombre===nombre); return p?(p.costo||0):0; };
@@ -419,8 +418,18 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
   const extraFiado    = ventasExtraDia.filter(v=>v.pago==="fiado").reduce((a,v)=>a+(v.neto||0),0);
   const extraTotal    = extraEfectivo + extraTrans + extraFiado;
   // Cobranza — todas las ventas del día (propias + otros días)
-  const cobEfectivo   = todasVentasDia.filter(v=>v.pago==="contado").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
-  const cobTransBruto = todasVentasDia.filter(v=>v.pago==="transferencia").reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
+  // Para pago mixto: la venta principal (pago="contado") tiene montoEfec y montoTrans guardados
+  // cobEfectivo debe contar solo la parte efectivo del mixto, no el total
+  const cobEfectivo   = todasVentasDia.filter(v=>v.pago==="contado").reduce((a,v)=>{
+    const esMixto = (Number(v.montoTrans)||0) > 0;
+    return a + (esMixto ? (Number(v.montoEfec)||0) : (v.pagadoNum||v.neto||0));
+  }, 0);
+  // cobTransBruto: transferencias puras + parte transferencia de pagos mixtos
+  const cobTransBruto = todasVentasDia.reduce((a,v)=>{
+    if(v.pago==="transferencia") return a+(v.pagadoNum||v.neto||0);
+    if(v.pago==="contado"&&(Number(v.montoTrans)||0)>0) return a+(Number(v.montoTrans)||0);
+    return a;
+  }, 0);
   const cobTransDesc  = Math.round(cobTransBruto*0.025);
   const cobTransNeto  = cobTransBruto - cobTransDesc;
   const ventasPendTrans = ventas.filter(v=>v.pago==="transferencia"&&!v.transConfirmada);
@@ -1100,4 +1109,3 @@ function InicioReparto({dia,fecha,planilla,productos,cargasDia,stock,onGuardar,o
     </div>
   );
 }
-
