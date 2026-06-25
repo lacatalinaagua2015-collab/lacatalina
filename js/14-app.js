@@ -182,7 +182,20 @@ function App() {
     cloudLoad().then(function(data) {
       if(!data) { setSyncStatus("idle"); return; }
       if (data.clientes?.length)   setClientes(data.clientes);
-      if (data.ventas?.length)     setVentasRaw(data.ventas);
+      // ── Ventas: MERGEAR en vez de sobreescribir ──────────────────────────
+      // Si el celular tenía ventas no sincronizadas, no las pisamos con Firebase
+      if (data.ventas?.length) {
+        const ventasLocales = (()=>{ try{ return JSON.parse(localStorage.getItem("cat_ventas_v3")||"[]"); }catch{ return []; } })();
+        const idsFirebase = new Set((data.ventas||[]).map(v=>v.id));
+        const soloEnLocal = ventasLocales.filter(v=>!idsFirebase.has(v.id));
+        const merged = soloEnLocal.length > 0 ? [...data.ventas, ...soloEnLocal] : data.ventas;
+        setVentasRaw(merged);
+        // Si había ventas locales que Firebase no tenía, sincronizarlas ahora
+        if(soloEnLocal.length > 0) {
+          console.log("Merge: "+soloEnLocal.length+" ventas locales no estaban en Firebase, sincronizando...");
+          setTimeout(()=>syncData({ventas:merged}), 2000);
+        }
+      }
       if (data.planillas)          setPlanillas(data.planillas);
       if (data.stock) {
         const ds = data.stock;
