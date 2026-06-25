@@ -308,11 +308,14 @@ function DetalleVentasDia({ventas, clientes, noVisitas, fecha}) {
       {abierto&&(
         <div style={{borderTop:"0.5px solid var(--color-border-info)",background:"var(--color-background-primary)"}}>
           {ventas.map((v,idx)=>{
-            const pagoBadge={
+            const esMixto = (Number(v.montoTrans)||0)>0 && (Number(v.montoEfec)||0)>0;
+            const pagoBadge = esMixto
+              ? {bg:"var(--color-background-info)",color:"var(--color-text-info)",txt:`Mixto · ef ${fmt(v.montoEfec)} + tr ${fmt(v.montoTrans)}`}
+              : ({
               contado:{bg:"var(--color-background-success)",color:"var(--color-text-success)",txt:"Contado"},
               transferencia:{bg:v.transConfirmada?"var(--color-background-success)":"var(--color-background-warning)",color:v.transConfirmada?"var(--color-text-success)":"#f5b942",txt:v.transConfirmada?"Transfer. ✅":"Transfer. 🔴"},
               fiado:{bg:"var(--color-background-warning)",color:"var(--color-text-warning)",txt:"Fiado"},
-            }[v.pago]||{bg:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",txt:v.pago};
+            }[v.pago]||{bg:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",txt:v.pago});
             const cli=(clientes||[]).find(x=>x.id===v.clienteId);
             const dir=cli?((cli.calle?`${cli.calle} ${cli.nro||""}`:cli.manzana?`Mz ${cli.manzana} L ${cli.lote}`:"")+(cli.barrio?` · ${cli.barrio}`:"")):"";
             const deudaPagada=Math.max(0,(v.pagadoNum||0)-(v.neto||0));
