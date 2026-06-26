@@ -876,7 +876,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
           )}
           <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0 2px"}}>
             <span style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>Total cobrado</span>
-            <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(cobEfectivo+cobTransBruto+cobSaldos)}</span>
+            <span style={{fontSize:16,fontWeight:500,color:"var(--color-text-primary)"}}>{fmt(cobEfectivo+cobTransBruto)}</span>
           </div>
         </div>
 

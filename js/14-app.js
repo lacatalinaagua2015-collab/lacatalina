@@ -720,6 +720,7 @@ function App() {
       envPrest:envPrestFinal,
       envDev:(envDev||[]).filter(e=>e.prod&&e.cant), ...calc,
       montoTrans:montoTrans2||0, montoEfec:opcionSaldo==="mixto_ef"?Number(montoPagado):0,
+      ...(opcionSaldo==="cobro_deuda"?{_esCobro:true,neto:0,bruto:0,costo:0,ganancia:0}:{}),
     };
 
     // Si es pago mixto, guardamos la transferencia como venta pendiente de confirmacion
@@ -1034,10 +1035,11 @@ function App() {
             const cl=cliente;
             const saldoAntes=cl.saldo||0;
             const saldoDespues=saldoAntes+monto;
-            const det=[{nombre:"Cobro de deuda",cantidad:1,precio:monto,total:monto}];
-            const vt={id:Date.now(),clienteId:cl.id,cliente:cl.nombre,dia:diaActual,fechaKey:fechaActual,fecha:new Date().toLocaleString("es-AR"),
+            const det=[{nombre:"Cobro de deuda",cantidad:1,precio:0,total:0}];
+            const fk=new Date().toLocaleDateString("en-CA");
+            const vt={id:Date.now(),clienteId:cl.id,cliente:cl.nombre,dia:diaActual||cl.dia,fechaKey:fk,fecha:new Date().toLocaleString("es-AR"),
               detalle:det,pago,obs:`Cobro de deuda ${fmt(monto)} (${pago})`,saldoAplicado:0,
-              neto:monto,bruto:monto,desc:0,costo:monto,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],
+              neto:0,bruto:0,desc:0,costo:0,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],
               saldoAntes,saldoDespues,_esCobro:true};
             saveVentas([...ventas,vt]);
             saveClientes(clientes.map(x=>x.id===cl.id?{...x,saldo:saldoDespues}:x));
