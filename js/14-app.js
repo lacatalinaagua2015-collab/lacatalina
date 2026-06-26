@@ -715,7 +715,7 @@ function App() {
     const calc = calcVenta(detalle, pagoReal, montoParaCalc, saldoAplicado, productos);
     const nuevaVenta = {
       id:Date.now(), clienteId:c.id, cliente:c.nombre,
-      dia:diaActual, fechaKey:fechaActual, fecha:new Date().toLocaleString("es-AR"),
+      dia:diaActual, fechaKey:new Date().toLocaleDateString("en-CA"), fecha:new Date().toLocaleString("es-AR"),
       detalle, pago:pagoReal, obs:(obs||"")+obsExtra, saldoAplicado:saldoAplicado||0,
       envPrest:envPrestFinal,
       envDev:(envDev||[]).filter(e=>e.prod&&e.cant), ...calc,
@@ -729,7 +729,7 @@ function App() {
     if(montoTrans2>0 && opcionSaldo==="mixto_ef") {
       const ventaTr = {
         id:Date.now()+2, clienteId:c.id, cliente:c.nombre,
-        dia:diaActual, fechaKey:fechaActual, fecha:new Date().toLocaleString("es-AR"),
+        dia:diaActual, fechaKey:new Date().toLocaleDateString("en-CA"), fecha:new Date().toLocaleString("es-AR"),
         detalle:[{nombre:"Pago mixto · transferencia",cantidad:1,precio:montoTrans2,total:montoTrans2}],
         pago:"transferencia", obs:"[Parte transfer. de pago mixto]", saldoAplicado:0,
         neto:montoTrans2, bruto:montoTrans2, desc:0, costo:0, ganancia:0,
@@ -1002,7 +1002,7 @@ function App() {
         onAbrirMapa={()=>irA("mapaClientes")}
         onPlanilla={()=>irA("planilla")}
         />}
-      {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>irA("venta")} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
+      {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>{const hoyKey=new Date().toLocaleDateString("en-CA");if(fechaActual!==hoyKey)setFechaActual(hoyKey);irA("venta");}} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
           onNoEstaCliente={()=>{
             const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noesta"}];
             saveNoVisitas(nv);
