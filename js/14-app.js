@@ -186,13 +186,26 @@ function App() {
       // Si el celular tenía ventas no sincronizadas, no las pisamos con Firebase
       if (data.ventas?.length) {
         const ventasLocales = (()=>{ try{ return JSON.parse(localStorage.getItem("cat_ventas_v3")||"[]"); }catch{ return []; } })();
-        const idsFirebase = new Set((data.ventas||[]).map(v=>v.id));
-        const soloEnLocal = ventasLocales.filter(v=>!idsFirebase.has(v.id));
-        const merged = soloEnLocal.length > 0 ? [...data.ventas, ...soloEnLocal] : data.ventas;
+        // ── MERGE INTELIGENTE: por cada venta, quedarse con la versión MÁS NUEVA ──
+        // Se compara el sello _upd (última modificación). Si empatan (o son datos
+        // viejos sin sello), se prioriza la transferencia YA confirmada para no revivirla.
+        const porId = {};
+        (data.ventas||[]).forEach(v=>{ porId[v.id] = v; });               // base: lo de la nube
+        let cambiosLocales = 0;
+        ventasLocales.forEach(v=>{
+          const enNube = porId[v.id];
+          if(!enNube){ porId[v.id] = v; cambiosLocales++; return; }       // solo en local → la agrego
+          const uL = Number(v._upd)||0, uN = Number(enNube._upd)||0;
+          const ganaLocal = (uL !== uN)
+            ? uL > uN                                                     // gana la más nueva
+            : (!!v.transConfirmada && !enNube.transConfirmada);          // empate → no revivir una confirmada
+          if(ganaLocal){ porId[v.id] = v; cambiosLocales++; }
+        });
+        const merged = Object.values(porId);
         setVentasRaw(merged);
-        // Si había ventas locales que Firebase no tenía, sincronizarlas ahora
-        if(soloEnLocal.length > 0) {
-          console.log("Merge: "+soloEnLocal.length+" ventas locales no estaban en Firebase, sincronizando...");
+        // Si el celular tenía versiones más nuevas que la nube, sincronizarlas ahora
+        if(cambiosLocales > 0) {
+          console.log("Merge: "+cambiosLocales+" ventas locales más nuevas que Firebase, sincronizando...");
           setTimeout(()=>syncData({ventas:merged}), 2000);
         }
       }
@@ -943,7 +956,7 @@ function App() {
           dia={diaActual||"todos los días"}
           ventas={ventas.filter(v=>v.pago==="transferencia"&&(!diaActual||v.dia===diaActual))}
           clientes={clientes}
-          onConfirmar={(ventaId)=>{const nv=ventas.map(v=>v.id===ventaId?{...v,transConfirmada:!v.transConfirmada}:v);saveVentas(nv);}}
+          onConfirmar={(ventaId)=>{const nv=ventas.map(v=>v.id===ventaId?{...v,transConfirmada:!v.transConfirmada,_upd:Date.now()}:v);saveVentas(nv);}}
           onVolver={()=>irA("menu")} />}
       {pantalla==="diaPrincipal"   && <DiaPrincipal dia={diaActual} onIrClientes={()=>irA("selectorFechaClientes")} onIrPlanilla={()=>irA("selectorFechaPlanilla")} onVolver={()=>irA("menu")} onVerConfirmaciones={()=>irA("confirmacionesDia")} ventasPendientesTransfer={ventas.filter(v=>v.dia===diaActual&&v.pago==="transferencia"&&!v.transConfirmada).length} />}
       {pantalla==="selectorFechaPlanilla" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("planilla");}} onVolver={()=>irA("diaPrincipal")} />}
@@ -981,7 +994,7 @@ function App() {
           saveClientes([...otros,...lista]);
         }} onRegistrarNoVisita={(clienteId,motivo)=>{const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo}];saveNoVisitas(nv);}} onQuitarNoVisita={(clienteId)=>{const nv=(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual));saveNoVisitas(nv);}}
         onConfirmarTransfer={(clienteId,ventaId)=>{
-          const nv=ventas.map(v=>v.id===ventaId?{...v,transConfirmada:!v.transConfirmada}:v);
+          const nv=ventas.map(v=>v.id===ventaId?{...v,transConfirmada:!v.transConfirmada,_upd:Date.now()}:v);
           saveVentas(nv);
         }}
         prospectos={(prospectos||[]).filter(p=>p.dia===diaActual&&p.estado==="activo")}
