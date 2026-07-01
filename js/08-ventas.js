@@ -57,8 +57,8 @@ function EditVenta({venta,productos,onGuardar,onCancelar}) { // onGuardar(detall
       {pago==="transferencia"&&(
         <div style={{...s.card,margin:"0 0 8px",background:"#1e3a5f",border:"0.5px solid #5daaff"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{fontSize:12,color:"#5daaff"}}>Confirmar transferencia</span>
-            <button style={{background:"#185FA5",color:"#fff",border:"none",borderRadius:6,padding:"5px 12px",fontSize:12,cursor:"pointer"}} onClick={sonarTrans}>🔔 Confirmar</button>
+            <span style={{fontSize:12,color:"#5daaff"}}>Transferencia — se aplica al guardar</span>
+            <button style={{background:"#185FA5",color:"#fff",border:"none",borderRadius:6,padding:"6px 12px",fontSize:12,cursor:"pointer",fontWeight:600}} onClick={()=>{ sonarTrans(); onGuardar(detalle,pago,monto,venta.saldoAplicado||0,obs); }}>✓ Confirmar y guardar</button>
           </div>
         </div>
       )}
