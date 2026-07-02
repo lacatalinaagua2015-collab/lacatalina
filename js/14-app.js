@@ -1058,7 +1058,8 @@ function App() {
             saveVentas([...ventas,vt]);
             saveClientes(clientes.map(x=>x.id===cl.id?{...x,saldo:saldoDespues}:x));
           }}
-          onGuardarAjuste={(vt)=>{saveVentas([...ventas,vt]);}} />}
+          onGuardarAjuste={(vt)=>{saveVentas([...ventas,vt]);}}
+          onGuardarCambio={(vt)=>{saveVentas([...ventas,vt]);}} />}
       {pantalla==="venta"          && cliente && <NuevaVenta key={`${clienteId}-${ventas.filter(v=>v.clienteId===cliente.id).length}`} cliente={cliente} productos={productos} fecha={fechaActual}
         ventasCliente={ventas.filter(v=>v.clienteId===cliente.id)}
         progressData={(()=>{

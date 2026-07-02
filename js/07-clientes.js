@@ -256,7 +256,7 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
   );
 }
 
-function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,onVolver,onEditar,onEliminarVenta,onEditarVenta,onEliminarCliente,onNoEstaCliente,onNoQuiereCliente,recordatorios,onGuardarRecordatorio,onConfirmarRecordatorio,onCobrarSaldo,onGuardarAjuste}) {
+function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,onVolver,onEditar,onEliminarVenta,onEditarVenta,onEliminarCliente,onNoEstaCliente,onNoQuiereCliente,recordatorios,onGuardarRecordatorio,onConfirmarRecordatorio,onCobrarSaldo,onGuardarAjuste,onGuardarCambio}) {
   const [editandoCliente,setEditandoCliente] = useState(false);
   const [editandoVentaId,setEditandoVentaId] = useState(null);
   const [editandoSaldo,setEditandoSaldo] = useState(false);
@@ -266,12 +266,16 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
   const [mostrarPagoSaldo,setMostrarPagoSaldo] = useState(false);
   const [mostrarFotoGrande,setMostrarFotoGrande] = useState(false);
   const [razonAjuste,setRazonAjuste] = useState("");
+  const [mostrarCambio,setMostrarCambio] = useState(false);
+  const [productoViejoCambio,setProductoViejoCambio] = useState("Bidón 20L");
+  const [productoNuevoCambio,setProductoNuevoCambio] = useState("Bidón 20L");
+  const [motivoCambio,setMotivoCambio] = useState("Agua en mal estado");
   const recActivos = (recordatorios||[]).filter(r=>r.clienteId===cliente.id&&!r.confirmado);
   // Las partes-transferencia de pagos mixtos NO son ventas: no se listan ni se cuentan acá
   // (la venta principal ya muestra el desglose [Mixto: ef + tr]; la transferencia se confirma en el panel del día)
   const ventasSinMixtoTr = ventas.filter(v=>!v._esMixtoTrans);
   const historial = [...ventasSinMixtoTr].sort((a,b)=>(b.fechaKey||"").localeCompare(a.fechaKey||"")||(b.id||0)-(a.id||0));
-  const ventaHoy  = fecha ? ventasSinMixtoTr.find(v=>v.fechaKey===fecha&&!v._esCobro&&!v._esAjuste) : null;
+  const ventaHoy  = fecha ? ventasSinMixtoTr.find(v=>v.fechaKey===fecha&&!v._esCobro&&!v._esAjuste&&!v._esCambio) : null;
   const initials  = cliente.nombre.split(" ").slice(0,2).map(w=>w[0]||"").join("").toUpperCase();
   const totalComprado = ventasSinMixtoTr.reduce((a,v)=>a+(v.neto||0),0);
   const promedioVenta = ventasSinMixtoTr.length>0 ? Math.round(totalComprado/ventasSinMixtoTr.length) : 0;
@@ -422,6 +426,7 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
                     </button>
                   )}
                   <button style={{...s.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>setEditandoSaldo(true)}>Ajustar</button>
+                  <button style={{...s.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>setMostrarCambio(true)}>🔄 Cambio</button>
                 </div>
               </div>
             ):(
@@ -467,6 +472,45 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
               </div>
             )}
           </div>
+
+          {/* Cambio de envase (ej: problema con el agua) — no cobra, solo registra */}
+          {mostrarCambio&&(
+            <div style={{...s.card,margin:"0 0 10px",border:"1px solid #818cf8"}}>
+              <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:8,fontWeight:500}}>🔄 Cambio de envase (no se cobra)</div>
+              <div style={{display:"flex",gap:8,marginBottom:8}}>
+                <div style={{flex:1}}>
+                  <label style={{...s.label,marginBottom:4}}>Se retira</label>
+                  <select style={s.select} value={productoViejoCambio} onChange={e=>setProductoViejoCambio(e.target.value)}>
+                    {(productos||[]).map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div style={{flex:1}}>
+                  <label style={{...s.label,marginBottom:4}}>Se entrega</label>
+                  <select style={s.select} value={productoNuevoCambio} onChange={e=>setProductoNuevoCambio(e.target.value)}>
+                    {(productos||[]).map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{marginBottom:8}}>
+                <label style={{...s.label,marginBottom:4}}>Motivo</label>
+                <input style={s.input} placeholder="Ej: Agua en mal estado" value={motivoCambio} onChange={e=>setMotivoCambio(e.target.value)}/>
+              </div>
+              <div style={{display:"flex",gap:6}}>
+                <button style={{...s.btn,flex:1,fontSize:12}} onClick={()=>setMostrarCambio(false)}>Cancelar</button>
+                <button style={{...s.btnPrimary,flex:2,fontSize:12,padding:"8px"}} onClick={()=>{
+                  const vt={id:Date.now(),clienteId:cliente.id,cliente:cliente.nombre,
+                    dia:dia,fechaKey:fecha,fecha:new Date().toLocaleString("es-AR"),
+                    detalle:[{nombre:"Cambio de envase",cantidad:1,precio:0,total:0}],
+                    pago:"cambio",obs:`Cambio: ${productoViejoCambio} → ${productoNuevoCambio}${motivoCambio.trim()?` · ${motivoCambio.trim()}`:""}`,
+                    neto:0,bruto:0,desc:0,costo:0,ganancia:0,pagadoNum:0,saldoDelta:0,
+                    envDev:[{prod:productoViejoCambio,cant:1}],envPrest:[{prod:productoNuevoCambio,cant:1}],
+                    _esCambio:true,_upd:Date.now()};
+                  onGuardarCambio&&onGuardarCambio(vt);
+                  setMostrarCambio(false);setMotivoCambio("Agua en mal estado");
+                }}>✓ Registrar cambio</button>
+              </div>
+            </div>
+          )}
 
           {/* Registrar venta — solo una por día */}
           {ventaHoy
@@ -536,6 +580,7 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
               const v=item;
               const esCobro=v.pagadoNum>0&&v.neto===0&&!v._esAjuste;
               const esAjuste=v._esAjuste||false;
+              const esCambio=v._esCambio||false;
               if(esCobro) return(
                 <div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"10px 12px",marginBottom:6,background:"rgba(16,185,129,0.08)",borderRadius:10,border:"0.5px solid rgba(16,185,129,0.3)"}}>
                   <div style={{display:"flex",gap:8,alignItems:"flex-start",flex:1}}>
@@ -564,6 +609,19 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
                     </div>
                   </div>
                   <button style={{fontSize:10,color:"var(--color-text-danger)",background:"none",border:"none",cursor:"pointer",flexShrink:0}} onClick={()=>{if(window.confirm("¿Eliminar este ajuste?"))onEliminarVenta(v.id);}}>Eliminar</button>
+                </div>
+              );
+              if(esCambio) return(
+                <div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"10px 12px",marginBottom:6,background:"rgba(129,140,248,0.08)",borderRadius:10,border:"0.5px solid rgba(129,140,248,0.3)"}}>
+                  <div style={{display:"flex",gap:8,alignItems:"flex-start",flex:1}}>
+                    <span style={{fontSize:18}}>🔄</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:700,color:"#818cf8"}}>Cambio de envase</div>
+                      <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:2}}>{v.obs?.replace("Cambio: ","")}</div>
+                      <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:1}}>{v.fechaKey} · no se cobró</div>
+                    </div>
+                  </div>
+                  <button style={{fontSize:10,color:"var(--color-text-danger)",background:"none",border:"none",cursor:"pointer",flexShrink:0}} onClick={()=>{if(window.confirm("¿Eliminar este cambio?"))onEliminarVenta(v.id);}}>Eliminar</button>
                 </div>
               );
               return(
@@ -747,7 +805,7 @@ function ClientesDormidos({clientes,ventas,onVolver,onSeleccionar,onEditarClient
   // Última compra real por cliente (ignora cobros y ajustes)
   const ultima={};
   (ventas||[]).forEach(v=>{
-    if(v._esCobro||v._esAjuste||v._esAjusteEnvases||v._esMixtoTrans) return;
+    if(v._esCobro||v._esAjuste||v._esAjusteEnvases||v._esCambio||v._esMixtoTrans) return;
     const fk=v.fechaKey; if(!fk) return;
     if(!ultima[v.clienteId]||fk>ultima[v.clienteId]) ultima[v.clienteId]=fk;
   });
