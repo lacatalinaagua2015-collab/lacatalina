@@ -706,7 +706,7 @@ function App() {
     const c = cliente;
     // Auto-detectar envases prestados (solo si no es cobro de deuda)
     const envAutoDetect = [];
-    if(opcionSaldo!=="cobro_deuda") {
+    if(opcionSaldo!=="cobro_deuda" && opcionSaldo!=="cambio_envase") {
       const mapa = {sifon:"Sifón 1.5L", bidon10:"Bidón 10L", bidon20:"Bidón 20L"};
       detalle.forEach(d=>{
         const asignado = d.nombre==="Sifón 1.5L"?(c.sifon||0):d.nombre==="Bidón 10L"?(c.bidon10||0):d.nombre==="Bidón 20L"?(c.bidon20||0):0;
@@ -735,6 +735,7 @@ function App() {
       montoTrans:montoTrans2||0, montoEfec:opcionSaldo==="mixto_ef"?Number(montoPagado):0,
       _upd:Date.now(),
       ...(opcionSaldo==="cobro_deuda"?{_esCobro:true,neto:0,bruto:0,costo:0,ganancia:0}:{}),
+      ...(opcionSaldo==="cambio_envase"?{_esCambio:true,neto:0,bruto:0,costo:0,ganancia:0}:{}),
     };
 
     // Si es pago mixto, guardamos la transferencia como venta pendiente de confirmacion

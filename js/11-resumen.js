@@ -37,7 +37,7 @@ function Resumen({ventas,clientes,productos,planillas,noVisitas,onVolver}) {
   // ── Ranking de clientes por volumen ──────────────────────────────────────
   const rankingClientes = React.useMemo(()=>{
     const mapa = {};
-    filtradas.filter(v=>!v._esCobro&&!v._esAjuste).forEach(v=>{
+    filtradas.filter(v=>!v._esCobro&&!v._esAjuste&&!v._esCambio).forEach(v=>{
       if(!mapa[v.clienteId]) mapa[v.clienteId]={id:v.clienteId,nombre:v.cliente,total:0,compras:0};
       mapa[v.clienteId].total += v.neto||0;
       mapa[v.clienteId].compras += 1;
@@ -153,7 +153,7 @@ function Resumen({ventas,clientes,productos,planillas,noVisitas,onVolver}) {
 
       {/* Métricas principales */}
       <div style={{...s.grid2,padding:"0 14px",gap:8,marginBottom:8}}>
-        <div style={s.metricCard}><div style={s.metricLabel}>Total vendido</div><div style={{...s.metricVal,color:"#5daaff"}}>{fmt(totalNeto)}</div><div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>{ventasReales.filter(v=>!v._esCobro&&!v._esAjuste).length} entregas</div></div>
+        <div style={s.metricCard}><div style={s.metricLabel}>Total vendido</div><div style={{...s.metricVal,color:"#5daaff"}}>{fmt(totalNeto)}</div><div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>{ventasReales.filter(v=>!v._esCobro&&!v._esAjuste&&!v._esCambio).length} entregas</div></div>
         <div style={s.metricCard}><div style={s.metricLabel}>Ganancia neta</div><div style={{...s.metricVal,color:"#4dd9a0"}}>{fmt(totalGan)}</div><div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>−{fmt(totalCosto)} llenado</div></div>
       </div>
 
