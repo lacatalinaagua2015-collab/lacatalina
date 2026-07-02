@@ -733,6 +733,7 @@ function App() {
       envPrest:envPrestFinal,
       envDev:(envDev||[]).filter(e=>e.prod&&e.cant), ...calc,
       montoTrans:montoTrans2||0, montoEfec:opcionSaldo==="mixto_ef"?Number(montoPagado):0,
+      _upd:Date.now(),
       ...(opcionSaldo==="cobro_deuda"?{_esCobro:true,neto:0,bruto:0,costo:0,ganancia:0}:{}),
     };
 
@@ -750,7 +751,7 @@ function App() {
         pagadoNum:montoTrans2, saldoDelta:0, // sin impacto en saldo
         envPrest:[], envDev:[],
         _esMixtoTrans:true, _mixtoDe:nuevaVenta.id,
-        transConfirmada:false, // aparece como transferencia pendiente de confirmar
+        transConfirmada:false, _upd:Date.now(), // aparece como transferencia pendiente de confirmar
       };
       nuevasVentas = [...nuevasVentas, ventaTr];
       // saldoExtra ya es correcto, NO sumamos montoTrans2
@@ -912,7 +913,7 @@ function App() {
       if(ligada && (Number(v.saldoDelta)||0)!==0) saldoExtra -= Number(v.saldoDelta); // compensar partes viejas que tocaban saldo
       return !ligada;
     });
-    nev = nev.map(v=>v.id===ventaId?{...vV,detalle,pago:pagoReal,obs:obsFinal,saldoAplicado:saldoAplicado||0,...calc,montoEfec:esMixto?ef:0,montoTrans:tr}:v);
+    nev = nev.map(v=>v.id===ventaId?{...vV,detalle,pago:pagoReal,obs:obsFinal,saldoAplicado:saldoAplicado||0,...calc,montoEfec:esMixto?ef:0,montoTrans:tr,_upd:Date.now()}:v);
     if(esMixto&&tr>0){
       const ventaTr = {
         id:Date.now()+2, clienteId:vV.clienteId, cliente:vV.cliente,
@@ -921,7 +922,7 @@ function App() {
         pago:"transferencia", obs:"[Parte transfer. de pago mixto]", saldoAplicado:0,
         neto:tr, bruto:tr, desc:0, costo:0, ganancia:0,
         pagadoNum:tr, saldoDelta:0, envPrest:[], envDev:[],
-        _esMixtoTrans:true, _mixtoDe:ventaId, transConfirmada:false,
+        _esMixtoTrans:true, _mixtoDe:ventaId, transConfirmada:false, _upd:Date.now(),
       };
       nev = [...nev, ventaTr];
     }
@@ -1053,7 +1054,7 @@ function App() {
             const vt={id:Date.now(),clienteId:cl.id,cliente:cl.nombre,dia:diaActual||cl.dia,fechaKey:fk,fecha:new Date().toLocaleString("es-AR"),
               detalle:det,pago,obs:`Cobro de deuda ${fmt(monto)} (${pago})`,saldoAplicado:0,
               neto:0,bruto:0,desc:0,costo:0,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],
-              saldoAntes,saldoDespues,_esCobro:true};
+              saldoAntes,saldoDespues,_esCobro:true,_upd:Date.now()};
             saveVentas([...ventas,vt]);
             saveClientes(clientes.map(x=>x.id===cl.id?{...x,saldo:saldoDespues}:x));
           }}
@@ -1242,7 +1243,7 @@ function App() {
                 dia:diaActual||cliente.dia,fechaKey:fk,fecha:new Date().toLocaleString("es-AR"),
                 detalle:det,pago,obs:`Cobro de deuda $${monto.toLocaleString("es-AR")} (${pago})`,saldoAplicado:0,
                 neto:0,bruto:0,desc:0,costo:0,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],
-                saldoAntes,saldoDespues,_esCobro:true};
+                saldoAntes,saldoDespues,_esCobro:true,_upd:Date.now()};
               saveVentas([...ventas,vt]);
               saveClientes(clientes.map(x=>x.id===cliente.id?{...x,saldo:saldoDespues}:x));
             }
@@ -1272,7 +1273,7 @@ function App() {
         const saldoDespues=saldoAntes+monto;
         const vt={id:Date.now(),clienteId:cl.id,cliente:cl.nombre,dia:cl.dia,fechaKey:new Date().toLocaleDateString("en-CA"),fecha:new Date().toLocaleString("es-AR"),
           detalle:[{nombre:"Cobro de deuda",cantidad:1,precio:monto,total:monto}],pago,obs:`Cobro de deuda ${fmt(monto)} (${pago})`,
-          neto:monto,bruto:monto,desc:0,costo:monto,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],saldoAntes,saldoDespues,_esCobro:true};
+          neto:monto,bruto:monto,desc:0,costo:monto,ganancia:0,pagadoNum:monto,saldoDelta:monto,envPrest:[],envDev:[],saldoAntes,saldoDespues,_esCobro:true,_upd:Date.now()};
         saveVentas([...ventas,vt]);
         saveClientes(clientes.map(c=>c.id===clienteId?{...c,saldo:saldoDespues}:c));
       }} onVolver={()=>irA("menu")} ventas={ventas} onEditarCliente={(id,cambios)=>{saveClientes(clientes.map(c=>c.id===id?{...c,...cambios}:c));}} /></React.Fragment>}
