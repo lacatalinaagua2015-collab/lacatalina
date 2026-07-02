@@ -1,6 +1,6 @@
 // ── La Catalina · Service Worker ─────────────────────────────────────────────
-// v55 — Babel pineado a 7.26.4 + cache + push notifications
-const CACHE = 'lc-v55';
+// v56 — Babel pineado a 7.26.4 + cache + push notifications
+const CACHE = 'lc-v56';
 const ASSETS = [
   'https://unpkg.com/react@18/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
