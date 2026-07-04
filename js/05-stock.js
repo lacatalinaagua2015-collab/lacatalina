@@ -20,6 +20,17 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
   const setProdPrecio=(id,campo,val)=>{
     setProductos((productos||[]).map(p=>p.id===id?{...p,[campo]:Math.max(0,Number(val)||0)}:p));
   };
+  const [draftProductos,setDraftProductos]=React.useState(()=>JSON.parse(JSON.stringify(productos||[])));
+  React.useEffect(()=>{ setDraftProductos(JSON.parse(JSON.stringify(productos||[]))); },[productos]);
+  const [hayCambiosProd,setHayCambiosProd]=React.useState(false);
+  const setDraftPrecio=(id,campo,val)=>{
+    setDraftProductos(dp=>dp.map(p=>p.id===id?{...p,[campo]:Math.max(0,Number(val)||0)}:p));
+    setHayCambiosProd(true);
+  };
+  const [mostrarNuevoProd,setMostrarNuevoProd]=React.useState(false);
+  const [nuevoProdNombre,setNuevoProdNombre]=React.useState("");
+  const [nuevoProdCosto,setNuevoProdCosto]=React.useState("");
+  const [nuevoProdPrecio,setNuevoProdPrecio]=React.useState("");
   const setCarga=(dia,key,val)=>{
     const nc=JSON.parse(JSON.stringify(cargasDia||{}));
     if(!nc[dia]) nc[dia]={};
@@ -205,16 +216,55 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
           <div style={{display:"grid",gridTemplateColumns:"1fr 74px 74px",gap:6,fontSize:11,color:"var(--color-text-tertiary)",marginBottom:5}}>
             <span></span><span style={{textAlign:"center"}}>Llenado</span><span style={{textAlign:"center"}}>Venta</span>
           </div>
-          {(productos||[]).map(p=>(
+          {draftProductos.map(p=>(
             <div key={p.id} style={{display:"grid",gridTemplateColumns:"1fr 74px 74px",gap:6,alignItems:"center",marginBottom:5}}>
               <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{p.nombre}</span>
-              <input type="number" value={p.costo||0} onChange={e=>setProdPrecio(p.id,"costo",e.target.value)} style={{...inNum,fontSize:12}} />
+              <input type="number" value={p.costo||0} onChange={e=>setDraftPrecio(p.id,"costo",e.target.value)} style={{...inNum,fontSize:12}} />
               {p.esDispenser
                 ? <span style={{textAlign:"center",fontSize:11,color:"var(--color-text-warning)"}}>comodato</span>
-                : <input type="number" value={p.precio||0} onChange={e=>setProdPrecio(p.id,"precio",e.target.value)} style={{...inNum,fontSize:12}} />
+                : <input type="number" value={p.precio||0} onChange={e=>setDraftPrecio(p.id,"precio",e.target.value)} style={{...inNum,fontSize:12}} />
               }
             </div>
           ))}
+
+          {hayCambiosProd&&(
+            <button style={{width:"100%",marginTop:8,background:"#1d9e75",color:"#fff",border:"none",borderRadius:8,padding:"9px",fontSize:13,fontWeight:600,cursor:"pointer"}}
+              onClick={()=>{ setProductos(draftProductos); setHayCambiosProd(false); }}>
+              ✓ Confirmar cambios de precio
+            </button>
+          )}
+
+          <div style={{borderTop:"0.5px solid var(--color-border-tertiary)",margin:"10px 0"}}/>
+
+          {!mostrarNuevoProd
+            ? <button style={{...s.btn,width:"100%",fontSize:12,padding:"8px"}} onClick={()=>setMostrarNuevoProd(true)}>+ Agregar producto</button>
+            : (
+              <div>
+                <div style={{marginBottom:6}}>
+                  <input placeholder="Nombre (ej: Botellón 5L)" value={nuevoProdNombre} onChange={e=>setNuevoProdNombre(e.target.value)} style={{...s.input,fontSize:13}} />
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8}}>
+                  <div>
+                    <label style={{...s.label,marginBottom:3}}>Costo llenado</label>
+                    <input type="number" value={nuevoProdCosto} onChange={e=>setNuevoProdCosto(e.target.value)} style={{...inNum,fontSize:12,width:"100%"}} />
+                  </div>
+                  <div>
+                    <label style={{...s.label,marginBottom:3}}>Precio venta</label>
+                    <input type="number" value={nuevoProdPrecio} onChange={e=>setNuevoProdPrecio(e.target.value)} style={{...inNum,fontSize:12,width:"100%"}} />
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:6}}>
+                  <button style={{...s.btn,flex:1,fontSize:12}} onClick={()=>{setMostrarNuevoProd(false);setNuevoProdNombre("");setNuevoProdCosto("");setNuevoProdPrecio("");}}>Cancelar</button>
+                  <button style={{flex:2,background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:8,padding:"9px",fontSize:13,fontWeight:600,cursor:"pointer"}}
+                    disabled={!nuevoProdNombre.trim()}
+                    onClick={()=>{
+                      const nuevo={id:Date.now(),nombre:nuevoProdNombre.trim(),costo:Number(nuevoProdCosto)||0,precio:Number(nuevoProdPrecio)||0};
+                      setProductos([...(productos||[]),nuevo]);
+                      setMostrarNuevoProd(false);setNuevoProdNombre("");setNuevoProdCosto("");setNuevoProdPrecio("");
+                    }}>✓ Agregar</button>
+                </div>
+              </div>
+            )}
         </div>
 
         {/* CARGA DIARIA */}
