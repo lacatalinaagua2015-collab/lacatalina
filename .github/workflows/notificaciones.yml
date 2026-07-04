@@ -1,32 +1,29 @@
 name: Notificaciones La Catalina
-
 on:
   schedule:
-    # Todos los horarios en UTC. Argentina = UTC-3 (sin cambio de horario).
+    # Chequeo de recordatorios de AGENDA — cada 15 min, todo el día (agarra cualquier horario agendado)
+    - cron: '*/15 * * * *'
+    # Los horarios fijos de abajo ya quedan cubiertos por el de arriba, pero los dejamos
+    # igual por si alguno no cae justo en un múltiplo de 15 min.
     - cron: '0 10 * * *'   # 07:00 Argentina — mantenimiento de vehículo
     - cron: '0 16 * * *'   # 13:00 Argentina — transferencias pendientes
     - cron: '0 21 * * *'   # 18:00 Argentina — ¿cerraste el día?
     - cron: '0 22 * * *'   # 19:00 Argentina — transferencias pendientes
     - cron: '0 23 * * *'   # 20:00 Argentina — cierre de planilla
-
   # Permite ejecutarlo manualmente desde la pestaña "Actions" de GitHub
   workflow_dispatch:
-
 jobs:
   notificar:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
-
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-
       - name: Instalar dependencias
         run: npm install web-push firebase-admin
-
       - name: Enviar notificación
         run: node scripts/enviar-notif.js
         env:
