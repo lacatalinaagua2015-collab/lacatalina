@@ -47,6 +47,35 @@ function NotifConfig({ permiso, onPermisoChange }) {
   );
 }
 
+// Toggle de huella — usa las funciones ya definidas en 04-portada.js (lcBioRegistrar/LC_BIO_KEY)
+function SeguridadHuella() {
+  const [enrolado,setEnrolado] = React.useState(lcBioEnrolado());
+  const [msg,setMsg] = React.useState("");
+  const soportado = lcBioSoportado();
+  return (
+    <div style={{...s.card,margin:"0 0 10px"}}>
+      <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:4}}>👆 Ingreso con huella</div>
+      <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:10}}>
+        Entrá a la app con tu huella o Face ID en vez de escribir el PIN.
+      </div>
+      {!soportado
+        ? <div style={{fontSize:12,color:"var(--color-text-tertiary)"}}>⚠ Este dispositivo/navegador no soporta huella.</div>
+        : (
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{fontSize:13,fontWeight:600,color:enrolado?"#4dd9a0":"#f5b942"}}>{enrolado?"✅ Activada":"⏳ Desactivada"}</span>
+            {enrolado
+              ? <button style={{background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"0.5px solid var(--color-border-danger)",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:500,cursor:"pointer"}}
+                  onClick={()=>{ try{localStorage.removeItem(LC_BIO_KEY);}catch(e){}; setEnrolado(false); }}>Desactivar</button>
+              : <button style={{background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:500,cursor:"pointer"}}
+                  onClick={async()=>{ setMsg(""); try{ await lcBioRegistrar(); setEnrolado(true); } catch(e){ setMsg("No se pudo activar. Probá de nuevo."); } }}>Activar</button>
+            }
+          </div>
+        )}
+      {msg&&<div style={{fontSize:11,color:"var(--color-text-danger)",marginTop:6}}>{msg}</div>}
+    </div>
+  );
+}
+
 function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,planillas,setPlanillas,stock,setStock,cargasDia,setCargasDia,syncData,onVolver,ecToken,setEcToken,tabInicial,noVisitas,prospectos}) {
   const [tab,setTab]=useState(["datos","vehiculo","apariencia"].includes(tabInicial)?tabInicial:"datos");
   const [editandoId,setEditandoId]=useState(null);
@@ -232,6 +261,8 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
 
       {tab==="datos"&&(
         <div style={{padding:16,display:"flex",flexDirection:"column",gap:12}}>
+
+          <SeguridadHuella />
 
           {/* RESPALDO */}
           <div style={{...s.card,margin:0}}>
