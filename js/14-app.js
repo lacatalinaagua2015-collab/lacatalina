@@ -27,6 +27,19 @@ function ClientesTabs({activo, onIr}) {
 
 let _catIdSeq = 0;
 function nuevoIdCat(){ _catIdSeq = (_catIdSeq + 1) % 1000; return Date.now()*1000 + _catIdSeq; }
+
+// En Android/Chrome mobile, si la página está controlada por un Service Worker,
+// `new Notification(...)` tira "Illegal constructor". Hay que usar el SW registration.
+function mostrarNotifLocal(titulo, opts) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.ready
+      .then(reg => reg.showNotification(titulo, opts))
+      .catch(() => { try { new Notification(titulo, opts); } catch(e) {} });
+  } else {
+    try { new Notification(titulo, opts); } catch(e) {}
+  }
+}
 function App() {
   const [pantalla, setPantalla]   = useState(()=>{
     const h = window.location.hash.slice(1)||"portada";
@@ -434,7 +447,7 @@ function App() {
         if(Notification.permission==="granted"){
           const hoyKey = new Date().toLocaleDateString("en-CA");
           if(!localStorage.getItem(`notif_cierre_${hoyKey}`)){
-            new Notification("🚚 Sistema de Reparto",{body:"Son las 18:00 — ¿Ya cerraste el día?",icon:"/icon-192.png",tag:"cierre-dia"});
+            mostrarNotifLocal("🚚 Sistema de Reparto",{body:"Son las 18:00 — ¿Ya cerraste el día?",icon:"/icon-192.png",tag:"cierre-dia"});
             localStorage.setItem(`notif_cierre_${hoyKey}`,"1");
           }
         }
@@ -455,7 +468,7 @@ function App() {
           const hoyKey = new Date().toLocaleDateString("en-CA");
           if(!localStorage.getItem(`${nk}_${hoyKey}`)){
             const tipoLabel={aceite:"Cambio de aceite",preventivo:"Mantenimiento preventivo",embrague:"Cambio de embrague",reparacion:"Reparación",otro:"Mantenimiento"}[m.tipo]||m.tipo;
-            new Notification("🔧 Vencimiento de mantenimiento",{body:`${tipoLabel} vence en ${diffDias} día${diffDias>1?"s":""}${m.descripcion?" — "+m.descripcion:""}`,icon:"/icon-192.png",tag:nk});
+            mostrarNotifLocal("🔧 Vencimiento de mantenimiento",{body:`${tipoLabel} vence en ${diffDias} día${diffDias>1?"s":""}${m.descripcion?" — "+m.descripcion:""}`,icon:"/icon-192.png",tag:nk});
             localStorage.setItem(`${nk}_${hoyKey}`,"1");
           }
         }
@@ -679,7 +692,7 @@ function App() {
     notifEnviadasRef.current[clave] = true;
     playNotifSound();
     if('Notification' in window && Notification.permission === 'granted') {
-      new Notification(titulo, {
+      mostrarNotifLocal(titulo, {
         body: cuerpo,
         icon: '/favicon.ico',
         vibrate: [200, 100, 200, 100, 200],
