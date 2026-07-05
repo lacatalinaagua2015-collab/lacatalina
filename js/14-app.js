@@ -189,10 +189,10 @@ function App() {
   // Al iniciar (y cada vez que volvés a la app), traer datos de la nube
   const { useEffect } = React;
   const ultimoFetchNubeRef = React.useRef(0);
-  const traerDeLaNube = React.useCallback(() => {
+  const traerDeLaNube = React.useCallback((forzar) => {
     if (!apiKey || !binId) return;
     const ahora = Date.now();
-    if (ahora - ultimoFetchNubeRef.current < 15000) return; // evita llamadas duplicadas (visibilitychange+focus)
+    if (!forzar && ahora - ultimoFetchNubeRef.current < 15000) return; // evita llamadas duplicadas (visibilitychange+focus)
     ultimoFetchNubeRef.current = ahora;
     setSyncStatus("loading");
     cloudLoad().then(function(data) {
@@ -265,12 +265,33 @@ function App() {
   useEffect(() => {
     traerDeLaNube(); // al montar
     const onVisible = () => { if(document.visibilityState === "visible") traerDeLaNube(); };
+    const onFocus = () => traerDeLaNube();
     document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("focus", traerDeLaNube);
+    window.addEventListener("focus", onFocus);
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("focus", traerDeLaNube);
+      window.removeEventListener("focus", onFocus);
     };
+  }, [traerDeLaNube]);
+
+  // Sync en tiempo real: escucha cambios en Firestore desde otros dispositivos
+  const ultimoUpdRemotoRef = React.useRef(null);
+  useEffect(() => {
+    if (!window.db) return;
+    const unsub = window.db.collection("lc2").doc("config").onSnapshot(
+      { includeMetadataChanges: true },
+      (snap) => {
+        if (!snap.exists || snap.metadata.hasPendingWrites) return; // ignora el eco de nuestro propio guardado
+        const upd = snap.data()._upd;
+        if (upd && upd !== ultimoUpdRemotoRef.current) {
+          const esPrimera = ultimoUpdRemotoRef.current === null;
+          ultimoUpdRemotoRef.current = upd;
+          if (!esPrimera) traerDeLaNube(true); // cambio real de otro dispositivo → traer ya
+        }
+      },
+      (err) => console.warn("Listener Firestore:", err)
+    );
+    return () => unsub();
   }, [traerDeLaNube]);
 
   // Ref siempre actualizado — evita datos viejos en el debounce
