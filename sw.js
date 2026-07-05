@@ -1,8 +1,6 @@
 // ── La Catalina · Service Worker ─────────────────────────────────────────────
-// v59 — install resiliente (no se cuelga si un CDN falla) + cache + push
-// v60 — el push ya no se bloquea cuando la app aparece "focused" (poco confiable en Android)
-// v61 — push handler blindado: todo dentro de waitUntil, con fallback si falla el parseo/showNotification
-const CACHE = 'lc-v61';
+// Cache offline + notificaciones push.
+const CACHE = 'lc-v63';
 const ASSETS = [
   'https://unpkg.com/react@18/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -43,6 +41,9 @@ self.addEventListener('notificationclick', e => {
   );
 });
 self.addEventListener('push', e => {
+  // Todo adentro de waitUntil: si el parseo o el showNotification fallan,
+  // igual queda una promesa que el navegador puede esperar (nunca se pierde
+  // el evento en silencio).
   e.waitUntil((async () => {
     let data = {};
     try {

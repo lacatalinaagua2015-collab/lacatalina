@@ -27,19 +27,6 @@ function ClientesTabs({activo, onIr}) {
 
 let _catIdSeq = 0;
 function nuevoIdCat(){ _catIdSeq = (_catIdSeq + 1) % 1000; return Date.now()*1000 + _catIdSeq; }
-
-// En Android/Chrome mobile, si la página está controlada por un Service Worker,
-// `new Notification(...)` tira "Illegal constructor". Hay que usar el SW registration.
-function mostrarNotifLocal(titulo, opts) {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-    navigator.serviceWorker.ready
-      .then(reg => reg.showNotification(titulo, opts))
-      .catch(() => { try { new Notification(titulo, opts); } catch(e) {} });
-  } else {
-    try { new Notification(titulo, opts); } catch(e) {}
-  }
-}
 function App() {
   const [pantalla, setPantalla]   = useState(()=>{
     const h = window.location.hash.slice(1)||"portada";
@@ -254,6 +241,7 @@ function App() {
         if(cambiosLocalesRec>0) setTimeout(()=>syncData({recordatorios:mergedRec}), 2000);
       }
       if (data.mantVeh?.length)    localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh));
+      if (data.horaAvisoCierre)    localStorage.setItem("lc_hora_notif_cierre", data.horaAvisoCierre);
       if (data.histPrecios?.length) localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios));
       if (data.zonasReparto && Object.keys(data.zonasReparto).length) setZonasReparto(data.zonasReparto);
       if (data.cargasDia && Object.keys(data.cargasDia).length) setCargasDia(data.cargasDia);
@@ -350,7 +338,7 @@ function App() {
     setSyncStatus("saving");
     const mantVehActual = (() => { try { return JSON.parse(localStorage.getItem("cat_mant_vehiculo_v1")||"[]"); } catch { return []; } })();
     const histPreciosActual = (() => { try { return JSON.parse(localStorage.getItem("lc_hist_precios")||"[]"); } catch { return []; } })();
-    const data = { ...estadoRef.current, ...overrides, noVisitas: estadoRef.current.noVisitas||[], prospectos: overrides.prospectos!==undefined ? overrides.prospectos : (estadoRef.current.prospectos||[]), recordatorios: estadoRef.current.recordatorios||[], mantVeh: overrides.mantVeh||mantVehActual, histPrecios: overrides.histPrecios||histPreciosActual, zonasReparto: overrides.zonasReparto||estadoRef.current.zonasReparto||{} };
+    const data = { ...estadoRef.current, ...overrides, noVisitas: estadoRef.current.noVisitas||[], prospectos: overrides.prospectos!==undefined ? overrides.prospectos : (estadoRef.current.prospectos||[]), recordatorios: estadoRef.current.recordatorios||[], mantVeh: overrides.mantVeh||mantVehActual, histPrecios: overrides.histPrecios||histPreciosActual, zonasReparto: overrides.zonasReparto||estadoRef.current.zonasReparto||{}, horaAvisoCierre: overrides.horaAvisoCierre || localStorage.getItem('lc_hora_notif_cierre') || '18:00' };
     estadoRef.current = data;
     debounceSave(() => {
       if(!navigator.onLine) {
@@ -399,18 +387,18 @@ function App() {
     return ()=>{ window.removeEventListener("online",goOnline); window.removeEventListener("offline",goOffline); };
   },[]);
 
-  // ── NOTIFICACIONES ────────────────────────────────────────────────
+  // ── NOTIFICACIONES PUSH ─────────────────────────────────────────────
+  // Los horarios (cierre, mantenimiento, transferencias, recordatorios de
+  // agenda) los maneja el servidor (GitHub Actions) mandando un push real,
+  // así funciona con la app cerrada. Acá SOLO nos suscribimos.
   React.useEffect(()=>{
-    if(!("Notification" in window)) return;
+    if(!("Notification" in window) || !("serviceWorker" in navigator)) return;
 
-    // Convierte la VAPID public key de base64url a Uint8Array
     function _vapidToUint8(base64String) {
       const p = (base64String + '===').slice(0, base64String.length + (4 - base64String.length % 4) % 4);
       const raw = window.atob(p.replace(/-/g, '+').replace(/_/g, '/'));
       return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
     }
-
-    // Corre una promesa con límite de tiempo — si no responde en "ms", tira error con "paso"
     function conLimite(promesa, ms, paso) {
       return Promise.race([
         promesa,
@@ -418,90 +406,41 @@ function App() {
       ]);
     }
 
-    // Suscribe al navegador a Web Push y guarda la suscripcion en Firestore
+    const VAPID_PUBLIC = 'BM_NKKlieI7BqahT-39TblUaxWGBaVQX7YRfWV_XUVy0Rb8lINBxEm2LXfDJe2348_ofSdYw62Us83koGJPXEGQ';
+
     async function suscribirPush() {
       if (!('PushManager' in window)) { localStorage.setItem('lc_push_estado', JSON.stringify({ok:false,msg:'Este navegador no soporta notificaciones push (PushManager).',ts:Date.now()})); return; }
       try {
         const sw = await conLimite(navigator.serviceWorker.ready, 8000, 'esperando el service worker');
-        const VAPID_PUBLIC = 'BM_NKKlieI7BqahT-39TblUaxWGBaVQX7YRfWV_XUVy0Rb8lINBxEm2LXfDJe2348_ofSdYw62Us83koGJPXEGQ';
-        // Si ya había una suscripción (posiblemente con una VAPID key vieja), la damos de baja
-        // para forzar una nueva y evitar quedar con un endpoint/clave desincronizados con el servidor.
+        // SIEMPRE da de baja cualquier suscripción anterior antes de crear una nueva:
+        // así nunca queda un endpoint/clave vieja desincronizada con el servidor.
         const subVieja = await conLimite(sw.pushManager.getSubscription(), 8000, 'consultando suscripción existente');
-        if (subVieja && localStorage.getItem('lc_push_vapid_v2')) {
-          localStorage.setItem('lc_push_estado', JSON.stringify({ok:true,msg:'Ya estaba suscripto (sin cambios)',ts:Date.now()}));
-          return; // ya está al día con esta VAPID key
-        }
         if (subVieja) { try { await subVieja.unsubscribe(); } catch(e) {} }
         const nuevaSub = await conLimite(sw.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: _vapidToUint8(VAPID_PUBLIC),
         }), 8000, 'pidiendo la suscripción al navegador');
-        // Guardar suscripcion en Firestore para que GitHub Actions la lea
         if (window.db) {
           await conLimite(window.db.collection('lc2').doc('push_sub').set({
             sub: JSON.stringify(nuevaSub.toJSON()),
             ts: Date.now(),
           }), 8000, 'guardando en la nube (Firestore)');
-          localStorage.setItem('lc_push_vapid_v2', '1');
           localStorage.setItem('lc_push_estado', JSON.stringify({ok:true,msg:'Suscripción guardada correctamente',ts:Date.now()}));
-          console.log('✅ Push subscription guardada en Firestore');
         } else {
           localStorage.setItem('lc_push_estado', JSON.stringify({ok:false,msg:'No se encontró conexión a la base de datos (window.db)',ts:Date.now()}));
         }
       } catch(e) {
-        console.log('Push sub error:', e.message);
         localStorage.setItem('lc_push_estado', JSON.stringify({ok:false,msg:e.message||'Error desconocido',ts:Date.now()}));
       }
     }
     window._suscribirPushLC = async () => {
-      localStorage.removeItem('lc_push_vapid_v2'); // fuerza a que reintente en vez de saltearse
       await suscribirPush();
       return JSON.parse(localStorage.getItem('lc_push_estado')||'null');
     };
-
-    const pedirPermiso = async () => {
+    (async () => {
       if (Notification.permission === "default") await Notification.requestPermission();
       if (Notification.permission === "granted") await suscribirPush();
-    };
-    pedirPermiso();
-    const programar18hs = () => {
-      const ahora = new Date();
-      const hoy18 = new Date(ahora.getFullYear(),ahora.getMonth(),ahora.getDate(),18,0,0);
-      let ms = hoy18 - ahora; if(ms<0) ms += 24*60*60*1000;
-      return setTimeout(()=>{
-        if(Notification.permission==="granted"){
-          const hoyKey = new Date().toLocaleDateString("en-CA");
-          if(!localStorage.getItem(`notif_cierre_${hoyKey}`)){
-            mostrarNotifLocal("🚚 Sistema de Reparto",{body:"Son las 18:00 — ¿Ya cerraste el día?",icon:"/icon-192.png",tag:"cierre-dia"});
-            localStorage.setItem(`notif_cierre_${hoyKey}`,"1");
-          }
-        }
-        programar18hs();
-      }, ms);
-    };
-    const t18 = programar18hs();
-    const chequearMantenimiento = () => {
-      if(Notification.permission!=="granted") return;
-      const mantList = (()=>{ try{ return JSON.parse(localStorage.getItem("cat_mant_vehiculo_v1")||"[]"); }catch{ return []; } })();
-      const hoy = new Date(); hoy.setHours(0,0,0,0);
-      mantList.forEach(m=>{
-        if(!m.proximaFechaISO) return;
-        const proxFecha = new Date(m.proximaFechaISO+"T12:00:00"); proxFecha.setHours(0,0,0,0);
-        const diffDias = Math.round((proxFecha-hoy)/(1000*60*60*24));
-        if(diffDias===3||diffDias===2||diffDias===1){
-          const nk = `notif_mant_${m.proximaFechaISO}_${m.tipo}`;
-          const hoyKey = new Date().toLocaleDateString("en-CA");
-          if(!localStorage.getItem(`${nk}_${hoyKey}`)){
-            const tipoLabel={aceite:"Cambio de aceite",preventivo:"Mantenimiento preventivo",embrague:"Cambio de embrague",reparacion:"Reparación",otro:"Mantenimiento"}[m.tipo]||m.tipo;
-            mostrarNotifLocal("🔧 Vencimiento de mantenimiento",{body:`${tipoLabel} vence en ${diffDias} día${diffDias>1?"s":""}${m.descripcion?" — "+m.descripcion:""}`,icon:"/icon-192.png",tag:nk});
-            localStorage.setItem(`${nk}_${hoyKey}`,"1");
-          }
-        }
-      });
-    };
-    chequearMantenimiento();
-    const tMant = setInterval(chequearMantenimiento, 60*60*1000);
-    return ()=>{ clearTimeout(t18); clearInterval(tMant); };
+    })();
   },[]);
 
   const saveClientes = (v) => { setClientes(v); syncData({clientes:v}); };
@@ -691,100 +630,6 @@ function App() {
       }
     }
   }, [ventas, noVisitas, clientes, diaActual, fechaActual, planillas, ecToken]);
-
-  // ── SISTEMA DE NOTIFICACIONES ──────────────────────────────────────────────
-  const notifEnviadasRef = React.useRef({});
-
-  // Genera un tono de 3 pulsos con Web Audio API (sin archivos externos)
-  const playNotifSound = React.useCallback(() => {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      [[880,0,0.12],[1100,0.18,0.12],[880,0.36,0.18]].forEach(([freq,t,dur])=>{
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain); gain.connect(ctx.destination);
-        osc.frequency.value = freq; osc.type = 'sine';
-        gain.gain.setValueAtTime(0.35, ctx.currentTime+t);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+t+dur);
-        osc.start(ctx.currentTime+t); osc.stop(ctx.currentTime+t+dur+0.05);
-      });
-    } catch(e) {}
-  }, []);
-
-  // Muestra una notificación nativa (solo una vez por clave por día)
-  const showNotif = React.useCallback((titulo, cuerpo, clave) => {
-    if(notifEnviadasRef.current[clave]) return;
-    notifEnviadasRef.current[clave] = true;
-    playNotifSound();
-    if('Notification' in window && Notification.permission === 'granted') {
-      mostrarNotifLocal(titulo, {
-        body: cuerpo,
-        icon: '/favicon.ico',
-        vibrate: [200, 100, 200, 100, 200],
-        tag: clave,
-      });
-    }
-  }, [playNotifSound]);
-
-  // Verificador de notificaciones — corre al iniciar y cada 60 segundos
-  React.useEffect(() => {
-    const horaNotifCierre = localStorage.getItem('lc_hora_notif_cierre') || '18:00';
-    const check = () => {
-      if(!('Notification' in window) || Notification.permission !== 'granted') return;
-      const now = new Date();
-      const hhmm = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-      const hoy = now.toLocaleDateString("en-CA");
-
-      // 1. Transferencias pendientes a las 13:00 y 19:00
-      if(hhmm === '13:00' || hhmm === '19:00') {
-        const pendientes = (ventas||[]).filter(v =>
-          v.fechaKey === hoy &&
-          (v.pago === 'transferencia' || v._esMixtoTrans) &&
-          !v.transConfirmada
-        );
-        if(pendientes.length > 0) {
-          showNotif(
-            '💳 Transferencias pendientes',
-            `Tenés ${pendientes.length} transferencia${pendientes.length > 1 ? 's' : ''} sin confirmar de hoy.`,
-            `trans_${hoy}_${hhmm}`
-          );
-        }
-      }
-
-      // 2. Cierre del día a la hora configurada
-      if(hhmm === horaNotifCierre && diaActual) {
-        const planKey = `${diaActual}_${hoy}`;
-        const plan = planillas[planKey];
-        const sinCerrar = !plan || (plan.efectivo === '' && plan.fiado === '');
-        if(sinCerrar) {
-          showNotif(
-            '📋 Cierre del día pendiente',
-            `Son las ${horaNotifCierre}. Todavía no cerraste la planilla de ${diaActual}.`,
-            `cierre_${hoy}`
-          );
-        }
-      }
-
-      // 3. Recordatorios de agenda con hora exacta
-      (recordatorios||[]).forEach(r => {
-        if(r.confirmado || !r.fecha || !r.hora) return;
-        const rHhmm = r.hora.slice(0, 5);
-        if(r.fecha === hoy && rHhmm === hhmm) {
-          const c = (clientes||[]).find(x => x.id === r.clienteId);
-          showNotif(
-            `📅 Recordatorio${c ? ' · ' + c.nombre : ''}`,
-            r.motivo || 'Recordatorio de agenda',
-            `agenda_${r.id || (r.fecha + r.hora)}`
-          );
-        }
-      });
-    };
-
-    check();
-    const interval = setInterval(check, 60000);
-    return () => clearInterval(interval);
-  }, [ventas, planillas, recordatorios, clientes, diaActual, showNotif]);
-  // ── FIN NOTIFICACIONES ─────────────────────────────────────────────────────
 
   const registrarVenta = (detalle, pago, montoPagado, saldoAplicado, envPrest, envDev, obs, opcionSaldo, montoTrans2, saldoDeltaMixto) => {
     montoTrans2 = Number(montoTrans2)||0; // defensa: siempre número (el desglose mixto depende de esto)

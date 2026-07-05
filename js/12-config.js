@@ -2,8 +2,7 @@
 // ◆  12-config.js — Config pantalla principal
 // ════════════════════════════════════════════════════════════════════
 
-// Componente sin hooks — recibe permiso y setter como props desde Config
-function NotifConfig({ permiso, onPermisoChange }) {
+function NotifConfig({ permiso, onPermisoChange, syncData }) {
   const pedirPermiso = async () => {
     if(!('Notification' in window)) return;
     const r = await Notification.requestPermission();
@@ -25,7 +24,7 @@ function NotifConfig({ permiso, onPermisoChange }) {
     <>
       <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:4}}>🔔 Notificaciones</div>
       <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:10}}>
-        Alertas emergentes con sonido para transferencias, cierre del día y agenda.
+        Alertas de transferencias, cierre del día y agenda — funcionan con la app cerrada.
       </div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
         <span style={{fontSize:13,fontWeight:600,color:estadoColor}}>{estadoTexto}</span>
@@ -53,13 +52,14 @@ function NotifConfig({ permiso, onPermisoChange }) {
           <input type="time"
             style={{padding:"8px 10px",border:"0.5px solid var(--color-border-secondary)",borderRadius:8,fontSize:14,background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",outline:"none",boxSizing:"border-box"}}
             defaultValue={localStorage.getItem('lc_hora_notif_cierre') || '18:00'}
-            onChange={e=>localStorage.setItem('lc_hora_notif_cierre', e.target.value)}
+            onChange={e=>{ localStorage.setItem('lc_hora_notif_cierre', e.target.value); syncData({horaAvisoCierre: e.target.value}); }}
           />
-          <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:4}}>Si a esa hora la planilla está vacía, recibís un aviso.</div>
+          <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:4}}>Si a esa hora la planilla está vacía (y es día de reparto), recibís un aviso.</div>
         </div>
         <div style={{fontSize:12,color:"var(--color-text-tertiary)",lineHeight:1.7}}>
           💳 Transferencias → <b>13:00</b> y <b>19:00</b><br/>
-          📅 Recordatorios de agenda → a la hora exacta
+          📅 Recordatorios de agenda → a la hora exacta<br/>
+          🔧 Mantenimiento de vehículo → 3, 2, 1 y 0 días antes
         </div>
       </>)}
     </>
@@ -282,7 +282,7 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
         <div style={{padding:16,display:"flex",flexDirection:"column",gap:12}}>
 
           <div style={{...s.card,margin:0}}>
-            <NotifConfig permiso={notifPermiso} onPermisoChange={setNotifPermiso} />
+            <NotifConfig permiso={notifPermiso} onPermisoChange={setNotifPermiso} syncData={syncData} />
           </div>
 
           <SeguridadHuella />

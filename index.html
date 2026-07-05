@@ -121,6 +121,7 @@
           mantVeh: data.mantVeh || [],
           histPrecios: data.histPrecios || [],
           zonasReparto: data.zonasReparto || {},
+          horaAvisoCierre: data.horaAvisoCierre || '18:00',
           _upd: Date.now()
         })
       ];
@@ -164,6 +165,7 @@
         if(!data.mantVeh) data.mantVeh = [];
         if(!data.zonasReparto) data.zonasReparto = {};
         if(!data.histPrecios) data.histPrecios = [];
+        if(!data.horaAvisoCierre) data.horaAvisoCierre = '18:00';
         // load clientes
         var nc = cMeta.exists ? (cMeta.data().n||0) : 0;
         var vn = vMeta.exists ? (vMeta.data().n||0) : 0;
@@ -274,125 +276,5 @@
 <script type="text/babel" src="js/12-config.js"></script>
 <script type="text/babel" src="js/13-agenda.js"></script>
 <script type="text/babel" src="js/14-app.js"></script>
-<script>
-  // ── Aviso de cierre de planilla a las 20:00 hs ─────────────────────────────
-  (function(){
-    var ALERT_KEY = 'lc_cierre_alerta_';
-
-    function hoyStr(){
-      return new Date().toISOString().slice(0,10); // "2025-05-23"
-    }
-    function yaMostrado(){
-      return localStorage.getItem(ALERT_KEY + hoyStr()) === '1';
-    }
-    function marcarMostrado(){
-      localStorage.setItem(ALERT_KEY + hoyStr(), '1');
-    }
-    function esHoraDeCierre(){
-      var h = new Date().getHours();
-      return h >= 20;
-    }
-
-    function mostrarModal(){
-      if(document.getElementById('lc-cierre-modal')) return;
-
-      var overlay = document.createElement('div');
-      overlay.id = 'lc-cierre-modal';
-      overlay.style.cssText = [
-        'position:fixed','top:0','left:0','right:0','bottom:0',
-        'background:rgba(0,0,0,0.88)',
-        'z-index:99999',
-        'display:flex','align-items:center','justify-content:center',
-        'padding:20px',
-        'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'
-      ].join(';');
-
-      overlay.innerHTML =
-        '<div id="lc-cierre-box" style="' +
-          'background:#1a2b3c;' +
-          'border:1px solid rgba(255,255,255,0.15);' +
-          'border-radius:16px;' +
-          'padding:28px 24px;' +
-          'max-width:340px;' +
-          'width:100%;' +
-          'text-align:center;' +
-          'box-shadow:0 8px 32px rgba(0,0,0,0.6);' +
-        '">' +
-          '<div style="font-size:44px;margin-bottom:12px">⏰</div>' +
-          '<div style="color:#f5b942;font-size:20px;font-weight:700;margin-bottom:6px">Son las 20:00 hs</div>' +
-          '<div style="color:#e2eaf4;font-size:15px;font-weight:600;margin-bottom:10px">Hora de cierre del día</div>' +
-          '<div style="color:#7a9ab8;font-size:13px;line-height:1.55;margin-bottom:24px">' +
-            'Los clientes que queden pendientes se registrarán como <span style="color:#f07070;font-weight:600">no visitados</span> en el historial del día.' +
-          '</div>' +
-          '<button id="lc-cierre-btn" style="' +
-            'width:100%;padding:14px;' +
-            'background:#185FA5;color:#fff;' +
-            'border:none;border-radius:10px;' +
-            'font-size:16px;font-weight:600;' +
-            'cursor:pointer;margin-bottom:10px;' +
-          '">Cerrar Planilla</button>' +
-          '<button id="lc-ignorar-btn" style="' +
-            'width:100%;padding:12px;' +
-            'background:transparent;color:#7a9ab8;' +
-            'border:1px solid rgba(255,255,255,0.13);' +
-            'border-radius:10px;font-size:14px;' +
-            'cursor:pointer;' +
-          '">Ignorar por ahora</button>' +
-        '</div>';
-
-      document.body.appendChild(overlay);
-
-      document.getElementById('lc-cierre-btn').addEventListener('click', function(){
-        marcarMostrado();
-
-        // Disparar evento global para que el app React lo capture y registre pendientes
-        window.dispatchEvent(new CustomEvent('lc:cierrePlanilla', {
-          detail:{ fecha: hoyStr(), hora: new Date().toTimeString().slice(0,5) }
-        }));
-
-        // Mostrar confirmación
-        var box = document.getElementById('lc-cierre-box');
-        box.innerHTML =
-          '<div style="font-size:44px;margin-bottom:14px">✅</div>' +
-          '<div style="color:#4dd9a0;font-size:18px;font-weight:700;margin-bottom:10px">Planilla cerrada</div>' +
-          '<div style="color:#7a9ab8;font-size:14px;line-height:1.5">Los clientes pendientes fueron<br>registrados como no visitados.</div>';
-
-        setTimeout(function(){ overlay.remove(); }, 2800);
-      });
-
-      document.getElementById('lc-ignorar-btn').addEventListener('click', function(){
-        marcarMostrado();
-        overlay.remove();
-      });
-
-      // Notificación del sistema (si hay permiso)
-      if(window.Notification && Notification.permission === 'granted'){
-        try {
-          navigator.serviceWorker.ready.then(function(reg){
-            reg.showNotification('⏰ Son las 20:00 hs — La Catalina', {
-              body: 'Hora de cerrar la planilla del día.',
-              icon: 'icon-192.png',
-              tag: 'cierre-planilla',
-              requireInteraction: true
-            });
-          });
-        } catch(e){}
-      }
-    }
-
-    function check(){
-      if(esHoraDeCierre() && !yaMostrado()){
-        mostrarModal();
-      }
-    }
-
-    // Verificar cada minuto
-    setInterval(check, 60000);
-
-    // Verificar 3 seg después de cargar (por si la app abre después de las 20:00)
-    setTimeout(check, 3000);
-
-  })();
-</script>
 </body>
 </html>
