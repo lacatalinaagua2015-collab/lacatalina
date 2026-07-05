@@ -173,11 +173,14 @@ function App() {
     }
   },[darkMode]);
 
-  // Al iniciar, si hay credenciales guardadas, cargar datos de la nube
+  // Al iniciar (y cada vez que volvés a la app), traer datos de la nube
   const { useEffect } = React;
-  useEffect(() => {
+  const ultimoFetchNubeRef = React.useRef(0);
+  const traerDeLaNube = React.useCallback(() => {
     if (!apiKey || !binId) return;
-    setSyncStatus("saving");
+    const ahora = Date.now();
+    if (ahora - ultimoFetchNubeRef.current < 15000) return; // evita llamadas duplicadas (visibilitychange+focus)
+    ultimoFetchNubeRef.current = ahora;
     setSyncStatus("loading");
     cloudLoad().then(function(data) {
       if(!data) { setSyncStatus("idle"); return; }
@@ -244,7 +247,18 @@ function App() {
       setSyncStatus("saved");
       setTimeout(()=>setSyncStatus("idle"), 2000);
     });
-  }, []);
+  }, [apiKey, binId]);
+
+  useEffect(() => {
+    traerDeLaNube(); // al montar
+    const onVisible = () => { if(document.visibilityState === "visible") traerDeLaNube(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", traerDeLaNube);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", traerDeLaNube);
+    };
+  }, [traerDeLaNube]);
 
   // Ref siempre actualizado — evita datos viejos en el debounce
   const estadoRef = React.useRef({clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios,prospectos,cargasDia});
