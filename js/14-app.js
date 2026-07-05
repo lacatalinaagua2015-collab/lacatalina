@@ -362,26 +362,34 @@ function App() {
       return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
     }
 
+    // Corre una promesa con límite de tiempo — si no responde en "ms", tira error con "paso"
+    function conLimite(promesa, ms, paso) {
+      return Promise.race([
+        promesa,
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error(`Se colgó en: ${paso} (no respondió en ${ms/1000}s)`)), ms)),
+      ]);
+    }
+
     // Suscribe al navegador a Web Push y guarda la suscripcion en Firestore
     async function suscribirPush() {
-      if (!('PushManager' in window)) return;
+      if (!('PushManager' in window)) { localStorage.setItem('lc_push_estado', JSON.stringify({ok:false,msg:'Este navegador no soporta notificaciones push (PushManager).',ts:Date.now()})); return; }
       try {
-        const sw = await navigator.serviceWorker.ready;
+        const sw = await conLimite(navigator.serviceWorker.ready, 8000, 'esperando el service worker');
         // Verificar si ya hay suscripcion activa y guardada
-        const sub = await sw.pushManager.getSubscription();
-        if (sub && localStorage.getItem('lc_push_ok_v1')) return; // ya esta listo
+        const sub = await conLimite(sw.pushManager.getSubscription(), 8000, 'consultando suscripción existente');
+        if (sub && localStorage.getItem('lc_push_ok_v1')) { localStorage.setItem('lc_push_estado', JSON.stringify({ok:true,msg:'Ya estaba suscripto (sin cambios)',ts:Date.now()})); return; } // ya esta listo
 
         const VAPID_PUBLIC = 'BLvllGAY5r46Zi6cwHnbfCrQeV-NVnBq-kwrmX8n_UCvqTkVSh1Hserwp1kiQMiRF8LiAiDq_-CY1J8xproao8I';
-        const nuevaSub = sub || await sw.pushManager.subscribe({
+        const nuevaSub = sub || await conLimite(sw.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: _vapidToUint8(VAPID_PUBLIC),
-        });
+        }), 8000, 'pidiendo la suscripción al navegador');
         // Guardar suscripcion en Firestore para que GitHub Actions la lea
         if (window.db) {
-          await window.db.collection('lc2').doc('push_sub').set({
+          await conLimite(window.db.collection('lc2').doc('push_sub').set({
             sub: JSON.stringify(nuevaSub.toJSON()),
             ts: Date.now(),
-          });
+          }), 8000, 'guardando en la nube (Firestore)');
           localStorage.setItem('lc_push_ok_v1', '1');
           localStorage.setItem('lc_push_estado', JSON.stringify({ok:true,msg:'Suscripción guardada correctamente',ts:Date.now()}));
           console.log('✅ Push subscription guardada en Firestore');
