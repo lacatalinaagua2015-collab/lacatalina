@@ -1,6 +1,6 @@
 // ── La Catalina · Service Worker ─────────────────────────────────────────────
 // Cache offline + notificaciones push.
-const CACHE = 'lc-v63';
+const CACHE = 'lc-v64';
 const ASSETS = [
   'https://unpkg.com/react@18/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -24,7 +24,10 @@ self.addEventListener('fetch', e => {
   e.respondWith(
     caches.match(e.request).then(cached => {
       const net = fetch(e.request).then(res => {
-        if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+        if (res.ok) {
+          const copia = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, copia)).catch(() => {});
+        }
         return res;
       }).catch(() => cached);
       return cached || net;
