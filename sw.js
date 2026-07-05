@@ -1,5 +1,5 @@
 // ── La Catalina · Service Worker ─────────────────────────────────────────────
-// v59 — Babel pineado a 7.26.4 + cache + push notifications
+// v59 — install resiliente (no se cuelga si un CDN falla) + cache + push
 const CACHE = 'lc-v59';
 const ASSETS = [
   'https://unpkg.com/react@18/umd/react.production.min.js',
@@ -9,7 +9,12 @@ const ASSETS = [
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
 ];
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  self.skipWaiting();
+  e.waitUntil(
+    caches.open(CACHE).then(c =>
+      Promise.all(ASSETS.map(u => c.add(u).catch(() => {})))
+    )
+  );
 });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => clients.claim()));
@@ -26,7 +31,6 @@ self.addEventListener('fetch', e => {
     })
   );
 });
-// Toca la notificacion → abre la app
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   e.waitUntil(
@@ -36,7 +40,6 @@ self.addEventListener('notificationclick', e => {
     })
   );
 });
-// Push desde GitHub Actions → muestra notificacion aunque la app este cerrada
 self.addEventListener('push', e => {
   const data = e.data ? e.data.json() : {};
   const title = data.title || '🚚 La Catalina';
