@@ -222,7 +222,21 @@ function App() {
       if (data.productos?.length)  setProductos(data.productos);
       if (data.noVisitas?.length)  setNoVisitas(data.noVisitas);
       if (data.prospectos?.length) setProspectos(data.prospectos);
-      if (data.recordatorios?.length) setRecordatorios(data.recordatorios);
+      if (data.recordatorios?.length) {
+        const recLocales = (()=>{ try{ return JSON.parse(localStorage.getItem("cat_recordatorios_v1")||"[]"); }catch{ return []; } })();
+        const porId={}; (data.recordatorios||[]).forEach(r=>{ porId[r.id]=r; });
+        let cambiosLocalesRec=0;
+        recLocales.forEach(r=>{
+          const enNube=porId[r.id];
+          if(!enNube){ porId[r.id]=r; cambiosLocalesRec++; return; }
+          const uL=Number(r._upd)||0, uN=Number(enNube._upd)||0;
+          const ganaLocal=(uL!==uN)?uL>uN:(!!r.confirmado&&!enNube.confirmado);
+          if(ganaLocal){ porId[r.id]=r; cambiosLocalesRec++; }
+        });
+        const mergedRec=Object.values(porId);
+        setRecordatorios(mergedRec);
+        if(cambiosLocalesRec>0) setTimeout(()=>syncData({recordatorios:mergedRec}), 2000);
+      }
       if (data.mantVeh?.length)    localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh));
       if (data.histPrecios?.length) localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios));
       if (data.zonasReparto && Object.keys(data.zonasReparto).length) setZonasReparto(data.zonasReparto);
@@ -940,7 +954,7 @@ function App() {
       {pantalla==="portada"        && <Portada onIngresar={()=>irA("menu")} />}
       {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={(tab)=>{setTabConfig(tab||"stock");irA("config");}} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onStock={()=>irA("stock")} onAgenda={()=>irA("agenda")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} scaleIdx={scaleIdx} onToggleScale={()=>setScaleIdx(i=>(i+1)%4)} scaleLabel={SCALE_LABELS[scaleIdx]} clientes={clientes} ventas={ventas} stock={stockNorm}
           recordatoriosActivos={recordatoriosActivos}
-          onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
+          onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true,_upd:Date.now()}:r))}
           onVerConfirmaciones={(dia)=>{if(dia)setDiaActual(dia);irA("confirmacionesDia");}}
           transferenciasPendientes={DIAS.map(dia=>{
             const vts = ventas.filter(v=>v.dia===dia&&v.pago==="transferencia"&&!v.transConfirmada);
@@ -1044,8 +1058,8 @@ function App() {
             if(sig){setClienteId(sig.id);irA("detalleCliente");}else irA("clientes");
           }}
           recordatorios={recordatorios}
-          onGuardarRecordatorio={(r)=>saveRecordatorios([...(recordatorios||[]),r])}
-          onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
+          onGuardarRecordatorio={(r)=>saveRecordatorios([...(recordatorios||[]),{...r,_upd:Date.now()}])}
+          onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true,_upd:Date.now()}:r))}
           onCobrarSaldo={(monto,pago)=>{
             const cl=cliente;
             const saldoAntes=cl.saldo||0;
@@ -1234,7 +1248,7 @@ function App() {
         }} onVerDetalle={(c)=>{setClienteId(c.id);irA("detalleDesdeGestion");}} ventas={ventas} productos={productos} onGuardarCambio={(vt)=>{saveVentas([...ventas,vt]);}} /></React.Fragment>}
       {pantalla==="detalleDesdeGestion" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual||cliente.dia} fecha={fechaActual} productos={productos} onVenta={()=>{setDiaActual(cliente.dia);const hoy=new Date().toLocaleDateString("en-CA");if(!fechaActual)setFechaActual(hoy);irA("venta");}} onVolver={()=>irA("gestionClientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>{eliminarCliente(cliente.id);irA("gestionClientes");}}
           onNoEstaCliente={()=>{}} onNoQuiereCliente={()=>{}}
-          recordatorios={recordatorios} onGuardarRecordatorio={(r)=>saveRecordatorios([...(recordatorios||[]),r])} onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
+          recordatorios={recordatorios} onGuardarRecordatorio={(r)=>saveRecordatorios([...(recordatorios||[]),{...r,_upd:Date.now()}])} onConfirmarRecordatorio={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true,_upd:Date.now()}:r))}
           onCobrarSaldo={(monto,pago)=>{
             if(cliente){
               const saldoAntes=cliente.saldo||0;
@@ -1254,7 +1268,7 @@ function App() {
       {pantalla==="agenda" && <AgendaScreen
         recordatorios={recordatorios||[]}
         clientes={clientes}
-        onConfirmar={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true}:r))}
+        onConfirmar={(id)=>saveRecordatorios((recordatorios||[]).map(r=>r.id===id?{...r,confirmado:true,_upd:Date.now()}:r))}
         onEliminar={(id)=>saveRecordatorios((recordatorios||[]).filter(r=>r.id!==id))}
         onNuevo={(datos)=>{
           const c=clientes.find(x=>x.id===datos.clienteId);
