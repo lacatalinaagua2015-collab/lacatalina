@@ -1,7 +1,8 @@
 // ── La Catalina · Service Worker ─────────────────────────────────────────────
 // v59 — install resiliente (no se cuelga si un CDN falla) + cache + push
 // v60 — el push ya no se bloquea cuando la app aparece "focused" (poco confiable en Android)
-const CACHE = 'lc-v60';
+// v61 — push handler blindado: todo dentro de waitUntil, con fallback si falla el parseo/showNotification
+const CACHE = 'lc-v61';
 const ASSETS = [
   'https://unpkg.com/react@18/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -42,17 +43,26 @@ self.addEventListener('notificationclick', e => {
   );
 });
 self.addEventListener('push', e => {
-  const data = e.data ? e.data.json() : {};
-  const title = data.title || '🚚 La Catalina';
-  const opts = {
-    body: data.body || '',
-    icon: data.icon || './icon-192.png',
-    badge: './icon-192.png',
-    tag: data.tag || 'reparto',
-    requireInteraction: data.requireInteraction !== false,
-    data: { url: './' },
-  };
-  e.waitUntil(
-    self.registration.showNotification(title, opts)
-  );
+  e.waitUntil((async () => {
+    let data = {};
+    try {
+      data = e.data ? e.data.json() : {};
+    } catch (err) {
+      try { data = { body: e.data ? e.data.text() : '' }; } catch (_) {}
+    }
+    const title = data.title || '🚚 La Catalina';
+    const opts = {
+      body: data.body || '',
+      icon: data.icon || './icon-192.png',
+      badge: './icon-192.png',
+      tag: data.tag || 'reparto',
+      requireInteraction: data.requireInteraction !== false,
+      data: { url: './' },
+    };
+    try {
+      await self.registration.showNotification(title, opts);
+    } catch (err) {
+      try { await self.registration.showNotification('🚚 La Catalina', { body: 'Tenés un aviso nuevo.' }); } catch (_) {}
+    }
+  })());
 });
