@@ -423,12 +423,16 @@ function App() {
       if (!('PushManager' in window)) { localStorage.setItem('lc_push_estado', JSON.stringify({ok:false,msg:'Este navegador no soporta notificaciones push (PushManager).',ts:Date.now()})); return; }
       try {
         const sw = await conLimite(navigator.serviceWorker.ready, 8000, 'esperando el service worker');
-        // Verificar si ya hay suscripcion activa y guardada
-        const sub = await conLimite(sw.pushManager.getSubscription(), 8000, 'consultando suscripción existente');
-        if (sub && localStorage.getItem('lc_push_ok_v1')) { localStorage.setItem('lc_push_estado', JSON.stringify({ok:true,msg:'Ya estaba suscripto (sin cambios)',ts:Date.now()})); return; } // ya esta listo
-
-        const VAPID_PUBLIC = 'BLvllGAY5r46Zi6cwHnbfCrQeV-NVnBq-kwrmX8n_UCvqTkVSh1Hserwp1kiQMiRF8LiAiDq_-CY1J8xproao8I';
-        const nuevaSub = sub || await conLimite(sw.pushManager.subscribe({
+        const VAPID_PUBLIC = 'BM_NKKlieI7BqahT-39TblUaxWGBaVQX7YRfWV_XUVy0Rb8lINBxEm2LXfDJe2348_ofSdYw62Us83koGJPXEGQ';
+        // Si ya había una suscripción (posiblemente con una VAPID key vieja), la damos de baja
+        // para forzar una nueva y evitar quedar con un endpoint/clave desincronizados con el servidor.
+        const subVieja = await conLimite(sw.pushManager.getSubscription(), 8000, 'consultando suscripción existente');
+        if (subVieja && localStorage.getItem('lc_push_vapid_v2')) {
+          localStorage.setItem('lc_push_estado', JSON.stringify({ok:true,msg:'Ya estaba suscripto (sin cambios)',ts:Date.now()}));
+          return; // ya está al día con esta VAPID key
+        }
+        if (subVieja) { try { await subVieja.unsubscribe(); } catch(e) {} }
+        const nuevaSub = await conLimite(sw.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: _vapidToUint8(VAPID_PUBLIC),
         }), 8000, 'pidiendo la suscripción al navegador');
@@ -438,7 +442,7 @@ function App() {
             sub: JSON.stringify(nuevaSub.toJSON()),
             ts: Date.now(),
           }), 8000, 'guardando en la nube (Firestore)');
-          localStorage.setItem('lc_push_ok_v1', '1');
+          localStorage.setItem('lc_push_vapid_v2', '1');
           localStorage.setItem('lc_push_estado', JSON.stringify({ok:true,msg:'Suscripción guardada correctamente',ts:Date.now()}));
           console.log('✅ Push subscription guardada en Firestore');
         } else {
@@ -450,7 +454,7 @@ function App() {
       }
     }
     window._suscribirPushLC = async () => {
-      localStorage.removeItem('lc_push_ok_v1'); // fuerza a que reintente en vez de saltearse
+      localStorage.removeItem('lc_push_vapid_v2'); // fuerza a que reintente en vez de saltearse
       await suscribirPush();
       return JSON.parse(localStorage.getItem('lc_push_estado')||'null');
     };
