@@ -383,10 +383,21 @@ function App() {
             ts: Date.now(),
           });
           localStorage.setItem('lc_push_ok_v1', '1');
+          localStorage.setItem('lc_push_estado', JSON.stringify({ok:true,msg:'Suscripción guardada correctamente',ts:Date.now()}));
           console.log('✅ Push subscription guardada en Firestore');
+        } else {
+          localStorage.setItem('lc_push_estado', JSON.stringify({ok:false,msg:'No se encontró conexión a la base de datos (window.db)',ts:Date.now()}));
         }
-      } catch(e) { console.log('Push sub error:', e.message); }
+      } catch(e) {
+        console.log('Push sub error:', e.message);
+        localStorage.setItem('lc_push_estado', JSON.stringify({ok:false,msg:e.message||'Error desconocido',ts:Date.now()}));
+      }
     }
+    window._suscribirPushLC = async () => {
+      localStorage.removeItem('lc_push_ok_v1'); // fuerza a que reintente en vez de saltearse
+      await suscribirPush();
+      return JSON.parse(localStorage.getItem('lc_push_estado')||'null');
+    };
 
     const pedirPermiso = async () => {
       if (Notification.permission === "default") await Notification.requestPermission();

@@ -9,6 +9,16 @@ function NotifConfig({ permiso, onPermisoChange }) {
     const r = await Notification.requestPermission();
     onPermisoChange(r);
   };
+  const [probando,setProbando] = React.useState(false);
+  const [resultado,setResultado] = React.useState(()=>{ try{ return JSON.parse(localStorage.getItem('lc_push_estado')||'null'); }catch{ return null; } });
+  const probarSuscripcion = async () => {
+    setProbando(true); setResultado(null);
+    try {
+      if(typeof window._suscribirPushLC!=='function'){ setResultado({ok:false,msg:'La función todavía no cargó, esperá unos segundos y probá de nuevo.'}); }
+      else { const r = await window._suscribirPushLC(); setResultado(r||{ok:false,msg:'No se pudo determinar el resultado.'}); }
+    } catch(e){ setResultado({ok:false,msg:e.message||'Error inesperado'}); }
+    setProbando(false);
+  };
   const estadoColor = permiso === 'granted' ? '#4dd9a0' : permiso === 'denied' ? '#f07070' : '#f5b942';
   const estadoTexto = permiso === 'granted' ? '✅ Activadas' : permiso === 'denied' ? '🚫 Bloqueadas por el sistema' : permiso === 'no-soportado' ? '⚠ No soportado' : '⏳ Sin activar';
   return (
@@ -28,6 +38,15 @@ function NotifConfig({ permiso, onPermisoChange }) {
         )}
       </div>
       {permiso === 'granted' && (<>
+        <button style={{width:"100%",background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",border:"0.5px solid var(--color-border-secondary)",borderRadius:8,padding:"9px",fontSize:13,fontWeight:500,cursor:"pointer",marginBottom:6}}
+          disabled={probando} onClick={probarSuscripcion}>
+          {probando?"Probando...":"🔄 Probar / renovar suscripción de avisos"}
+        </button>
+        {resultado&&(
+          <div style={{fontSize:12,color:resultado.ok?"var(--color-text-success)":"var(--color-text-danger)",marginBottom:8,lineHeight:1.4}}>
+            {resultado.ok?"✓ ":"✗ "}{resultado.msg}
+          </div>
+        )}
         <div style={{borderTop:"0.5px solid var(--color-border-tertiary)",margin:"8px 0"}}/>
         <div style={{marginBottom:8}}>
           <label style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:3,display:"block"}}>⏰ Cierre del día — hora de aviso</label>
@@ -261,6 +280,10 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
 
       {tab==="datos"&&(
         <div style={{padding:16,display:"flex",flexDirection:"column",gap:12}}>
+
+          <div style={{...s.card,margin:0}}>
+            <NotifConfig permiso={notifPermiso} onPermisoChange={setNotifPermiso} />
+          </div>
 
           <SeguridadHuella />
 
