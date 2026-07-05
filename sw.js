@@ -1,6 +1,7 @@
 // ── La Catalina · Service Worker ─────────────────────────────────────────────
 // v59 — install resiliente (no se cuelga si un CDN falla) + cache + push
-const CACHE = 'lc-v59';
+// v60 — el push ya no se bloquea cuando la app aparece "focused" (poco confiable en Android)
+const CACHE = 'lc-v60';
 const ASSETS = [
   'https://unpkg.com/react@18/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -52,9 +53,6 @@ self.addEventListener('push', e => {
     data: { url: './' },
   };
   e.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cls => {
-      if (cls.some(c => c.focused)) return;
-      return self.registration.showNotification(title, opts);
-    })
+    self.registration.showNotification(title, opts)
   );
 });
