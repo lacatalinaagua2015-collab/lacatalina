@@ -39,10 +39,9 @@ function NotifConfig({ permiso, onPermisoChange, syncData }) {
   const estadoTexto = permiso === 'granted' ? '✅ Activadas' : permiso === 'denied' ? '🚫 Bloqueadas por el sistema' : permiso === 'no-soportado' ? '⚠ No soportado' : '⏳ Sin activar';
   return (
     <>
-      <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:4}}>🔔 Notificaciones</div>
-      <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:10}}>
+      <p style={{fontSize:12,color:"var(--color-text-tertiary)",margin:"0 0 10px",lineHeight:1.5}}>
         Alertas de transferencias, cierre del día y agenda — funcionan con la app cerrada.
-      </div>
+      </p>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
         <span style={{fontSize:13,fontWeight:600,color:estadoColor}}>{estadoTexto}</span>
         {permiso !== 'granted' && permiso !== 'denied' && (
@@ -118,8 +117,7 @@ function SeguridadHuella() {
   const [msg,setMsg] = React.useState("");
   const soportado = lcBioSoportado();
   return (
-    <div style={{...s.card,margin:"0 0 10px"}}>
-      <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)",marginBottom:4}}>👆 Ingreso con huella</div>
+    <>
       <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:10}}>
         Entrá a la app con tu huella o Face ID en vez de escribir el PIN.
       </div>
@@ -137,12 +135,16 @@ function SeguridadHuella() {
           </div>
         )}
       {msg&&<div style={{fontSize:11,color:"var(--color-text-danger)",marginTop:6}}>{msg}</div>}
-    </div>
+    </>
   );
 }
 
 function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,planillas,setPlanillas,stock,setStock,cargasDia,setCargasDia,syncData,onVolver,ecToken,setEcToken,tabInicial,noVisitas,prospectos}) {
   const [tab,setTab]=useState(["datos","vehiculo","apariencia"].includes(tabInicial)?tabInicial:"datos");
+  const [abiertoNotif,setAbiertoNotif]=useState(false);
+  const [abiertoHuella,setAbiertoHuella]=useState(false);
+  const [abiertoRespaldo,setAbiertoRespaldo]=useState(false);
+  const [abiertoMant,setAbiertoMant]=useState(false);
   const [editandoId,setEditandoId]=useState(null);
   const [importando,setImportando]=useState(false);
   const [mantVeh,setMantVeh] = React.useState(()=>{try{return JSON.parse(localStorage.getItem("cat_mant_vehiculo_v1")||"[]");}catch{return [];}});
@@ -328,17 +330,36 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
         <div style={{padding:16,display:"flex",flexDirection:"column",gap:12}}>
 
           <div style={{...s.card,margin:0}}>
-            <NotifConfig permiso={notifPermiso} onPermisoChange={setNotifPermiso} syncData={syncData} />
+            <button style={{width:"100%",background:"none",border:"none",padding:0,display:"flex",alignItems:"center",gap:8,cursor:"pointer",textAlign:"left"}}
+              onClick={()=>setAbiertoNotif(!abiertoNotif)}>
+              <span style={{fontSize:18}}>🔔</span>
+              <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)",flex:1}}>Notificaciones</span>
+              <span style={{color:"var(--color-text-tertiary)",fontSize:13}}>{abiertoNotif?"▲":"▼"}</span>
+            </button>
+            {abiertoNotif&&<div style={{marginTop:10}}>
+              <NotifConfig permiso={notifPermiso} onPermisoChange={setNotifPermiso} syncData={syncData} />
+            </div>}
           </div>
 
-          <SeguridadHuella />
+          <div style={{...s.card,margin:0}}>
+            <button style={{width:"100%",background:"none",border:"none",padding:0,display:"flex",alignItems:"center",gap:8,cursor:"pointer",textAlign:"left"}}
+              onClick={()=>setAbiertoHuella(!abiertoHuella)}>
+              <span style={{fontSize:18}}>👆</span>
+              <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)",flex:1}}>Ingreso con huella</span>
+              <span style={{color:"var(--color-text-tertiary)",fontSize:13}}>{abiertoHuella?"▲":"▼"}</span>
+            </button>
+            {abiertoHuella&&<div style={{marginTop:10}}><SeguridadHuella /></div>}
+          </div>
 
           {/* RESPALDO */}
           <div style={{...s.card,margin:0}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+            <button style={{width:"100%",background:"none",border:"none",padding:0,display:"flex",alignItems:"center",gap:8,cursor:"pointer",textAlign:"left"}}
+              onClick={()=>setAbiertoRespaldo(!abiertoRespaldo)}>
               <span style={{fontSize:18}}>💾</span>
-              <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)"}}>Respaldo</span>
-            </div>
+              <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)",flex:1}}>Respaldo</span>
+              <span style={{color:"var(--color-text-tertiary)",fontSize:13}}>{abiertoRespaldo?"▲":"▼"}</span>
+            </button>
+            {abiertoRespaldo&&(<div style={{marginTop:10}}>
             <p style={{fontSize:12,color:"var(--color-text-tertiary)",margin:"0 0 12px",lineHeight:1.5}}>
               Guardá todos tus datos en un archivo. Descargalo seguido y guardalo en otro lado (mail, Drive). Si perdés el celular, lo restaurás y recuperás todo.
             </p>
@@ -371,14 +392,18 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
                 📊 Exportar Excel
               </button>
             </div>
+            </div>)}
           </div>
 
           {/* MANTENIMIENTO DE DATOS */}
           <div style={{...s.card,margin:0}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+            <button style={{width:"100%",background:"none",border:"none",padding:0,display:"flex",alignItems:"center",gap:8,cursor:"pointer",textAlign:"left"}}
+              onClick={()=>setAbiertoMant(!abiertoMant)}>
               <span style={{fontSize:18}}>🔧</span>
-              <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)"}}>Mantenimiento de datos</span>
-            </div>
+              <span style={{fontSize:14,fontWeight:600,color:"var(--color-text-primary)",flex:1}}>Mantenimiento de datos</span>
+              <span style={{color:"var(--color-text-tertiary)",fontSize:13}}>{abiertoMant?"▲":"▼"}</span>
+            </button>
+            {abiertoMant&&(<div style={{marginTop:10}}>
             {(()=>{
               const fantasmas=(clientes||[]).filter(c=>c._esProspecto);
               const idsClientes=new Set((clientes||[]).map(c=>c.id));
@@ -420,6 +445,7 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
               }}}>
               🔄 Forzar sincronización
             </button>
+            </div>)}
           </div>
 
           {/* ESPACIO USADO */}
