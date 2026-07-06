@@ -1,8 +1,8 @@
 name: Notificaciones La Catalina
 on:
   schedule:
-    # Chequeo de recordatorios de AGENDA — cada 15 min, todo el día (agarra cualquier horario agendado)
-    - cron: '*/15 * * * *'
+    # Chequeo de recordatorios de AGENDA — cada 5 min, todo el día (agarra cualquier horario agendado)
+    - cron: '*/5 * * * *'
     # Los horarios fijos de abajo ya quedan cubiertos por el de arriba, pero los dejamos
     # igual por si alguno no cae justo en un múltiplo de 15 min.
     - cron: '0 10 * * *'   # 07:00 Argentina — mantenimiento de vehículo
