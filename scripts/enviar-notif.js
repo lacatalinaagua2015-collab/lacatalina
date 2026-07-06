@@ -150,9 +150,13 @@ async function checkCierre(subs, cfg, log) {
   return cambio;
 }
 // ── Transferencias pendientes (13:00 y 19:00) ────────────────────────────────
-async function checkTransferencias(subs, log) {
+async function checkTransferencias(subs, cfg, log) {
   const ahoraMin = ahoraMinArg();
-  const objetivos = [{ h: 13 * 60, clave: 't13' }, { h: 19 * 60, clave: 't19' }];
+  const horas = (cfg.horasAvisoTrans && cfg.horasAvisoTrans.length===2) ? cfg.horasAvisoTrans : ['13:00','19:00'];
+  const objetivos = horas.map((h,i)=>{
+    const [hh,mm] = h.split(':').map(Number);
+    return { h: (hh||0)*60+(mm||0), clave: 't'+i };
+  });
   const hoy = fechaArgHoy();
   const objetivo = objetivos.find(o => ahoraMin >= o.h && ahoraMin - o.h <= VENTANA_MIN);
   if (!objetivo) return false;
@@ -187,6 +191,7 @@ async function checkMantenimiento(subs, cfg, log) {
   if (horaArg() !== 7) return false;
   const mantVeh = cfg.mantVeh || [];
   if (!mantVeh.length) return false;
+  const diasAviso = (cfg.diasAvisoMant && cfg.diasAvisoMant.length) ? cfg.diasAvisoMant : [3,2,1,0];
   const hoy = new Date(fechaArgHoy() + 'T12:00:00');
   const labels = {
     aceite: 'Cambio de aceite', preventivo: 'Mantenimiento preventivo',
@@ -197,7 +202,7 @@ async function checkMantenimiento(subs, cfg, log) {
     if (!m.proximaFechaISO) continue;
     const prox = new Date(m.proximaFechaISO + 'T12:00:00');
     const dias = Math.round((prox - hoy) / (1000 * 60 * 60 * 24));
-    if (dias !== 3 && dias !== 2 && dias !== 1 && dias !== 0) continue;
+    if (!diasAviso.includes(dias)) continue;
     const clave = 'mant-' + m.proximaFechaISO + '_' + m.tipo + '_' + fechaArgHoy();
     if (log[clave]) continue;
     const tipo = labels[m.tipo] || m.tipo || 'Mantenimiento';
@@ -224,7 +229,7 @@ async function main() {
 
   cambioLog = (await checkRecordatorios(subs, cfg, log)) || cambioLog;
   cambioLog = (await checkCierre(subs, cfg, log))        || cambioLog;
-  cambioLog = (await checkTransferencias(subs, log))     || cambioLog;
+  cambioLog = (await checkTransferencias(subs, cfg, log))     || cambioLog;
   cambioLog = (await checkMantenimiento(subs, cfg, log)) || cambioLog;
 
   if (cambioLog) await guardarLog(log);
