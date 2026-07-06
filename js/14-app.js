@@ -876,6 +876,10 @@ function App() {
 
   return (
     <div style={{position:"relative"}}>
+    <div style={{position:"fixed",top:8,right:14,zIndex:9999,display:"flex",gap:6}}>
+      <button onClick={()=>setDarkMode(!darkMode)} style={{width:34,height:34,borderRadius:8,border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",fontSize:15,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} title="Cambiar tema">{darkMode?"☀️":"🌙"}</button>
+      <button onClick={()=>setScaleIdx(i=>(i+1)%4)} style={{width:34,height:34,borderRadius:8,border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} title="Tamaño de texto">{SCALE_LABELS[scaleIdx]}</button>
+    </div>
     <div style={{...s.app, zoom: SCALES[scaleIdx]}}>
       <SyncBar status={syncStatus} isOnline={isOnline} />
       {pantalla==="portada"        && <Portada onIngresar={()=>irA("menu")} />}
