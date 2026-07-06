@@ -2,6 +2,23 @@
 // ◆  12-config.js — Config pantalla principal
 // ════════════════════════════════════════════════════════════════════
 
+// ── Acordeón simple: título + resumen, se expande al tocar ─────────────────
+function SeccionPlegable({icono, titulo, resumen, children}) {
+  const [abierto, setAbierto] = React.useState(false);
+  return (
+    <div style={{marginBottom:8,border:"0.5px solid var(--color-border-tertiary)",borderRadius:8,overflow:"hidden"}}>
+      <button style={{width:"100%",background:"var(--color-background-tertiary)",border:"none",padding:"8px 10px",display:"flex",alignItems:"center",gap:6,cursor:"pointer",textAlign:"left"}}
+        onClick={()=>setAbierto(!abierto)}>
+        <span style={{fontSize:13}}>{icono}</span>
+        <span style={{fontSize:11,color:"var(--color-text-secondary)",flex:1}}>{titulo}</span>
+        <span style={{fontSize:12,color:"var(--color-text-primary)",fontWeight:600}}>{resumen}</span>
+        <span style={{fontSize:11,color:"var(--color-text-tertiary)",marginLeft:4}}>{abierto?"▲":"▼"}</span>
+      </button>
+      {abierto&&<div style={{padding:"10px"}}>{children}</div>}
+    </div>
+  );
+}
+
 function NotifConfig({ permiso, onPermisoChange, syncData }) {
   const pedirPermiso = async () => {
     if(!('Notification' in window)) return;
@@ -46,8 +63,7 @@ function NotifConfig({ permiso, onPermisoChange, syncData }) {
             {resultado.ok?"✓ ":"✗ "}{resultado.msg}
           </div>
         )}
-        <div style={{marginBottom:8}}>
-          <label style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:3,display:"block"}}>💳 Transferencias — horas de aviso</label>
+        <SeccionPlegable icono="💳" titulo="Transferencias — horas de aviso" resumen={(()=>{try{const a=JSON.parse(localStorage.getItem('lc_horas_notif_trans')||'["13:00","19:00"]');return a[0]+' y '+a[1];}catch{return '13:00 y 19:00';}})()}>
           <div style={{display:"flex",gap:8}}>
             <input type="time"
               style={{padding:"8px 10px",border:"0.5px solid var(--color-border-secondary)",borderRadius:8,fontSize:14,background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",outline:"none",boxSizing:"border-box",flex:1}}
@@ -67,9 +83,8 @@ function NotifConfig({ permiso, onPermisoChange, syncData }) {
             />
           </div>
           <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:4}}>Si a esa hora hay transferencias sin confirmar, recibís un aviso.</div>
-        </div>
-        <div style={{marginBottom:8}}>
-          <label style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:3,display:"block"}}>🔧 Mantenimiento — días antes del vencimiento</label>
+        </SeccionPlegable>
+        <SeccionPlegable icono="🔧" titulo="Mantenimiento — días antes del vencimiento" resumen={localStorage.getItem('lc_dias_notif_mant') || '3,2,1,0'}>
           <input type="text" placeholder="ej: 3,2,1,0"
             style={{padding:"8px 10px",border:"0.5px solid var(--color-border-secondary)",borderRadius:8,fontSize:14,background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",outline:"none",boxSizing:"border-box",width:"100%"}}
             defaultValue={localStorage.getItem('lc_dias_notif_mant') || '3,2,1,0'}
@@ -80,18 +95,16 @@ function NotifConfig({ permiso, onPermisoChange, syncData }) {
             }}
           />
           <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:4}}>Números separados por coma. Se avisa a las 7am si faltan esos días exactos.</div>
-        </div>
-        <div style={{borderTop:"0.5px solid var(--color-border-tertiary)",margin:"8px 0"}}/>
-        <div style={{marginBottom:8}}>
-          <label style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:3,display:"block"}}>⏰ Cierre del día — hora de aviso</label>
+        </SeccionPlegable>
+        <SeccionPlegable icono="⏰" titulo="Cierre del día — hora de aviso" resumen={localStorage.getItem('lc_hora_notif_cierre') || '18:00'}>
           <input type="time"
             style={{padding:"8px 10px",border:"0.5px solid var(--color-border-secondary)",borderRadius:8,fontSize:14,background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",outline:"none",boxSizing:"border-box"}}
             defaultValue={localStorage.getItem('lc_hora_notif_cierre') || '18:00'}
             onChange={e=>{ localStorage.setItem('lc_hora_notif_cierre', e.target.value); syncData({horaAvisoCierre: e.target.value}); }}
           />
           <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:4}}>Si a esa hora la planilla está vacía (y es día de reparto), recibís un aviso.</div>
-        </div>
-        <div style={{fontSize:12,color:"var(--color-text-tertiary)",lineHeight:1.7}}>
+        </SeccionPlegable>
+        <div style={{fontSize:12,color:"var(--color-text-tertiary)",lineHeight:1.7,marginTop:8}}>
           📅 Recordatorios de agenda → a la hora exacta
         </div>
       </>)}
