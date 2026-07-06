@@ -46,6 +46,41 @@ function NotifConfig({ permiso, onPermisoChange, syncData }) {
             {resultado.ok?"✓ ":"✗ "}{resultado.msg}
           </div>
         )}
+        <div style={{marginBottom:8}}>
+          <label style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:3,display:"block"}}>💳 Transferencias — horas de aviso</label>
+          <div style={{display:"flex",gap:8}}>
+            <input type="time"
+              style={{padding:"8px 10px",border:"0.5px solid var(--color-border-secondary)",borderRadius:8,fontSize:14,background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",outline:"none",boxSizing:"border-box",flex:1}}
+              defaultValue={(()=>{try{return JSON.parse(localStorage.getItem('lc_horas_notif_trans')||'["13:00","19:00"]')[0];}catch{return '13:00';}})()}
+              onChange={e=>{
+                let arr; try{arr=JSON.parse(localStorage.getItem('lc_horas_notif_trans')||'["13:00","19:00"]');}catch{arr=['13:00','19:00'];}
+                arr[0]=e.target.value; localStorage.setItem('lc_horas_notif_trans',JSON.stringify(arr)); syncData({horasAvisoTrans:arr});
+              }}
+            />
+            <input type="time"
+              style={{padding:"8px 10px",border:"0.5px solid var(--color-border-secondary)",borderRadius:8,fontSize:14,background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",outline:"none",boxSizing:"border-box",flex:1}}
+              defaultValue={(()=>{try{return JSON.parse(localStorage.getItem('lc_horas_notif_trans')||'["13:00","19:00"]')[1];}catch{return '19:00';}})()}
+              onChange={e=>{
+                let arr; try{arr=JSON.parse(localStorage.getItem('lc_horas_notif_trans')||'["13:00","19:00"]');}catch{arr=['13:00','19:00'];}
+                arr[1]=e.target.value; localStorage.setItem('lc_horas_notif_trans',JSON.stringify(arr)); syncData({horasAvisoTrans:arr});
+              }}
+            />
+          </div>
+          <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:4}}>Si a esa hora hay transferencias sin confirmar, recibís un aviso.</div>
+        </div>
+        <div style={{marginBottom:8}}>
+          <label style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:3,display:"block"}}>🔧 Mantenimiento — días antes del vencimiento</label>
+          <input type="text" placeholder="ej: 3,2,1,0"
+            style={{padding:"8px 10px",border:"0.5px solid var(--color-border-secondary)",borderRadius:8,fontSize:14,background:"var(--color-background-tertiary)",color:"var(--color-text-primary)",outline:"none",boxSizing:"border-box",width:"100%"}}
+            defaultValue={localStorage.getItem('lc_dias_notif_mant') || '3,2,1,0'}
+            onChange={e=>{
+              localStorage.setItem('lc_dias_notif_mant', e.target.value);
+              const arr = e.target.value.split(',').map(n=>parseInt(n.trim(),10)).filter(n=>!isNaN(n));
+              syncData({diasAvisoMant: arr});
+            }}
+          />
+          <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:4}}>Números separados por coma. Se avisa a las 7am si faltan esos días exactos.</div>
+        </div>
         <div style={{borderTop:"0.5px solid var(--color-border-tertiary)",margin:"8px 0"}}/>
         <div style={{marginBottom:8}}>
           <label style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:3,display:"block"}}>⏰ Cierre del día — hora de aviso</label>
@@ -57,9 +92,7 @@ function NotifConfig({ permiso, onPermisoChange, syncData }) {
           <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:4}}>Si a esa hora la planilla está vacía (y es día de reparto), recibís un aviso.</div>
         </div>
         <div style={{fontSize:12,color:"var(--color-text-tertiary)",lineHeight:1.7}}>
-          💳 Transferencias → <b>13:00</b> y <b>19:00</b><br/>
-          📅 Recordatorios de agenda → a la hora exacta<br/>
-          🔧 Mantenimiento de vehículo → 3, 2, 1 y 0 días antes
+          📅 Recordatorios de agenda → a la hora exacta
         </div>
       </>)}
     </>
@@ -506,4 +539,3 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
     </div>
   );
 }
-
