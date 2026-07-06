@@ -122,6 +122,8 @@
           histPrecios: data.histPrecios || [],
           zonasReparto: data.zonasReparto || {},
           horaAvisoCierre: data.horaAvisoCierre || '18:00',
+          horasAvisoTrans: data.horasAvisoTrans || ['13:00','19:00'],
+          diasAvisoMant: data.diasAvisoMant || [3,2,1,0],
           _upd: Date.now()
         })
       ];
@@ -166,6 +168,8 @@
         if(!data.zonasReparto) data.zonasReparto = {};
         if(!data.histPrecios) data.histPrecios = [];
         if(!data.horaAvisoCierre) data.horaAvisoCierre = '18:00';
+        if(!data.horasAvisoTrans) data.horasAvisoTrans = ['13:00','19:00'];
+        if(!data.diasAvisoMant) data.diasAvisoMant = [3,2,1,0];
         // load clientes
         var nc = cMeta.exists ? (cMeta.data().n||0) : 0;
         var vn = vMeta.exists ? (vMeta.data().n||0) : 0;
