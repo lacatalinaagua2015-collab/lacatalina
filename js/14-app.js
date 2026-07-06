@@ -388,9 +388,9 @@ function App() {
   },[]);
 
   // ── NOTIFICACIONES PUSH ─────────────────────────────────────────────
-  // Los horarios (cierre, mantenimiento, transferencias, recordatorios de
-  // agenda) los maneja el servidor (GitHub Actions) mandando un push real,
-  // así funciona con la app cerrada. Acá SOLO nos suscribimos.
+  // Corre al abrir la app: pide permiso y (re)suscribe. El botón "Probar" en
+  // Configuración (12-config.js) reusa esta misma función vía window._suscribirPushLC,
+  // no hay una segunda copia de esta lógica en ningún otro lado.
   React.useEffect(()=>{
     if(!("Notification" in window) || !("serviceWorker" in navigator)) return;
 
@@ -408,12 +408,19 @@ function App() {
 
     const VAPID_PUBLIC = 'BM_NKKlieI7BqahT-39TblUaxWGBaVQX7YRfWV_XUVy0Rb8lINBxEm2LXfDJe2348_ofSdYw62Us83koGJPXEGQ';
 
+    function getDeviceId() {
+      let id = localStorage.getItem('lc_device_id');
+      if (!id) {
+        id = 'dev_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+        localStorage.setItem('lc_device_id', id);
+      }
+      return id;
+    }
+
     async function suscribirPush() {
       if (!('PushManager' in window)) { localStorage.setItem('lc_push_estado', JSON.stringify({ok:false,msg:'Este navegador no soporta notificaciones push (PushManager).',ts:Date.now()})); return; }
       try {
         const sw = await conLimite(navigator.serviceWorker.ready, 8000, 'esperando el service worker');
-        // SIEMPRE da de baja cualquier suscripción anterior antes de crear una nueva:
-        // así nunca queda un endpoint/clave vieja desincronizada con el servidor.
         const subVieja = await conLimite(sw.pushManager.getSubscription(), 8000, 'consultando suscripción existente');
         if (subVieja) { try { await subVieja.unsubscribe(); } catch(e) {} }
         const nuevaSub = await conLimite(sw.pushManager.subscribe({
@@ -421,11 +428,12 @@ function App() {
           applicationServerKey: _vapidToUint8(VAPID_PUBLIC),
         }), 8000, 'pidiendo la suscripción al navegador');
         if (window.db) {
-          await conLimite(window.db.collection('lc2').doc('push_sub').set({
-            sub: JSON.stringify(nuevaSub.toJSON()),
-            ts: Date.now(),
-          }), 8000, 'guardando en la nube (Firestore)');
-          localStorage.setItem('lc_push_estado', JSON.stringify({ok:true,msg:'Suscripción guardada correctamente',ts:Date.now()}));
+          const deviceId = getDeviceId();
+          // Guarda bajo la clave de ESTE dispositivo — no pisa la suscripción de otros celus/PC.
+          await conLimite(window.db.collection('lc2').doc('push_subs').set({
+            [deviceId]: { sub: JSON.stringify(nuevaSub.toJSON()), ts: Date.now() }
+          }, { merge: true }), 8000, 'guardando en la nube (Firestore)');
+          localStorage.setItem('lc_push_estado', JSON.stringify({ok:true,msg:'Suscripción guardada. Esto confirma que el navegador quedó registrado — no confirma que un aviso vaya a llegar (eso depende del servidor).',ts:Date.now()}));
         } else {
           localStorage.setItem('lc_push_estado', JSON.stringify({ok:false,msg:'No se encontró conexión a la base de datos (window.db)',ts:Date.now()}));
         }
