@@ -242,6 +242,8 @@ function App() {
       }
       if (data.mantVeh?.length)    localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh));
       if (data.horaAvisoCierre)    localStorage.setItem("lc_hora_notif_cierre", data.horaAvisoCierre);
+      if (data.horasAvisoTrans)    localStorage.setItem("lc_horas_notif_trans", JSON.stringify(data.horasAvisoTrans));
+      if (data.diasAvisoMant)      localStorage.setItem("lc_dias_notif_mant", data.diasAvisoMant.join(','));
       if (data.histPrecios?.length) localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios));
       if (data.zonasReparto && Object.keys(data.zonasReparto).length) setZonasReparto(data.zonasReparto);
       if (data.cargasDia && Object.keys(data.cargasDia).length) setCargasDia(data.cargasDia);
@@ -338,7 +340,7 @@ function App() {
     setSyncStatus("saving");
     const mantVehActual = (() => { try { return JSON.parse(localStorage.getItem("cat_mant_vehiculo_v1")||"[]"); } catch { return []; } })();
     const histPreciosActual = (() => { try { return JSON.parse(localStorage.getItem("lc_hist_precios")||"[]"); } catch { return []; } })();
-    const data = { ...estadoRef.current, ...overrides, noVisitas: estadoRef.current.noVisitas||[], prospectos: overrides.prospectos!==undefined ? overrides.prospectos : (estadoRef.current.prospectos||[]), recordatorios: estadoRef.current.recordatorios||[], mantVeh: overrides.mantVeh||mantVehActual, histPrecios: overrides.histPrecios||histPreciosActual, zonasReparto: overrides.zonasReparto||estadoRef.current.zonasReparto||{}, horaAvisoCierre: overrides.horaAvisoCierre || localStorage.getItem('lc_hora_notif_cierre') || '18:00' };
+    const data = { ...estadoRef.current, ...overrides, noVisitas: estadoRef.current.noVisitas||[], prospectos: overrides.prospectos!==undefined ? overrides.prospectos : (estadoRef.current.prospectos||[]), recordatorios: estadoRef.current.recordatorios||[], mantVeh: overrides.mantVeh||mantVehActual, histPrecios: overrides.histPrecios||histPreciosActual, zonasReparto: overrides.zonasReparto||estadoRef.current.zonasReparto||{}, horaAvisoCierre: overrides.horaAvisoCierre || localStorage.getItem('lc_hora_notif_cierre') || '18:00', horasAvisoTrans: overrides.horasAvisoTrans || (()=>{try{return JSON.parse(localStorage.getItem('lc_horas_notif_trans')||'["13:00","19:00"]');}catch{return ['13:00','19:00'];}})(), diasAvisoMant: overrides.diasAvisoMant || (localStorage.getItem('lc_dias_notif_mant')||'3,2,1,0').split(',').map(n=>parseInt(n.trim(),10)).filter(n=>!isNaN(n)) };
     estadoRef.current = data;
     debounceSave(() => {
       if(!navigator.onLine) {
@@ -639,7 +641,7 @@ function App() {
     }
   }, [ventas, noVisitas, clientes, diaActual, fechaActual, planillas, ecToken]);
 
-  const registrarVenta = (detalle, pago, montoPagado, saldoAplicado, envPrest, envDev, obs, opcionSaldo, montoTrans2, saldoDeltaMixto) => {
+  const registrarVenta = (detalle, pago, montoPagado, saldoAplicado, envPrest, envDev, obs, opcionSaldo, montoTrans2, saldoDeltaMixto, transConfirmadaInicial) => {
     montoTrans2 = Number(montoTrans2)||0; // defensa: siempre número (el desglose mixto depende de esto)
     const c = cliente;
     // Auto-detectar envases prestados (solo si no es cobro de deuda)
@@ -671,6 +673,7 @@ function App() {
       envPrest:envPrestFinal,
       envDev:(envDev||[]).filter(e=>e.prod&&e.cant), ...calc,
       montoTrans:montoTrans2||0, montoEfec:opcionSaldo==="mixto_ef"?Number(montoPagado):0,
+      transConfirmada: !!transConfirmadaInicial,
       _upd:Date.now(),
       ...(opcionSaldo==="cobro_deuda"?{_esCobro:true,neto:0,bruto:0,costo:0,ganancia:0}:{}),
       ...(opcionSaldo==="cambio_envase"?{_esCambio:true,neto:0,bruto:0,costo:0,ganancia:0}:{}),
