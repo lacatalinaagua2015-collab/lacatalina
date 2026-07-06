@@ -126,7 +126,6 @@ function MenuDias({dias,onDia,onResumen,onConfig,onGestionClientes,onPromocion,o
             </button>
             );
           })()}
-          )}
           </div>
           {editandoZona===d&&(
             <div style={{background:"var(--color-background-secondary)",border:"0.5px solid var(--color-border-secondary)",borderRadius:10,padding:"10px 14px",marginTop:2}} onClick={e=>e.stopPropagation()}>
@@ -329,7 +328,7 @@ function DetalleVentasDia({ventas, clientes, noVisitas, fecha}) {
           {ventas.map((v,idx)=>{
             const esMixto = (Number(v.montoTrans)||0)>0 && (Number(v.montoEfec)||0)>0;
             const pagoBadge = esMixto
-              ? {bg:"var(--color-background-info)",color:"var(--color-text-info)",txt:`Mixto · ef ${fmt(v.montoEfec)} + tr ${fmt(v.montoTrans)}`}
+              ? {bg:v.transConfirmada?"var(--color-background-success)":"var(--color-background-warning)",color:v.transConfirmada?"var(--color-text-success)":"#f5b942",txt:`Mixto · ef ${fmt(v.montoEfec)} + tr ${fmt(v.montoTrans)} ${v.transConfirmada?"✅":"🔴"}`}
               : ({
               contado:{bg:"var(--color-background-success)",color:"var(--color-text-success)",txt:"Contado"},
               transferencia:{bg:v.transConfirmada?"var(--color-background-success)":"var(--color-background-warning)",color:v.transConfirmada?"var(--color-text-success)":"#f5b942",txt:v.transConfirmada?"Transfer. ✅":"Transfer. 🔴"},
@@ -454,7 +453,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
   }, 0);
   const cobTransDesc  = Math.round(cobTransBruto*0.025);
   const cobTransNeto  = cobTransBruto - cobTransDesc;
-  const ventasPendTrans = ventas.filter(v=>v.pago==="transferencia"&&!v.transConfirmada);
+  const ventasPendTrans = ventas.filter(v=>(v.pago==="transferencia"||(v.pago==="mixto"&&Number(v.montoTrans)>0))&&!v.transConfirmada);
   const cobFiado      = todasVentasDia.filter(v=>v.pago==="fiado").reduce((a,v)=>a+(v.neto||0),0);
   const cobSaldosEfec  = todasVentasDia.filter(v=>v.pago==="contado").reduce((a,v)=>{ const extra=(v.pagadoNum||0)-(v.neto||0); return a+(extra>0?extra:0); },0);
   const cobSaldosTrans = todasVentasDia.filter(v=>v.pago==="transferencia").reduce((a,v)=>{ const extra=(v.pagadoNum||0)-(v.neto||0); return a+(extra>0?extra:0); },0);
@@ -1133,4 +1132,3 @@ function InicioReparto({dia,fecha,planilla,productos,cargasDia,stock,onGuardar,o
     </div>
   );
 }
-
