@@ -31,7 +31,7 @@ function diaSemanaArg() {
 }
 // Días con reparto real (Lunes queda afuera: la app lo tiene con carga 0 en CARGA_DIA_DEFAULT)
 const DIAS_REPARTO = ['Martes', 'Miércoles', 'Jueves', 'Viernes'];
-const VENTANA_MIN = 20; // tolerancia: no perder el aviso si el cron corre cada 15 min
+const VENTANA_MIN = 15; // con cron cada 5 min, alcanza y no llega tan tarde
 // ── Leer TODAS las suscripciones guardadas (una por dispositivo) ────────────
 async function getSubs() {
   const doc = await db.collection('lc2').doc('push_subs').get();
