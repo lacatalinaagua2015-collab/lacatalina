@@ -32,24 +32,30 @@ function diaSemanaArg() {
 // Días con reparto real (Lunes queda afuera: la app lo tiene con carga 0 en CARGA_DIA_DEFAULT)
 const DIAS_REPARTO = ['Martes', 'Miércoles', 'Jueves', 'Viernes'];
 const VENTANA_MIN = 20; // tolerancia: no perder el aviso si el cron corre cada 15 min
-// ── Enviar push ───────────────────────────────────────────────────────────────
-async function enviar(sub, payload) {
-  try {
-    await webpush.sendNotification(sub, JSON.stringify(payload));
-    console.log('✅ Notificación enviada:', payload.title);
-  } catch (err) {
-    console.error('❌ Error enviando push:', err.statusCode, err.message);
-    if (err.statusCode === 410 || err.statusCode === 404) {
-      await db.collection('lc2').doc('push_sub').delete();
-      console.log('⚠ Suscripción expirada, borrada de Firestore. El usuario debe abrir la app una vez para renovarla.');
+// ── Leer TODAS las suscripciones guardadas (una por dispositivo) ────────────
+async function getSubs() {
+  const doc = await db.collection('lc2').doc('push_subs').get();
+  if (!doc.exists) { console.log('Sin suscripciones push registradas.'); return {}; }
+  return doc.data() || {};
+}
+// ── Enviar un mismo aviso a todos los dispositivos suscriptos ───────────────
+async function enviarATodos(subsMap, payload) {
+  const entries = Object.entries(subsMap || {});
+  if (!entries.length) return;
+  for (const [deviceId, info] of entries) {
+    let sub;
+    try { sub = JSON.parse(info.sub); } catch { continue; }
+    try {
+      await webpush.sendNotification(sub, JSON.stringify(payload));
+      console.log(`✅ Notificación enviada (${deviceId}):`, payload.title);
+    } catch (err) {
+      console.error(`❌ Error enviando push (${deviceId}):`, err.statusCode, err.message);
+      if (err.statusCode === 410 || err.statusCode === 404) {
+        await db.collection('lc2').doc('push_subs').update({ [deviceId]: admin.firestore.FieldValue.delete() });
+        console.log(`⚠ Suscripción de ${deviceId} expirada, borrada. Ese dispositivo debe abrir la app una vez para renovarla.`);
+      }
     }
   }
-}
-// ── Leer suscripción guardada ────────────────────────────────────────────────
-async function getSub() {
-  const doc = await db.collection('lc2').doc('push_sub').get();
-  if (!doc.exists) { console.log('Sin suscripción push registrada.'); return null; }
-  try { return JSON.parse(doc.data().sub); } catch { return null; }
 }
 // ── Log de enviados (evita repetir el mismo aviso si el cron corre varias veces por hora) ─
 async function getLog() {
@@ -60,7 +66,7 @@ async function guardarLog(log) {
   await db.collection('lc2').doc('push_log').set({ enviados: log }, { merge: true });
 }
 // ── Recordatorios de la AGENDA (corre en cada ejecución) ─────────────────────
-async function checkRecordatorios(sub, cfg, log) {
+async function checkRecordatorios(subs, cfg, log) {
   const hoy      = fechaArgHoy();
   const ahoraMin = ahoraMinArg();
   const recordatorios = cfg.recordatorios || [];
@@ -93,7 +99,7 @@ async function checkRecordatorios(sub, cfg, log) {
     const nombre = (cli && cli.nombre) || r.clienteNombre || '';
     const cuerpo = (nombre ? nombre + ' — ' : '') + (r.motivo || 'Tenés un recordatorio');
 
-    await enviar(sub, {
+    await enviarATodos(subs, {
       title: r.tipo === 'cobro' ? '💰 Recordatorio de cobro' : '🏠 Recordatorio de visita',
       body: cuerpo, tag: clave, requireInteraction: true,
     });
@@ -103,7 +109,7 @@ async function checkRecordatorios(sub, cfg, log) {
   return cambio;
 }
 // ── Cierre del día (hora configurable desde la app + cierre definitivo 20:00) ─
-async function checkCierre(sub, cfg, log) {
+async function checkCierre(subs, cfg, log) {
   const dia = diaSemanaArg();
   if (!DIAS_REPARTO.includes(dia)) return false; // Lunes/sábado/domingo: no hay reparto
 
@@ -121,7 +127,7 @@ async function checkCierre(sub, cfg, log) {
   if (ahoraMin >= minAviso && ahoraMin - minAviso <= VENTANA_MIN) {
     const clave = 'cierre-aviso_' + hoy;
     if (!log[clave]) {
-      await enviar(sub, {
+      await enviarATodos(subs, {
         title: '📋 Cierre del día pendiente',
         body: `Son las ${horaAviso}. Todavía no cerraste la planilla de ${dia}.`,
         tag: clave, requireInteraction: false,
@@ -133,7 +139,7 @@ async function checkCierre(sub, cfg, log) {
   if (ahoraMin >= minCierre && ahoraMin - minCierre <= VENTANA_MIN) {
     const clave = 'cierre-final_' + hoy;
     if (!log[clave]) {
-      await enviar(sub, {
+      await enviarATodos(subs, {
         title: '⏰ Son las 20:00 hs — La Catalina',
         body: 'Hora de cerrar la planilla. Los pendientes quedarán como no visitados.',
         tag: clave, requireInteraction: true,
@@ -144,7 +150,7 @@ async function checkCierre(sub, cfg, log) {
   return cambio;
 }
 // ── Transferencias pendientes (13:00 y 19:00) ────────────────────────────────
-async function checkTransferencias(sub, log) {
+async function checkTransferencias(subs, log) {
   const ahoraMin = ahoraMinArg();
   const objetivos = [{ h: 13 * 60, clave: 't13' }, { h: 19 * 60, clave: 't19' }];
   const hoy = fechaArgHoy();
@@ -168,7 +174,7 @@ async function checkTransferencias(sub, log) {
   } catch (e) { console.error('Error leyendo ventas:', e.message); return false; }
 
   if (pendientes === 0) { console.log('Sin transferencias pendientes.'); return false; }
-  await enviar(sub, {
+  await enviarATodos(subs, {
     title: '💳 Transferencias sin confirmar',
     body: `Tenés ${pendientes} transferencia${pendientes > 1 ? 's' : ''} pendiente${pendientes > 1 ? 's' : ''} de hoy.`,
     tag: clave, requireInteraction: true,
@@ -177,7 +183,7 @@ async function checkTransferencias(sub, log) {
   return true;
 }
 // ── Vencimiento de mantenimiento del vehículo (una vez por día, a la mañana) ─
-async function checkMantenimiento(sub, cfg, log) {
+async function checkMantenimiento(subs, cfg, log) {
   if (horaArg() !== 7) return false;
   const mantVeh = cfg.mantVeh || [];
   if (!mantVeh.length) return false;
@@ -196,7 +202,7 @@ async function checkMantenimiento(sub, cfg, log) {
     if (log[clave]) continue;
     const tipo = labels[m.tipo] || m.tipo || 'Mantenimiento';
     const cuando = dias === 0 ? 'HOY' : `en ${dias} día${dias > 1 ? 's' : ''}`;
-    await enviar(sub, {
+    await enviarATodos(subs, {
       title: '🔧 Vencimiento de mantenimiento',
       body: `${tipo} vence ${cuando}${m.descripcion ? ' — ' + m.descripcion : ''}.`,
       tag: clave, requireInteraction: false,
@@ -208,18 +214,18 @@ async function checkMantenimiento(sub, cfg, log) {
 // ── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
   console.log(`Hora Argentina: ${horaArg()}:00 — ${diaSemanaArg()}`);
-  const sub = await getSub();
-  if (!sub) return;
+  const subs = await getSubs();
+  if (!Object.keys(subs).length) return;
 
   const cfgSnap = await db.collection('lc2').doc('config').get();
   const cfg = cfgSnap.exists ? cfgSnap.data() : {};
   const log = await getLog();
   let cambioLog = false;
 
-  cambioLog = (await checkRecordatorios(sub, cfg, log)) || cambioLog;
-  cambioLog = (await checkCierre(sub, cfg, log))        || cambioLog;
-  cambioLog = (await checkTransferencias(sub, log))     || cambioLog;
-  cambioLog = (await checkMantenimiento(sub, cfg, log)) || cambioLog;
+  cambioLog = (await checkRecordatorios(subs, cfg, log)) || cambioLog;
+  cambioLog = (await checkCierre(subs, cfg, log))        || cambioLog;
+  cambioLog = (await checkTransferencias(subs, log))     || cambioLog;
+  cambioLog = (await checkMantenimiento(subs, cfg, log)) || cambioLog;
 
   if (cambioLog) await guardarLog(log);
   process.exit(0);
