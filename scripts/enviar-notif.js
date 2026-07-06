@@ -168,7 +168,7 @@ async function checkTransferencias(subs, log) {
       const doc = await db.collection('lc2').doc(`vt_${i}`).get();
       if (!doc.exists) continue;
       (doc.data().d || []).forEach(v => {
-        if (v.fechaKey === hoy && (v.pago === 'transferencia' || v._esMixtoTrans) && !v.transConfirmada) pendientes++;
+        if (v.fechaKey === hoy && (v.pago === 'transferencia' || (v.pago === 'mixto' && Number(v.montoTrans) > 0)) && !v.transConfirmada) pendientes++;
       });
     }
   } catch (e) { console.error('Error leyendo ventas:', e.message); return false; }
