@@ -578,3 +578,4 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
     </div>
   );
 }
+

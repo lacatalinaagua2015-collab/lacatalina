@@ -4,6 +4,11 @@
 
 function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setProductos,cargasDia,setCargasDia,planillas,onVolver,onResumen}) {
   const [clientesAbierto,setClientesAbierto]=React.useState(false);
+  const [abiertoSoderia,setAbiertoSoderia]=React.useState(false);
+  const [abiertoDeposito,setAbiertoDeposito]=React.useState(false);
+  const [abiertoEnClientes,setAbiertoEnClientes]=React.useState(false);
+  const [abiertoProductos,setAbiertoProductos]=React.useState(false);
+  const [abiertoCarga,setAbiertoCarga]=React.useState(false);
   const hoyDia = DIAS[(new Date().getDay()+6)%7] || "Lunes";
   const [diaCarga,setDiaCarga]=React.useState(DIAS.includes(hoyDia)?hoyDia:"Lunes");
   const PRODS=[["sifon","Sifón 1.5L"],["bidon10","Bidón 10L"],["bidon20","Bidón 20L"],["dispenser","Dispenser"]];
@@ -91,7 +96,12 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
 
         {/* SODERÍA */}
         <div style={{...s.card,margin:"0 0 10px"}}>
-          <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",marginBottom:9}}>🏭 Sodería <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:11}}>· de acá sale el camión</span></div>
+          <button style={{width:"100%",background:"none",border:"none",padding:0,marginBottom:abiertoSoderia?9:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
+            onClick={()=>setAbiertoSoderia(!abiertoSoderia)}>
+            <span style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",flex:1}}>🏭 Sodería <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:11}}>· de acá sale el camión</span></span>
+            <span style={{color:"var(--color-text-tertiary)",fontSize:12}}>{abiertoSoderia?"▲":"▼"}</span>
+          </button>
+          {abiertoSoderia&&(<>
           <div style={{display:"grid",gridTemplateColumns:"1fr 52px 52px 46px",gap:6,fontSize:11,color:"var(--color-text-tertiary)",marginBottom:5}}>
             <span></span><span style={{textAlign:"center"}}>Llenos</span><span style={{textAlign:"center"}}>Vacíos</span><span style={{textAlign:"center",color:"var(--color-text-secondary)"}}>Total</span>
           </div>
@@ -106,11 +116,17 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
               </div>
             );
           })}
+          </>)}
         </div>
 
         {/* DEPÓSITO */}
         <div style={{...s.card,margin:"0 0 10px"}}>
-          <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",marginBottom:9}}>📦 Depósito <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:11}}>· vacíos nuevos, sin uso</span></div>
+          <button style={{width:"100%",background:"none",border:"none",padding:0,marginBottom:abiertoDeposito?9:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
+            onClick={()=>setAbiertoDeposito(!abiertoDeposito)}>
+            <span style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",flex:1}}>📦 Depósito <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:11}}>· vacíos nuevos, sin uso</span></span>
+            <span style={{color:"var(--color-text-tertiary)",fontSize:12}}>{abiertoDeposito?"▲":"▼"}</span>
+          </button>
+          {abiertoDeposito&&(
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
             {PRODS.map(([k,lbl])=>(
               <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"var(--color-background-tertiary)",borderRadius:8,padding:"6px 9px"}}>
@@ -119,11 +135,17 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
               </div>
             ))}
           </div>
+          )}
         </div>
 
         {/* EN CLIENTES — ARQUEO GENERAL */}
         <div style={{...s.card,margin:"0 0 10px"}}>
-          <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",marginBottom:7}}>👥 En clientes <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:11}}>· fijos + prestados</span></div>
+          <button style={{width:"100%",background:"none",border:"none",padding:0,marginBottom:abiertoEnClientes?7:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
+            onClick={()=>setAbiertoEnClientes(!abiertoEnClientes)}>
+            <span style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",flex:1}}>👥 En clientes <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:11}}>· fijos + prestados</span></span>
+            <span style={{color:"var(--color-text-tertiary)",fontSize:12}}>{abiertoEnClientes?"▲":"▼"}</span>
+          </button>
+          {abiertoEnClientes&&(<>
           {/* Tabla de totales */}
           {(()=>{
             const totGeneral={sifon:totClientes.sifon+totPrestados.sifon,bidon10:totClientes.bidon10+totPrestados.bidon10,bidon20:totClientes.bidon20+totPrestados.bidon20,dispenser:totClientes.dispenser+totPrestados.dispenser};
@@ -207,11 +229,20 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
               ))}
             </div>
           )}
+          </>)}
         </div>
 
         {/* PRODUCTOS Y PRECIOS */}
         <div style={{...s.card,margin:"0 0 10px"}}>
-          <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",marginBottom:3}}>🏷️ Productos y precios</div>
+          <button style={{width:"100%",background:"none",border:"none",padding:0,marginBottom:abiertoProductos?9:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
+            onClick={()=>setAbiertoProductos(!abiertoProductos)}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)"}}>🏷️ Productos y precios</div>
+              {!abiertoProductos&&<div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>De acá salen los precios de la planilla y todas las ventas</div>}
+            </div>
+            <span style={{color:"var(--color-text-tertiary)",fontSize:12}}>{abiertoProductos?"▲":"▼"}</span>
+          </button>
+          {abiertoProductos&&(<>
           <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginBottom:9}}>De acá salen los precios de la planilla y todas las ventas</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 74px 74px",gap:6,fontSize:11,color:"var(--color-text-tertiary)",marginBottom:5}}>
             <span></span><span style={{textAlign:"center"}}>Llenado</span><span style={{textAlign:"center"}}>Venta</span>
@@ -265,11 +296,17 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
                 </div>
               </div>
             )}
+          </>)}
         </div>
 
         {/* CARGA DIARIA */}
         <div style={{...s.card,margin:"0 0 10px"}}>
-          <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",marginBottom:9}}>🚐 Carga diaria del camión</div>
+          <button style={{width:"100%",background:"none",border:"none",padding:0,marginBottom:abiertoCarga?9:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
+            onClick={()=>setAbiertoCarga(!abiertoCarga)}>
+            <span style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",flex:1}}>🚐 Carga diaria del camión</span>
+            <span style={{color:"var(--color-text-tertiary)",fontSize:12}}>{abiertoCarga?"▲":"▼"}</span>
+          </button>
+          {abiertoCarga&&(<>
           <div style={{display:"flex",gap:5,marginBottom:10,flexWrap:"wrap"}}>
             {DIAS.map(d=>(
               <button key={d} onClick={()=>setDiaCarga(d)} style={{fontSize:12,padding:"4px 9px",borderRadius:7,border:"none",cursor:"pointer",background:diaCarga===d?"#185FA5":"var(--color-background-tertiary)",color:diaCarga===d?"#e2eaf4":"var(--color-text-secondary)",fontWeight:diaCarga===d?500:400}}>{d.slice(0,3)}</button>
@@ -283,6 +320,7 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
               </div>
             ))}
           </div>
+          </>)}
         </div>
 
       </div>

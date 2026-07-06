@@ -2,7 +2,7 @@
 // ◆  10-gestion.js — GestionClientes, FormCliente
 // ════════════════════════════════════════════════════════════════════
 
-function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReordenarTodo,onRegistrarVenta,onVerDetalle,ventas,productos,onGuardarCambio}) {
+function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReordenarTodo,onRegistrarVenta,onVerDetalle,ventas,productos,onGuardarCambio,onIrTab}) {
   const [fotoClienteId,setFotoClienteId] = React.useState(null);
   const fotoCliente = fotoClienteId ? clientes.find(c=>c.id===fotoClienteId) : null;
   const [busqueda,setBusqueda]   = useState("");
@@ -52,9 +52,11 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
         </button>
       </div>
 
+      {onIrTab&&<ClientesTabs activo="todos" onIr={onIrTab}/>}
+
       {/* Filtros */}
       <div style={{padding:"10px 14px 6px"}}>
-        <input style={s.input} placeholder="Buscar por domicilio, nombre o teléfono..." value={busqueda} onChange={e=>setBusqueda(e.target.value)} />
+        <input style={{...s.input,background:"var(--color-background-info)",border:"0.5px solid var(--color-border-info)"}} placeholder="Buscar por domicilio, nombre o teléfono..." value={busqueda} onChange={e=>setBusqueda(e.target.value)} />
         <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap",alignItems:"center"}}>
           {["todos",...DIAS].map(d=>(
             <button key={d} style={{...s.btn,fontSize:11,padding:"3px 10px",

@@ -704,3 +704,5 @@ function NuevoCliente({diaActual,onGuardar,onVolver}) {
     </div>
   );
 }
+
+
