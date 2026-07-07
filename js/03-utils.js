@@ -339,3 +339,31 @@ function buscarCliente(c, q) {
   if((c.notas||"").toLowerCase().includes(t)) return 1;
   return 0;
 }
+
+// ════════════════════════════════════════════════════════════════════
+// ◆  HeaderBotones / HeaderApp — encabezado estándar: "Empresa · Pantalla"
+//    + sol/M adentro del recuadro, sin pedir props de tema (usa window._setDarkModeLC/_setScaleIdxLC)
+// ════════════════════════════════════════════════════════════════════
+const SCALE_LABELS_LC = ["S","M","L","XL"];
+function HeaderBotones() {
+  const [darkMode,setDarkModeLocal] = React.useState(()=>{ try{return JSON.parse(localStorage.getItem("cat_darkmode")||"false");}catch{return false;} });
+  const [scaleIdx,setScaleIdxLocal] = React.useState(()=>{ try{return JSON.parse(localStorage.getItem("cat_scale_v1")||"1");}catch{return 1;} });
+  return (
+    <>
+      <button onClick={()=>{ const nv=!darkMode; setDarkModeLocal(nv); if(window._setDarkModeLC) window._setDarkModeLC(nv); }}
+        style={{padding:"6px 10px",borderRadius:8,border:"none",background:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Cambiar tema">{darkMode?"☀️":"🌙"}</button>
+      <button onClick={()=>{ const nv=(scaleIdx+1)%4; setScaleIdxLocal(nv); if(window._setScaleIdxLC) window._setScaleIdxLC(nv); }}
+        style={{padding:"6px 10px",borderRadius:8,border:"none",background:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Tamaño de texto">{SCALE_LABELS_LC[scaleIdx]}</button>
+    </>
+  );
+}
+function HeaderApp({titulo, onVolver}) {
+  const negocio = (()=>{ try{ return JSON.parse(localStorage.getItem("lc_negocio_nombre")||'"La Catalina"'); }catch{ return "La Catalina"; } })();
+  return (
+    <div style={s.header}>
+      <button style={s.backBtn} onClick={onVolver}>← Volver</button>
+      <span style={{...s.headerTitle,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{titulo?`${negocio} · ${titulo}`:negocio}</span>
+      <HeaderBotones/>
+    </div>
+  );
+}

@@ -394,9 +394,10 @@ function NuevaVenta({cliente,productos,fecha,onGuardar,onNoEsta,onNoQuiere,onVol
             {cliente.calle?`${cliente.calle} ${cliente.nro||""}`:cliente.manzana?`Mz ${cliente.manzana} L ${cliente.lote}`:""}{cliente.barrio?` · ${cliente.barrio}`:""}{cliente.orden?` · #${cliente.orden}`:""}
           </div>
         </div>
-        <div style={{display:"flex",gap:6,fontSize:17,flexShrink:0}}>
+        <div style={{display:"flex",gap:6,fontSize:17,flexShrink:0,alignItems:"center"}}>
           {(cliente.maps||(cliente.lat&&cliente.lng))&&<a href={cliente.maps||`https://www.google.com/maps?q=${cliente.lat},${cliente.lng}`} target="_blank" rel="noreferrer" style={{textDecoration:"none"}} onClick={e=>e.stopPropagation()}>📍</a>}
           {cliente.telefono&&<a href={`https://wa.me/54${cliente.telefono}`} target="_blank" rel="noreferrer" style={{textDecoration:"none"}} onClick={e=>e.stopPropagation()}>💬</a>}
+          <HeaderBotones/>
         </div>
       </div>
       {/* Panel de info del cliente */}
@@ -697,7 +698,7 @@ function NuevoCliente({diaActual,onGuardar,onVolver}) {
   // Usa el FormCliente UNIFICADO (definido en 03-utils.js) — mismo formulario en toda la app
   return (
     <div style={s.screen}>
-      <div style={s.header}><button style={s.backBtn} onClick={onVolver}>← Volver</button><span style={s.headerTitle}>Nuevo cliente</span></div>
+      <HeaderApp titulo="Nuevo cliente" onVolver={onVolver}/>
       <div style={{padding:16}}>
         <FormCliente inicial={{dia:diaActual||"Martes"}} textoGuardar="Agregar cliente" onGuardar={onGuardar} />
       </div>

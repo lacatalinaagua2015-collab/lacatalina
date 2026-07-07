@@ -27,12 +27,7 @@ function AgendaScreen({recordatorios,clientes,onConfirmar,onEliminar,onNuevo,onI
 
   return (
     <div style={s.screen}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>📅 Agenda</span>
-        <button style={{...s.btn,padding:"6px 12px",fontSize:12,background:"#185FA5",color:"#e2eaf4",border:"none"}}
-          onClick={()=>setMostrarNuevo(true)}>+ Nuevo</button>
-      </div>
+      <HeaderApp titulo="📅 Agenda" onVolver={onVolver}/>
 
       {/* Métricas rápidas */}
       <div style={{display:"flex",gap:8,padding:"10px 14px 6px"}}>
@@ -61,6 +56,8 @@ function AgendaScreen({recordatorios,clientes,onConfirmar,onEliminar,onNuevo,onI
             border:filtro===v?"none":"0.5px solid var(--color-border-secondary)"}}
             onClick={()=>setFiltro(v)}>{l}</button>
         ))}
+        <button style={{...s.btn,fontSize:12,padding:"6px 12px",background:"#185FA5",color:"#e2eaf4",border:"none"}}
+          onClick={()=>setMostrarNuevo(true)}>+ Nuevo</button>
       </div>
 
       {/* Lista */}

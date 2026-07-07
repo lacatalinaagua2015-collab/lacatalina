@@ -43,10 +43,7 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
   return (
     <>
     <div style={s.screen}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>Gestión de clientes</span>
-      </div>
+      <HeaderApp titulo="Gestión de clientes" onVolver={onVolver}/>
 
       {onIrTab&&<ClientesTabs activo="todos" onIr={onIrTab}/>}
 
@@ -288,10 +285,7 @@ function CargaGPSMasiva({clientes, onActualizar, onVolver}) {
 
   return (
     <div style={{...s.screen,display:"flex",flexDirection:"column"}}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>Cargar GPS · {idx+1}/{sinGPS.length}</span>
-      </div>
+      <HeaderApp titulo={`Cargar GPS · ${idx+1}/${sinGPS.length}`} onVolver={onVolver}/>
       <div style={{height:4,background:"var(--color-background-tertiary)"}}>
         <div style={{height:"100%",background:"#185FA5",width:`${progreso}%`,transition:"width 0.3s"}}/>
       </div>
@@ -452,10 +446,7 @@ function MapaClientes({clientes, dia, fecha, ventas, noVisitas, onSeleccionar, o
 
   return (
     <div style={{...s.screen, display:"flex", flexDirection:"column"}}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>Mapa de clientes</span>
-      </div>
+      <HeaderApp titulo="Mapa de clientes" onVolver={onVolver}/>
 
       {/* Filtro por día */}
       <div style={{display:"flex",gap:6,padding:"8px 14px",overflowX:"auto",background:"var(--color-background-secondary)",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>

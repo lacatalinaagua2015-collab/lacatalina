@@ -215,18 +215,15 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
 
   return (
     <div style={s.screen}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>Clientes · {dia}</span>
-        <button style={{...s.btn,padding:"6px 12px",fontSize:13}} onClick={onNuevoCliente}>+ Nuevo</button>
-      </div>
+      <HeaderApp titulo={`Clientes · ${dia}`} onVolver={onVolver}/>
       <div style={{padding:"10px 16px 6px"}}>
         <input style={s.input} placeholder="Buscar por domicilio o nombre..." value={busqueda} onChange={e=>setBusqueda(e.target.value)} />
         <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap",alignItems:"center"}}>
           <span style={s.badge("success")}>{clientesReales.filter(c=>visitados.has(c.id)).length}/{clientesReales.length} visitados</span>
           {volverAlFinal.length>0&&<span style={s.badge("warning")}>{volverAlFinal.length} volver al final</span>}
           {sinEntrega.length>0&&<span style={s.badge("danger")}>{sinEntrega.length} sin entrega</span>}
-          <button style={{...s.btn,fontSize:11,padding:"3px 10px",marginLeft:"auto"}} onClick={abrirRutaOptima}>🧭 Ruta óptima</button>
+          <button style={{...s.btn,fontSize:11,padding:"3px 10px",marginLeft:"auto",background:"#185FA5",color:"#e2eaf4",border:"none"}} onClick={onNuevoCliente}>+ Nuevo</button>
+          <button style={{...s.btn,fontSize:11,padding:"3px 10px"}} onClick={abrirRutaOptima}>🧭 Ruta óptima</button>
           <button style={{...s.btn,fontSize:11,padding:"3px 10px"}} onClick={onAbrirMapa}>🗺 Mapa</button>
         </div>
         <p style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:6}}>Tocá el # para editar el número de orden del cliente</p>
@@ -299,6 +296,7 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
           <button style={{...s.btn,fontSize:12,padding:"5px 10px"}} onClick={()=>{setEditandoCliente(!editandoCliente);setEditandoVentaId(null);}}>
             {editandoCliente?"Cancelar":"Editar"}
           </button>
+          <HeaderBotones/>
         </div>
       </div>
       {mostrarPagoSaldo&&(
@@ -757,6 +755,7 @@ function FiadosPendientes({clientes,ventas,onCobrar,onVolver,onEditarCliente}) {
           <div style={s.headerTitle}>💰 Fiados pendientes</div>
           <div style={{fontSize:11,color:'var(--color-text-danger)'}}>{conDeuda.length} clientes · {fmt(totalDeuda)} total</div>
         </div>
+        <HeaderBotones/>
       </div>
       {conDeuda.length===0&&<div style={{padding:40,textAlign:'center',color:'var(--color-text-success)',fontSize:15}}>✅ ¡Sin fiados pendientes!</div>}
       {conDeuda.map(c=>(
@@ -827,6 +826,7 @@ function ClientesDormidos({clientes,ventas,onVolver,onSeleccionar,onEditarClient
           <div style={s.headerTitle}>😴 Clientes dormidos</div>
           <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{lista.length} cliente{lista.length!==1?"s":""} sin comprar hace {semanas}+ semanas</div>
         </div>
+        <HeaderBotones/>
       </div>
       <div style={{padding:"10px 14px 4px",display:"flex",gap:6,alignItems:"center"}}>
         <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>Mostrar sin comprar hace:</span>

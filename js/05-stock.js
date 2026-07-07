@@ -84,15 +84,13 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
 
   return (
     <div style={s.screen}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={{...s.headerTitle,flex:1}}>📦 Stock</span>
-        {onResumen&&<button style={s.btn} onClick={onResumen}>📊 Resumen</button>}
-      </div>
+      <HeaderApp titulo="📦 Stock" onVolver={onVolver}/>
 
       <div style={{padding:"10px 14px 40px"}}>
 
         <div style={{fontSize:11,color:"var(--color-text-info)",margin:"0 0 10px",padding:"7px 11px",background:"var(--color-background-info)",borderRadius:8}}>ℹ️ El <b>sifón</b> se cuenta en <b>unidades sueltas</b> (6 unidades = 1 cajón).</div>
+
+        {onResumen&&<button style={{...s.btn,width:"100%",marginBottom:10,fontSize:13,fontWeight:500}} onClick={onResumen}>📊 Ver resumen</button>}
 
         {/* SODERÍA */}
         <div style={{...s.card,margin:"0 0 10px"}}>
@@ -346,10 +344,7 @@ function ConfirmacionesDia({dia,ventas,clientes,onConfirmar,onVolver}) {
   const fechasConf = Object.keys(confirmadasPorFecha).sort().reverse();
   return (
     <div style={s.screen}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={onVolver}>← Volver</button>
-        <span style={s.headerTitle}>Transferencias · {dia}</span>
-      </div>
+      <HeaderApp titulo={`Transferencias · ${dia}`} onVolver={onVolver}/>
       <div style={{padding:"10px 14px 4px"}}>
         <div style={{display:"flex",gap:8,marginBottom:8}}>
           <div style={{...s.card,flex:1,margin:0,background:"#1e3a5f",border:"1px solid #f5b942",padding:"10px 12px"}}>

@@ -157,7 +157,7 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
   const stockKeys={"Sifón 1.5L":"sifon","Bidón 10L":"bidon10","Bidón 20L":"bidon20","Dispenser":"dispenser"};
   return (
     <div style={s.screen}>
-      <div style={s.header}><button style={s.backBtn} onClick={onVolver}>← Volver</button><span style={s.headerTitle}>Configuración</span></div>
+      <HeaderApp titulo="Configuración" onVolver={onVolver}/>
       <div style={{padding:"14px 14px 6px",background:"var(--color-background-secondary)"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:8}}>
           {[["datos","📋","Datos"],["vehiculo","🚐","Vehículo"],["apariencia","🎨","Estilo"]].map(([id,ico,lbl])=>(

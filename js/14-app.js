@@ -820,12 +820,11 @@ function App() {
 
   if(!pinOk) return <PantallaBloqueoLC onOk={()=>{ setPinOk(true); if(pantalla==="portada") irA("menu"); }} />;
 
+  window._setDarkModeLC = setDarkMode;
+  window._setScaleIdxLC = setScaleIdx;
+
   return (
     <div style={{position:"relative"}}>
-    <div style={{position:"fixed",top:10,right:14,zIndex:9999,display:"flex",gap:6}}>
-      <button onClick={()=>setDarkMode(!darkMode)} style={{padding:"6px 10px",borderRadius:8,border:"none",background:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} title="Cambiar tema">{darkMode?"☀️":"🌙"}</button>
-      <button onClick={()=>setScaleIdx(i=>(i+1)%4)} style={{padding:"6px 10px",borderRadius:8,border:"none",background:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} title="Tamaño de texto">{SCALE_LABELS[scaleIdx]}</button>
-    </div>
     <div style={{...s.app, zoom: SCALES[scaleIdx]}}>
       <SyncBar status={syncStatus} isOnline={isOnline} />
       {pantalla==="portada"        && <Portada onIngresar={()=>irA("menu")} />}
