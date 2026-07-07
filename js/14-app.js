@@ -184,7 +184,28 @@ function App() {
     setSyncStatus("loading");
     cloudLoad().then(function(data) {
       if(!data) { setSyncStatus("idle"); return; }
-      if (data.clientes?.length)   setClientes(data.clientes);
+      // ── Clientes: MERGEAR en vez de sobreescribir (igual que ventas) ──────
+      // Antes esto pisaba el array entero con lo de la nube, perdiendo saldos
+      // recién actualizados localmente si el refetch llegaba antes de que
+      // terminara de sincronizar (foco de la app, otro dispositivo, etc.)
+      if (data.clientes?.length) {
+        const clientesLocales = (()=>{ try{ return JSON.parse(localStorage.getItem("cat_clientes_v3")||"[]"); }catch{ return []; } })();
+        const porIdCli = {};
+        (data.clientes||[]).forEach(c=>{ porIdCli[c.id] = c; });          // base: lo de la nube
+        let cambiosLocalesCli = 0;
+        clientesLocales.forEach(c=>{
+          const enNube = porIdCli[c.id];
+          if(!enNube){ porIdCli[c.id] = c; cambiosLocalesCli++; return; } // solo en local → lo agrego
+          const uL = Number(c._upd)||0, uN = Number(enNube._upd)||0;
+          if(uL > uN){ porIdCli[c.id] = c; cambiosLocalesCli++; }         // gana el más nuevo
+        });
+        const mergedCli = Object.values(porIdCli);
+        setClientes(mergedCli);
+        if(cambiosLocalesCli > 0){
+          console.log("Merge: "+cambiosLocalesCli+" clientes locales más nuevos que Firebase, sincronizando...");
+          setTimeout(()=>syncData({clientes:mergedCli}), 2000);
+        }
+      }
       // ── Ventas: MERGEAR en vez de sobreescribir ──────────────────────────
       // Si el celular tenía ventas no sincronizadas, no las pisamos con Firebase
       if (data.ventas?.length) {
@@ -283,6 +304,9 @@ function App() {
     );
     return () => unsub();
   }, [traerDeLaNube]);
+
+  // Ref para el guard anti doble-tap en registrarVenta
+  const ultimoRegistroRef = React.useRef({firma:null, ts:0});
 
   // Ref siempre actualizado — evita datos viejos en el debounce
   const estadoRef = React.useRef({clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios,prospectos,cargasDia});
@@ -453,7 +477,7 @@ function App() {
     })();
   },[]);
 
-  const saveClientes = (v) => { setClientes(v); syncData({clientes:v}); };
+  const saveClientes = (v) => { const _t=Date.now(); const vv=v.map(c=>({...c,_upd:_t})); setClientes(vv); syncData({clientes:vv}); };
   const saveVentas   = (v) => { setVentasRaw(v);   syncData({ventas:v}); };
 
   // Hooks globales: respaldo COMPLETO descargable + restaurar
@@ -644,6 +668,15 @@ function App() {
   const registrarVenta = (detalle, pago, montoPagado, saldoAplicado, envPrest, envDev, obs, opcionSaldo, montoTrans2, saldoDeltaMixto, transConfirmadaInicial) => {
     montoTrans2 = Number(montoTrans2)||0; // defensa: siempre número (el desglose mixto depende de esto)
     const c = cliente;
+    // ── Guard anti doble-tap: ignora una llamada idéntica al mismo cliente ──
+    // dentro de 1.5s (botón sin lock + toque duplicado en el celular)
+    const firmaReg = JSON.stringify({cid:c.id, detalle, pago, montoPagado, opcionSaldo});
+    const ahoraReg = Date.now();
+    if(ultimoRegistroRef.current.firma===firmaReg && (ahoraReg-ultimoRegistroRef.current.ts)<1500){
+      console.warn("⚠️ Venta duplicada bloqueada (doble tap):", c.nombre);
+      return;
+    }
+    ultimoRegistroRef.current = {firma:firmaReg, ts:ahoraReg};
     // Auto-detectar envases prestados (solo si no es cobro de deuda)
     const envAutoDetect = [];
     if(opcionSaldo!=="cobro_deuda" && opcionSaldo!=="cambio_envase") {
@@ -693,7 +726,7 @@ function App() {
         pagadoNum:montoTrans2, saldoDelta:0, // sin impacto en saldo
         envPrest:[], envDev:[],
         _esMixtoTrans:true, _mixtoDe:nuevaVenta.id,
-        transConfirmada:false, _upd:Date.now(), // aparece como transferencia pendiente de confirmar
+        transConfirmada: !!transConfirmadaInicial, _upd:Date.now(), // refleja el checkbox, no queda pendiente para siempre
       };
       nuevasVentas = [...nuevasVentas, ventaTr];
       // saldoExtra ya es correcto, NO sumamos montoTrans2
@@ -792,13 +825,18 @@ function App() {
     const obsFinal  = esMixto&&tr>0 ? obsLimpia+` [Mixto: ef $${ef} + tr $${tr}]` : obsLimpia;
     const eraMixta  = (Number(vV.montoTrans)||0)>0;
     let saldoExtra = c ? (c.saldo - vV.saldoDelta + calc.saldoDelta) : 0;
+    // Guardar el estado de confirmación de la parte-transferencia vieja, para no resetearla a "pendiente"
+    let transConfirmadaPrevia = false;
     // Quitar SOLO la parte-transferencia ligada a ESTA venta (no las de otras ventas mixtas del día)
     let nev = ventas.filter(v=>{
       const ligada = v._esMixtoTrans && (
         v._mixtoDe===ventaId ||
         (v._mixtoDe===undefined && eraMixta && v.clienteId===vV.clienteId && v.fechaKey===vV.fechaKey)
       );
-      if(ligada && (Number(v.saldoDelta)||0)!==0) saldoExtra -= Number(v.saldoDelta); // compensar partes viejas que tocaban saldo
+      if(ligada){
+        if((Number(v.saldoDelta)||0)!==0) saldoExtra -= Number(v.saldoDelta); // compensar partes viejas que tocaban saldo
+        if(v.transConfirmada) transConfirmadaPrevia = true;
+      }
       return !ligada;
     });
     nev = nev.map(v=>v.id===ventaId?{...vV,detalle,pago:pagoReal,obs:obsFinal,saldoAplicado:saldoAplicado||0,...calc,montoEfec:esMixto?ef:0,montoTrans:tr,_upd:Date.now()}:v);
@@ -810,7 +848,7 @@ function App() {
         pago:"transferencia", obs:"[Parte transfer. de pago mixto]", saldoAplicado:0,
         neto:tr, bruto:tr, desc:0, costo:0, ganancia:0,
         pagadoNum:tr, saldoDelta:0, envPrest:[], envDev:[],
-        _esMixtoTrans:true, _mixtoDe:ventaId, transConfirmada:false, _upd:Date.now(),
+        _esMixtoTrans:true, _mixtoDe:ventaId, transConfirmada:transConfirmadaPrevia, _upd:Date.now(),
       };
       nev = [...nev, ventaTr];
     }
