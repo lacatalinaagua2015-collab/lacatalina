@@ -46,10 +46,6 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
       <div style={s.header}>
         <button style={s.backBtn} onClick={onVolver}>← Volver</button>
         <span style={s.headerTitle}>Gestión de clientes</span>
-        <button style={{...s.btn,padding:"6px 12px",fontSize:12,background:"#185FA5",color:"#e2eaf4",border:"none"}}
-          onClick={()=>{setModoNuevo(true);setEditandoId(null);}}>
-          + Nuevo
-        </button>
       </div>
 
       {onIrTab&&<ClientesTabs activo="todos" onIr={onIrTab}/>}
@@ -67,7 +63,11 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
               {d==="todos"?"Todos":d}
             </button>
           ))}
-          <button style={{...s.btn,fontSize:11,padding:"3px 10px",marginLeft:"auto"}}
+          <button style={{...s.btn,fontSize:11,padding:"3px 10px",marginLeft:"auto",background:"#185FA5",color:"#e2eaf4",border:"none"}}
+            onClick={()=>{setModoNuevo(true);setEditandoId(null);}}>
+            + Nuevo
+          </button>
+          <button style={{...s.btn,fontSize:11,padding:"3px 10px"}}
           onClick={()=>{
             const porDia = {};
             DIAS.forEach(d=>{ porDia[d]=[...clientes].filter(c=>c.dia===d).sort((a,b)=>(a.orden||9999)-(b.orden||9999)); });
