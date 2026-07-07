@@ -512,7 +512,7 @@ function App() {
     setProductos(v); syncData({productos:v});
   };
   const saveCargasDia = (v) => { setCargasDia(v); try{localStorage.setItem("cat_cargas_dia_v1",JSON.stringify(v));}catch{} syncData({cargasDia:v}); };
-  const saveNoVisitas= (v) => { setNoVisitas(v); try{localStorage.setItem("cat_novisitas_v1",JSON.stringify(v));}catch{} };
+  const saveNoVisitas= (v) => { setNoVisitas(v); try{localStorage.setItem("cat_novisitas_v1",JSON.stringify(v));}catch{} syncData({noVisitas:v}); };
   const saveProspectos=(v)=>{ setProspectos(v); try{localStorage.setItem("cat_prospectos_v1",JSON.stringify(v));}catch{} syncData({prospectos:v}); };
 
   const cliente = clientes.find(c=>c.id===clienteId)||null;
