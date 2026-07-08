@@ -1,6 +1,6 @@
 // ── La Catalina · Service Worker ─────────────────────────────────────────────
 // Cache offline + notificaciones push.
-const CACHE = 'lc-v64';
+const CACHE = 'lc-v63';
 const ASSETS = [
   'https://unpkg.com/react@18/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -21,13 +21,26 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+
+  // El documento HTML (index.html) es el que dice qué versión de cada
+  // js/*.js hay que pedir. Si a ESE lo servimos desde caché primero,
+  // un cambio recién subido tarda una recarga de más en aparecer —
+  // por eso, sólo para la navegación, va SIEMPRE primero a la red.
+  const esNavegacion = e.request.mode === 'navigate' || (e.request.headers.get('accept') || '').includes('text/html');
+  if (esNavegacion) {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+        return res;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
   e.respondWith(
     caches.match(e.request).then(cached => {
       const net = fetch(e.request).then(res => {
-        if (res.ok) {
-          const copia = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, copia)).catch(() => {});
-        }
+        if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
         return res;
       }).catch(() => cached);
       return cached || net;
