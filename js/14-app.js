@@ -862,21 +862,26 @@ function App() {
     ultimoBorradoRef.current = {id:ventaId, ts:ahoraDel};
     const v = ventas.find(x=>x.id===ventaId); if(!v) return;
     const eraMixta = (Number(v.montoTrans)||0)>0;
+    // Calculamos qué se borra y el ajuste de saldo AHORA MISMO, de forma
+    // sincrónica — no depende de cuándo React decida correr el actualizador
+    // de saveVentas (eso fue lo que causaba el tilde en "No está"/"No quiere").
     let ajusteSaldoExtra = 0;
+    const idsABorrar = new Set([ventaId]);
+    ventas.forEach(x=>{
+      const ligada = x._esMixtoTrans && (
+        x._mixtoDe===ventaId ||
+        (x._mixtoDe===undefined && eraMixta && x.clienteId===v.clienteId && x.fechaKey===v.fechaKey)
+      );
+      if(ligada){
+        idsABorrar.add(x.id);
+        if((Number(x.saldoDelta)||0)!==0) ajusteSaldoExtra += Number(x.saldoDelta);
+      }
+    });
     // Escribimos sobre el ventas MÁS RECIENTE (prev), no sobre el closure —
     // así, si se borran varias ventas una atrás de otra rápido, ninguna
     // "revive" por pisar el array con una versión vieja.
     saveVentas(prev => {
-      let nv = prev.filter(x=>{
-        if(x.id===ventaId) return false;
-        // Cascada: borrar también la parte-transferencia ligada a ESTA venta
-        const ligada = x._esMixtoTrans && (
-          x._mixtoDe===ventaId ||
-          (x._mixtoDe===undefined && eraMixta && x.clienteId===v.clienteId && x.fechaKey===v.fechaKey)
-        );
-        if(ligada && (Number(x.saldoDelta)||0)!==0) ajusteSaldoExtra += Number(x.saldoDelta);
-        return !ligada;
-      });
+      let nv = prev.filter(x=>!idsABorrar.has(x.id));
       // Limpieza: partes-transferencia huérfanas (su venta principal ya no existe)
       nv = nv.filter(x=>!(x._esMixtoTrans && x._mixtoDe!==undefined && !nv.some(y=>y.id===x._mixtoDe)));
       return nv;
@@ -914,24 +919,28 @@ function App() {
     const obsLimpia = (obs||"").replace(/\s*\[Mixto:[^\]]*\]/g,"");
     const obsFinal  = esMixto&&tr>0 ? obsLimpia+` [Mixto: ef $${ef} + tr $${tr}]` : obsLimpia;
     const eraMixta  = (Number(vV.montoTrans)||0)>0;
+    // Buscar de forma sincrónica las partes-transferencia ligadas a esta venta
+    // — no depende de cuándo React corra el actualizador de saveVentas.
+    let ajusteLigadas = 0;
+    let transConfirmadaPrevia = false;
+    const idsLigados = new Set();
+    ventas.forEach(v=>{
+      const ligada = v._esMixtoTrans && (
+        v._mixtoDe===ventaId ||
+        (v._mixtoDe===undefined && eraMixta && v.clienteId===vV.clienteId && v.fechaKey===vV.fechaKey)
+      );
+      if(ligada){
+        idsLigados.add(v.id);
+        if((Number(v.saldoDelta)||0)!==0) ajusteLigadas += Number(v.saldoDelta);
+        if(v.transConfirmada) transConfirmadaPrevia = true;
+      }
+    });
     // netDeltaCambio: cuánto CAMBIA el saldo por esta edición — es un delta puro,
     // no depende del saldo actual del cliente (por eso es seguro aplicarlo después
     // sobre el saldo más reciente, en vez de sobre el que había al abrir la pantalla).
-    let netDeltaCambio = calc.saldoDelta - vV.saldoDelta;
-    let transConfirmadaPrevia = false;
+    const netDeltaCambio = calc.saldoDelta - vV.saldoDelta - ajusteLigadas;
     saveVentas(prev => {
-      let nev = prev.filter(v=>{
-        // Quitar SOLO la parte-transferencia ligada a ESTA venta (no las de otras ventas mixtas del día)
-        const ligada = v._esMixtoTrans && (
-          v._mixtoDe===ventaId ||
-          (v._mixtoDe===undefined && eraMixta && v.clienteId===vV.clienteId && v.fechaKey===vV.fechaKey)
-        );
-        if(ligada){
-          if((Number(v.saldoDelta)||0)!==0) netDeltaCambio -= Number(v.saldoDelta); // compensar partes viejas que tocaban saldo
-          if(v.transConfirmada) transConfirmadaPrevia = true;
-        }
-        return !ligada;
-      });
+      let nev = prev.filter(v=>!idsLigados.has(v.id));
       nev = nev.map(v=>v.id===ventaId?{...vV,detalle,pago:pagoReal,obs:obsFinal,saldoAplicado:saldoAplicado||0,...calc,montoEfec:esMixto?ef:0,montoTrans:tr,_upd:Date.now()}:v);
       if(esMixto&&tr>0){
         const ventaTr = {
@@ -1037,14 +1046,11 @@ function App() {
         />}
       {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>{const hoyKey=new Date().toLocaleDateString("en-CA");if(fechaActual!==hoyKey)setFechaActual(hoyKey);irA("venta");}} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
           onNoEstaCliente={()=>{
-            let nvFinal=null;
-            saveNoVisitas(prev => {
-              const nv=[...(prev||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noesta",_upd:Date.now()}];
-              nvFinal=nv; return nv;
-            });
+            const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noesta",_upd:Date.now()}];
+            saveNoVisitas(nv);
             const clientesDia=clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
             const ventasIds=new Set(ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste&&!v._esMixtoTrans).map(v=>v.clienteId));
-            const noVMap={};nvFinal.filter(v=>v.dia===diaActual&&v.fecha===fechaActual).forEach(v=>{noVMap[v.clienteId]=v.motivo;});
+            const noVMap={};nv.filter(v=>v.dia===diaActual&&v.fecha===fechaActual).forEach(v=>{noVMap[v.clienteId]=v.motivo;});
             const terminados=new Set(clientesDia.filter(c=>ventasIds.has(c.id)||noVMap[c.id]==="noquiso"||noVMap[c.id]==="noesta2").map(c=>c.id));
             const normalPend=clientesDia.filter(c=>!terminados.has(c.id)&&noVMap[c.id]!=="noesta"&&c.id!==cliente.id);
             const noestaPend=clientesDia.filter(c=>noVMap[c.id]==="noesta"&&!terminados.has(c.id)&&c.id!==cliente.id);
@@ -1052,14 +1058,11 @@ function App() {
             if(sig){setClienteId(sig.id);irA("detalleCliente");}else irA("clientes");
           }}
           onNoQuiereCliente={()=>{
-            let nvFinal=null;
-            saveNoVisitas(prev => {
-              const nv=[...(prev||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noquiso",_upd:Date.now()}];
-              nvFinal=nv; return nv;
-            });
+            const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noquiso",_upd:Date.now()}];
+            saveNoVisitas(nv);
             const clientesDia=clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
             const ventasIds=new Set(ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste&&!v._esMixtoTrans).map(v=>v.clienteId));
-            const noVMap={};nvFinal.filter(v=>v.dia===diaActual&&v.fecha===fechaActual).forEach(v=>{noVMap[v.clienteId]=v.motivo;});
+            const noVMap={};nv.filter(v=>v.dia===diaActual&&v.fecha===fechaActual).forEach(v=>{noVMap[v.clienteId]=v.motivo;});
             const terminados=new Set(clientesDia.filter(c=>ventasIds.has(c.id)||noVMap[c.id]==="noquiso"||noVMap[c.id]==="noesta2").map(c=>c.id));
             const normalPend=clientesDia.filter(c=>!terminados.has(c.id)&&noVMap[c.id]!=="noesta"&&c.id!==cliente.id);
             const noestaPend=clientesDia.filter(c=>noVMap[c.id]==="noesta"&&!terminados.has(c.id)&&c.id!==cliente.id);
@@ -1104,17 +1107,13 @@ function App() {
           return {visitados:visitadosIds.size,total:clientesDia.length,montoHoy,stock:stockRestante};
         })()}
         onNoEsta={()=>{
-          let nvFinal=null;
-          saveNoVisitas(prevNV => {
-            const base=prevNV||[];
-            const anterior=base.find(v=>v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual);
-            const motivo=anterior?.motivo==="noesta"?"noesta2":"noesta";
-            const nv=[...base.filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo,_upd:Date.now()}];
-            nvFinal=nv; return nv;
-          });
+          const anterior=(noVisitas||[]).find(v=>v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual);
+          const motivo=anterior?.motivo==="noesta"?"noesta2":"noesta";
+          const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo,_upd:Date.now()}];
+          saveNoVisitas(nv);
           const clientesDia=clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
           const ventasIds=new Set(ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste&&!v._esMixtoTrans).map(v=>v.clienteId));
-          const noVMap={};nvFinal.filter(v=>v.dia===diaActual&&v.fecha===fechaActual).forEach(v=>{noVMap[v.clienteId]=v.motivo;});
+          const noVMap={};nv.filter(v=>v.dia===diaActual&&v.fecha===fechaActual).forEach(v=>{noVMap[v.clienteId]=v.motivo;});
           const terminados=new Set(clientesDia.filter(c=>ventasIds.has(c.id)||noVMap[c.id]==="noquiso"||noVMap[c.id]==="noesta2").map(c=>c.id));
           // 1ro: pendientes normales, 2do: los que no estaban, nunca sale si quedan clientes
           const normalPend=clientesDia.filter(c=>!terminados.has(c.id)&&noVMap[c.id]!=="noesta"&&c.id!==clienteId);
@@ -1123,14 +1122,11 @@ function App() {
           if(sig){setClienteId(sig.id);irA("venta");}else irA("clientes");
         }}
         onNoQuiere={()=>{
-          let nvFinal=null;
-          saveNoVisitas(prevNV => {
-            const nv=[...(prevNV||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo:"noquiso",_upd:Date.now()}];
-            nvFinal=nv; return nv;
-          });
+          const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo:"noquiso",_upd:Date.now()}];
+          saveNoVisitas(nv);
           const clientesDia=clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
           const ventasIds=new Set(ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual&&!v._esCobro&&!v._esAjuste&&!v._esMixtoTrans).map(v=>v.clienteId));
-          const noVMap={};nvFinal.filter(v=>v.dia===diaActual&&v.fecha===fechaActual).forEach(v=>{noVMap[v.clienteId]=v.motivo;});
+          const noVMap={};nv.filter(v=>v.dia===diaActual&&v.fecha===fechaActual).forEach(v=>{noVMap[v.clienteId]=v.motivo;});
           const terminados=new Set(clientesDia.filter(c=>ventasIds.has(c.id)||noVMap[c.id]==="noquiso"||noVMap[c.id]==="noesta2").map(c=>c.id));
           const normalPend=clientesDia.filter(c=>!terminados.has(c.id)&&noVMap[c.id]!=="noesta"&&c.id!==clienteId);
           const noestaPend=clientesDia.filter(c=>noVMap[c.id]==="noesta"&&!terminados.has(c.id)&&c.id!==clienteId);
@@ -1152,16 +1148,12 @@ function App() {
   else irA("clientes");
 }}
         onSaltar={()=>{
-          let nvFinal=null;
-          saveNoVisitas(prevNV => {
-            const nv=[...(prevNV||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo:"salteado",_upd:Date.now()}];
-            nvFinal=nv; return nv;
-          });
+          const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo:"salteado",_upd:Date.now()}];
+          saveNoVisitas(nv);
           // Auto-avanzar al siguiente cliente pendiente, respetando el orden de reparto
-          // (antes no ordenaba por "orden" y podía saltar a cualquier lado)
           const visitadosIds=new Set([
             ...ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual).map(v=>v.clienteId),
-            ...nvFinal.filter(v=>v.fecha===fechaActual&&v.dia===diaActual).map(v=>v.clienteId)
+            ...nv.filter(v=>v.fecha===fechaActual&&v.dia===diaActual).map(v=>v.clienteId)
           ]);
           const clientesDia=clientes.filter(c=>c.dia===diaActual).sort((a,b)=>(a.orden||9999)-(b.orden||9999));
           const sig=clientesDia.find(c=>!visitadosIds.has(c.id)&&c.id!==clienteId);
