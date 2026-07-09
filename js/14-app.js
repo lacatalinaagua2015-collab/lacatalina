@@ -999,7 +999,7 @@ function App() {
           onVolver={()=>irA("menu")} />}
       {pantalla==="diaPrincipal"   && <DiaPrincipal dia={diaActual} onIrClientes={()=>irA("selectorFechaClientes")} onIrPlanilla={()=>irA("selectorFechaPlanilla")} onVolver={()=>irA("menu")} onVerConfirmaciones={()=>irA("confirmacionesDia")} ventasPendientesTransfer={ventas.filter(v=>v.dia===diaActual&&v.pago==="transferencia"&&!v.transConfirmada).length} />}
       {pantalla==="selectorFechaPlanilla" && <SelectorFecha dia={diaActual} planillas={planillas} ventas={ventas} noVisitas={noVisitas} onSeleccionar={(fk,fo)=>{setFechaActual(fk);setFechaObj(fo);irA("planilla");}} onVolver={()=>irA("diaPrincipal")} />}
-      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual)} clientes={clientes} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} autoCierre={!!planillas[`${diaActual}_${fechaActual}`]?.iniciado}
+      {pantalla==="planilla"       && <PlanillaDelDia dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual)} clientes={clientes} planilla={planillas[`${diaActual}_${fechaActual}`]||planillaDiaVacia()} productos={productos} stock={stockNorm} setStock={setStock} syncData={syncData} autoCierre={!!planillas[`${diaActual}_${fechaActual}`]?.iniciado} cargasDia={cargasDia}
         onGuardar={d=>{
           savePlanilla(`${diaActual}_${fechaActual}`,d);
           if(!d._diaCerrado) irA("selectorFechaPlanilla");
@@ -1012,11 +1012,11 @@ function App() {
         onGuardar={(p,descontar)=>{
           savePlanilla(`${diaActual}_${fechaActual}`,p);
           if(descontar){
+            const soda=Number(p.productos?.soda?.llenos||0);
+            const b10=Number(p.productos?.b10?.llenos||0);
+            const b20=Number(p.productos?.b20?.llenos||0);
             setStock(prev=>{
               const s=JSON.parse(JSON.stringify(normStock(prev)));
-              const soda=Number(p.productos?.soda?.llenos||0);
-              const b10=Number(p.productos?.b10?.llenos||0);
-              const b20=Number(p.productos?.b20?.llenos||0);
               s.soderia.sifon  =Math.max(0,(s.soderia.sifon||0)-soda);
               s.soderia.bidon10=Math.max(0,(s.soderia.bidon10||0)-b10);
               s.soderia.bidon20=Math.max(0,(s.soderia.bidon20||0)-b20);
@@ -1025,6 +1025,9 @@ function App() {
               s.camion.bidon20 =(s.camion.bidon20||0)+b20;
               syncData({stock:normStock(s)}); return normStock(s);
             });
+            // La carga real de hoy queda como sugerencia para la próxima vez que
+            // toque este día — así no depende de un número fijo cargado una vez.
+            saveCargasDia(prev=>({...prev,[diaActual]:{soda,b10,b20}}));
           }
           irA("clientes");
         }} onVolver={()=>irA("selectorFechaClientes")} />}
