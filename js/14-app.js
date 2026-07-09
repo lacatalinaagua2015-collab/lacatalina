@@ -360,12 +360,16 @@ function App() {
   React.useEffect(()=>{ estadoRef.current={clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios,prospectos,zonasReparto,cargasDia}; });
 
   // ── AUTO-BACKUP mejorado ────────────────────────────────────────────────
-  // Guarda cada 10 minutos (no solo al arrancar) y mantiene los últimos 3 días
+  // Guarda cada 10 minutos (no solo al arrancar) y mantiene los últimos 3 días.
+  // OJO: antes dependía de [clientes,ventas,planillas], así que se re-disparaba
+  // cada vez que cambiaba CUALQUIER dato (no solo cada 10 minutos) — ahora lee
+  // siempre el dato más fresco desde estadoRef, y el efecto corre una sola vez.
   React.useEffect(()=>{
     const hacerBackup = () => {
       try {
         const hoy = new Date().toLocaleDateString("en-CA");
-        const payload = JSON.stringify({clientes,ventas,planillas});
+        const {clientes:cl,ventas:ve,planillas:pl} = estadoRef.current;
+        const payload = JSON.stringify({clientes:cl,ventas:ve,planillas:pl});
         localStorage.setItem("lc_backup_"+hoy, payload);
         localStorage.setItem("lc_ultimo_backup", hoy);
         // Mantener solo los últimos 3 días de backup
@@ -377,7 +381,7 @@ function App() {
     hacerBackup(); // inmediato al cargar
     const intervalo = setInterval(hacerBackup, 10 * 60 * 1000); // cada 10 minutos
     return () => clearInterval(intervalo);
-  },[clientes, ventas, planillas]);
+  },[]);
 
   // ── LIMPIEZA AUTOMÁTICA de ventas antiguas ──────────────────────────────
   // Archiva a Firebase y elimina localmente ventas de más de 3 meses

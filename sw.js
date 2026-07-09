@@ -1,6 +1,6 @@
 // ── La Catalina · Service Worker ─────────────────────────────────────────────
 // Cache offline + notificaciones push.
-const CACHE = 'lc-v63';
+const CACHE = 'lc-v64';
 const ASSETS = [
   'https://unpkg.com/react@18/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -21,6 +21,21 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  const url = e.request.url;
+
+  // CRÍTICO: nunca interceptar Firebase/Firestore/Google — son conexiones
+  // en vivo (streaming/long-polling), no archivos para cachear. Meterse acá
+  // rompía la conexión con la base de datos (por eso Firestore empezó a
+  // rechazar pedidos como si hubiera exceso de cuota: en realidad eran
+  // pedidos duplicados por el error de más abajo).
+  if (
+    url.includes('googleapis.com') ||
+    url.includes('gstatic.com') ||
+    url.includes('firebaseio.com') ||
+    url.includes('firebase.com') ||
+    url.includes('firestore.googleapis') ||
+    url.includes('securetoken.googleapis')
+  ) return; // lo maneja el navegador directo, sin pasar por acá
 
   // El documento HTML (index.html) es el que dice qué versión de cada
   // js/*.js hay que pedir. Si a ESE lo servimos desde caché primero,
@@ -30,7 +45,10 @@ self.addEventListener('fetch', e => {
   if (esNavegacion) {
     e.respondWith(
       fetch(e.request).then(res => {
-        if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+        // Clonar ACÁ, antes de devolver la respuesta — si se clona adentro
+        // de un .then() posterior, el body ya puede estar consumido y
+        // revienta con "Response body is already used".
+        if (res.ok) { const copia = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copia)); }
         return res;
       }).catch(() => caches.match(e.request))
     );
@@ -40,7 +58,7 @@ self.addEventListener('fetch', e => {
   e.respondWith(
     caches.match(e.request).then(cached => {
       const net = fetch(e.request).then(res => {
-        if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+        if (res.ok) { const copia = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copia)); }
         return res;
       }).catch(() => cached);
       return cached || net;
