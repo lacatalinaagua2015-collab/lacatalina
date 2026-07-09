@@ -2,7 +2,7 @@
 // ◆  07-clientes.js — ListaClientes, DetalleCliente (formulario: FormCliente unificado en 03-utils)
 // ════════════════════════════════════════════════════════════════════
 
-function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onNuevoCliente,onVolver,onReordenar,onEditarCliente,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onNoQuiereProspecto,onConfirmarTransfer,onVerProspecto,onEliminarProspecto,onAbrirMapa,onPlanilla}) {
+function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onEntregar,onNuevoCliente,onVolver,onReordenar,onEditarCliente,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onNoQuiereProspecto,onConfirmarTransfer,onVerProspecto,onEliminarProspecto,onAbrirMapa,onPlanilla}) {
   const [busqueda,setBusqueda] = useState("");
   const [editandoOrden,setEditandoOrden] = useState(null);
   const [ordenTemp,setOrdenTemp] = useState("");
@@ -177,7 +177,7 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
             <button style={{background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"1px solid var(--color-border-danger)",borderRadius:10,padding:"10px 0",fontSize:13,cursor:"pointer",fontWeight:500,flex:1}}
               onClick={()=>marcarNoVisita(c.id,"noquiso")}>No quiere</button>
             <button style={{background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:10,padding:"10px 0",fontSize:14,cursor:"pointer",fontWeight:600,flex:2}}
-              onClick={()=>onSeleccionar(c)}>Entregar →</button>
+              onClick={()=>(onEntregar||onSeleccionar)(c)}>Entregar →</button>
           </div>
         )}
         {(est==="noesta2"||est==="noquiso")&&!atendido&&(
