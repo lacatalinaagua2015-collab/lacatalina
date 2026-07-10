@@ -32,62 +32,42 @@ Object.keys(TEMAS_LC).forEach(id=>{
   TEMAS_LC[id+"-metal"] = { nombre:base.nombre, modo:base.modo, emoji:"⚙️", relieve:true, vars:base.vars };
 });
 
-// ── RELIEVE — gradiente + sombra calculados a partir del color del tema ───
-// card/btn/btnPrimary son objetos JS compartidos por toda la app (no clases
-// CSS), así que acá directamente les mutamos las propiedades: todo lo que se
-// arma con {...s.card} en el próximo render agarra la versión con relieve
-// sola, sin tocar ninguna pantalla puntual.
-function _generarRelieveLC(vars, modo) {
-  const base   = vars["--color-background-tertiary"];
-  const baseCard = vars["--color-background-secondary"];
+// ── RELIEVE — el degradado vive DENTRO de la variable de color ────────────
+// Todas las pantallas ya pintan sus tarjetas y botones con
+// background:"var(--color-background-tertiary)" (o secondary, o accent).
+// Una variable CSS puede contener un degradado igual que un color plano —
+// así que en vez de tocar cada pantalla, acá redefinimos esas 3 variables
+// para que en vez de un color liso tengan un linear-gradient. Se aplica
+// solo, en todos lados, apenas cambia la variable — sin re-render de React.
+function _generarRelieveVarsLC(vars, modo) {
+  const bgSec  = vars["--color-background-secondary"];
+  const bgTer  = vars["--color-background-tertiary"];
   const accent = vars["--color-accent"];
-  const txt    = vars["--color-text-primary"];
   const oscuro = modo === "oscuro";
-  const bordeMetal = _ajustarColorLC(base, oscuro?-32:-42);
-  const sombraCard = oscuro
-    ? "inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -3px 6px rgba(0,0,0,0.35), 0 3px 0 rgba(0,0,0,0.5), 0 5px 8px rgba(0,0,0,0.4)"
-    : "inset 0 1px 0 rgba(255,255,255,0.7), inset 0 -2px 4px rgba(0,0,0,0.08), 0 2px 0 rgba(0,0,0,0.15), 0 3px 6px rgba(0,0,0,0.12)";
-  const sombraBtn = oscuro
-    ? "inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -2px 4px rgba(0,0,0,0.35), 0 2px 0 rgba(0,0,0,0.5)"
-    : "inset 0 1px 0 rgba(255,255,255,0.8), inset 0 -2px 3px rgba(0,0,0,0.06), 0 1px 0 rgba(0,0,0,0.15)";
   return {
-    card: {
-      background:`linear-gradient(180deg, ${_ajustarColorLC(base, oscuro?18:10)} 0%, ${_ajustarColorLC(baseCard, oscuro?-8:-6)} 100%)`,
-      border:`1px solid ${bordeMetal}`, borderRadius:10, padding:"10px 14px", margin:"6px 14px",
-      boxShadow: sombraCard,
-    },
-    btn: {
-      border:`1px solid ${bordeMetal}`, borderRadius:8, padding:"6px 12px", fontSize:12, cursor:"pointer",
-      background:`linear-gradient(180deg, ${_ajustarColorLC(base,oscuro?28:16)} 0%, ${_ajustarColorLC(base,oscuro?6:0)} 45%, ${_ajustarColorLC(base,oscuro?-10:-14)} 100%)`,
-      color: txt,
-      boxShadow: sombraBtn,
-    },
-    btnPrimary: {
-      background:`linear-gradient(180deg, ${_ajustarColorLC(accent,50)} 0%, ${accent} 45%, ${_ajustarColorLC(accent,-38)} 100%)`,
-      color:"#fff", border:`1px solid ${_ajustarColorLC(accent,-48)}`,
-      borderRadius:8, padding:"12px 20px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%",
-      boxShadow:`inset 0 1px 0 rgba(255,255,255,0.5), 0 0 14px ${accent}77, 0 3px 0 ${_ajustarColorLC(accent,-48)}`,
-    },
+    "--color-background-secondary": `linear-gradient(180deg, ${_ajustarColorLC(bgSec, oscuro?22:14)} 0%, ${_ajustarColorLC(bgSec, oscuro?-10:-8)} 100%)`,
+    "--color-background-tertiary":  `linear-gradient(180deg, ${_ajustarColorLC(bgTer, oscuro?28:16)} 0%, ${_ajustarColorLC(bgTer, oscuro?4:0)} 45%, ${_ajustarColorLC(bgTer, oscuro?-12:-14)} 100%)`,
+    "--color-accent":               `linear-gradient(180deg, ${_ajustarColorLC(accent,50)} 0%, ${accent} 45%, ${_ajustarColorLC(accent,-38)} 100%)`,
   };
 }
-let FLAT_STYLES_LC = null; // guarda los valores planos originales la primera vez, para poder volver
 function aplicarTemaLC(temaId) {
   const tema = TEMAS_LC[temaId]; if(!tema) return;
   const root = document.documentElement;
+  // Primero se pisan TODAS las variables con los colores planos de siempre
+  // (esto es lo que hace que volver de metálico a clásico también funcione:
+  // el degradado queda pisado por el color plano de nuevo).
   Object.entries(tema.vars).forEach(([k,v])=>{ if(k==="body-bg") document.body.style.background=v; else root.style.setProperty(k,v); });
-  // Relieve: solo pisa card/btn/btnPrimary si "s" (03-utils.js) ya cargó.
-  // La primera llamada (antes de que exista "s") no hace nada acá — por eso
-  // 03-utils.js vuelve a llamar a aplicarTemaLC() apenas define "s".
-  if(typeof s !== "undefined" && s && s.card){
-    if(!FLAT_STYLES_LC) FLAT_STYLES_LC = { card:{...s.card}, btn:{...s.btn}, btnPrimary:{...s.btnPrimary} };
-    const origen = tema.relieve ? _generarRelieveLC(tema.vars, tema.modo) : FLAT_STYLES_LC;
-    Object.assign(s.card, origen.card);
-    Object.assign(s.btn, origen.btn);
-    Object.assign(s.btnPrimary, origen.btnPrimary);
+  // Si el tema es metálico, ENCIMA de eso, 3 variables pasan a degradado,
+  // más el fondo general de la página.
+  if(tema.relieve){
+    const rel = _generarRelieveVarsLC(tema.vars, tema.modo);
+    Object.entries(rel).forEach(([k,v])=>root.style.setProperty(k,v));
+    const bg = tema.vars["body-bg"];
+    const oscuro = tema.modo === "oscuro";
+    document.body.style.background = `linear-gradient(160deg, ${_ajustarColorLC(bg, oscuro?14:8)} 0%, ${_ajustarColorLC(bg, oscuro?-8:-6)} 100%)`;
   }
 }
 function getTemaLC() { try { return JSON.parse(localStorage.getItem("lc_tema")||'"oscuro-azul"'); } catch { return "oscuro-azul"; } }
 (()=>{ try { aplicarTemaLC(getTemaLC()); } catch{} })();
 
 const { useState } = React;
-
