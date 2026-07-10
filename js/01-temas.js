@@ -96,21 +96,45 @@ function _aplicarSombraGlobalLC(tema) {
     }
   `;
 }
+// ── FONDO DE FIBRA DE CARBONO — solo en Metálico ───────────────────────────
+// Trama tejida clásica hecha con gradientes CSS (sin imagen, carga al
+// toque). Los colores salen del body-bg de cada tema, así el trenzado
+// combina con el color elegido en vez de ser siempre negro.
+function _aplicarFondoFibraLC(bg, oscuro) {
+  const hilo   = _ajustarColorLC(bg, oscuro?16:10);
+  const cruce  = _ajustarColorLC(bg, oscuro?24:16);
+  const sombra = _ajustarColorLC(bg, oscuro?-6:-5);
+  document.body.style.backgroundColor = bg;
+  document.body.style.backgroundImage = [
+    `linear-gradient(27deg, ${hilo} 5px, transparent 5px)`,
+    `linear-gradient(207deg, ${hilo} 5px, transparent 5px)`,
+    `linear-gradient(27deg, ${hilo} 5px, transparent 5px)`,
+    `linear-gradient(207deg, ${hilo} 5px, transparent 5px)`,
+    `linear-gradient(90deg, ${sombra} 10px, transparent 10px)`,
+    `linear-gradient(${sombra} 25%, transparent 25%, transparent 75%, ${sombra} 75%, ${sombra})`,
+    `linear-gradient(90deg, ${cruce} 10px, transparent 10px)`,
+    `linear-gradient(${cruce} 25%, transparent 25%, transparent 75%, ${cruce} 75%, ${cruce})`,
+  ].join(", ");
+  document.body.style.backgroundSize = "20px 20px";
+  document.body.style.backgroundPosition = "0 0, 0 0, 10px 10px, 10px 10px, 0 0, 0 0, 10px 10px, 10px 10px";
+}
 function aplicarTemaLC(temaId) {
   const tema = TEMAS_LC[temaId]; if(!tema) return;
   const root = document.documentElement;
-  // Primero se pisan TODAS las variables con los colores planos de siempre
-  // (esto es lo que hace que volver de metálico a clásico también funcione:
-  // el degradado queda pisado por el color plano de nuevo).
-  Object.entries(tema.vars).forEach(([k,v])=>{ if(k==="body-bg") document.body.style.background=v; else root.style.setProperty(k,v); });
-  // Si el tema es metálico, ENCIMA de eso, 3 variables pasan a degradado,
-  // más el fondo general de la página.
+  // Primero se pisan TODAS las variables con los colores planos de siempre.
+  // El fondo de la página (body-bg) se maneja aparte (ver abajo) porque en
+  // metálico no es un color liso, es la textura de fibra de carbono.
+  Object.entries(tema.vars).forEach(([k,v])=>{ if(k!=="body-bg") root.style.setProperty(k,v); });
   if(tema.relieve){
     const rel = _generarRelieveVarsLC(tema.vars, tema.modo);
     Object.entries(rel).forEach(([k,v])=>root.style.setProperty(k,v));
-    const bg = tema.vars["body-bg"];
-    const oscuro = tema.modo === "oscuro";
-    document.body.style.background = `linear-gradient(160deg, ${_ajustarColorLC(bg, oscuro?26:16)} 0%, ${_ajustarColorLC(bg, oscuro?-14:-10)} 100%)`;
+    _aplicarFondoFibraLC(tema.vars["body-bg"], tema.modo==="oscuro");
+  } else {
+    // Clásico: fondo liso de siempre, sin ninguna textura.
+    document.body.style.backgroundImage = "none";
+    document.body.style.backgroundColor = tema.vars["body-bg"];
+    document.body.style.backgroundSize = "";
+    document.body.style.backgroundPosition = "";
   }
   _aplicarSombraGlobalLC(tema);
 }
