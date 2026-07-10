@@ -150,10 +150,14 @@ function aplicarTemaLC(temaId) {
       cont.style.backgroundSize = "20px 20px";
       cont.style.backgroundPosition = capasApp.position;
     }
-    document.body.style.backgroundColor = tema.vars["body-bg"];
-    document.body.style.backgroundImage = capasBody.image;
-    document.body.style.backgroundSize = "20px 20px";
-    document.body.style.backgroundPosition = capasBody.position;
+    // <html> también, no solo <body> — así no queda un hueco blanco abajo
+    // si el documento termina siendo más alto que lo que <body> cubre.
+    [document.body, root].forEach(el=>{
+      el.style.backgroundColor = tema.vars["body-bg"];
+      el.style.backgroundImage = capasBody.image;
+      el.style.backgroundSize = "20px 20px";
+      el.style.backgroundPosition = capasBody.position;
+    });
   } else {
     // Clásico: sin textura, todo vuelve a ser liso.
     if(cont){
@@ -162,10 +166,12 @@ function aplicarTemaLC(temaId) {
       cont.style.backgroundSize = "";
       cont.style.backgroundPosition = "";
     }
-    document.body.style.backgroundImage = "none";
-    document.body.style.backgroundColor = tema.vars["body-bg"];
-    document.body.style.backgroundSize = "";
-    document.body.style.backgroundPosition = "";
+    [document.body, root].forEach(el=>{
+      el.style.backgroundImage = "none";
+      el.style.backgroundColor = tema.vars["body-bg"];
+      el.style.backgroundSize = "";
+      el.style.backgroundPosition = "";
+    });
   }
   _aplicarSombraGlobalLC(tema);
 }
