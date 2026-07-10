@@ -122,33 +122,46 @@ function _capasFibraCarbonoLC(bg, oscuro) {
     position: "0 0, 0 0, 10px 10px, 10px 10px, 0 0, 0 0, 10px 10px, 10px 10px",
   };
 }
+// Encuentra el div raíz de la app buscando por un estilo que sabemos que
+// tiene siempre (min-height:100vh, de s.app en 03-utils.js) — más seguro
+// que adivinar un selector CSS que puede no coincidir con el HTML real.
+function _contenedorAppLC() {
+  const candidatos = document.querySelectorAll("#root div, #root main, #root section");
+  for(const el of candidatos){
+    if(el.style && el.style.minHeight === "100vh") return el;
+  }
+  const raiz = document.getElementById("root");
+  return raiz ? raiz.firstElementChild : null;
+}
 function aplicarTemaLC(temaId) {
   const tema = TEMAS_LC[temaId]; if(!tema) return;
   const root = document.documentElement;
   Object.entries(tema.vars).forEach(([k,v])=>{ if(k!=="body-bg") root.style.setProperty(k,v); });
-  let tagFibra = document.getElementById("fibra-carbono-lc");
-  if(!tagFibra){ tagFibra = document.createElement("style"); tagFibra.id = "fibra-carbono-lc"; document.head.appendChild(tagFibra); }
+  const cont = _contenedorAppLC();
   if(tema.relieve){
     const rel = _generarRelieveVarsLC(tema.vars, tema.modo);
     Object.entries(rel).forEach(([k,v])=>root.style.setProperty(k,v));
     const oscuro = tema.modo==="oscuro";
     const capasApp  = _capasFibraCarbonoLC(tema.vars["--color-background-primary"], oscuro);
     const capasBody = _capasFibraCarbonoLC(tema.vars["body-bg"], oscuro);
-    tagFibra.textContent = `
-      #root > div{
-        background-color:${tema.vars["--color-background-primary"]} !important;
-        background-image:${capasApp.image} !important;
-        background-size:20px 20px !important;
-        background-position:${capasApp.position} !important;
-      }
-    `;
+    if(cont){
+      cont.style.backgroundColor = tema.vars["--color-background-primary"];
+      cont.style.backgroundImage = capasApp.image;
+      cont.style.backgroundSize = "20px 20px";
+      cont.style.backgroundPosition = capasApp.position;
+    }
     document.body.style.backgroundColor = tema.vars["body-bg"];
     document.body.style.backgroundImage = capasBody.image;
     document.body.style.backgroundSize = "20px 20px";
     document.body.style.backgroundPosition = capasBody.position;
   } else {
     // Clásico: sin textura, todo vuelve a ser liso.
-    tagFibra.textContent = "";
+    if(cont){
+      cont.style.backgroundImage = "none";
+      cont.style.backgroundColor = "";
+      cont.style.backgroundSize = "";
+      cont.style.backgroundPosition = "";
+    }
     document.body.style.backgroundImage = "none";
     document.body.style.backgroundColor = tema.vars["body-bg"];
     document.body.style.backgroundSize = "";
@@ -157,6 +170,19 @@ function aplicarTemaLC(temaId) {
   _aplicarSombraGlobalLC(tema);
 }
 function getTemaLC() { try { return JSON.parse(localStorage.getItem("lc_tema")||'"oscuro-azul"'); } catch { return "oscuro-azul"; } }
-(()=>{ try { aplicarTemaLC(getTemaLC()); } catch{} })();
+(()=>{
+  try { aplicarTemaLC(getTemaLC()); } catch{}
+  // El contenedor de la app todavía no existe acá (React recién lo crea
+  // después de que carguen TODOS los archivos, al final de index.html).
+  // En cuanto aparezca, reaplicamos una vez más para que la fibra de
+  // carbono llegue también ahí adentro, no solo al fondo de la página.
+  const raiz = document.getElementById("root");
+  if(raiz && window.MutationObserver){
+    const obs = new MutationObserver(()=>{
+      if(raiz.firstElementChild){ try{ aplicarTemaLC(getTemaLC()); }catch{} obs.disconnect(); }
+    });
+    obs.observe(raiz, {childList:true});
+  }
+})();
 
 const { useState } = React;
