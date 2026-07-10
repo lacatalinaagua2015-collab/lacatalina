@@ -45,28 +45,38 @@ function _generarRelieveVarsLC(vars, modo) {
   const accent = vars["--color-accent"];
   const oscuro = modo === "oscuro";
   return {
-    "--color-background-secondary": `linear-gradient(180deg, ${_ajustarColorLC(bgSec, oscuro?22:14)} 0%, ${_ajustarColorLC(bgSec, oscuro?-10:-8)} 100%)`,
-    "--color-background-tertiary":  `linear-gradient(180deg, ${_ajustarColorLC(bgTer, oscuro?28:16)} 0%, ${_ajustarColorLC(bgTer, oscuro?4:0)} 45%, ${_ajustarColorLC(bgTer, oscuro?-12:-14)} 100%)`,
-    "--color-accent":               `linear-gradient(180deg, ${_ajustarColorLC(accent,50)} 0%, ${accent} 45%, ${_ajustarColorLC(accent,-38)} 100%)`,
+    "--color-background-secondary": `linear-gradient(180deg, ${_ajustarColorLC(bgSec, oscuro?46:34)} 0%, ${_ajustarColorLC(bgSec, oscuro?-22:-20)} 100%)`,
+    "--color-background-tertiary":  `linear-gradient(180deg, ${_ajustarColorLC(bgTer, oscuro?54:38)} 0%, ${_ajustarColorLC(bgTer, oscuro?8:2)} 45%, ${_ajustarColorLC(bgTer, oscuro?-26:-30)} 100%)`,
+    "--color-accent":               `linear-gradient(180deg, ${_ajustarColorLC(accent,60)} 0%, ${accent} 45%, ${_ajustarColorLC(accent,-45)} 100%)`,
   };
 }
 // ── SOMBRA GLOBAL — el relieve de verdad ──────────────────────────────────
 // Casi toda la app arma sus botones con la etiqueta <button> (los días, los
 // accesos rápidos, Clientes/Stock/Config, etc.) — así que una sola regla de
-// CSS con !important le agrega bisel (sombra) a TODOS a la vez, sin tocar
-// ninguna pantalla. Ojo: solo la sombra, no el border-radius — así no rompe
-// los pocos botones redondos (círculos, puntos de estado) que haya.
+// CSS con !important le agrega bisel (sombra), borde y tipografía más
+// pesada a TODOS a la vez, sin tocar ninguna pantalla. Ojo: no toca
+// border-radius ni padding — así no rompe botones chicos/circulares que
+// dependan de su tamaño exacto.
 function _aplicarSombraGlobalLC(tema) {
   let tag = document.getElementById("relieve-global-lc");
   if(!tag){ tag = document.createElement("style"); tag.id = "relieve-global-lc"; document.head.appendChild(tag); }
   if(!tema.relieve){ tag.textContent = ""; return; }
   const oscuro = tema.modo === "oscuro";
   const sombra = oscuro
-    ? "inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -3px 6px rgba(0,0,0,0.4), 0 3px 0 rgba(0,0,0,0.6), 0 4px 7px rgba(0,0,0,0.45)"
-    : "inset 0 1px 0 rgba(255,255,255,0.8), inset 0 -2px 4px rgba(0,0,0,0.1), 0 2px 0 rgba(0,0,0,0.2), 0 3px 6px rgba(0,0,0,0.16)";
+    ? "inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -4px 8px rgba(0,0,0,0.5), 0 4px 0 rgba(0,0,0,0.75), 0 7px 12px rgba(0,0,0,0.55)"
+    : "inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -3px 6px rgba(0,0,0,0.14), 0 3px 0 rgba(0,0,0,0.28), 0 5px 10px rgba(0,0,0,0.22)";
+  const borde = oscuro ? "rgba(0,0,0,0.75)" : "rgba(0,0,0,0.35)";
+  const textShadow = oscuro ? "0 1px 1px rgba(0,0,0,0.7)" : "0 1px 0 rgba(255,255,255,0.6)";
   tag.textContent = `
-    button:not(.no-relieve){ box-shadow:${sombra} !important; transition:box-shadow .12s, transform .05s; }
-    button:not(.no-relieve):active{ transform:translateY(1.5px); }
+    button:not(.no-relieve){
+      box-shadow:${sombra} !important;
+      border:1px solid ${borde} !important;
+      font-weight:700 !important;
+      letter-spacing:0.02em !important;
+      text-shadow:${textShadow} !important;
+      transition:box-shadow .12s, transform .05s;
+    }
+    button:not(.no-relieve):active{ transform:translateY(2px); box-shadow:inset 0 2px 4px rgba(0,0,0,0.5) !important; }
   `;
 }
 function aplicarTemaLC(temaId) {
@@ -83,7 +93,7 @@ function aplicarTemaLC(temaId) {
     Object.entries(rel).forEach(([k,v])=>root.style.setProperty(k,v));
     const bg = tema.vars["body-bg"];
     const oscuro = tema.modo === "oscuro";
-    document.body.style.background = `linear-gradient(160deg, ${_ajustarColorLC(bg, oscuro?14:8)} 0%, ${_ajustarColorLC(bg, oscuro?-8:-6)} 100%)`;
+    document.body.style.background = `linear-gradient(160deg, ${_ajustarColorLC(bg, oscuro?26:16)} 0%, ${_ajustarColorLC(bg, oscuro?-14:-10)} 100%)`;
   }
   _aplicarSombraGlobalLC(tema);
 }
