@@ -50,6 +50,25 @@ function _generarRelieveVarsLC(vars, modo) {
     "--color-accent":               `linear-gradient(180deg, ${_ajustarColorLC(accent,50)} 0%, ${accent} 45%, ${_ajustarColorLC(accent,-38)} 100%)`,
   };
 }
+// ── SOMBRA GLOBAL — el relieve de verdad ──────────────────────────────────
+// Casi toda la app arma sus botones con la etiqueta <button> (los días, los
+// accesos rápidos, Clientes/Stock/Config, etc.) — así que una sola regla de
+// CSS con !important le agrega bisel (sombra) a TODOS a la vez, sin tocar
+// ninguna pantalla. Ojo: solo la sombra, no el border-radius — así no rompe
+// los pocos botones redondos (círculos, puntos de estado) que haya.
+function _aplicarSombraGlobalLC(tema) {
+  let tag = document.getElementById("relieve-global-lc");
+  if(!tag){ tag = document.createElement("style"); tag.id = "relieve-global-lc"; document.head.appendChild(tag); }
+  if(!tema.relieve){ tag.textContent = ""; return; }
+  const oscuro = tema.modo === "oscuro";
+  const sombra = oscuro
+    ? "inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -3px 6px rgba(0,0,0,0.4), 0 3px 0 rgba(0,0,0,0.6), 0 4px 7px rgba(0,0,0,0.45)"
+    : "inset 0 1px 0 rgba(255,255,255,0.8), inset 0 -2px 4px rgba(0,0,0,0.1), 0 2px 0 rgba(0,0,0,0.2), 0 3px 6px rgba(0,0,0,0.16)";
+  tag.textContent = `
+    button:not(.no-relieve){ box-shadow:${sombra} !important; transition:box-shadow .12s, transform .05s; }
+    button:not(.no-relieve):active{ transform:translateY(1.5px); }
+  `;
+}
 function aplicarTemaLC(temaId) {
   const tema = TEMAS_LC[temaId]; if(!tema) return;
   const root = document.documentElement;
@@ -66,6 +85,7 @@ function aplicarTemaLC(temaId) {
     const oscuro = tema.modo === "oscuro";
     document.body.style.background = `linear-gradient(160deg, ${_ajustarColorLC(bg, oscuro?14:8)} 0%, ${_ajustarColorLC(bg, oscuro?-8:-6)} 100%)`;
   }
+  _aplicarSombraGlobalLC(tema);
 }
 function getTemaLC() { try { return JSON.parse(localStorage.getItem("lc_tema")||'"oscuro-azul"'); } catch { return "oscuro-azul"; } }
 (()=>{ try { aplicarTemaLC(getTemaLC()); } catch{} })();
