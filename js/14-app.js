@@ -347,6 +347,20 @@ function App() {
     return () => clearInterval(intervalo);
   },[]);
 
+  // Descarga un archivo JSON al PC — usado por la limpieza automática de
+  // abajo, para que quede un registro a mano además del que se guarda en
+  // Firebase (por si algún día hace falta mirarlo sin entrar a la nube).
+  const _descargarArchivoLC = (nombre, contenido) => {
+    try {
+      const blob = new Blob([JSON.stringify(contenido, null, 2)], {type:"application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = nombre;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(url), 1500);
+    } catch(e) { console.warn("No se pudo descargar el archivo de respaldo:", e); }
+  };
+
   // ── LIMPIEZA AUTOMÁTICA de ventas antiguas ──────────────────────────────
   // Archiva a Firebase y elimina localmente ventas de más de 3 meses
   React.useEffect(()=>{
@@ -368,9 +382,39 @@ function App() {
             console.log("Limpieza automática: archivadas "+viejas.length+" ventas antiguas en Firebase");
             setVentasRaw(ventasRecientes);
             syncData({ventas: ventasRecientes});
+            _descargarArchivoLC(`la-catalina_ventas-archivadas_${limiteKey}.json`, viejas);
           }
         })
         .catch(e=>console.warn("No se pudieron archivar ventas antiguas:", e));
+    }
+  },[]); // solo al arrancar
+
+  // ── LIMPIEZA AUTOMÁTICA de marcas "no está/no quiere" antiguas ─────────
+  // Mismo criterio que las ventas de arriba: archiva a Firebase y elimina
+  // localmente las de más de 3 meses. Esto era lo que estaba haciendo lenta
+  // la carga de ventas — estas marcas se acumulaban PARA SIEMPRE (nunca se
+  // limpiaban), y llegaron a 1027 sin que hubiera ningún tope.
+  React.useEffect(()=>{
+    if(!noVisitas || !noVisitas.length) return;
+    const hoy = new Date();
+    const limite = new Date(hoy.getFullYear(), hoy.getMonth()-3, hoy.getDate());
+    const limiteKey = limite.toLocaleDateString("en-CA");
+    const viejas = noVisitas.filter(v=>v.fecha && v.fecha < limiteKey);
+    if(!viejas.length) return;
+    if(window.db) {
+      const col = window.db.collection("lc2");
+      const archivoKey = "archivo_novisitas_"+limiteKey;
+      col.doc(archivoKey).set({d: viejas, archivadasEl: hoy.toISOString()})
+        .then(()=>{
+          const recientes = noVisitas.filter(v=>!v.fecha || v.fecha >= limiteKey);
+          if(recientes.length < noVisitas.length) {
+            console.log("Limpieza automática: archivadas "+viejas.length+" marcas de visita antiguas en Firebase");
+            setNoVisitas(recientes);
+            syncData({noVisitas: recientes});
+            _descargarArchivoLC(`la-catalina_visitas-archivadas_${limiteKey}.json`, viejas);
+          }
+        })
+        .catch(e=>console.warn("No se pudieron archivar marcas de visita antiguas:", e));
     }
   },[]); // solo al arrancar
 
