@@ -76,6 +76,10 @@ const s = {
   tabBar:{ display:"flex", borderBottom:"0.5px solid var(--color-border-tertiary)", padding:"0 14px", gap:4, background:"var(--color-background-secondary)" },
   tab:(a)=>({ padding:"9px 12px", fontSize:13, cursor:"pointer", border:"none", background:"none", color:a?"var(--color-text-primary)":"var(--color-text-tertiary)", fontWeight:a?500:400, borderBottom:a?"2px solid #5daaff":"2px solid transparent" }),
 };
+// "s" recién se acaba de definir — si el tema guardado tiene relieve
+// (Panel Industrial / Aluminio), la primera llamada en 01-temas.js no pudo
+// mutar card/btn/btnPrimary porque "s" todavía no existía. La repetimos acá.
+try { aplicarTemaLC(getTemaLC()); } catch{}
 
 function calcVenta(detalle, pago, montoPagado, saldoAplicado, productos) {
   const bruto = detalle.reduce((a,d)=>a+d.total,0);

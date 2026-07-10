@@ -14,11 +14,44 @@ const TEMAS_LC = {
   "claro-naranja":  { nombre:"Arena Cálida",    modo:"claro",  emoji:"🌅", vars:{"--color-background-primary":"#fdf6ee","--color-background-secondary":"#ffffff","--color-background-tertiary":"#f7ece0","--color-background-info":"#fef3c7","--color-background-success":"#d1fae5","--color-background-warning":"#fef3c7","--color-background-danger":"#fee2e2","--color-text-primary":"#2d1f0e","--color-text-secondary":"#7a5a3a","--color-text-tertiary":"#a07a5a","--color-text-info":"#b45309","--color-text-success":"#065f46","--color-text-warning":"#92400e","--color-text-danger":"#991b1b","--color-border-tertiary":"rgba(0,0,0,0.07)","--color-border-secondary":"rgba(0,0,0,0.13)","--color-border-primary":"rgba(0,0,0,0.22)","--color-accent":"#c05a10","body-bg":"#f0e4d5"} },
   "claro-violeta":  { nombre:"Lavanda",          modo:"claro",  emoji:"💜", vars:{"--color-background-primary":"#f5f0fc","--color-background-secondary":"#ffffff","--color-background-tertiary":"#ede4f8","--color-background-info":"#ede9fe","--color-background-success":"#d1fae5","--color-background-warning":"#fef3c7","--color-background-danger":"#fee2e2","--color-text-primary":"#1e1040","--color-text-secondary":"#5a4080","--color-text-tertiary":"#8a70b0","--color-text-info":"#5b21b6","--color-text-success":"#065f46","--color-text-warning":"#92400e","--color-text-danger":"#991b1b","--color-border-tertiary":"rgba(0,0,0,0.07)","--color-border-secondary":"rgba(0,0,0,0.13)","--color-border-primary":"rgba(0,0,0,0.22)","--color-accent":"#6d28d9","body-bg":"#e8ddf5"} },
   "claro-gris":     { nombre:"Minimalista",      modo:"claro",  emoji:"⚪", vars:{"--color-background-primary":"#f8f9fa","--color-background-secondary":"#ffffff","--color-background-tertiary":"#eef0f2","--color-background-info":"#e0e7ff","--color-background-success":"#d1fae5","--color-background-warning":"#fef3c7","--color-background-danger":"#fee2e2","--color-text-primary":"#111827","--color-text-secondary":"#4b5563","--color-text-tertiary":"#9ca3af","--color-text-info":"#3730a3","--color-text-success":"#065f46","--color-text-warning":"#92400e","--color-text-danger":"#991b1b","--color-border-tertiary":"rgba(0,0,0,0.07)","--color-border-secondary":"rgba(0,0,0,0.13)","--color-border-primary":"rgba(0,0,0,0.22)","--color-accent":"#374151","body-bg":"#e5e7eb"} },
+  "oscuro-industrial": { nombre:"Panel Industrial", modo:"oscuro", emoji:"⚙️", relieve:true, vars:{"--color-background-primary":"#1c1e21","--color-background-secondary":"#26292d","--color-background-tertiary":"#33373c","--color-background-info":"#2a2f36","--color-background-success":"#0a2e1f","--color-background-warning":"#2e2006","--color-background-danger":"#2e0a0a","--color-text-primary":"#eef0f2","--color-text-secondary":"#9aa0a6","--color-text-tertiary":"#6d737a","--color-text-info":"#ffb066","--color-text-success":"#4dd9a0","--color-text-warning":"#f5b942","--color-text-danger":"#f07070","--color-border-tertiary":"rgba(255,255,255,0.08)","--color-border-secondary":"rgba(255,255,255,0.15)","--color-border-primary":"rgba(255,255,255,0.24)","--color-accent":"#d88c1f","body-bg":"#0e0f11"} },
+  "claro-industrial":  { nombre:"Aluminio",         modo:"claro",  emoji:"⚙️", relieve:true, vars:{"--color-background-primary":"#e9ebee","--color-background-secondary":"#f7f8f9","--color-background-tertiary":"#dfe2e5","--color-background-info":"#eef1f4","--color-background-success":"#d1fae5","--color-background-warning":"#fef3c7","--color-background-danger":"#fee2e2","--color-text-primary":"#24272b","--color-text-secondary":"#565c63","--color-text-tertiary":"#888d93","--color-text-info":"#a3660d","--color-text-success":"#065f46","--color-text-warning":"#92400e","--color-text-danger":"#991b1b","--color-border-tertiary":"rgba(0,0,0,0.08)","--color-border-secondary":"rgba(0,0,0,0.16)","--color-border-primary":"rgba(0,0,0,0.26)","--color-accent":"#a3660d","body-bg":"#d7dade"} },
 };
+
+// ── RELIEVE (Panel Industrial / Aluminio) ─────────────────────────────────
+// Los temas normales solo cambian variables CSS (colores planos). Estos dos
+// además le dan volumen a tarjetas y botones — gradiente + sombra en vez de
+// un color liso. Como card/btn/btnPrimary son objetos JS compartidos (no
+// clases CSS), acá directamente les mutamos las propiedades: todo lo que se
+// arma con {...s.card} en el próximo render agarra la versión con relieve
+// sola, sin tocar ninguna pantalla.
+const RELIEVE_STYLES = {
+  oscuro: {
+    card:{ background:"linear-gradient(180deg,#3d4147 0%,#2b2e32 100%)", border:"1px solid #16181b", borderRadius:10, padding:"10px 14px", margin:"6px 14px", boxShadow:"inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -3px 6px rgba(0,0,0,0.35), 0 3px 0 #16181b, 0 5px 8px rgba(0,0,0,0.4)" },
+    btn:{ border:"1px solid #16181b", borderRadius:8, padding:"6px 12px", fontSize:12, cursor:"pointer", background:"linear-gradient(180deg,#565c63 0%,#3d4147 45%,#33373c 100%)", color:"#eef0f2", boxShadow:"inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -2px 4px rgba(0,0,0,0.35), 0 2px 0 #16181b" },
+    btnPrimary:{ background:"linear-gradient(180deg,#f0ac4a 0%,#d88c1f 45%,#b06f14 100%)", color:"#2b1a02", border:"1px solid #7a4e0d", borderRadius:8, padding:"12px 20px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", boxShadow:"inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -3px 6px rgba(0,0,0,0.3), 0 0 14px rgba(232,161,60,0.4), 0 3px 0 #7a4e0d" },
+  },
+  claro: {
+    card:{ background:"linear-gradient(180deg,#f7f8f9 0%,#dfe2e5 100%)", border:"1px solid #b8bcc1", borderRadius:10, padding:"10px 14px", margin:"6px 14px", boxShadow:"inset 0 1px 0 rgba(255,255,255,0.7), inset 0 -2px 4px rgba(0,0,0,0.08), 0 2px 0 #b8bcc1, 0 3px 6px rgba(0,0,0,0.12)" },
+    btn:{ border:"1px solid #b8bcc1", borderRadius:8, padding:"6px 12px", fontSize:12, cursor:"pointer", background:"linear-gradient(180deg,#fcfcfd 0%,#eef0f2 50%,#dadde1 100%)", color:"#24272b", boxShadow:"inset 0 1px 0 rgba(255,255,255,0.8), inset 0 -2px 3px rgba(0,0,0,0.06), 0 1px 0 #b8bcc1" },
+    btnPrimary:{ background:"linear-gradient(180deg,#f0ac4a 0%,#d88c1f 45%,#b06f14 100%)", color:"#2b1a02", border:"1px solid #7a4e0d", borderRadius:8, padding:"12px 20px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", boxShadow:"inset 0 1px 0 rgba(255,255,255,0.5), 0 0 12px rgba(232,161,60,0.3), 0 3px 0 #7a4e0d" },
+  },
+};
+let FLAT_STYLES_LC = null; // guarda los valores planos originales la primera vez, para poder volver
 function aplicarTemaLC(temaId) {
   const tema = TEMAS_LC[temaId]; if(!tema) return;
   const root = document.documentElement;
   Object.entries(tema.vars).forEach(([k,v])=>{ if(k==="body-bg") document.body.style.background=v; else root.style.setProperty(k,v); });
+  // Relieve: solo pisa card/btn/btnPrimary si "s" (03-utils.js) ya cargó.
+  // La primera llamada (antes de que exista "s") no hace nada acá — por eso
+  // 03-utils.js vuelve a llamar a aplicarTemaLC() apenas define "s".
+  if(typeof s !== "undefined" && s && s.card){
+    if(!FLAT_STYLES_LC) FLAT_STYLES_LC = { card:{...s.card}, btn:{...s.btn}, btnPrimary:{...s.btnPrimary} };
+    const origen = tema.relieve ? RELIEVE_STYLES[tema.modo] : FLAT_STYLES_LC;
+    Object.assign(s.card, origen.card);
+    Object.assign(s.btn, origen.btn);
+    Object.assign(s.btnPrimary, origen.btnPrimary);
+  }
 }
 function getTemaLC() { try { return JSON.parse(localStorage.getItem("lc_tema")||'"oscuro-azul"'); } catch { return "oscuro-azul"; } }
 (()=>{ try { aplicarTemaLC(getTemaLC()); } catch{} })();
