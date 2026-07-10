@@ -51,32 +51,49 @@ function _generarRelieveVarsLC(vars, modo) {
   };
 }
 // ── SOMBRA GLOBAL — el relieve de verdad ──────────────────────────────────
-// Casi toda la app arma sus botones con la etiqueta <button> (los días, los
-// accesos rápidos, Clientes/Stock/Config, etc.) — así que una sola regla de
-// CSS con !important le agrega bisel (sombra), borde y tipografía más
-// pesada a TODOS a la vez, sin tocar ninguna pantalla. Ojo: no toca
-// border-radius ni padding — así no rompe botones chicos/circulares que
-// dependan de su tamaño exacto.
+// Casi toda la app arma sus botones con <button> (los días, los accesos
+// rápidos, Clientes/Stock/Config, etc.) y sus campos con <input>/<select>/
+// <textarea> — así que una sola regla de CSS con !important le agrega
+// bisel, forma, borde y tipografía a TODOS a la vez, sin tocar ninguna
+// pantalla puntual. Los botones quedan elevados (relieve hacia afuera);
+// los campos de carga quedan hundidos (como una ranura, al revés) — así se
+// distingue de un vistazo qué se toca y dónde se escribe.
 function _aplicarSombraGlobalLC(tema) {
   let tag = document.getElementById("relieve-global-lc");
   if(!tag){ tag = document.createElement("style"); tag.id = "relieve-global-lc"; document.head.appendChild(tag); }
   if(!tema.relieve){ tag.textContent = ""; return; }
   const oscuro = tema.modo === "oscuro";
-  const sombra = oscuro
+  const sombraBtn = oscuro
     ? "inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -4px 8px rgba(0,0,0,0.5), 0 4px 0 rgba(0,0,0,0.75), 0 7px 12px rgba(0,0,0,0.55)"
     : "inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -3px 6px rgba(0,0,0,0.14), 0 3px 0 rgba(0,0,0,0.28), 0 5px 10px rgba(0,0,0,0.22)";
+  const sombraInput = oscuro
+    ? "inset 0 2px 5px rgba(0,0,0,0.6), inset 0 1px 0 rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.06)"
+    : "inset 0 2px 4px rgba(0,0,0,0.18), inset 0 1px 0 rgba(0,0,0,0.08), 0 1px 0 rgba(255,255,255,0.8)";
+  const sombraBadge = oscuro
+    ? "0 2px 3px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.25)"
+    : "0 2px 3px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.6)";
   const borde = oscuro ? "rgba(0,0,0,0.75)" : "rgba(0,0,0,0.35)";
+  const bordeInput = oscuro ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.25)";
   const textShadow = oscuro ? "0 1px 1px rgba(0,0,0,0.7)" : "0 1px 0 rgba(255,255,255,0.6)";
   tag.textContent = `
     button:not(.no-relieve){
-      box-shadow:${sombra} !important;
+      box-shadow:${sombraBtn} !important;
       border:1px solid ${borde} !important;
+      border-radius:9px !important;
       font-weight:700 !important;
       letter-spacing:0.02em !important;
       text-shadow:${textShadow} !important;
       transition:box-shadow .12s, transform .05s;
     }
     button:not(.no-relieve):active{ transform:translateY(2px); box-shadow:inset 0 2px 4px rgba(0,0,0,0.5) !important; }
+    input:not(.no-relieve), select:not(.no-relieve), textarea:not(.no-relieve){
+      box-shadow:${sombraInput} !important;
+      border:1px solid ${bordeInput} !important;
+      border-radius:7px !important;
+    }
+    span[style*="border-radius: 50%"], span[style*="border-radius:50%"]{
+      box-shadow:${sombraBadge} !important;
+    }
   `;
 }
 function aplicarTemaLC(temaId) {
