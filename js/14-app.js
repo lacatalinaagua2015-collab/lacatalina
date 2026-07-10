@@ -242,7 +242,7 @@ function App() {
           const enNube = porClaveNV[k];
           if(!enNube){ porClaveNV[k] = v; cambiosLocalesNV++; return; }
           const uL = Number(v._upd)||0, uN = Number(enNube._upd)||0;
-          if(uL >= uN){ porClaveNV[k] = v; cambiosLocalesNV++; }             // empate → gana local (recién hecha)
+          if(uL > uN){ porClaveNV[k] = v; cambiosLocalesNV++; }              // gana el más nuevo (empate = sin cambio real)
         });
         const mergedNV = Object.values(porClaveNV);
         setNoVisitas(mergedNV);
