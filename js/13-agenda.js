@@ -217,8 +217,12 @@ function ConfigAparienciaLC() {
   const [estiloVista, setEstiloVista] = React.useState(()=>TEMAS_LC[getTemaLC()]?.relieve?"metalico":"clasico");
   const [guardado, setGuardado] = React.useState(false);
   const aplicar = (id) => {
-    setTemaActual(id); aplicarTemaLC(id);
+    // Guardar PRIMERO — así la elección queda guardada pase lo que pase
+    // después. Si aplicarTemaLC tira un error al pintar la app, antes se
+    // perdía todo (ni siquiera quedaba guardado el que elegiste).
     localStorage.setItem("lc_tema", JSON.stringify(id));
+    setTemaActual(id);
+    try { aplicarTemaLC(id); } catch(e) { console.warn("Error al aplicar el tema (la elección igual quedó guardada):", e); }
     setGuardado(true); setTimeout(()=>setGuardado(false),2000);
   };
   const temasFiltrados = Object.entries(TEMAS_LC).filter(([,t])=>

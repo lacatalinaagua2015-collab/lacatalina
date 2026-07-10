@@ -743,7 +743,11 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
               ⚙ Opciones avanzadas
             </summary>
             <div style={{marginTop:8}}>
-              <button style={{...s.btnDanger,width:"100%",padding:"10px",fontSize:13}} onClick={()=>{if(window.confirm(`¿Eliminar a ${cliente.nombre}? Se borrarán también sus ventas.`))onEliminarCliente();}}>
+              <button style={{...s.btnDanger,width:"100%",padding:"10px",fontSize:13}} onClick={()=>{
+                const tieneEnv=(Number(cliente.sifon)||0)+(Number(cliente.bidon10)||0)+(Number(cliente.bidon20)||0)>0;
+                const aviso=tieneEnv?"\n\n(Como tiene envases a su nombre, después te va a preguntar aparte si los devolvió — eso no cancela el borrado, es solo para el stock)":"";
+                if(window.confirm(`¿Eliminar a ${cliente.nombre}? Se borrarán también sus ventas.${aviso}`))onEliminarCliente();
+              }}>
                 Eliminar cliente
               </button>
             </div>

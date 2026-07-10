@@ -124,55 +124,18 @@ function App() {
     ()=>!!localStorage.getItem("sr_offline_pending")
   );
   const [cloudSetup, setCloudSetup] = useState(false);
-  const [darkMode, setDarkMode]   = useLS("cat_darkmode", false);
+  const [darkMode, setDarkMode]   = useLS("cat_darkmode", false); // ya no controla el tema — ver 01-temas.js
   const [tabConfig, setTabConfig] = useState("stock");
   const [zonasReparto, setZonasReparto] = useLS("cat_zonas_v1", {});
   const [modalResumenDia, setModalResumenDia] = useState(null); // {dia, fechaKey}
   const [scaleIdx, setScaleIdx]   = useLS("cat_scale_v1", 1); // 0=S 1=M 2=L 3=XL
   const SCALES = [0.82, 1.0, 1.18, 1.36];
   const SCALE_LABELS = ["S","M","L","XL"];
-
-  // Apply dark/light mode toggle over base dark theme
-  React.useEffect(()=>{
-    if(!darkMode){
-      document.body.style.background = "#f0f4f8";
-      document.documentElement.style.setProperty("--color-background-primary","#ffffff");
-      document.documentElement.style.setProperty("--color-background-secondary","#f4f4f5");
-      document.documentElement.style.setProperty("--color-background-tertiary","#e8ecf0");
-      document.documentElement.style.setProperty("--color-text-primary","#18181b");
-      document.documentElement.style.setProperty("--color-text-secondary","#71717a");
-      document.documentElement.style.setProperty("--color-text-tertiary","#a1a1aa");
-      document.documentElement.style.setProperty("--color-text-info","#1d4ed8");
-      document.documentElement.style.setProperty("--color-text-success","#15803d");
-      document.documentElement.style.setProperty("--color-text-warning","#a16207");
-      document.documentElement.style.setProperty("--color-text-danger","#b91c1c");
-      document.documentElement.style.setProperty("--color-background-info","#dbeafe");
-      document.documentElement.style.setProperty("--color-background-success","#dcfce7");
-      document.documentElement.style.setProperty("--color-background-warning","#fef9c3");
-      document.documentElement.style.setProperty("--color-background-danger","#fee2e2");
-      document.documentElement.style.setProperty("--color-border-tertiary","rgba(0,0,0,0.10)");
-      document.documentElement.style.setProperty("--color-border-secondary","rgba(0,0,0,0.18)");
-    } else {
-      document.body.style.background = "#080f17";
-      document.documentElement.style.setProperty("--color-background-primary","#0f1923");
-      document.documentElement.style.setProperty("--color-background-secondary","#1a2b3c");
-      document.documentElement.style.setProperty("--color-background-tertiary","#253647");
-      document.documentElement.style.setProperty("--color-text-primary","#e2eaf4");
-      document.documentElement.style.setProperty("--color-text-secondary","#7a9ab8");
-      document.documentElement.style.setProperty("--color-text-tertiary","#4a6a85");
-      document.documentElement.style.setProperty("--color-text-info","#5daaff");
-      document.documentElement.style.setProperty("--color-text-success","#4dd9a0");
-      document.documentElement.style.setProperty("--color-text-warning","#f5b942");
-      document.documentElement.style.setProperty("--color-text-danger","#f07070");
-      document.documentElement.style.setProperty("--color-background-info","#1e3a5f");
-      document.documentElement.style.setProperty("--color-background-success","#0a2e1f");
-      document.documentElement.style.setProperty("--color-background-warning","#2e1f06");
-      document.documentElement.style.setProperty("--color-background-danger","#2e0a0a");
-      document.documentElement.style.setProperty("--color-border-tertiary","rgba(255,255,255,0.07)");
-      document.documentElement.style.setProperty("--color-border-secondary","rgba(255,255,255,0.13)");
-    }
-  },[darkMode]);
-
+  // NOTA: acá antes había un useEffect que pisaba las variables de color
+  // con valores fijos escritos a mano cada vez que arrancaba la app —
+  // chocaba de frente con el selector de temas de Configuración (que usa
+  // TEMAS_LC en 01-temas.js) y podía "resetear" el tema elegido al recargar.
+  // Se sacó: el color/modo ahora lo maneja SOLO aplicarTemaLC.
   // Al iniciar (y cada vez que volvés a la app), traer datos de la nube
   const { useEffect } = React;
   const ultimoFetchNubeRef = React.useRef(0);
@@ -354,6 +317,7 @@ function App() {
   // de confirmación tarda en desaparecer y se vuelve a tocar Eliminar/Editar.
   const ultimoBorradoRef = React.useRef({id:null, ts:0});
   const ultimoEditadoRef = React.useRef({firma:null, ts:0});
+  const ultimoClienteBorradoRef = React.useRef({id:null, ts:0});
 
   // Ref siempre actualizado — evita datos viejos en el debounce
   const estadoRef = React.useRef({clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios,prospectos,cargasDia});
@@ -821,13 +785,25 @@ function App() {
     );
   };
   const eliminarCliente = (clienteId) => {
+    // Guard anti doble-toque: ignora un segundo borrado del MISMO cliente
+    // dentro de 3s (dos confirmaciones seguidas — la de acá y la de envases
+    // si tiene — pueden hacer que el dedo vuelva a tocar por las dudas).
+    const ahoraDel = Date.now();
+    if(ultimoClienteBorradoRef.current.id===clienteId && (ahoraDel-ultimoClienteBorradoRef.current.ts)<3000){
+      console.warn("⚠️ Borrado de cliente duplicado bloqueado (doble toque):", clienteId);
+      return;
+    }
+    ultimoClienteBorradoRef.current = {id:clienteId, ts:ahoraDel};
     const eliminado = clientes.find(c=>c.id===clienteId);
     if(eliminado){
       const env = {sifon:Number(eliminado.sifon)||0, bidon10:Number(eliminado.bidon10)||0, bidon20:Number(eliminado.bidon20)||0};
       const totalEnv = env.sifon+env.bidon10+env.bidon20;
       if(totalEnv>0){
         const det = [env.sifon&&`${env.sifon} Sifón 1.5L`, env.bidon10&&`${env.bidon10} Bidón 10L`, env.bidon20&&`${env.bidon20} Bidón 20L`].filter(Boolean).join(" · ");
-        const devolvio = window.confirm(`"${eliminado.nombre}" tiene envases en su poder:\n${det}\n\n¿Los devolvió?\n\n• Aceptar = SÍ, los devolvió → se suman al stock (Casa)\n• Cancelar = NO → se dan por perdidos`);
+        // OJO: esto NO pregunta "¿eliminar?" de nuevo — el cliente YA se va
+        // a borrar (eso se confirmó en el cartel anterior). Esta pregunta es
+        // solo para el stock: si los envases vuelven a la Casa o se pierden.
+        const devolvio = window.confirm(`Borrando a "${eliminado.nombre}"...\n\nTenía estos envases:\n${det}\n\n¿Los devolvió?\n\n• Aceptar = SÍ, sumarlos al stock (Casa)\n• Cancelar = NO, se dan por perdidos\n\n(Cualquiera de las dos opciones borra al cliente igual)`);
         if(devolvio){
           setStock(prev=>{
             const s = JSON.parse(JSON.stringify(prev));
@@ -965,7 +941,6 @@ function App() {
 
   if(!pinOk) return <PantallaBloqueoLC onOk={()=>{ setPinOk(true); if(pantalla==="portada") irA("menu"); }} />;
 
-  window._setDarkModeLC = setDarkMode;
   window._setScaleIdxLC = setScaleIdx;
 
   return (

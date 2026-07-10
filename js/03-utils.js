@@ -353,16 +353,29 @@ function buscarCliente(c, q) {
 
 // ════════════════════════════════════════════════════════════════════
 // ◆  HeaderBotones / HeaderApp — encabezado estándar: "Empresa · Pantalla"
-//    + sol/M adentro del recuadro, sin pedir props de tema (usa window._setDarkModeLC/_setScaleIdxLC)
+//    + sol/M adentro del recuadro, conectado al selector de temas real
+//    (antes usaba un interruptor aparte que no tenía nada que ver)
 // ════════════════════════════════════════════════════════════════════
 const SCALE_LABELS_LC = ["S","M","L","XL"];
+function _flipModoTemaLC(id) {
+  if(id.startsWith("oscuro-")) return "claro-"+id.slice(7);
+  if(id.startsWith("claro-")) return "oscuro-"+id.slice(6);
+  return id;
+}
 function HeaderBotones() {
-  const [darkMode,setDarkModeLocal] = React.useState(()=>{ try{return JSON.parse(localStorage.getItem("cat_darkmode")||"false");}catch{return false;} });
+  const [temaId,setTemaIdLocal] = React.useState(getTemaLC);
   const [scaleIdx,setScaleIdxLocal] = React.useState(()=>{ try{return JSON.parse(localStorage.getItem("cat_scale_v1")||"1");}catch{return 1;} });
+  const modoActual = TEMAS_LC[temaId]?.modo || "oscuro";
   return (
     <>
-      <button onClick={()=>{ const nv=!darkMode; setDarkModeLocal(nv); if(window._setDarkModeLC) window._setDarkModeLC(nv); }}
-        style={{padding:"6px 10px",borderRadius:8,border:"none",background:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Cambiar tema">{darkMode?"☀️":"🌙"}</button>
+      <button onClick={()=>{
+          const nuevoId = _flipModoTemaLC(temaId);
+          if(!TEMAS_LC[nuevoId]) return; // no debería pasar, pero por las dudas no rompe nada
+          localStorage.setItem("lc_tema", JSON.stringify(nuevoId)); // guardar primero, siempre
+          setTemaIdLocal(nuevoId);
+          try{ aplicarTemaLC(nuevoId); }catch(e){ console.warn("Error al cambiar de modo:", e); }
+        }}
+        style={{padding:"6px 10px",borderRadius:8,border:"none",background:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Cambiar modo claro/oscuro">{modoActual==="oscuro"?"☀️":"🌙"}</button>
       <button onClick={()=>{ const nv=(scaleIdx+1)%4; setScaleIdxLocal(nv); if(window._setScaleIdxLC) window._setScaleIdxLC(nv); }}
         style={{padding:"6px 10px",borderRadius:8,border:"none",background:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Tamaño de texto">{SCALE_LABELS_LC[scaleIdx]}</button>
     </>
