@@ -214,17 +214,29 @@ function NuevoRecordatorioForm({clientes,onGuardar,onCerrar}) {
 function ConfigAparienciaLC() {
   const [temaActual, setTemaActual] = React.useState(getTemaLC);
   const [modoVista, setModoVista] = React.useState(()=>TEMAS_LC[getTemaLC()]?.modo||"oscuro");
+  const [estiloVista, setEstiloVista] = React.useState(()=>TEMAS_LC[getTemaLC()]?.relieve?"metalico":"clasico");
   const [guardado, setGuardado] = React.useState(false);
   const aplicar = (id) => {
     setTemaActual(id); aplicarTemaLC(id);
     localStorage.setItem("lc_tema", JSON.stringify(id));
     setGuardado(true); setTimeout(()=>setGuardado(false),2000);
   };
-  const temasFiltrados = Object.entries(TEMAS_LC).filter(([,t])=>t.modo===modoVista);
+  const temasFiltrados = Object.entries(TEMAS_LC).filter(([,t])=>
+    t.modo===modoVista && (!!t.relieve === (estiloVista==="metalico"))
+  );
   return (
     <div>
       <div style={{...s.card,marginBottom:12,background:"var(--color-background-secondary)"}}>
         <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-primary)",marginBottom:10}}>🎨 Paleta de colores</div>
+        <div style={{display:"flex",gap:8,marginBottom:8}}>
+          {[["clasico","Clásico"],["metalico","⚙️ Metálico"]].map(([e,l])=>(
+            <button key={e} style={{flex:1,padding:"7px 8px",fontSize:12,fontWeight:500,borderRadius:8,cursor:"pointer",
+              background:estiloVista===e?"var(--color-accent)":"var(--color-background-tertiary)",
+              color:estiloVista===e?"#fff":"var(--color-text-secondary)",
+              border:`1px solid ${estiloVista===e?"transparent":"var(--color-border-secondary)"}`}}
+              onClick={()=>setEstiloVista(e)}>{l}</button>
+          ))}
+        </div>
         <div style={{display:"flex",gap:8,marginBottom:12}}>
           {[["oscuro","🌙 Oscuro"],["claro","☀️ Claro"]].map(([m,l])=>(
             <button key={m} style={{flex:1,padding:"7px 8px",fontSize:12,fontWeight:500,borderRadius:8,cursor:"pointer",
