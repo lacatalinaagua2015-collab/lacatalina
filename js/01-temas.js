@@ -96,52 +96,63 @@ function _aplicarSombraGlobalLC(tema) {
     }
   `;
 }
-// ── FIBRA DE CARBONO — como VALOR de variable CSS ──────────────────────────
+// ── FIBRA DE CARBONO — propiedades separadas, no todo en una variable ─────
 // El contenedor de toda la app pinta con background:"var(--color-background-
 // primary)" — por eso antes la textura no se veía "adentro": estaba puesta
-// en <body>, y el contenedor de la app (que tapa todo el ancho/alto) seguía
-// mostrando su color de siempre por encima. Acá se arma como texto plano
-// listo para ir DENTRO de esa variable, con posición y tamaño por capa
-// (así funciona metido en una sola propiedad "background").
-function _fibraCarbonoValorLC(bg, oscuro) {
+// solo en <body>, y el contenedor (que tapa todo el ancho/alto) mostraba su
+// color de siempre por encima. Ahora se inyecta como regla CSS directa con
+// !important, apuntando a "#root > div" (el contenedor real que arma
+// React) — más confiable que meter todo el patrón adentro de una sola
+// variable CSS.
+function _capasFibraCarbonoLC(bg, oscuro) {
   const hilo   = _ajustarColorLC(bg, oscuro?16:10);
   const cruce  = _ajustarColorLC(bg, oscuro?24:16);
   const sombra = _ajustarColorLC(bg, oscuro?-6:-5);
-  return [
-    `linear-gradient(27deg, ${hilo} 5px, transparent 5px) 0 0/20px 20px`,
-    `linear-gradient(207deg, ${hilo} 5px, transparent 5px) 0 0/20px 20px`,
-    `linear-gradient(27deg, ${hilo} 5px, transparent 5px) 10px 10px/20px 20px`,
-    `linear-gradient(207deg, ${hilo} 5px, transparent 5px) 10px 10px/20px 20px`,
-    `linear-gradient(90deg, ${sombra} 10px, transparent 10px) 0 0/20px 20px`,
-    `linear-gradient(${sombra} 25%, transparent 25%, transparent 75%, ${sombra} 75%, ${sombra}) 0 0/20px 20px`,
-    `linear-gradient(90deg, ${cruce} 10px, transparent 10px) 10px 10px/20px 20px`,
-    `linear-gradient(${cruce} 25%, transparent 25%, transparent 75%, ${cruce} 75%, ${cruce}) 10px 10px/20px 20px`,
-    bg,
-  ].join(", ");
+  return {
+    image: [
+      `linear-gradient(27deg, ${hilo} 5px, transparent 5px)`,
+      `linear-gradient(207deg, ${hilo} 5px, transparent 5px)`,
+      `linear-gradient(27deg, ${hilo} 5px, transparent 5px)`,
+      `linear-gradient(207deg, ${hilo} 5px, transparent 5px)`,
+      `linear-gradient(90deg, ${sombra} 10px, transparent 10px)`,
+      `linear-gradient(${sombra} 25%, transparent 25%, transparent 75%, ${sombra} 75%, ${sombra})`,
+      `linear-gradient(90deg, ${cruce} 10px, transparent 10px)`,
+      `linear-gradient(${cruce} 25%, transparent 25%, transparent 75%, ${cruce} 75%, ${cruce})`,
+    ].join(", "),
+    position: "0 0, 0 0, 10px 10px, 10px 10px, 0 0, 0 0, 10px 10px, 10px 10px",
+  };
 }
 function aplicarTemaLC(temaId) {
   const tema = TEMAS_LC[temaId]; if(!tema) return;
   const root = document.documentElement;
-  // Primero se pisan TODAS las variables con los colores planos de siempre.
-  // background-primary y body-bg se manejan aparte (ver abajo) porque en
-  // metálico no son un color liso, son la textura de fibra de carbono.
-  Object.entries(tema.vars).forEach(([k,v])=>{ if(k!=="body-bg"&&k!=="--color-background-primary") root.style.setProperty(k,v); });
+  Object.entries(tema.vars).forEach(([k,v])=>{ if(k!=="body-bg") root.style.setProperty(k,v); });
+  let tagFibra = document.getElementById("fibra-carbono-lc");
+  if(!tagFibra){ tagFibra = document.createElement("style"); tagFibra.id = "fibra-carbono-lc"; document.head.appendChild(tagFibra); }
   if(tema.relieve){
     const rel = _generarRelieveVarsLC(tema.vars, tema.modo);
     Object.entries(rel).forEach(([k,v])=>root.style.setProperty(k,v));
     const oscuro = tema.modo==="oscuro";
-    // El contenedor de la app pinta con background:"var(--color-background-primary)"
-    // — esta es la variable que hay que meterle la textura para que se vea
-    // ADENTRO de la app, no solo en los márgenes de afuera.
-    root.style.setProperty("--color-background-primary", _fibraCarbonoValorLC(tema.vars["--color-background-primary"], oscuro));
-    // El body (los márgenes a los costados en pantallas anchas, como PC)
-    // recibe la misma textura, calculada con el body-bg como base.
-    const fibraBody = _fibraCarbonoValorLC(tema.vars["body-bg"], oscuro);
-    document.body.style.background = fibraBody;
+    const capasApp  = _capasFibraCarbonoLC(tema.vars["--color-background-primary"], oscuro);
+    const capasBody = _capasFibraCarbonoLC(tema.vars["body-bg"], oscuro);
+    tagFibra.textContent = `
+      #root > div{
+        background-color:${tema.vars["--color-background-primary"]} !important;
+        background-image:${capasApp.image} !important;
+        background-size:20px 20px !important;
+        background-position:${capasApp.position} !important;
+      }
+    `;
+    document.body.style.backgroundColor = tema.vars["body-bg"];
+    document.body.style.backgroundImage = capasBody.image;
+    document.body.style.backgroundSize = "20px 20px";
+    document.body.style.backgroundPosition = capasBody.position;
   } else {
-    // Clásico: fondo liso de siempre, sin ninguna textura.
-    root.style.setProperty("--color-background-primary", tema.vars["--color-background-primary"]);
-    document.body.style.background = tema.vars["body-bg"];
+    // Clásico: sin textura, todo vuelve a ser liso.
+    tagFibra.textContent = "";
+    document.body.style.backgroundImage = "none";
+    document.body.style.backgroundColor = tema.vars["body-bg"];
+    document.body.style.backgroundSize = "";
+    document.body.style.backgroundPosition = "";
   }
   _aplicarSombraGlobalLC(tema);
 }
