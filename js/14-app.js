@@ -368,8 +368,13 @@ function App() {
     const hoy = new Date();
     const limite = new Date(hoy.getFullYear(), hoy.getMonth()-3, hoy.getDate());
     const limiteKey = limite.toLocaleDateString("en-CA");
+    // Si ya archivamos hasta esta fecha (o más allá) antes, no repetir — esto
+    // es lo que evitaba que la descarga se disparara de nuevo en cada apertura
+    // cuando la nube no llegaba a guardar la versión "limpia" a tiempo.
+    const yaHasta = localStorage.getItem("lc_archivado_ventas_hasta") || "";
+    if(yaHasta >= limiteKey) return;
     const viejas = ventas.filter(v=>v.fechaKey && v.fechaKey < limiteKey);
-    if(!viejas.length) return;
+    if(!viejas.length) { localStorage.setItem("lc_archivado_ventas_hasta", limiteKey); return; }
     // Archivar las viejas en Firebase antes de borrarlas localmente
     if(window.db) {
       const col = window.db.collection("lc2");
@@ -384,6 +389,7 @@ function App() {
             syncData({ventas: ventasRecientes});
             _descargarArchivoLC(`la-catalina_ventas-archivadas_${limiteKey}.json`, viejas);
           }
+          localStorage.setItem("lc_archivado_ventas_hasta", limiteKey);
         })
         .catch(e=>console.warn("No se pudieron archivar ventas antiguas:", e));
     }
@@ -399,8 +405,10 @@ function App() {
     const hoy = new Date();
     const limite = new Date(hoy.getFullYear(), hoy.getMonth()-3, hoy.getDate());
     const limiteKey = limite.toLocaleDateString("en-CA");
+    const yaHasta = localStorage.getItem("lc_archivado_novisitas_hasta") || "";
+    if(yaHasta >= limiteKey) return;
     const viejas = noVisitas.filter(v=>v.fecha && v.fecha < limiteKey);
-    if(!viejas.length) return;
+    if(!viejas.length) { localStorage.setItem("lc_archivado_novisitas_hasta", limiteKey); return; }
     if(window.db) {
       const col = window.db.collection("lc2");
       const archivoKey = "archivo_novisitas_"+limiteKey;
@@ -413,6 +421,7 @@ function App() {
             syncData({noVisitas: recientes});
             _descargarArchivoLC(`la-catalina_visitas-archivadas_${limiteKey}.json`, viejas);
           }
+          localStorage.setItem("lc_archivado_novisitas_hasta", limiteKey);
         })
         .catch(e=>console.warn("No se pudieron archivar marcas de visita antiguas:", e));
     }
