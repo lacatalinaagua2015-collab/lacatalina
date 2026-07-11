@@ -479,11 +479,6 @@ function App() {
   React.useEffect(()=>{
     if(!("Notification" in window) || !("serviceWorker" in navigator)) return;
 
-    function _vapidToUint8(base64String) {
-      const p = (base64String + '===').slice(0, base64String.length + (4 - base64String.length % 4) % 4);
-      const raw = window.atob(p.replace(/-/g, '+').replace(/_/g, '/'));
-      return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
-    }
     function conLimite(promesa, ms, paso) {
       return Promise.race([
         promesa,
@@ -491,7 +486,7 @@ function App() {
       ]);
     }
 
-    const VAPID_PUBLIC = 'BM_NKKlieI7BqahT-39TblUaxWGBaVQX7YRfWV_XUVy0Rb8lINBxEm2LXfDJe2348_ofSdYw62Us83koGJPXEGQ';
+    const VAPID_PUBLIC = 'BHLfex7GDQ-rMtrSuhoXjiPtul-_WvfvnMV_AvGhlbjc5DxvV3NDt6kn2Uugnx98CSgTIiP-tJ0aJlJ8gYsiUBk';
 
     function getDeviceId() {
       let id = localStorage.getItem('lc_device_id');
@@ -503,22 +498,17 @@ function App() {
     }
 
     async function suscribirPush() {
-      if (!('PushManager' in window)) { localStorage.setItem('lc_push_estado', JSON.stringify({ok:false,msg:'Este navegador no soporta notificaciones push (PushManager).',ts:Date.now()})); return; }
+      if (!window.messagingLC) { localStorage.setItem('lc_push_estado', JSON.stringify({ok:false,msg:'Cloud Messaging no está disponible en este navegador.',ts:Date.now()})); return; }
       try {
         const sw = await conLimite(navigator.serviceWorker.ready, 8000, 'esperando el service worker');
-        const subVieja = await conLimite(sw.pushManager.getSubscription(), 8000, 'consultando suscripción existente');
-        if (subVieja) { try { await subVieja.unsubscribe(); } catch(e) {} }
-        const nuevaSub = await conLimite(sw.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: _vapidToUint8(VAPID_PUBLIC),
-        }), 8000, 'pidiendo la suscripción al navegador');
+        const token = await conLimite(window.messagingLC.getToken({ vapidKey: VAPID_PUBLIC, serviceWorkerRegistration: sw }), 8000, 'pidiendo el token a Firebase');
         if (window.db) {
           const deviceId = getDeviceId();
-          // Guarda bajo la clave de ESTE dispositivo — no pisa la suscripción de otros celus/PC.
+          // Guarda bajo la clave de ESTE dispositivo — no pisa el token de otros celus/PC.
           await conLimite(window.db.collection('lc2').doc('push_subs').set({
-            [deviceId]: { sub: JSON.stringify(nuevaSub.toJSON()), ts: Date.now() }
+            [deviceId]: { token, ts: Date.now() }
           }, { merge: true }), 8000, 'guardando en la nube (Firestore)');
-          localStorage.setItem('lc_push_estado', JSON.stringify({ok:true,msg:'Suscripción guardada. Esto confirma que el navegador quedó registrado — no confirma que un aviso vaya a llegar (eso depende del servidor).',ts:Date.now()}));
+          localStorage.setItem('lc_push_estado', JSON.stringify({ok:true,msg:'Token guardado. Esto confirma que el navegador quedó registrado — no confirma que un aviso vaya a llegar (eso depende del servidor).',ts:Date.now()}));
         } else {
           localStorage.setItem('lc_push_estado', JSON.stringify({ok:false,msg:'No se encontró conexión a la base de datos (window.db)',ts:Date.now()}));
         }

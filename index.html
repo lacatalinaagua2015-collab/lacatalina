@@ -24,6 +24,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
   
   <script>
     var firebaseConfig = {
@@ -43,6 +44,11 @@
       window._authReady = firebase.auth().signInAnonymously()
         .then(function(cred){ return cred.user; })
         .catch(function(e){ console.warn("Auth anónima:", e); return null; });
+
+      // Cloud Messaging — para las notificaciones push (14-app.js pide el
+      // token acá adentro con messagingLC.getToken(...))
+      try { if(firebase.messaging.isSupported()) window.messagingLC = firebase.messaging(); }
+      catch(e) { console.warn("Cloud Messaging no disponible en este navegador:", e); }
 
       // Firebase secundario: Emma Control (para enviar datos de integración)
       var ecConfig = {
@@ -266,19 +272,19 @@
 
 <div id="root"></div>
 
-<script type="text/babel" src="js/01-temas.js?v=20260708"></script>
-<script type="text/babel" src="js/02-constantes.js?v=20260708"></script>
-<script type="text/babel" src="js/03-utils.js?v=20260708"></script>
-<script type="text/babel" src="js/04-portada.js?v=20260708"></script>
-<script type="text/babel" src="js/05-stock.js?v=20260708"></script>
-<script type="text/babel" src="js/06-menu.js?v=20260708"></script>
-<script type="text/babel" src="js/07-clientes.js?v=20260708"></script>
-<script type="text/babel" src="js/08-ventas.js?v=20260708"></script>
-<script type="text/babel" src="js/09-promocion.js?v=20260708"></script>
-<script type="text/babel" src="js/10-gestion.js?v=20260708"></script>
-<script type="text/babel" src="js/11-resumen.js?v=20260708"></script>
-<script type="text/babel" src="js/12-config.js?v=20260708"></script>
-<script type="text/babel" src="js/13-agenda.js?v=20260708"></script>
-<script type="text/babel" src="js/14-app.js?v=20260708"></script>
+<script type="text/babel" src="js/01-temas.js"></script>
+<script type="text/babel" src="js/02-constantes.js"></script>
+<script type="text/babel" src="js/03-utils.js"></script>
+<script type="text/babel" src="js/04-portada.js"></script>
+<script type="text/babel" src="js/05-stock.js"></script>
+<script type="text/babel" src="js/06-menu.js"></script>
+<script type="text/babel" src="js/07-clientes.js"></script>
+<script type="text/babel" src="js/08-ventas.js"></script>
+<script type="text/babel" src="js/09-promocion.js"></script>
+<script type="text/babel" src="js/10-gestion.js"></script>
+<script type="text/babel" src="js/11-resumen.js"></script>
+<script type="text/babel" src="js/12-config.js"></script>
+<script type="text/babel" src="js/13-agenda.js"></script>
+<script type="text/babel" src="js/14-app.js"></script>
 </body>
 </html>
