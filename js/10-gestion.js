@@ -2,7 +2,7 @@
 // ◆  10-gestion.js — GestionClientes, FormCliente
 // ════════════════════════════════════════════════════════════════════
 
-function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReordenarTodo,onRegistrarVenta,onVerDetalle,ventas,productos,onGuardarCambio,onIrTab}) {
+function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReordenarTodo,onRegistrarVenta,onVerDetalle,ventas,productos,onGuardarCambio,onIrTab,onPerdida}) {
   const [fotoClienteId,setFotoClienteId] = React.useState(null);
   const fotoCliente = fotoClienteId ? clientes.find(c=>c.id===fotoClienteId) : null;
   const [busqueda,setBusqueda]   = useState("");
@@ -188,7 +188,7 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
                   <span style={{fontSize:18,cursor:"pointer",lineHeight:1}} onClick={e=>{e.stopPropagation();setFotoClienteId(fotoClienteId===c.id?null:c.id);}}>📷</span>
                 </div>
               </div>
-              <PieEnvases c={c} ventas={ventas} onEditar={onEditar}
+              <PieEnvases c={c} ventas={ventas} onEditar={onEditar} onPerdida={onPerdida}
                 izquierda={<button style={{width:28,height:28,borderRadius:8,cursor:"pointer",background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"1px solid var(--color-border-danger)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}} onClick={e=>{e.stopPropagation();onEliminar(c.id);}} title="Eliminar cliente">🗑️</button>}>
                 {onRegistrarVenta&&<button style={{fontSize:11,fontWeight:600,padding:"5px 12px",borderRadius:20,cursor:"pointer",background:"#185FA5",color:"#e2eaf4",border:"none"}} onClick={e=>{e.stopPropagation();onRegistrarVenta(c);}}>💰 Venta</button>}
                 <button style={{fontSize:11,fontWeight:600,padding:"5px 12px",borderRadius:20,cursor:"pointer",background:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",border:"0.5px solid var(--color-border-secondary)"}} onClick={e=>{e.stopPropagation();setCambioId(cambioId===c.id?null:c.id);}}>🔄 Cambio</button>

@@ -92,14 +92,10 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
   const confirmarPerdida=()=>{
     const cant=Math.round(Number(formPerdida.cantidad)||0);
     if(cant<=0) return;
-    // Descontar de la ubicación real donde se rompió/perdió — si era de un
-    // cliente no se toca stock acá (ya se descuenta al editar/eliminar el cliente).
-    if(formPerdida.ubicacion!=="clientes"){
-      const ns=JSON.parse(JSON.stringify(stock));
-      if(!ns[formPerdida.ubicacion]) ns[formPerdida.ubicacion]={sifon:0,bidon10:0,bidon20:0,dispenser:0};
-      ns[formPerdida.ubicacion][formPerdida.producto]=Math.max(0,(ns[formPerdida.ubicacion][formPerdida.producto]||0)-cant);
-      setStock(ns);
-    }
+    const ns=JSON.parse(JSON.stringify(stock));
+    if(!ns[formPerdida.ubicacion]) ns[formPerdida.ubicacion]={sifon:0,bidon10:0,bidon20:0,dispenser:0};
+    ns[formPerdida.ubicacion][formPerdida.producto]=Math.max(0,(ns[formPerdida.ubicacion][formPerdida.producto]||0)-cant);
+    setStock(ns);
     registrarPerdida&&registrarPerdida({[formPerdida.producto]:cant}, formPerdida.motivo, null);
     setFormPerdida({producto:"sifon",cantidad:"",ubicacion:"soderia",motivo:"Roto en el reparto"});
   };
@@ -315,8 +311,8 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
                 <option value="soderia">Sodería (llenos)</option>
                 <option value="soderia_vacios">Sodería (vacíos)</option>
                 <option value="casa">Depósito</option>
-                <option value="clientes">De un cliente (no descuenta stock acá)</option>
               </select>
+              <div style={{fontSize:10,color:"var(--color-text-tertiary)",marginTop:3}}>¿Un cliente perdió un envase? Se registra solo al eliminarlo (te pregunta ahí si lo devolvió) — así queda ligado a ese cliente puntual.</div>
             </div>
             <div style={{marginBottom:8}}>
               <label style={{fontSize:11,color:"var(--color-text-tertiary)",display:"block",marginBottom:3}}>Motivo</label>

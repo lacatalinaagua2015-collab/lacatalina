@@ -157,10 +157,21 @@ function extraerCoordsDeURL(url) {
 //    Uso: <PieEnvases c={c} ventas={ventas} onEditar={(id,cambios)=>...}
 //           izquierda={<botón opcional/>}> {botones derecha opcionales} </PieEnvases>
 // ════════════════════════════════════════════════════════════════════
-function PieEnvases({c, ventas, onEditar, izquierda, children}) {
+function PieEnvases({c, ventas, onEditar, onPerdida, izquierda, children}) {
   const KEYS=["sifon","bidon10","bidon20","dispenser"];
   const KP={"Sifón 1.5L":"sifon","Bidón 10L":"bidon10","Bidón 20L":"bidon20","Dispenser":"dispenser"};
   const [draft,setDraft]=React.useState(null); // null = panel cerrado
+  const [mostrarPerdida,setMostrarPerdida]=React.useState(false);
+  const [prodPerdida,setProdPerdida]=React.useState("sifon");
+  const [cantPerdida,setCantPerdida]=React.useState("");
+  const confirmarPerdidaCliente=()=>{
+    const cant=Math.round(Number(cantPerdida)||0);
+    if(cant<=0) return;
+    const nuevoValor=Math.max(0,(Number(c[prodPerdida])||0)-cant);
+    onEditar(c.id,{[prodPerdida]:nuevoValor});
+    onPerdida&&onPerdida({[prodPerdida]:cant}, "Roto/perdido en lo del cliente", c.nombre);
+    setMostrarPerdida(false); setCantPerdida("");
+  };
   const calcExtra=()=>{
     const ex={sifon:0,bidon10:0,bidon20:0,dispenser:0};
     (ventas||[]).filter(v=>v.clienteId===c.id).forEach(v=>{
@@ -211,6 +222,28 @@ function PieEnvases({c, ventas, onEditar, izquierda, children}) {
             </div>
           ))}
           <div style={{fontSize:10,color:"var(--color-text-tertiary)",margin:"2px 0 6px"}}>Prestados = total extra que tiene hoy · 0 = devolvió todo</div>
+          {!mostrarPerdida ? (
+            <button style={{width:"100%",background:"none",border:"none",color:"var(--color-text-danger)",fontSize:11,fontWeight:500,cursor:"pointer",padding:"4px 0",textAlign:"left",marginBottom:6}}
+              onClick={e=>{e.stopPropagation();setMostrarPerdida(true);}}>💔 Se le rompió/perdió un envase</button>
+          ) : (
+            <div style={{background:"var(--color-background-secondary)",borderRadius:7,padding:8,marginBottom:8}} onClick={e=>e.stopPropagation()}>
+              <div style={{fontSize:11,color:"var(--color-text-danger)",fontWeight:500,marginBottom:6}}>💔 Registrar roto/perdido de {c.nombre}</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 60px",gap:6,marginBottom:6}}>
+                <select value={prodPerdida} onChange={e=>setProdPerdida(e.target.value)} style={{...s.inputNum,padding:"6px 4px",fontSize:12,textAlign:"left"}}>
+                  <option value="sifon">Sifón 1.5L</option>
+                  <option value="bidon10">Bidón 10L</option>
+                  <option value="bidon20">Bidón 20L</option>
+                  <option value="dispenser">Dispenser</option>
+                </select>
+                <input type="number" min={1} placeholder="Cant." value={cantPerdida} onChange={e=>setCantPerdida(e.target.value)} style={{...s.inputNum,padding:"6px 4px",fontSize:12,textAlign:"center"}} />
+              </div>
+              <div style={{display:"flex",gap:6}}>
+                <button style={{...s.btn,flex:1,fontSize:11,padding:"6px"}} onClick={()=>{setMostrarPerdida(false);setCantPerdida("");}}>Cancelar</button>
+                <button style={{flex:2,background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"1px solid var(--color-border-danger)",borderRadius:7,padding:"7px",fontSize:12,fontWeight:600,cursor:"pointer"}} onClick={confirmarPerdidaCliente}>Confirmar pérdida</button>
+              </div>
+              <div style={{fontSize:10,color:"var(--color-text-tertiary)",marginTop:5}}>Se descuenta directo de lo que este cliente tiene asignado, y queda anotado en Stock → Pérdidas.</div>
+            </div>
+          )}
           <div style={{display:"flex",gap:6}}>
             <button style={{...s.btn,flex:1,fontSize:12}} onClick={e=>{e.stopPropagation();setDraft(null);}}>Cancelar</button>
             <button style={{flex:2,background:"#1d9e75",color:"#fff",border:"none",borderRadius:8,padding:"9px",fontSize:13,fontWeight:600,cursor:"pointer"}}

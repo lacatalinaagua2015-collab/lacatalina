@@ -1016,7 +1016,7 @@ function App() {
     <div style={{...s.app, zoom: SCALES[scaleIdx]}}>
       <SyncBar status={syncStatus} isOnline={isOnline} />
       {pantalla==="portada"        && <Portada onIngresar={()=>irA("menu")} />}
-      {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={(tab)=>{setTabConfig(tab||"stock");irA("config");}} onGestionClientes={()=>irA("gestionClientes")} onPromocion={()=>irA("promocion")} onStock={()=>irA("stock")} onAgenda={()=>irA("agenda")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} scaleIdx={scaleIdx} onToggleScale={()=>setScaleIdx(i=>(i+1)%4)} scaleLabel={SCALE_LABELS[scaleIdx]} clientes={clientes} ventas={ventas} stock={stockNorm}
+      {pantalla==="menu"           && <MenuDias dias={DIAS} onDia={d=>{setDiaActual(d);irA("diaPrincipal");}} onResumen={()=>irA("resumen")} onConfig={(tab)=>{setTabConfig(tab||"stock");irA("config");}} onGestionClientes={()=>irA("gestionClientes")} onStock={()=>irA("stock")} onAgenda={()=>irA("agenda")} onVolver={()=>irA("portada")} darkMode={darkMode} onToggleDark={()=>setDarkMode(!darkMode)} scaleIdx={scaleIdx} onToggleScale={()=>setScaleIdx(i=>(i+1)%4)} scaleLabel={SCALE_LABELS[scaleIdx]} clientes={clientes} ventas={ventas} stock={stockNorm}
           recordatoriosActivos={recordatoriosActivos}
           onConfirmarRecordatorio={(id)=>saveRecordatorios(prev=>(prev||[]).map(r=>r.id===id?{...r,confirmado:true,_upd:Date.now()}:r))}
           onVerConfirmaciones={(dia)=>{if(dia)setDiaActual(dia);irA("confirmacionesDia");}}
@@ -1078,7 +1078,7 @@ function App() {
           }
           irA("clientes");
         }} onVolver={()=>irA("selectorFechaClientes")} />}
-      {pantalla==="clientes"       && <ListaClientes clientes={clientes.filter(c=>c.dia===diaActual)} dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual)} todasVentas={ventas} noVisitas={(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual)} onEditarCliente={(id,cambios)=>{saveClientes(prev=>prev.map(c=>c.id===id?{...c,...cambios}:c));}} onSeleccionar={c=>{setClienteId(c.id);irA("detalleCliente");}} onEntregar={c=>{setClienteId(c.id);irA("venta");}} onNuevoCliente={()=>irA("nuevoCliente")} onVolver={()=>irA("selectorFechaClientes")} onReordenar={lista=>{
+      {pantalla==="clientes"       && <ListaClientes clientes={clientes.filter(c=>c.dia===diaActual)} dia={diaActual} fecha={fechaActual} ventas={ventas.filter(v=>v.fechaKey===fechaActual&&v.dia===diaActual)} todasVentas={ventas} noVisitas={(noVisitas||[]).filter(v=>v.dia===diaActual&&v.fecha===fechaActual)} onPerdida={registrarPerdida} onEditarCliente={(id,cambios)=>{saveClientes(prev=>prev.map(c=>c.id===id?{...c,...cambios}:c));}} onSeleccionar={c=>{setClienteId(c.id);irA("detalleCliente");}} onEntregar={c=>{setClienteId(c.id);irA("venta");}} onNuevoCliente={()=>irA("nuevoCliente")} onVolver={()=>irA("selectorFechaClientes")} onReordenar={lista=>{
           saveClientes(prev => [...prev.filter(c=>c.dia!==diaActual), ...lista]);
         }} onRegistrarNoVisita={(clienteId,motivo)=>{saveNoVisitas(prev=>[...(prev||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId,dia:diaActual,fecha:fechaActual,motivo,_upd:Date.now()}]);}} onQuitarNoVisita={(clienteId)=>{saveNoVisitas(prev=>(prev||[]).filter(v=>!(v.clienteId===clienteId&&v.dia===diaActual&&v.fecha===fechaActual)));}}
         onConfirmarTransfer={(clienteId,ventaId)=>{
@@ -1100,7 +1100,7 @@ function App() {
         onAbrirMapa={()=>irA("mapaClientes")}
         onPlanilla={()=>irA("planilla")}
         />}
-      {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onVenta={()=>{const hoyKey=new Date().toLocaleDateString("en-CA");if(fechaActual!==hoyKey)setFechaActual(hoyKey);irA("venta");}} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
+      {pantalla==="detalleCliente" && cliente && <DetalleCliente cliente={cliente} ventas={ventas.filter(v=>v.clienteId===cliente.id)} noVisitas={(noVisitas||[]).filter(v=>v.clienteId===cliente.id)} dia={diaActual} fecha={fechaActual} productos={productos} onPerdida={registrarPerdida} onVenta={()=>{const hoyKey=new Date().toLocaleDateString("en-CA");if(fechaActual!==hoyKey)setFechaActual(hoyKey);irA("venta");}} onVolver={()=>irA("clientes")} onEditar={cambios=>updateCliente(cliente.id,cambios)} onEliminarVenta={eliminarVenta} onEditarVenta={editarVenta} onEliminarCliente={()=>eliminarCliente(cliente.id)}
           onNoEstaCliente={()=>{
             const nv=[...(noVisitas||[]).filter(v=>!(v.clienteId===cliente.id&&v.dia===diaActual&&v.fecha===fechaActual)),{clienteId:cliente.id,dia:diaActual,fecha:fechaActual,motivo:"noesta",_upd:Date.now()}];
             saveNoVisitas(nv);
@@ -1251,13 +1251,7 @@ function App() {
           onNoEstaCliente={()=>irA("clientes")} onNoQuiereCliente={()=>irA("clientes")}
         />;
       })()}
-      {pantalla==="promocion"       && <React.Fragment><ClientesTabs activo="prospectos" onIr={irA}/><Promocion prospectos={prospectos} clientes={clientes} onSave={saveProspectos} onConvertir={(p)=>{
-        const nuevo={...p,id:Date.now(),saldo:0,sifon:0,bidon10:1,bidon20:0};
-        saveClientes(prev=>[...prev,nuevo]);
-        saveProspectos(prev=>(prev||[]).map(x=>x.id===p.id?{...x,estado:"convertido"}:x));
-        irA("promocion");
-      }} onVolver={()=>irA("menu")} /></React.Fragment>}
-      {pantalla==="gestionClientes" && <GestionClientes onIrTab={irA} clientes={clientes} onReordenarTodo={(lista)=>saveClientes(lista)} onEditar={(id,cambios)=>{saveClientes(prev=>prev.map(c=>c.id===id?{...c,...cambios}:c));}} onEliminar={(id)=>{
+      {pantalla==="gestionClientes" && <GestionClientes onIrTab={irA} clientes={clientes} onPerdida={registrarPerdida} onReordenarTodo={(lista)=>saveClientes(lista)} onEditar={(id,cambios)=>{saveClientes(prev=>prev.map(c=>c.id===id?{...c,...cambios}:c));}} onEliminar={(id)=>{
         if(window.confirm("¿Eliminar cliente? Se quitará de todas las listas (clientes, ventas, prospectos, no-visitas y recordatorios).")){
           eliminarCliente(id);
           irA("gestionClientes");
@@ -1315,7 +1309,7 @@ function App() {
       />}
       {pantalla==="stock"          && <StockGeneral stock={stockNorm} setStock={(ns)=>{setStock(ns);syncData({stock:ns});}} clientes={clientes} setClientes={saveClientes} ventas={ventas} productos={productos} setProductos={saveProductos} cargasDia={cargasDia} setCargasDia={saveCargasDia} planillas={planillas} perdidas={perdidas} registrarPerdida={registrarPerdida} onVolver={()=>irA("menu")} onResumen={()=>irA("resumen")} />}
       {pantalla==="resumen"        && <Resumen ventas={ventas} clientes={clientes} productos={productos} planillas={planillas} noVisitas={noVisitas||[]} onVolver={()=>irA("menu")} />}
-      {pantalla==="fiadosPendientes" && <React.Fragment><ClientesTabs activo="fiados" onIr={irA}/><FiadosPendientes clientes={clientes} onCobrar={(clienteId,monto,pago)=>{
+      {pantalla==="fiadosPendientes" && <React.Fragment><ClientesTabs activo="fiados" onIr={irA}/><FiadosPendientes clientes={clientes} onPerdida={registrarPerdida} onCobrar={(clienteId,monto,pago)=>{
         const cl=clientes.find(c=>c.id===clienteId);
         if(!cl) return;
         // saldoAntes/saldoDespues son solo para mostrar en el historial (referencia visual);
@@ -1326,7 +1320,7 @@ function App() {
         saveVentas(prev=>[...prev,vt]);
         saveClientes(prev=>prev.map(c=>c.id===clienteId?{...c,saldo:(Number(c.saldo)||0)+monto}:c));
       }} onVolver={()=>irA("menu")} ventas={ventas} onEditarCliente={(id,cambios)=>{saveClientes(prev=>prev.map(c=>c.id===id?{...c,...cambios}:c));}} /></React.Fragment>}
-      {pantalla==="clientesDormidos" && <React.Fragment><ClientesTabs activo="dormidos" onIr={irA}/><ClientesDormidos clientes={clientes} ventas={ventas} onVolver={()=>irA("menu")} onSeleccionar={c=>{setClienteId(c.id);setDiaActual(c.dia);irA("detalleCliente");}} onEditarCliente={(id,cambios)=>{saveClientes(prev=>prev.map(c=>c.id===id?{...c,...cambios}:c));}} /></React.Fragment>}
+      {pantalla==="clientesDormidos" && <React.Fragment><ClientesTabs activo="dormidos" onIr={irA}/><ClientesDormidos clientes={clientes} ventas={ventas} onPerdida={registrarPerdida} onVolver={()=>irA("menu")} onSeleccionar={c=>{setClienteId(c.id);setDiaActual(c.dia);irA("detalleCliente");}} onEditarCliente={(id,cambios)=>{saveClientes(prev=>prev.map(c=>c.id===id?{...c,...cambios}:c));}} /></React.Fragment>}
       {/* Modal resumen del día al completarse */}
       {modalResumenDia&&(()=>{
         const {dia,fechaKey}=modalResumenDia;

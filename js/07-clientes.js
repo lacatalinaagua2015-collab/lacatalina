@@ -2,7 +2,7 @@
 // ◆  07-clientes.js — ListaClientes, DetalleCliente (formulario: FormCliente unificado en 03-utils)
 // ════════════════════════════════════════════════════════════════════
 
-function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onEntregar,onNuevoCliente,onVolver,onReordenar,onEditarCliente,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onNoQuiereProspecto,onConfirmarTransfer,onVerProspecto,onEliminarProspecto,onAbrirMapa,onPlanilla}) {
+function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospectos,recordatorios,onSeleccionar,onEntregar,onNuevoCliente,onVolver,onReordenar,onEditarCliente,onRegistrarNoVisita,onQuitarNoVisita,onVentaProspecto,onNoEstaProspecto,onNoQuiereProspecto,onConfirmarTransfer,onVerProspecto,onEliminarProspecto,onAbrirMapa,onPlanilla,onPerdida}) {
   const [busqueda,setBusqueda] = useState("");
   const [clienteMoviendo,setClienteMoviendo] = useState(null); // id del cliente "levantado", esperando destino
   // ventas y noVisitas ya filtradas por fecha+dia desde App
@@ -198,7 +198,7 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
             <button style={{...s.btn,fontSize:12,padding:"4px 10px"}} onClick={()=>onQuitarNoVisita(c.id)}>Desmarcar</button>
           </div>
         )}
-        {onEditarCliente&&<PieEnvases c={c} ventas={todasVentas||ventas} onEditar={onEditarCliente} />}
+        {onEditarCliente&&<PieEnvases c={c} ventas={todasVentas||ventas} onEditar={onEditarCliente} onPerdida={onPerdida} />}
       </div>
       {fotoOpen&&(
         <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.92)",zIndex:2000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20}} onClick={e=>{e.stopPropagation();setFotoOpen(false);}}>
@@ -270,7 +270,7 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
   );
 }
 
-function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,onVolver,onEditar,onEliminarVenta,onEditarVenta,onEliminarCliente,onNoEstaCliente,onNoQuiereCliente,recordatorios,onGuardarRecordatorio,onConfirmarRecordatorio,onCobrarSaldo,onGuardarAjuste,onGuardarCambio}) {
+function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,onVolver,onEditar,onEliminarVenta,onEditarVenta,onEliminarCliente,onNoEstaCliente,onNoQuiereCliente,recordatorios,onGuardarRecordatorio,onConfirmarRecordatorio,onCobrarSaldo,onGuardarAjuste,onGuardarCambio,onPerdida}) {
   const [editandoCliente,setEditandoCliente] = useState(false);
   const [editandoVentaId,setEditandoVentaId] = useState(null);
   const [editandoSaldo,setEditandoSaldo] = useState(false);
@@ -684,7 +684,7 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
             <div style={{marginTop:4}}>
               {/* Editor unificado: el mismo ♻️ Envases de todas las listas */}
               <div style={{...s.card,margin:"0 0 10px",paddingTop:2}}>
-                <PieEnvases c={cliente} ventas={ventas} onEditar={(id,cambios)=>onEditar(cambios)}
+                <PieEnvases c={cliente} ventas={ventas} onEditar={(id,cambios)=>onEditar(cambios)} onPerdida={onPerdida}
                   izquierda={<span style={{fontSize:12,color:"var(--color-text-secondary)"}}>Ajustar fijos y prestados</span>} />
               </div>
               {(()=>{
@@ -767,7 +767,7 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
   );
 }
 
-function FiadosPendientes({clientes,ventas,onCobrar,onVolver,onEditarCliente}) {
+function FiadosPendientes({clientes,ventas,onCobrar,onVolver,onEditarCliente,onPerdida}) {
   const [pagando,setPagando]=React.useState(null); // clienteId
   const [monto,setMonto]=React.useState('');
   const [pago,setPago]=React.useState('contado');
@@ -817,14 +817,14 @@ function FiadosPendientes({clientes,ventas,onCobrar,onVolver,onEditarCliente}) {
               💰 Cobrar deuda
             </button>
           )}
-          {onEditarCliente&&<PieEnvases c={c} ventas={ventas} onEditar={onEditarCliente} />}
+          {onEditarCliente&&<PieEnvases c={c} ventas={ventas} onEditar={onEditarCliente} onPerdida={onPerdida} />}
         </div>
       ))}
     </div>
   );
 }
 
-function ClientesDormidos({clientes,ventas,onVolver,onSeleccionar,onEditarCliente}) {
+function ClientesDormidos({clientes,ventas,onVolver,onSeleccionar,onEditarCliente,onPerdida}) {
   const [semanas,setSemanas]=React.useState(2);
   const hoy=new Date();
   // Última compra real por cliente (ignora cobros y ajustes)
@@ -883,7 +883,7 @@ function ClientesDormidos({clientes,ventas,onVolver,onSeleccionar,onEditarClient
               {(c.maps||(c.lat&&c.lng))&&<a href={c.maps||`https://www.google.com/maps?q=${c.lat},${c.lng}`} target="_blank" rel="noreferrer" style={{fontSize:22,textDecoration:"none"}} title="Mapa">📍</a>}
             </div>
           </div>
-          {onEditarCliente&&<PieEnvases c={c} ventas={ventas} onEditar={onEditarCliente} />}
+          {onEditarCliente&&<PieEnvases c={c} ventas={ventas} onEditar={onEditarCliente} onPerdida={onPerdida} />}
         </div>
       ))}
     </div>
