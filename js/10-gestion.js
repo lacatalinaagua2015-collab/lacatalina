@@ -154,8 +154,8 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
                     <span style={{fontWeight:600,fontSize:14,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nombre}</span>
                     <span style={{fontSize:10,fontWeight:600,padding:"2px 8px",borderRadius:20,background:"var(--color-background-success)",color:"var(--color-text-success)",flexShrink:0}}>{c.dia}</span>
                   </div>
-                  <div style={{fontSize:13,color:"var(--color-text-secondary)",fontWeight:600,marginTop:3}}>
-                    {c.calle?`${c.calle} ${c.nro||""}`:c.manzana?`Mz ${c.manzana} L ${c.lote}`:""}{c.barrio?` · ${c.barrio}`:""}
+                  <div style={{fontSize:13,color:"var(--color-text-primary)",fontWeight:600,marginTop:3}}>
+                    {direccionCliente(c)}
                   </div>
                   {c.notas&&<div style={{fontSize:11,color:"var(--color-text-warning)",marginTop:2}}>📝 {c.notas}</div>}
                   <div style={{display:"flex",flexWrap:"wrap",gap:5,marginTop:7}}>
@@ -313,9 +313,7 @@ function CargaGPSMasiva({clientes, onActualizar, onVolver}) {
   );
 
   const progreso = Math.round((idx/sinGPS.length)*100);
-  const dir = cliente.calle ? `${cliente.calle} ${cliente.nro||""}`.trim()
-    : cliente.manzana ? `Mz ${cliente.manzana} L ${cliente.lote||""} · ${cliente.barrio||""}`
-    : cliente.barrio||"";
+  const dir = direccionCliente(cliente);
   const latOk = latVal&&lngVal&&!isNaN(parseFloat(latVal))&&!isNaN(parseFloat(lngVal));
 
   return (

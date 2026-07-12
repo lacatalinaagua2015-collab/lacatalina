@@ -327,7 +327,7 @@ function DetalleVentasDia({ventas, clientes, noVisitas, fecha}) {
               fiado:{bg:"var(--color-background-warning)",color:"var(--color-text-warning)",txt:"Fiado"},
             }[v.pago]||{bg:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",txt:v.pago});
             const cli=(clientes||[]).find(x=>x.id===v.clienteId);
-            const dir=cli?((cli.calle?`${cli.calle} ${cli.nro||""}`:cli.manzana?`Mz ${cli.manzana} L ${cli.lote}`:"")+(cli.barrio?` · ${cli.barrio}`:"")):"";
+            const dir=cli?direccionCliente(cli):"";
             const deudaPagada=Math.max(0,(v.pagadoNum||0)-(v.neto||0));
             const fmtEnv=(arr)=>(arr||[]).filter(e=>e.prod&&Number(e.cant)>0).map(e=>`${e.cant} ${e.prod}`).join(", ");
             const prestStr=fmtEnv(v.envPrest);
@@ -371,7 +371,7 @@ function DetalleVentasDia({ventas, clientes, noVisitas, fecha}) {
                 {noComp.map((n,i)=>{
                   const p = (clientes||[]).find(x=>x.id===n.clienteId) || {};
                   const info = lbl(n.motivo);
-                  const dir = (p.calle?`${p.calle} ${p.nro||""}`:p.manzana?`Mz ${p.manzana} L ${p.lote}`:"")+(p.barrio?` · ${p.barrio}`:"");
+                  const dir = direccionCliente(p);
                   return (
                     <div key={"nv"+i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 16px",borderTop:i>0?"0.5px solid var(--color-border-tertiary)":"none"}}>
                       <div style={{minWidth:0}}>

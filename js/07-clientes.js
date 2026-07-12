@@ -149,8 +149,8 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
                 );
               })()}
             </div>
-            <div style={{fontSize:17,color:"var(--color-text-secondary)",marginTop:2}}>
-              {c.calle?`${c.calle} ${c.nro||""}`:c.manzana?`Mz ${c.manzana} L ${c.lote}`:""}{c.barrio?` · ${c.barrio}`:""}
+            <div style={{fontSize:17,color:"var(--color-text-primary)",fontWeight:600,marginTop:2}}>
+              {direccionCliente(c)}
             </div>
             {c.notas&&<div style={{fontSize:12,color:"var(--color-text-warning)",marginTop:2}}>📝 {c.notas}</div>}
             <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>
@@ -388,8 +388,7 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
             <div style={{flex:1}}>
               <div style={{fontWeight:500,fontSize:16,color:"var(--color-text-primary)"}}>{cliente.nombre}</div>
               <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>
-                {cliente.calle?`${cliente.calle} ${cliente.nro||""} · `:cliente.manzana?`Mz ${cliente.manzana} L ${cliente.lote} · `:""}
-                {cliente.barrio} · {cliente.dia}
+                {direccionCliente(cliente)}{cliente.dia?` · ${cliente.dia}`:""}
               </div>
               {cliente.notas&&<div style={{fontSize:12,color:"var(--color-text-warning)",marginTop:3}}>📝 {cliente.notas}</div>}
             </div>
@@ -790,7 +789,7 @@ function FiadosPendientes({clientes,ventas,onCobrar,onVolver,onEditarCliente}) {
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
             <div>
               <div style={{fontSize:14,fontWeight:500,color:'var(--color-text-primary)'}}>{c.nombre}</div>
-              <div style={{fontSize:11,color:'var(--color-text-tertiary)'}}>{c.dia}{c.barrio?' · '+c.barrio:''}</div>
+              <div style={{fontSize:11,color:'var(--color-text-tertiary)'}}>{c.dia}{direccionCliente(c)?' · '+direccionCliente(c):''}</div>
             </div>
             <span style={{fontSize:16,fontWeight:700,color:'var(--color-text-danger)'}}>{fmt(Math.abs(c.saldo))}</span>
           </div>
@@ -872,7 +871,7 @@ function ClientesDormidos({clientes,ventas,onVolver,onSeleccionar,onEditarClient
             <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>onSeleccionar&&onSeleccionar(c)}>
               <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>{c.nombre}</div>
               <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>
-                {c.dia}{c.barrio?" · "+c.barrio:""}{c.calle?` · ${c.calle} ${c.nro||""}`:c.manzana?` · Mz ${c.manzana} L ${c.lote}`:""}
+                {c.dia}{direccionCliente(c)?" · "+direccionCliente(c):""}
               </div>
               <div style={{fontSize:12,fontWeight:600,color:c.dias>=28?"var(--color-text-danger)":"var(--color-text-warning)",marginTop:4}}>
                 ⏳ {textoTiempo(c)}
