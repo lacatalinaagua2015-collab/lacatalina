@@ -45,6 +45,24 @@ function App() {
   const [clienteId, setClienteId] = useState(null);
   const [pinOk, setPinOk] = React.useState(false);
   const [noVisitas, setNoVisitas] = useLS("cat_novisitas_v1", []);
+  // Registro de envases perdidos — rotos durante el reparto, o no
+  // recuperados al eliminar un cliente (se mudó y no avisó, etc). Se
+  // descuentan del stock real y quedan anotados acá para poder revisar
+  // después cuánto se está perdiendo y por qué.
+  const [perdidas, setPerdidas] = useLS("cat_perdidas_v1", []);
+  const registrarPerdida = (items, motivo, clienteNombre) => {
+    // items: {sifon,bidon10,bidon20} — cantidades perdidas de cada producto
+    setPerdidas(prev => {
+      const next = [...prev, {
+        id: Date.now()+"_"+Math.random().toString(36).slice(2,7),
+        fecha: new Date().toISOString(),
+        motivo, clienteNombre: clienteNombre||null,
+        sifon: items.sifon||0, bidon10: items.bidon10||0, bidon20: items.bidon20||0,
+      }];
+      syncData({perdidas: next});
+      return next;
+    });
+  };
   const [prospectos, setProspectos] = useLS("cat_prospectos_v1", []);
   const [recordatorios, setRecordatorios] = useLS("cat_recordatorios_v1", []);
   // recordatorio: {id, clienteId, clienteNombre, fecha, hora, motivo, dia, confirmado}
@@ -321,7 +339,7 @@ function App() {
 
   // Ref siempre actualizado — evita datos viejos en el debounce
   const estadoRef = React.useRef({clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios,prospectos,cargasDia});
-  React.useEffect(()=>{ estadoRef.current={clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios,prospectos,zonasReparto,cargasDia}; });
+  React.useEffect(()=>{ estadoRef.current={clientes,ventas,planillas,stock:stockNorm,productos,noVisitas,recordatorios,prospectos,zonasReparto,cargasDia,perdidas}; });
 
   // ── AUTO-BACKUP mejorado ────────────────────────────────────────────────
   // Guarda cada 10 minutos (no solo al arrancar) y mantiene los últimos 3 días.
@@ -587,6 +605,7 @@ function App() {
         }
         if(data.productos!==undefined)  setProductos(data.productos||[]);
         if(data.noVisitas!==undefined)  setNoVisitas(data.noVisitas||[]);
+        if(data.perdidas!==undefined)   setPerdidas(data.perdidas||[]);
         if(data.prospectos!==undefined) setProspectos(data.prospectos||[]);
         if(data.recordatorios!==undefined) setRecordatorios(data.recordatorios||[]);
         if(data.mantVeh!==undefined)    localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh||[]));
@@ -856,6 +875,12 @@ function App() {
             syncData({stock:s});
             return s;
           });
+        } else {
+          // No se pudieron recuperar — quedan registrados como pérdida en
+          // vez de desaparecer sin dejar rastro. El total general de stock
+          // ya los deja de contar solo (salían de "En clientes"), esto es
+          // nada más para poder revisar después cuánto se perdió y por qué.
+          registrarPerdida(env, "Cliente eliminado sin recuperar envases", eliminado.nombre);
         }
       }
     }
@@ -1288,7 +1313,7 @@ function App() {
         }}
         onVolver={()=>irA("menu")}
       />}
-      {pantalla==="stock"          && <StockGeneral stock={stockNorm} setStock={(ns)=>{setStock(ns);syncData({stock:ns});}} clientes={clientes} setClientes={saveClientes} ventas={ventas} productos={productos} setProductos={saveProductos} cargasDia={cargasDia} setCargasDia={saveCargasDia} planillas={planillas} onVolver={()=>irA("menu")} onResumen={()=>irA("resumen")} />}
+      {pantalla==="stock"          && <StockGeneral stock={stockNorm} setStock={(ns)=>{setStock(ns);syncData({stock:ns});}} clientes={clientes} setClientes={saveClientes} ventas={ventas} productos={productos} setProductos={saveProductos} cargasDia={cargasDia} setCargasDia={saveCargasDia} planillas={planillas} perdidas={perdidas} registrarPerdida={registrarPerdida} onVolver={()=>irA("menu")} onResumen={()=>irA("resumen")} />}
       {pantalla==="resumen"        && <Resumen ventas={ventas} clientes={clientes} productos={productos} planillas={planillas} noVisitas={noVisitas||[]} onVolver={()=>irA("menu")} />}
       {pantalla==="fiadosPendientes" && <React.Fragment><ClientesTabs activo="fiados" onIr={irA}/><FiadosPendientes clientes={clientes} onCobrar={(clienteId,monto,pago)=>{
         const cl=clientes.find(c=>c.id===clienteId);
