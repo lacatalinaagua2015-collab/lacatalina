@@ -653,8 +653,8 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
                       const diff=realVal-calc;
                       return (
                         <div key={tipo}>
-                          <div style={{fontSize:10,color:"var(--color-text-tertiary)",textAlign:"center",marginBottom:2}}>{titulo}</div>
-                          <div style={{fontSize:10,color:"#5daaff",textAlign:"center",marginBottom:3}}>calc. {calc}</div>
+                          <div style={{fontSize:12,color:"var(--color-text-tertiary)",textAlign:"center",marginBottom:2}}>{titulo}</div>
+                          <div style={{fontSize:12,color:"#5daaff",textAlign:"center",marginBottom:3}}>calc. {calc}</div>
                           <input type="number" min={0}
                             value={stateObj[pk]}
                             placeholder={String(calc)}
@@ -662,7 +662,7 @@ function PlanillaDelDia({dia,fecha,ventas,clientes,planilla,productos,stock,setS
                             onChange={e=>setFn(r=>({...r,[pk]:e.target.value}))}
                           />
                           {diff!==0&&(
-                            <div style={{textAlign:"center",marginTop:2,fontSize:10,fontWeight:600,color:diff>0?"var(--color-text-warning)":"var(--color-text-danger)"}}>
+                            <div style={{textAlign:"center",marginTop:2,fontSize:12,fontWeight:600,color:diff>0?"var(--color-text-warning)":"var(--color-text-danger)"}}>
                               {`${diff>0?"+":""}${diff} dif.`}
                             </div>
                           )}

@@ -120,8 +120,8 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
             resta de nuevo acá (sumarla de vuelta inflaría el total). */}
         <div style={{...s.card,margin:"0 0 10px",border:"1px solid var(--color-border-secondary)"}}>
           <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-primary)",marginBottom:2}}>Σ Total general</div>
-          <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginBottom:9}}>El número real que existe hoy, sea cual sea la ubicación.</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 46px 46px 46px 46px 52px",gap:5,fontSize:10,color:"var(--color-text-tertiary)",marginBottom:5}}>
+          <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginBottom:9}}>El número real que existe hoy, sea cual sea la ubicación.</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 46px 46px 46px 46px 52px",gap:5,fontSize:12,color:"var(--color-text-tertiary)",marginBottom:5}}>
             <span></span><span style={{textAlign:"center"}}>Soder.</span><span style={{textAlign:"center"}}>Depós.</span><span style={{textAlign:"center"}}>Client.</span><span style={{textAlign:"center",color:"var(--color-text-danger)"}}>Perdi.</span><span style={{textAlign:"center",color:"var(--color-text-success)",fontWeight:600}}>Total</span>
           </div>
           {PRODS.map(([k,lbl])=>{
@@ -137,23 +137,23 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
                 <span style={{textAlign:"center",fontSize:12,color:"var(--color-text-secondary)"}}>{enDeposito}</span>
                 <span style={{textAlign:"center",fontSize:12,color:"var(--color-text-secondary)"}}>{enClientes}</span>
                 <span style={{textAlign:"center",fontSize:12,color:perdido>0?"var(--color-text-danger)":"var(--color-text-tertiary)"}}>{perdido>0?`-${perdido}`:"—"}</span>
-                <span style={{textAlign:"center",fontSize:14,fontWeight:700,color:"var(--color-text-success)"}}>{total}{k==="sifon"&&<span style={{display:"block",fontSize:9,color:"var(--color-text-tertiary)",fontWeight:400}}>{Math.floor(total/6)} caj</span>}</span>
+                <span style={{textAlign:"center",fontSize:14,fontWeight:700,color:"var(--color-text-success)"}}>{total}{k==="sifon"&&<span style={{display:"block",fontSize:11,color:"var(--color-text-tertiary)",fontWeight:400}}>{Math.floor(total/6)} caj</span>}</span>
               </div>
             );
           })}
         </div>
 
-        <div style={{fontSize:11,color:"var(--color-text-info)",margin:"0 0 10px",padding:"7px 11px",background:"var(--color-background-info)",borderRadius:8}}>ℹ️ El <b>sifón</b> se cuenta en <b>unidades sueltas</b> (6 unidades = 1 cajón).</div>
+        <div style={{fontSize:12,color:"var(--color-text-info)",margin:"0 0 10px",padding:"7px 11px",background:"var(--color-background-info)",borderRadius:8}}>ℹ️ El <b>sifón</b> se cuenta en <b>unidades sueltas</b> (6 unidades = 1 cajón).</div>
 
         {/* SODERÍA */}
         <div style={{...s.card,margin:"0 0 10px"}}>
           <button style={{width:"100%",background:"none",border:"none",padding:0,marginBottom:abiertoSoderia?9:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
             onClick={()=>setAbiertoSoderia(!abiertoSoderia)}>
-            <span style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",flex:1}}>🏭 Sodería <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:11}}>· de acá sale el camión</span></span>
+            <span style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",flex:1}}>🏭 Sodería <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:12}}>· de acá sale el camión</span></span>
             <span style={{color:"var(--color-text-tertiary)",fontSize:12}}>{abiertoSoderia?"▲":"▼"}</span>
           </button>
           {abiertoSoderia&&(<>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 52px 52px 46px",gap:6,fontSize:11,color:"var(--color-text-tertiary)",marginBottom:5}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 52px 52px 46px",gap:6,fontSize:12,color:"var(--color-text-tertiary)",marginBottom:5}}>
             <span></span><span style={{textAlign:"center"}}>Llenos</span><span style={{textAlign:"center"}}>Vacíos</span><span style={{textAlign:"center",color:"var(--color-text-secondary)"}}>Total</span>
           </div>
           {PRODS.map(([k,lbl])=>{
@@ -163,7 +163,7 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
                 <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{lbl}</span>
                 <input type="number" value={ll} onChange={e=>setLoc("soderia",k,e.target.value)} style={inNum} />
                 <input type="number" value={va} onChange={e=>setLoc("soderia_vacios",k,e.target.value)} style={inNum} />
-                <span style={{textAlign:"center",fontSize:13,color:"var(--color-text-secondary)",fontWeight:500}}>{ll+va}{k==="sifon"&&<span style={{display:"block",fontSize:9,color:"var(--color-text-tertiary)",fontWeight:400}}>{Math.floor((ll+va)/6)} caj</span>}</span>
+                <span style={{textAlign:"center",fontSize:13,color:"var(--color-text-secondary)",fontWeight:500}}>{ll+va}{k==="sifon"&&<span style={{display:"block",fontSize:11,color:"var(--color-text-tertiary)",fontWeight:400}}>{Math.floor((ll+va)/6)} caj</span>}</span>
               </div>
             );
           })}
@@ -174,14 +174,14 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
         <div style={{...s.card,margin:"0 0 10px"}}>
           <button style={{width:"100%",background:"none",border:"none",padding:0,marginBottom:abiertoDeposito?9:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
             onClick={()=>setAbiertoDeposito(!abiertoDeposito)}>
-            <span style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",flex:1}}>📦 Depósito <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:11}}>· vacíos nuevos, sin uso</span></span>
+            <span style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",flex:1}}>📦 Depósito <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:12}}>· vacíos nuevos, sin uso</span></span>
             <span style={{color:"var(--color-text-tertiary)",fontSize:12}}>{abiertoDeposito?"▲":"▼"}</span>
           </button>
           {abiertoDeposito&&(
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
             {PRODS.map(([k,lbl])=>(
               <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"var(--color-background-tertiary)",borderRadius:8,padding:"6px 9px"}}>
-                <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{lbl.replace(" 1.5L","")}{k==="sifon"&&<span style={{fontSize:9,color:"var(--color-text-tertiary)",display:"block"}}>{Math.floor((stock.casa?.sifon||0)/6)} caj</span>}</span>
+                <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{lbl.replace(" 1.5L","")}{k==="sifon"&&<span style={{fontSize:11,color:"var(--color-text-tertiary)",display:"block"}}>{Math.floor((stock.casa?.sifon||0)/6)} caj</span>}</span>
                 <input type="number" value={stock.casa?.[k]||0} onChange={e=>setLoc("casa",k,e.target.value)} style={{...inNum,width:48}} />
               </div>
             ))}
@@ -193,7 +193,7 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
         <div style={{...s.card,margin:"0 0 10px"}}>
           <button style={{width:"100%",background:"none",border:"none",padding:0,marginBottom:abiertoEnClientes?7:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
             onClick={()=>setAbiertoEnClientes(!abiertoEnClientes)}>
-            <span style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",flex:1}}>👥 En clientes <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:11}}>· fijos + prestados</span></span>
+            <span style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",flex:1}}>👥 En clientes <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:12}}>· fijos + prestados</span></span>
             <span style={{color:"var(--color-text-tertiary)",fontSize:12}}>{abiertoEnClientes?"▲":"▼"}</span>
           </button>
           {abiertoEnClientes&&(<>
@@ -203,16 +203,16 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
             const filas=[["🏠 Fijos",totClientes,"var(--color-text-primary)"],["📦 Prestados",totPrestados,"var(--color-text-warning)"],["Σ Total",totGeneral,"var(--color-text-info)"]];
             return (
               <div style={{marginBottom:8,background:"var(--color-background-tertiary)",borderRadius:8,padding:"7px 9px"}}>
-                <div style={{display:"grid",gridTemplateColumns:"80px 1fr 1fr 1fr 1fr",gap:4,fontSize:10,color:"var(--color-text-tertiary)",marginBottom:3}}>
+                <div style={{display:"grid",gridTemplateColumns:"80px 1fr 1fr 1fr 1fr",gap:4,fontSize:12,color:"var(--color-text-tertiary)",marginBottom:3}}>
                   <span></span><span style={{textAlign:"center"}}>Sifón</span><span style={{textAlign:"center"}}>10L</span><span style={{textAlign:"center"}}>20L</span><span style={{textAlign:"center"}}>Disp</span>
                 </div>
                 {filas.map(([l,t,col],i)=>(
                   <div key={l} style={{display:"grid",gridTemplateColumns:"80px 1fr 1fr 1fr 1fr",gap:4,padding:"3px 0",borderTop:i===2?"0.5px solid var(--color-border-secondary)":"none",alignItems:"center"}}>
-                    <span style={{color:"var(--color-text-secondary)",fontSize:11}}>{l}</span>
+                    <span style={{color:"var(--color-text-secondary)",fontSize:12}}>{l}</span>
                     {["sifon","bidon10","bidon20","dispenser"].map(k=>(
                       <span key={k} style={{textAlign:"center",fontSize:13,fontWeight:i===2?600:400,color:col}}>
                         {t[k]||0}
-                        {k==="sifon"&&i===2&&<span style={{display:"block",fontSize:9,color:"var(--color-text-tertiary)",fontWeight:400}}>{Math.floor((t[k]||0)/6)} caj</span>}
+                        {k==="sifon"&&i===2&&<span style={{display:"block",fontSize:11,color:"var(--color-text-tertiary)",fontWeight:400}}>{Math.floor((t[k]||0)/6)} caj</span>}
                       </span>
                     ))}
                   </div>
@@ -235,7 +235,7 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
                       border:modoArqueo===v?"none":"0.5px solid var(--color-border-secondary)"}}>{l}</button>
                 ))}
               </div>
-              <div style={{fontSize:10,color:"var(--color-text-tertiary)",marginBottom:8,lineHeight:1.5}}>
+              <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginBottom:8,lineHeight:1.5}}>
                 {modoArqueo==="fijos"
                   ? "Envases habituales que el cliente tiene siempre en su poder. Editá directo el número."
                   : "Envases EXTRA prestados. Editá el TOTAL que tiene hoy en su poder · 0 = devolvió todo · negativo = devolvió de más."}
@@ -245,14 +245,14 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
               <div style={{display:"flex",gap:4,marginBottom:8,flexWrap:"wrap"}}>
                 {["todos",...DIAS].map(d=>(
                   <button key={d} onClick={()=>setDiaArqueo(d)}
-                    style={{fontSize:10,padding:"3px 9px",borderRadius:6,border:"none",cursor:"pointer",
+                    style={{fontSize:12,padding:"3px 9px",borderRadius:6,border:"none",cursor:"pointer",
                       background:diaArqueo===d?"#185FA5":"var(--color-background-tertiary)",
                       color:diaArqueo===d?"#e2eaf4":"var(--color-text-secondary)",fontWeight:diaArqueo===d?600:400}}>
                     {d==="todos"?"Todos":d.slice(0,3)}
                   </button>
                 ))}
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 42px 42px 42px 42px",gap:4,fontSize:10,color:"var(--color-text-tertiary)",marginBottom:5}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 42px 42px 42px 42px",gap:4,fontSize:12,color:"var(--color-text-tertiary)",marginBottom:5}}>
                 <span></span><span style={{textAlign:"center"}}>Sif</span><span style={{textAlign:"center"}}>10L</span><span style={{textAlign:"center"}}>20L</span><span style={{textAlign:"center"}}>Disp</span>
               </div>
               {clientesReales
@@ -263,7 +263,7 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
                 <div key={c.id} style={{display:"grid",gridTemplateColumns:"1fr 42px 42px 42px 42px",gap:4,alignItems:"center",marginBottom:4}}>
                   <span style={{fontSize:12,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                     {c.nombre}
-                    <span style={{display:"block",fontSize:9,color:"var(--color-text-tertiary)"}}>{c.dia}</span>
+                    <span style={{display:"block",fontSize:11,color:"var(--color-text-tertiary)"}}>{c.dia}</span>
                   </span>
                   {modoArqueo==="fijos"
                     ? ["sifon","bidon10","bidon20","dispenser"].map(k=>(
@@ -287,7 +287,7 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
         <div style={{...s.card,margin:"0 0 10px"}}>
           <button style={{width:"100%",background:"none",border:"none",padding:0,marginBottom:abiertoPerdidas?9:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
             onClick={()=>setAbiertoPerdidas(!abiertoPerdidas)}>
-            <span style={{fontSize:13,fontWeight:600,color:"var(--color-text-danger)",flex:1}}>💔 Pérdidas <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:11}}>· rotos o no recuperados</span></span>
+            <span style={{fontSize:13,fontWeight:600,color:"var(--color-text-danger)",flex:1}}>💔 Pérdidas <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:12}}>· rotos o no recuperados</span></span>
             <span style={{color:"var(--color-text-tertiary)",fontSize:12}}>{abiertoPerdidas?"▲":"▼"}</span>
           </button>
           {abiertoPerdidas&&(<>
@@ -306,16 +306,16 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
               <input type="number" min={1} placeholder="Cant." value={formPerdida.cantidad} onChange={e=>setFormPerdida(f=>({...f,cantidad:e.target.value}))} style={inNum} />
             </div>
             <div style={{marginBottom:6}}>
-              <label style={{fontSize:11,color:"var(--color-text-tertiary)",display:"block",marginBottom:3}}>¿De dónde salía?</label>
+              <label style={{fontSize:12,color:"var(--color-text-tertiary)",display:"block",marginBottom:3}}>¿De dónde salía?</label>
               <select value={formPerdida.ubicacion} onChange={e=>setFormPerdida(f=>({...f,ubicacion:e.target.value}))} style={{...inNum,textAlign:"left",width:"100%"}}>
                 <option value="soderia">Sodería (llenos)</option>
                 <option value="soderia_vacios">Sodería (vacíos)</option>
                 <option value="casa">Depósito</option>
               </select>
-              <div style={{fontSize:10,color:"var(--color-text-tertiary)",marginTop:3}}>¿Un cliente perdió un envase? Se registra solo al eliminarlo (te pregunta ahí si lo devolvió) — así queda ligado a ese cliente puntual.</div>
+              <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginTop:3}}>¿Un cliente perdió un envase? Se registra solo al eliminarlo (te pregunta ahí si lo devolvió) — así queda ligado a ese cliente puntual.</div>
             </div>
             <div style={{marginBottom:8}}>
-              <label style={{fontSize:11,color:"var(--color-text-tertiary)",display:"block",marginBottom:3}}>Motivo</label>
+              <label style={{fontSize:12,color:"var(--color-text-tertiary)",display:"block",marginBottom:3}}>Motivo</label>
               <input type="text" value={formPerdida.motivo} onChange={e=>setFormPerdida(f=>({...f,motivo:e.target.value}))} style={{...inNum,textAlign:"left",width:"100%"}} placeholder="Roto en el reparto, se cayó del camión, etc." />
             </div>
             <button onClick={confirmarPerdida} style={{...s.btn,width:"100%",background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"1px solid var(--color-border-danger)"}}>💔 Registrar pérdida</button>
@@ -323,14 +323,14 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
 
           {(perdidas||[]).length>0 && (
             <div>
-              <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginBottom:6}}>Historial ({perdidas.length})</div>
+              <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginBottom:6}}>Historial ({perdidas.length})</div>
               {[...perdidas].reverse().slice(0,20).map(p=>{
                 const items=[p.sifon&&`${p.sifon} Sifón`,p.bidon10&&`${p.bidon10} 10L`,p.bidon20&&`${p.bidon20} 20L`].filter(Boolean).join(" · ");
                 const fecha=new Date(p.fecha).toLocaleDateString("es-AR");
                 return (
                   <div key={p.id} style={{padding:"6px 0",borderTop:"0.5px solid var(--color-border-tertiary)"}}>
                     <div style={{fontSize:12,color:"var(--color-text-primary)"}}>{items}</div>
-                    <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{fecha} · {p.motivo}{p.clienteNombre?` · ${p.clienteNombre}`:""}</div>
+                    <div style={{fontSize:12,color:"var(--color-text-tertiary)"}}>{fecha} · {p.motivo}{p.clienteNombre?` · ${p.clienteNombre}`:""}</div>
                   </div>
                 );
               })}
@@ -345,13 +345,13 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
             onClick={()=>setAbiertoProductos(!abiertoProductos)}>
             <div style={{flex:1}}>
               <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)"}}>🏷️ Productos y precios</div>
-              {!abiertoProductos&&<div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>De acá salen los precios de la planilla y todas las ventas</div>}
+              {!abiertoProductos&&<div style={{fontSize:12,color:"var(--color-text-tertiary)",marginTop:2}}>De acá salen los precios de la planilla y todas las ventas</div>}
             </div>
             <span style={{color:"var(--color-text-tertiary)",fontSize:12}}>{abiertoProductos?"▲":"▼"}</span>
           </button>
           {abiertoProductos&&(<>
-          <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginBottom:9}}>De acá salen los precios de la planilla y todas las ventas</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 60px 60px 60px",gap:6,fontSize:11,color:"var(--color-text-tertiary)",marginBottom:5}}>
+          <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginBottom:9}}>De acá salen los precios de la planilla y todas las ventas</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 60px 60px 60px",gap:6,fontSize:12,color:"var(--color-text-tertiary)",marginBottom:5}}>
             <span></span><span style={{textAlign:"center"}}>Llenado</span><span style={{textAlign:"center"}}>Venta</span><span style={{textAlign:"center",color:"var(--color-text-success)"}}>Stock</span>
           </div>
           {draftProductos.map(p=>{
@@ -361,7 +361,7 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
               <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{p.nombre}</span>
               <input type="number" value={p.costo||0} onChange={e=>setDraftPrecio(p.id,"costo",e.target.value)} style={{...inNum,fontSize:12}} />
               {p.esDispenser
-                ? <span style={{textAlign:"center",fontSize:11,color:"var(--color-text-warning)"}}>comodato</span>
+                ? <span style={{textAlign:"center",fontSize:12,color:"var(--color-text-warning)"}}>comodato</span>
                 : <input type="number" value={p.precio||0} onChange={e=>setDraftPrecio(p.id,"precio",e.target.value)} style={{...inNum,fontSize:12}} />
               }
               <span style={{textAlign:"center",fontSize:13,fontWeight:700,color:"var(--color-text-success)"}}>{totalGeneralDe(k)}</span>
@@ -425,7 +425,7 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
             {[["soda","Sifón"],["b10","Bidón 10L"],["b20","Bidón 20L"],["disp","Dispenser"]].map(([k,lbl])=>(
               <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"var(--color-background-tertiary)",borderRadius:8,padding:"6px 9px"}}>
-                <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{lbl.replace("Bidón ","").replace(" 1.5L","")}{k==="soda"&&<span style={{fontSize:9,color:"var(--color-text-tertiary)",display:"block"}}>{Math.floor(((cargasDia?.[diaCarga]?.soda)||0)/6)} caj</span>}</span>
+                <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{lbl.replace("Bidón ","").replace(" 1.5L","")}{k==="soda"&&<span style={{fontSize:11,color:"var(--color-text-tertiary)",display:"block"}}>{Math.floor(((cargasDia?.[diaCarga]?.soda)||0)/6)} caj</span>}</span>
                 <input type="number" value={(cargasDia?.[diaCarga]?.[k])||0} onChange={e=>setCarga(diaCarga,k,e.target.value)} style={{...inNum,width:48}} />
               </div>
             ))}
@@ -460,14 +460,14 @@ function ConfirmacionesDia({dia,ventas,clientes,onConfirmar,onVolver}) {
       <div style={{padding:"10px 14px 4px"}}>
         <div style={{display:"flex",gap:8,marginBottom:8}}>
           <div style={{...s.card,flex:1,margin:0,background:"#1e3a5f",border:"1px solid #f5b942",padding:"10px 12px"}}>
-            <div style={{fontSize:10,color:"#f5b942",fontWeight:500,textTransform:"uppercase",marginBottom:4}}>🔴 Pendientes</div>
+            <div style={{fontSize:12,color:"#f5b942",fontWeight:500,textTransform:"uppercase",marginBottom:4}}>🔴 Pendientes</div>
             <div style={{fontSize:18,fontWeight:700,color:"#f5b942"}}>{fmt(totalPendiente)}</div>
-            <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{pendientes.length} transfer.</div>
+            <div style={{fontSize:12,color:"var(--color-text-tertiary)"}}>{pendientes.length} transfer.</div>
           </div>
           <div style={{...s.card,flex:1,margin:0,background:"#0a2e1f",border:"1px solid #4dd9a0",padding:"10px 12px"}}>
-            <div style={{fontSize:10,color:"#4dd9a0",fontWeight:500,textTransform:"uppercase",marginBottom:4}}>✓ Confirmadas</div>
+            <div style={{fontSize:12,color:"#4dd9a0",fontWeight:500,textTransform:"uppercase",marginBottom:4}}>✓ Confirmadas</div>
             <div style={{fontSize:18,fontWeight:700,color:"#4dd9a0"}}>{fmt(totalConfirmado)}</div>
-            <div style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{confirmadas.length} transfer.</div>
+            <div style={{fontSize:12,color:"var(--color-text-tertiary)"}}>{confirmadas.length} transfer.</div>
           </div>
         </div>
         {grupos.length===0&&<p style={{textAlign:"center",padding:"20px 0",color:"var(--color-text-tertiary)",fontSize:14}}>✓ No hay transferencias pendientes para {dia}</p>}
@@ -497,7 +497,7 @@ function ConfirmacionesDia({dia,ventas,clientes,onConfirmar,onVolver}) {
         ))}
         {fechasConf.length>0&&(
           <div style={{marginTop:8}}>
-            <div style={{fontSize:10,color:"var(--color-text-tertiary)",fontWeight:500,textTransform:"uppercase",letterSpacing:"0.05em",margin:"8px 0 6px"}}>✓ Ya confirmadas</div>
+            <div style={{fontSize:12,color:"var(--color-text-tertiary)",fontWeight:500,textTransform:"uppercase",letterSpacing:"0.05em",margin:"8px 0 6px"}}>✓ Ya confirmadas</div>
             {fechasConf.map(fk=>{
               const vtsFecha=confirmadasPorFecha[fk];
               const totalFecha=vtsFecha.reduce((a,v)=>a+(v.pagadoNum||v.neto||0),0);
@@ -507,7 +507,7 @@ function ConfirmacionesDia({dia,ventas,clientes,onConfirmar,onVolver}) {
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}} onClick={()=>toggleFecha(fk)}>
                     <div>
                       <div style={{fontSize:13,fontWeight:500,color:"#4dd9a0"}}>📅 {fk}</div>
-                      <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>{vtsFecha.length} transferencia{vtsFecha.length!==1?"s":""}</div>
+                      <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginTop:2}}>{vtsFecha.length} transferencia{vtsFecha.length!==1?"s":""}</div>
                     </div>
                     <div style={{textAlign:"right"}}>
                       <div style={{fontSize:15,fontWeight:600,color:"#4dd9a0"}}>{fmt(totalFecha)}</div>
@@ -521,11 +521,11 @@ function ConfirmacionesDia({dia,ventas,clientes,onConfirmar,onVolver}) {
                         <div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"0.5px solid rgba(77,217,160,0.15)"}}>
                           <div>
                             <div style={{fontSize:13,color:"var(--color-text-primary)"}}>{c?.nombre||"Cliente"}</div>
-                            <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:1}}>{(v.detalle||[]).map(d=>`${d.nombre}×${d.cantidad}`).join(" · ")}</div>
+                            <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginTop:1}}>{(v.detalle||[]).map(d=>`${d.nombre}×${d.cantidad}`).join(" · ")}</div>
                           </div>
                           <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
                             <div style={{fontSize:13,fontWeight:500,color:"#4dd9a0"}}>{fmt(v.pagadoNum||v.neto||0)}</div>
-                            <button style={{fontSize:10,color:"var(--color-text-tertiary)",background:"none",border:"none",cursor:"pointer",padding:"2px 0",textDecoration:"underline"}} onClick={()=>onConfirmar(v.id)}>desmarcar</button>
+                            <button style={{fontSize:12,color:"var(--color-text-tertiary)",background:"none",border:"none",cursor:"pointer",padding:"2px 0",textDecoration:"underline"}} onClick={()=>onConfirmar(v.id)}>desmarcar</button>
                           </div>
                         </div>
                       );

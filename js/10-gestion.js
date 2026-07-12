@@ -152,7 +152,7 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                     <span style={{fontWeight:700,fontSize:18,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nombre}</span>
-                    <span style={{fontSize:10,fontWeight:600,padding:"2px 8px",borderRadius:20,background:"var(--color-background-success)",color:"var(--color-text-success)",flexShrink:0}}>{c.dia}</span>
+                    <span style={{fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:20,background:"var(--color-background-success)",color:"var(--color-text-success)",flexShrink:0}}>{c.dia}</span>
                   </div>
                   <div style={{fontSize:13,color:"var(--color-text-primary)",fontWeight:600,marginTop:3}}>
                     {direccionCliente(c)}
