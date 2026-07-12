@@ -81,6 +81,13 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
   const [diaArqueo,setDiaArqueo]=React.useState("todos");
   const totPrestados={sifon:0,bidon10:0,bidon20:0,dispenser:0};
   clientesReales.forEach(c=>{["sifon","bidon10","bidon20","dispenser"].forEach(k=>{totPrestados[k]+=prestadoDe(c,k);});});
+  // Total general por producto: Sodería (llenos+vacíos+camión) + Depósito + Clientes (fijos+prestados)
+  const totalGeneralDe=(k)=>{
+    const enSoderia=(stock.soderia?.[k]||0)+(stock.soderia_vacios?.[k]||0)+(stock.camion?.[k]||0);
+    const enDeposito=stock.casa?.[k]||0;
+    const enClientes=(totClientes[k]||0)+(totPrestados[k]||0);
+    return enSoderia+enDeposito+enClientes;
+  };
 
   const confirmarPerdida=()=>{
     const cant=Math.round(Number(formPerdida.cantidad)||0);
@@ -342,19 +349,22 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
           </button>
           {abiertoProductos&&(<>
           <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginBottom:9}}>De acá salen los precios de la planilla y todas las ventas</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 74px 74px",gap:6,fontSize:11,color:"var(--color-text-tertiary)",marginBottom:5}}>
-            <span></span><span style={{textAlign:"center"}}>Llenado</span><span style={{textAlign:"center"}}>Venta</span>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 60px 60px 60px",gap:6,fontSize:11,color:"var(--color-text-tertiary)",marginBottom:5}}>
+            <span></span><span style={{textAlign:"center"}}>Llenado</span><span style={{textAlign:"center"}}>Venta</span><span style={{textAlign:"center",color:"var(--color-text-success)"}}>Stock</span>
           </div>
-          {draftProductos.map(p=>(
-            <div key={p.id} style={{display:"grid",gridTemplateColumns:"1fr 74px 74px",gap:6,alignItems:"center",marginBottom:5}}>
+          {draftProductos.map(p=>{
+            const k=keyDe(p);
+            return (
+            <div key={p.id} style={{display:"grid",gridTemplateColumns:"1fr 60px 60px 60px",gap:6,alignItems:"center",marginBottom:5}}>
               <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{p.nombre}</span>
               <input type="number" value={p.costo||0} onChange={e=>setDraftPrecio(p.id,"costo",e.target.value)} style={{...inNum,fontSize:12}} />
               {p.esDispenser
                 ? <span style={{textAlign:"center",fontSize:11,color:"var(--color-text-warning)"}}>comodato</span>
                 : <input type="number" value={p.precio||0} onChange={e=>setDraftPrecio(p.id,"precio",e.target.value)} style={{...inNum,fontSize:12}} />
               }
+              <span style={{textAlign:"center",fontSize:13,fontWeight:700,color:"var(--color-text-success)"}}>{totalGeneralDe(k)}</span>
             </div>
-          ))}
+          );})}
 
           {hayCambiosProd&&(
             <button style={{width:"100%",marginTop:8,background:"#1d9e75",color:"#fff",border:"none",borderRadius:8,padding:"9px",fontSize:13,fontWeight:600,cursor:"pointer"}}
