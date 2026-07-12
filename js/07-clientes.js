@@ -154,23 +154,25 @@ function ListaClientes({clientes,dia,fecha,ventas,todasVentas,noVisitas,prospect
             </div>
             {c.notas&&<div style={{fontSize:12,color:"var(--color-text-warning)",marginTop:2}}>📝 {c.notas}</div>}
             <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>
-              {c.sifon>0    && <span style={s.tag}>Sifón×{c.sifon}</span>}
-              {c.bidon10>0  && <span style={s.tag}>10L×{c.bidon10}</span>}
-              {c.bidon20>0  && <span style={s.tag}>20L×{c.bidon20}</span>}
-              {c.dispenser>0 && <span style={{...s.tag,color:"#5daaff"}}>Disp×{c.dispenser}</span>}
+              {(()=>{
+                const real={
+                  sifon:Math.max(0,(Number(c.sifon)||0)+envExtra.sifon),
+                  bidon10:Math.max(0,(Number(c.bidon10)||0)+envExtra.bidon10),
+                  bidon20:Math.max(0,(Number(c.bidon20)||0)+envExtra.bidon20),
+                };
+                return (<>
+                  {real.sifon>0 && <span style={s.tag}>Sifón×{real.sifon}</span>}
+                  {real.bidon10>0 && <span style={s.tag}>10L×{real.bidon10}</span>}
+                  {real.bidon20>0 && <span style={s.tag}>20L×{real.bidon20}</span>}
+                  {c.dispenser>0 && <span style={{...s.tag,color:"#5daaff"}}>Disp×{c.dispenser}</span>}
+                </>);
+              })()}
               {atendido    && <span style={s.badge("success")}>✓ Listo</span>}
               {est==="noesta" && !atendido  && <span style={s.badge("warning")}>🔄 No estaba aún</span>}
               {est==="noesta2"  && <span style={s.badge("warning")}>No estaba</span>}
               {est==="noquiso"  && <span style={s.badge("danger")}>No quiso</span>}
               {c.saldo<0   && <span style={s.badge("danger")}>Debe {fmt(Math.abs(c.saldo))}</span>}
               {c.saldo>0   && <span style={s.badge("success")}>A favor {fmt(c.saldo)}</span>}
-              {(envExtra.sifon!==0||envExtra.bidon10!==0||envExtra.bidon20!==0) && (
-                <span style={{...s.tag,color:"#f5b942",fontWeight:600}}>
-                  🔁{envExtra.sifon!==0?` Sif×${envExtra.sifon}`:""}
-                     {envExtra.bidon10!==0?` 10L×${envExtra.bidon10}`:""}
-                     {envExtra.bidon20!==0?` 20L×${envExtra.bidon20}`:""}
-                </span>
-              )}
             </div>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0,alignItems:"center"}}>
@@ -649,12 +651,19 @@ function DetalleCliente({cliente,ventas,noVisitas,dia,fecha,productos,onVenta,on
                       <span style={{fontSize:15,fontWeight:700,color:"#3b82f6"}}>{fmt(v.neto)}</span>
                     </div>
                     <div style={{fontSize:13,color:"var(--color-text-primary)",marginBottom:2,paddingLeft:22}}>{v.detalle.map(d=>`${d.nombre} ×${d.cantidad}`).join(" · ")}</div>
-                    <div style={{fontSize:11,color:"var(--color-text-secondary)",paddingLeft:22,marginBottom:6}}>
+                    <div style={{fontSize:11,color:"var(--color-text-secondary)",paddingLeft:22,marginBottom:v.envPrest?.length||v.envDev?.length?2:6}}>
                       {(()=>{
                         const esMixto=(Number(v.montoTrans)||0)>0&&(Number(v.montoEfec)||0)>0;
                         if(esMixto) return `Mixto · ef ${fmt(v.montoEfec)} + tr ${fmt(v.montoTrans)}`;
                         return v.pago;
                       })()}{v.desc>0?` · desc. ${fmt(v.desc)}`:""}{v.saldoAplicado>0?` · saldo apl. ${fmt(v.saldoAplicado)}`:""}{v.obs?` · ${v.obs.replace(/\s*\[Mixto:[^\]]*\]/g,"")}`:""}</div>
+                    {(v.envPrest?.length>0||v.envDev?.length>0)&&(
+                      <div style={{fontSize:11,color:"var(--color-text-warning)",paddingLeft:22,marginBottom:6}}>
+                        🔁{(v.envPrest||[]).filter(e=>Number(e.cant)>0).map(e=>` Prestó ${e.cant} ${e.prod}`).join(" ·")}
+                        {(v.envPrest?.some(e=>Number(e.cant)>0)&&v.envDev?.some(e=>Number(e.cant)>0))?" ·":""}
+                        {(v.envDev||[]).filter(e=>Number(e.cant)>0).map(e=>` Devolvió ${e.cant} ${e.prod}`).join(" ·")}
+                      </div>
+                    )}
                     <div style={{display:"flex",justifyContent:"flex-end",gap:6}}>
                       <button style={{...s.btn,fontSize:11,padding:"3px 8px"}} onClick={()=>setEditandoVentaId(v.id)}>Editar</button>
                       <button style={{...s.btnDanger,fontSize:11,padding:"3px 8px"}} onClick={()=>{if(window.confirm(`¿Eliminar venta de ${fmt(v.neto)}?`))onEliminarVenta(v.id);}}>Eliminar</button>
