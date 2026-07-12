@@ -114,9 +114,40 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
 
       <div style={{padding:"10px 14px 40px"}}>
 
-        <div style={{fontSize:11,color:"var(--color-text-info)",margin:"0 0 10px",padding:"7px 11px",background:"var(--color-background-info)",borderRadius:8}}>ℹ️ El <b>sifón</b> se cuenta en <b>unidades sueltas</b> (6 unidades = 1 cajón).</div>
-
         {onResumen&&<button style={{...s.btn,width:"100%",marginBottom:10,fontSize:13,fontWeight:500}} onClick={onResumen}>📊 Ver resumen</button>}
+
+        {/* TOTAL GENERAL — arriba de todo, es lo primero que hace falta ver.
+            Sodería + Depósito + En clientes (fijos+prestados) = el número
+            real que existe hoy. El camión no es un lugar aparte, es sodería
+            en tránsito. Pérdidas se muestra aparte, como referencia — ya
+            está descontada de la ubicación de la que salió, por eso no se
+            resta de nuevo acá (sumarla de vuelta inflaría el total). */}
+        <div style={{...s.card,margin:"0 0 10px",border:"1px solid var(--color-border-secondary)"}}>
+          <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-primary)",marginBottom:2}}>Σ Total general</div>
+          <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginBottom:9}}>El número real que existe hoy, sea cual sea la ubicación.</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 46px 46px 46px 46px 52px",gap:5,fontSize:10,color:"var(--color-text-tertiary)",marginBottom:5}}>
+            <span></span><span style={{textAlign:"center"}}>Soder.</span><span style={{textAlign:"center"}}>Depós.</span><span style={{textAlign:"center"}}>Client.</span><span style={{textAlign:"center",color:"var(--color-text-danger)"}}>Perdi.</span><span style={{textAlign:"center",color:"var(--color-text-success)",fontWeight:600}}>Total</span>
+          </div>
+          {PRODS.map(([k,lbl])=>{
+            const enSoderia=(stock.soderia?.[k]||0)+(stock.soderia_vacios?.[k]||0)+(stock.camion?.[k]||0);
+            const enDeposito=stock.casa?.[k]||0;
+            const enClientes=(totClientes[k]||0)+(totPrestados[k]||0);
+            const perdido=totalPerdidas[k]||0;
+            const total=enSoderia+enDeposito+enClientes;
+            return (
+              <div key={k} style={{display:"grid",gridTemplateColumns:"1fr 46px 46px 46px 46px 52px",gap:5,alignItems:"center",padding:"5px 0",borderTop:"0.5px solid var(--color-border-tertiary)"}}>
+                <span style={{fontSize:12,color:"var(--color-text-primary)"}}>{lbl.replace(" 1.5L","")}</span>
+                <span style={{textAlign:"center",fontSize:12,color:"var(--color-text-secondary)"}}>{enSoderia}</span>
+                <span style={{textAlign:"center",fontSize:12,color:"var(--color-text-secondary)"}}>{enDeposito}</span>
+                <span style={{textAlign:"center",fontSize:12,color:"var(--color-text-secondary)"}}>{enClientes}</span>
+                <span style={{textAlign:"center",fontSize:12,color:perdido>0?"var(--color-text-danger)":"var(--color-text-tertiary)"}}>{perdido>0?`-${perdido}`:"—"}</span>
+                <span style={{textAlign:"center",fontSize:14,fontWeight:700,color:"var(--color-text-success)"}}>{total}{k==="sifon"&&<span style={{display:"block",fontSize:9,color:"var(--color-text-tertiary)",fontWeight:400}}>{Math.floor(total/6)} caj</span>}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{fontSize:11,color:"var(--color-text-info)",margin:"0 0 10px",padding:"7px 11px",background:"var(--color-background-info)",borderRadius:8}}>ℹ️ El <b>sifón</b> se cuenta en <b>unidades sueltas</b> (6 unidades = 1 cajón).</div>
 
         {/* SODERÍA */}
         <div style={{...s.card,margin:"0 0 10px"}}>
@@ -254,31 +285,6 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
             </div>
           )}
           </>)}
-        </div>
-
-        {/* TOTAL GENERAL — Sodería + Depósito + En clientes (fijos+prestados).
-            El camión no es un lugar aparte, es sodería en tránsito. */}
-        <div style={{...s.card,margin:"0 0 10px",border:"1px solid var(--color-border-secondary)"}}>
-          <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-primary)",marginBottom:2}}>Σ Total general</div>
-          <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginBottom:9}}>El número real que existe en total, sea cual sea la ubicación.</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 60px 60px 60px 60px",gap:6,fontSize:10,color:"var(--color-text-tertiary)",marginBottom:5}}>
-            <span></span><span style={{textAlign:"center"}}>Sodería</span><span style={{textAlign:"center"}}>Depós.</span><span style={{textAlign:"center"}}>Client.</span><span style={{textAlign:"center",color:"var(--color-text-success)",fontWeight:600}}>Total</span>
-          </div>
-          {PRODS.map(([k,lbl])=>{
-            const enSoderia=(stock.soderia?.[k]||0)+(stock.soderia_vacios?.[k]||0)+(stock.camion?.[k]||0);
-            const enDeposito=stock.casa?.[k]||0;
-            const enClientes=(totClientes[k]||0)+(totPrestados[k]||0);
-            const total=enSoderia+enDeposito+enClientes;
-            return (
-              <div key={k} style={{display:"grid",gridTemplateColumns:"1fr 60px 60px 60px 60px",gap:6,alignItems:"center",padding:"5px 0",borderTop:"0.5px solid var(--color-border-tertiary)"}}>
-                <span style={{fontSize:12,color:"var(--color-text-primary)"}}>{lbl.replace(" 1.5L","")}</span>
-                <span style={{textAlign:"center",fontSize:12,color:"var(--color-text-secondary)"}}>{enSoderia}</span>
-                <span style={{textAlign:"center",fontSize:12,color:"var(--color-text-secondary)"}}>{enDeposito}</span>
-                <span style={{textAlign:"center",fontSize:12,color:"var(--color-text-secondary)"}}>{enClientes}</span>
-                <span style={{textAlign:"center",fontSize:14,fontWeight:700,color:"var(--color-text-success)"}}>{total}{k==="sifon"&&<span style={{display:"block",fontSize:9,color:"var(--color-text-tertiary)",fontWeight:400}}>{Math.floor(total/6)} caj</span>}</span>
-              </div>
-            );
-          })}
         </div>
 
         {/* PÉRDIDAS — envases rotos o no recuperados, para no perderles el rastro */}
