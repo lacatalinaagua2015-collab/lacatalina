@@ -353,7 +353,7 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
             <span></span><span style={{textAlign:"center"}}>Llenado</span><span style={{textAlign:"center"}}>Venta</span><span style={{textAlign:"center",color:"var(--color-text-success)"}}>Stock</span>
           </div>
           {draftProductos.map(p=>{
-            const k=keyDe(p);
+            const k=KEY_PROD[p.nombre];
             return (
             <div key={p.id} style={{display:"grid",gridTemplateColumns:"1fr 60px 60px 60px",gap:6,alignItems:"center",marginBottom:5}}>
               <span style={{fontSize:13,color:"var(--color-text-primary)"}}>{p.nombre}</span>
