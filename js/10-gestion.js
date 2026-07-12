@@ -151,7 +151,7 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
                 </div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                    <span style={{fontWeight:600,fontSize:14,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nombre}</span>
+                    <span style={{fontWeight:700,fontSize:18,color:"var(--color-text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nombre}</span>
                     <span style={{fontSize:10,fontWeight:600,padding:"2px 8px",borderRadius:20,background:"var(--color-background-success)",color:"var(--color-text-success)",flexShrink:0}}>{c.dia}</span>
                   </div>
                   <div style={{fontSize:13,color:"var(--color-text-primary)",fontWeight:600,marginTop:3}}>
@@ -189,7 +189,7 @@ function GestionClientes({clientes,onEditar,onEliminar,onNuevo,onVolver,onReorde
                 </div>
               </div>
               <PieEnvases c={c} ventas={ventas} onEditar={onEditar}
-                izquierda={<button style={{fontSize:11,fontWeight:600,padding:"5px 12px",borderRadius:20,cursor:"pointer",background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"1px solid var(--color-border-danger)"}} onClick={e=>{e.stopPropagation();onEliminar(c.id);}}>🗑️ Eliminar</button>}>
+                izquierda={<button style={{width:28,height:28,borderRadius:8,cursor:"pointer",background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"1px solid var(--color-border-danger)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}} onClick={e=>{e.stopPropagation();onEliminar(c.id);}} title="Eliminar cliente">🗑️</button>}>
                 {onRegistrarVenta&&<button style={{fontSize:11,fontWeight:600,padding:"5px 12px",borderRadius:20,cursor:"pointer",background:"#185FA5",color:"#e2eaf4",border:"none"}} onClick={e=>{e.stopPropagation();onRegistrarVenta(c);}}>💰 Venta</button>}
                 <button style={{fontSize:11,fontWeight:600,padding:"5px 12px",borderRadius:20,cursor:"pointer",background:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",border:"0.5px solid var(--color-border-secondary)"}} onClick={e=>{e.stopPropagation();setCambioId(cambioId===c.id?null:c.id);}}>🔄 Cambio</button>
                 <button style={{fontSize:11,fontWeight:600,padding:"5px 12px",borderRadius:20,cursor:"pointer",background:"var(--color-background-tertiary)",color:"var(--color-text-secondary)",border:"0.5px solid var(--color-border-secondary)"}} onClick={e=>{e.stopPropagation();setEditandoId(c.id);}}>✏️ Editar</button>
