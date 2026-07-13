@@ -147,10 +147,10 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
 
         {/* SODERÍA */}
         <div style={{...s.card,margin:"0 0 10px"}}>
-          <button style={{width:"100%",background:"none",border:"none",padding:0,marginBottom:abiertoSoderia?9:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
+          <button style={{width:"100%",background:"var(--color-background-tertiary)",border:"none",borderRadius:10,padding:"14px 16px",marginBottom:abiertoSoderia?10:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
             onClick={()=>setAbiertoSoderia(!abiertoSoderia)}>
-            <span style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",flex:1}}>🏭 Sodería <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:12}}>· de acá sale el camión</span></span>
-            <span style={{color:"var(--color-text-tertiary)",fontSize:12}}>{abiertoSoderia?"▲":"▼"}</span>
+            <span style={{fontSize:15,fontWeight:600,color:"var(--color-text-info)",flex:1}}>🏭 Sodería <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:12}}>· de acá sale el camión</span></span>
+            <span style={{width:26,height:26,borderRadius:"50%",background:"var(--color-background-primary)",color:"var(--color-text-info)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>{abiertoSoderia?"▲":"▼"}</span>
           </button>
           {abiertoSoderia&&(<>
           <div style={{display:"grid",gridTemplateColumns:"1fr 52px 52px 46px",gap:6,fontSize:12,color:"var(--color-text-tertiary)",marginBottom:5}}>
@@ -172,10 +172,10 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
 
         {/* DEPÓSITO */}
         <div style={{...s.card,margin:"0 0 10px"}}>
-          <button style={{width:"100%",background:"none",border:"none",padding:0,marginBottom:abiertoDeposito?9:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
+          <button style={{width:"100%",background:"var(--color-background-tertiary)",border:"none",borderRadius:10,padding:"14px 16px",marginBottom:abiertoDeposito?10:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
             onClick={()=>setAbiertoDeposito(!abiertoDeposito)}>
-            <span style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",flex:1}}>📦 Depósito <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:12}}>· vacíos nuevos, sin uso</span></span>
-            <span style={{color:"var(--color-text-tertiary)",fontSize:12}}>{abiertoDeposito?"▲":"▼"}</span>
+            <span style={{fontSize:15,fontWeight:600,color:"var(--color-text-info)",flex:1}}>📦 Depósito <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:12}}>· vacíos nuevos, sin uso</span></span>
+            <span style={{width:26,height:26,borderRadius:"50%",background:"var(--color-background-primary)",color:"var(--color-text-info)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>{abiertoDeposito?"▲":"▼"}</span>
           </button>
           {abiertoDeposito&&(
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
@@ -191,10 +191,10 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
 
         {/* EN CLIENTES — ARQUEO GENERAL */}
         <div style={{...s.card,margin:"0 0 10px"}}>
-          <button style={{width:"100%",background:"none",border:"none",padding:0,marginBottom:abiertoEnClientes?7:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
+          <button style={{width:"100%",background:"var(--color-background-tertiary)",border:"none",borderRadius:10,padding:"14px 16px",marginBottom:abiertoEnClientes?10:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
             onClick={()=>setAbiertoEnClientes(!abiertoEnClientes)}>
-            <span style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",flex:1}}>👥 En clientes <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:12}}>· fijos + prestados</span></span>
-            <span style={{color:"var(--color-text-tertiary)",fontSize:12}}>{abiertoEnClientes?"▲":"▼"}</span>
+            <span style={{fontSize:15,fontWeight:600,color:"var(--color-text-info)",flex:1}}>👥 En clientes <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:12}}>· fijos + prestados</span></span>
+            <span style={{width:26,height:26,borderRadius:"50%",background:"var(--color-background-primary)",color:"var(--color-text-info)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>{abiertoEnClientes?"▲":"▼"}</span>
           </button>
           {abiertoEnClientes&&(<>
           {/* Tabla de totales */}
@@ -285,10 +285,10 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
 
         {/* PÉRDIDAS — envases rotos o no recuperados, para no perderles el rastro */}
         <div style={{...s.card,margin:"0 0 10px"}}>
-          <button style={{width:"100%",background:"none",border:"none",padding:0,marginBottom:abiertoPerdidas?9:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
+          <button style={{width:"100%",background:"var(--color-background-tertiary)",border:"none",borderRadius:10,padding:"14px 16px",marginBottom:abiertoPerdidas?10:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
             onClick={()=>setAbiertoPerdidas(!abiertoPerdidas)}>
             <span style={{fontSize:13,fontWeight:600,color:"var(--color-text-danger)",flex:1}}>💔 Pérdidas <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:12}}>· rotos o no recuperados</span></span>
-            <span style={{color:"var(--color-text-tertiary)",fontSize:12}}>{abiertoPerdidas?"▲":"▼"}</span>
+            <span style={{width:26,height:26,borderRadius:"50%",background:"var(--color-background-primary)",color:"var(--color-text-info)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>{abiertoPerdidas?"▲":"▼"}</span>
           </button>
           {abiertoPerdidas&&(<>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
@@ -341,13 +341,13 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
 
         {/* PRODUCTOS Y PRECIOS */}
         <div style={{...s.card,margin:"0 0 10px"}}>
-          <button style={{width:"100%",background:"none",border:"none",padding:0,marginBottom:abiertoProductos?9:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
+          <button style={{width:"100%",background:"var(--color-background-tertiary)",border:"none",borderRadius:10,padding:"14px 16px",marginBottom:abiertoProductos?10:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
             onClick={()=>setAbiertoProductos(!abiertoProductos)}>
             <div style={{flex:1}}>
-              <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)"}}>🏷️ Productos y precios</div>
+              <div style={{fontSize:15,fontWeight:600,color:"var(--color-text-info)"}}>🏷️ Productos y precios</div>
               {!abiertoProductos&&<div style={{fontSize:12,color:"var(--color-text-tertiary)",marginTop:2}}>De acá salen los precios de la planilla y todas las ventas</div>}
             </div>
-            <span style={{color:"var(--color-text-tertiary)",fontSize:12}}>{abiertoProductos?"▲":"▼"}</span>
+            <span style={{width:26,height:26,borderRadius:"50%",background:"var(--color-background-primary)",color:"var(--color-text-info)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>{abiertoProductos?"▲":"▼"}</span>
           </button>
           {abiertoProductos&&(<>
           <div style={{fontSize:12,color:"var(--color-text-tertiary)",marginBottom:9}}>De acá salen los precios de la planilla y todas las ventas</div>
@@ -411,10 +411,10 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
 
         {/* CARGA DIARIA */}
         <div style={{...s.card,margin:"0 0 10px"}}>
-          <button style={{width:"100%",background:"none",border:"none",padding:0,marginBottom:abiertoCarga?9:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
+          <button style={{width:"100%",background:"var(--color-background-tertiary)",border:"none",borderRadius:10,padding:"14px 16px",marginBottom:abiertoCarga?10:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
             onClick={()=>setAbiertoCarga(!abiertoCarga)}>
-            <span style={{fontSize:13,fontWeight:600,color:"var(--color-text-info)",flex:1}}>🚐 Carga diaria del camión</span>
-            <span style={{color:"var(--color-text-tertiary)",fontSize:12}}>{abiertoCarga?"▲":"▼"}</span>
+            <span style={{fontSize:15,fontWeight:600,color:"var(--color-text-info)",flex:1}}>🚐 Carga diaria del camión</span>
+            <span style={{width:26,height:26,borderRadius:"50%",background:"var(--color-background-primary)",color:"var(--color-text-info)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>{abiertoCarga?"▲":"▼"}</span>
           </button>
           {abiertoCarga&&(<>
           <div style={{display:"flex",gap:5,marginBottom:10,flexWrap:"wrap"}}>
