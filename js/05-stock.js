@@ -287,7 +287,7 @@ function StockGeneral({stock,setStock,clientes,setClientes,ventas,productos,setP
         <div style={{...s.card,margin:"0 0 10px"}}>
           <button style={{width:"100%",background:"var(--color-background-tertiary)",border:"none",borderRadius:10,padding:"14px 16px",marginBottom:abiertoPerdidas?10:0,display:"flex",alignItems:"center",cursor:"pointer",textAlign:"left"}}
             onClick={()=>setAbiertoPerdidas(!abiertoPerdidas)}>
-            <span style={{fontSize:13,fontWeight:600,color:"var(--color-text-danger)",flex:1}}>💔 Pérdidas <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:12}}>· rotos o no recuperados</span></span>
+            <span style={{fontSize:15,fontWeight:600,color:"var(--color-text-danger)",flex:1}}>💔 Pérdidas <span style={{fontWeight:400,color:"var(--color-text-tertiary)",fontSize:12}}>· rotos o no recuperados</span></span>
             <span style={{width:26,height:26,borderRadius:"50%",background:"var(--color-background-primary)",color:"var(--color-text-info)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>{abiertoPerdidas?"▲":"▼"}</span>
           </button>
           {abiertoPerdidas&&(<>
