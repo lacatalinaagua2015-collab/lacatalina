@@ -165,6 +165,26 @@ function App() {
     setSyncStatus("loading");
     cloudLoad().then(function(data) {
       if(!data) { setSyncStatus("idle"); return; }
+      // ═══════════════════════════════════════════════════════════════════
+      // LEER ESTO ANTES DE TOCAR CUALQUIER MERGE DE ACÁ ABAJO
+      // ═══════════════════════════════════════════════════════════════════
+      // Patrón que se repite para clientes/ventas/planillas/noVisitas: al
+      // cargar de la nube, en vez de PISAR el array local con el de la nube
+      // (lo que perdía cambios recientes si el refetch llegaba antes de
+      // terminar de sincronizar), se compara registro por registro usando
+      // el timestamp `_upd` de cada uno, y gana el más nuevo.
+      //
+      // REGLA DE ORO: la comparación debe ser SIEMPRE con > estricto, nunca
+      // con >=. Un empate (misma marca de tiempo) significa que ese registro
+      // YA está sincronizado sin cambios — tratarlo como "cambio" hace que
+      // se re-suba de nuevo cada vez que la app carga, aunque no haya pasado
+      // nada. Esto pasó de verdad: un typo de >= en el merge de noVisitas
+      // hizo que 1027 marcas se re-sincronizaran en cada apertura de la app,
+      // agotando la cuota gratuita de Firestore en un día (julio 2026).
+      // Si algún día la cuota se agota sin explicación, ACÁ es el primer
+      // lugar para revisar — buscar cualquier ">=" y confirmar que debería
+      // ser ">".
+      // ═══════════════════════════════════════════════════════════════════
       // ── Clientes: MERGEAR en vez de sobreescribir (igual que ventas) ──────
       // Antes esto pisaba el array entero con lo de la nube, perdiendo saldos
       // recién actualizados localmente si el refetch llegaba antes de que
@@ -334,6 +354,11 @@ function App() {
   // Mismo tipo de guard, para no restar/editar el saldo dos veces si el cartel
   // de confirmación tarda en desaparecer y se vuelve a tocar Eliminar/Editar.
   const ultimoBorradoRef = React.useRef({id:null, ts:0});
+  // "Deshacer" para venta eliminada — guarda lo justo para poder revertir:
+  // las ventas borradas (para reponerlas tal cual estaban) y el ajuste de
+  // saldo que hay que devolver. Se limpia solo a los 8s si no se usa.
+  const [deshacerVenta, setDeshacerVenta] = React.useState(null); // {ventasBorradas, clienteId, ajusteTotal, ts}
+  const deshacerTimerRef = React.useRef(null);
   const ultimoEditadoRef = React.useRef({firma:null, ts:0});
   const ultimoClienteBorradoRef = React.useRef({id:null, ts:0});
 
@@ -467,12 +492,15 @@ function App() {
         } else {
           try { localStorage.setItem("sr_offline_pending", JSON.stringify(data)); } catch {}
           setPendingOfflineSync(true);
-          setSyncStatus("offline_pending");
+          // Si el navegador dice que hay conexión, esto NO es un problema de
+          // señal — es un fallo real (permisos, cuota, dato mal formado).
+          // Mostrar "sin conexión" ahí sería confuso, así que se distingue.
+          setSyncStatus(navigator.onLine ? "error" : "offline_pending");
         }
       }).catch(function(){
         try { localStorage.setItem("sr_offline_pending", JSON.stringify(data)); } catch {}
         setPendingOfflineSync(true);
-        setSyncStatus("offline_pending");
+        setSyncStatus(navigator.onLine ? "error" : "offline_pending");
       });
     });
   };
@@ -496,7 +524,18 @@ function App() {
     const goOffline = () => { setIsOnline(false); setSyncStatus("offline"); };
     window.addEventListener("online",  goOnline);
     window.addEventListener("offline", goOffline);
-    return ()=>{ window.removeEventListener("online",goOnline); window.removeEventListener("offline",goOffline); };
+    // Reintento periódico: cubre el caso de un guardado que falló ESTANDO
+    // online (permisos, cuota momentánea) — sin esto, solo se reintentaba
+    // al pasar de sin señal a con señal, y ese cambio puede no pasar nunca
+    // en una sesión donde la conexión nunca se corta.
+    const reintentoPeriodico = setInterval(()=>{
+      if(navigator.onLine && localStorage.getItem("sr_offline_pending")) goOnline();
+    }, 45000);
+    return () => {
+      window.removeEventListener("online",  goOnline);
+      window.removeEventListener("offline", goOffline);
+      clearInterval(reintentoPeriodico);
+    };
   },[]);
 
   // ── NOTIFICACIONES PUSH ─────────────────────────────────────────────
@@ -925,6 +964,12 @@ function App() {
         if((Number(x.saldoDelta)||0)!==0) ajusteSaldoExtra += Number(x.saldoDelta);
       }
     });
+    // Guardar lo borrado para poder "Deshacer" — antes de tocar nada
+    const ventasBorradas = ventas.filter(x=>idsABorrar.has(x.id));
+    const ajusteTotal = v.saldoDelta + ajusteSaldoExtra;
+    if(deshacerTimerRef.current) clearTimeout(deshacerTimerRef.current);
+    setDeshacerVenta({ventasBorradas, clienteId:v.clienteId, ajusteTotal, ts:Date.now()});
+    deshacerTimerRef.current = setTimeout(()=>setDeshacerVenta(null), 8000);
     // Escribimos sobre el ventas MÁS RECIENTE (prev), no sobre el closure —
     // así, si se borran varias ventas una atrás de otra rápido, ninguna
     // "revive" por pisar el array con una versión vieja.
@@ -937,6 +982,15 @@ function App() {
     // El saldo se resta sobre el saldo REAL más reciente del cliente (prev),
     // así ninguna reversión se pierde si borrás varias ventas seguidas.
     saveClientes(prev => prev.map(x=>x.id===v.clienteId?{...x,saldo:(Number(x.saldo)||0)-v.saldoDelta-ajusteSaldoExtra}:x));
+  };
+
+  const deshacerUltimaVenta = () => {
+    if(!deshacerVenta) return;
+    if(deshacerTimerRef.current) clearTimeout(deshacerTimerRef.current);
+    const {ventasBorradas, clienteId, ajusteTotal} = deshacerVenta;
+    saveVentas(prev => [...prev, ...ventasBorradas]);
+    saveClientes(prev => prev.map(x=>x.id===clienteId?{...x,saldo:(Number(x.saldo)||0)+ajusteTotal}:x));
+    setDeshacerVenta(null);
   };
 
   // Limpieza automática: partes-transferencia cuya venta principal ya fue eliminada
@@ -1372,6 +1426,12 @@ function App() {
         onVolver={()=>irA("menu")}
       /></React.Fragment>}
       {pantalla==="config"         && <Config productos={productos} setProductos={saveProductos} clientes={clientes} setClientes={saveClientes} ventas={ventas} setVentas={saveVentas} planillas={planillas} setPlanillas={savePlanillasCloud} stock={stockNorm} setStock={(s)=>{const ns=normStock(s);setStockRaw(ns);syncData({stock:ns});}} cargasDia={cargasDia} setCargasDia={saveCargasDia} syncData={syncData} onVolver={()=>irA("menu")} ecToken={ecToken} setEcToken={setEcToken} tabInicial={tabConfig} noVisitas={noVisitas} prospectos={prospectos} />}
+      {deshacerVenta && (
+        <div style={{position:"fixed",left:14,right:14,bottom:18,zIndex:999,background:"var(--color-background-tertiary)",border:"1px solid var(--color-border-secondary)",borderRadius:12,padding:"12px 14px",display:"flex",alignItems:"center",gap:10,boxShadow:"0 4px 16px rgba(0,0,0,0.35)"}}>
+          <span style={{fontSize:13,color:"var(--color-text-primary)",flex:1}}>🗑️ Venta eliminada</span>
+          <button style={{background:"#185FA5",color:"#e2eaf4",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}} onClick={deshacerUltimaVenta}>↩️ Deshacer</button>
+        </div>
+      )}
     </div>
     </div>
   );
