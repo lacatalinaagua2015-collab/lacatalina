@@ -824,8 +824,8 @@ function FiadosPendientes({clientes,ventas,onCobrar,onVolver,onEditarCliente,onP
   );
 }
 
-function ClientesDormidos({clientes,ventas,onVolver,onSeleccionar,onEditarCliente,onPerdida}) {
-  const [semanas,setSemanas]=React.useState(2);
+function ClientesDormidos({clientes,ventas,onVolver,onSeleccionar,onEditarCliente,onEliminar,onPerdida}) {
+  const [semanas,setSemanas]=React.useState(4);
   const hoy=new Date();
   // Última compra real por cliente (ignora cobros y ajustes)
   const ultima={};
@@ -864,6 +864,11 @@ function ClientesDormidos({clientes,ventas,onVolver,onSeleccionar,onEditarClient
           </button>
         ))}
       </div>
+      <div style={{padding:"0 14px 4px"}}>
+        <div style={{fontSize:11,color:"var(--color-text-tertiary)",background:"var(--color-background-tertiary)",borderRadius:8,padding:"7px 10px"}}>
+          📋 Política: a partir de 3-4 semanas sin comprar, se recomienda retirar los envases y eliminar al cliente.
+        </div>
+      </div>
       {lista.length===0&&<div style={{padding:40,textAlign:"center",color:"var(--color-text-success)",fontSize:15}}>✅ ¡Ningún cliente dormido con ese filtro!</div>}
       {lista.map(c=>(
         <div key={c.id} style={{...s.card,margin:"6px 14px"}}>
@@ -883,7 +888,8 @@ function ClientesDormidos({clientes,ventas,onVolver,onSeleccionar,onEditarClient
               {(c.maps||(c.lat&&c.lng))&&<a href={c.maps||`https://www.google.com/maps?q=${c.lat},${c.lng}`} target="_blank" rel="noreferrer" style={{fontSize:22,textDecoration:"none"}} title="Mapa">📍</a>}
             </div>
           </div>
-          {onEditarCliente&&<PieEnvases c={c} ventas={ventas} onEditar={onEditarCliente} onPerdida={onPerdida} />}
+          {onEditarCliente&&<PieEnvases c={c} ventas={ventas} onEditar={onEditarCliente} onPerdida={onPerdida}
+            izquierda={onEliminar&&<button style={{fontSize:11,fontWeight:600,padding:"5px 12px",borderRadius:20,cursor:"pointer",background:"var(--color-background-danger)",color:"var(--color-text-danger)",border:"1px solid var(--color-border-danger)"}} onClick={e=>{e.stopPropagation();onEliminar(c.id);}}>🗑️ Eliminar</button>} />}
         </div>
       ))}
     </div>

@@ -153,6 +153,28 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
     'Notification' in window ? Notification.permission : 'no-soportado'
   );
   const saveMantVeh = (lista) => {setMantVeh(lista);localStorage.setItem("cat_mant_vehiculo_v1",JSON.stringify(lista));if(syncData)syncData({mantVeh:lista});};
+
+  // Exportar ventas a CSV — para llevarle algo armado a un contador, o
+  // simplemente tener el historial en una planilla aparte de la app.
+  const exportarVentasCSV = () => {
+    if(!ventas||!ventas.length){ alert("No hay ventas para exportar."); return; }
+    const clientePorId = {}; (clientes||[]).forEach(c=>{ clientePorId[c.id]=c.nombre; });
+    const esc = (v) => `"${String(v??"").replace(/"/g,'""')}"`;
+    const filas = [["Fecha","Día","Cliente","Productos","Monto","Forma de pago","Observaciones"].map(esc).join(",")];
+    [...ventas].sort((a,b)=>(a.fechaKey||"").localeCompare(b.fechaKey||"")).forEach(v=>{
+      if(v._esCobro||v._esAjuste||v._esAjusteEnvases) return; // solo ventas reales, no ajustes internos
+      const prods = (v.detalle||[]).map(d=>`${d.nombre} x${d.cantidad}`).join(" · ");
+      filas.push([v.fechaKey||"", v.dia||"", clientePorId[v.clienteId]||"", prods, v.neto||v.pagadoNum||0, v.pago||"", v.obs||""].map(esc).join(","));
+    });
+    const csv = "\uFEFF"+filas.join("\n"); // BOM para que Excel reconozca tildes bien
+    const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `la-catalina_ventas_${new Date().toLocaleDateString("en-CA")}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 1500);
+  };
+
   const prestados={sifon:clientes.reduce((a,c)=>a+(c.sifon||0),0),bidon10:clientes.reduce((a,c)=>a+(c.bidon10||0),0),bidon20:clientes.reduce((a,c)=>a+(c.bidon20||0),0)};
   const stockKeys={"Sifón 1.5L":"sifon","Bidón 10L":"bidon10","Bidón 20L":"bidon20","Dispenser":"dispenser"};
   return (
@@ -368,6 +390,9 @@ function Config({productos,setProductos,clientes,setClientes,ventas,setVentas,pl
               else alert("No se pudo generar el respaldo. Recargá la app e intentá de nuevo.");
             }}>
               💾 Descargar respaldo (.json)
+            </button>
+            <button style={{...s.btn,width:"100%",marginBottom:8}} onClick={exportarVentasCSV}>
+              📊 Exportar ventas (.csv, para Excel/contador)
             </button>
             <div style={{display:"flex",gap:8}}>
               <label style={{...s.btn,flex:1,padding:"10px",display:"block",textAlign:"center",cursor:"pointer",boxSizing:"border-box",fontSize:12}}>

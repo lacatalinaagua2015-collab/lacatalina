@@ -27,10 +27,11 @@ function _ajustarColorLC(hex, amt) {
   const canal = (i) => Math.max(0,Math.min(255, parseInt(hex.substring(i,i+2),16)+amt)).toString(16).padStart(2,"0");
   return "#"+canal(0)+canal(2)+canal(4);
 }
-Object.keys(TEMAS_LC).forEach(id=>{
-  const base = TEMAS_LC[id];
-  TEMAS_LC[id+"-metal"] = { nombre:base.nombre, modo:base.modo, emoji:"⚙️", relieve:true, vars:base.vars };
-});
+// Los temas "Metálico" (relieve/fibra de carbono) se sacaron para
+// simplificar — eran 10 variantes extra (el doble de superficie para
+// mantener) que complicaban probar cualquier cambio visual sin revisar las
+// 20 combinaciones. El resguardo de aplicarTemaLC (más abajo) hace que
+// quien tuviera un Metálico elegido caiga solo a su versión Clásica.
 
 // ── RELIEVE — el degradado vive DENTRO de la variable de color ────────────
 // Todas las pantallas ya pintan sus tarjetas y botones con
@@ -134,7 +135,16 @@ function _contenedorAppLC() {
   return raiz ? raiz.firstElementChild : null;
 }
 function aplicarTemaLC(temaId) {
-  const tema = TEMAS_LC[temaId]; if(!tema) return;
+  let tema = TEMAS_LC[temaId];
+  if(!tema){
+    // El tema pedido no existe (por ejemplo, tenía un "-metal" elegido de
+    // cuando existía ese estilo). En vez de dejar la app sin ningún tema
+    // aplicado, cae a la versión base, y si tampoco existe, a un default fijo.
+    const base = (temaId||"").replace(/-metal$/,"");
+    temaId = TEMAS_LC[base] ? base : "oscuro-azul";
+    tema = TEMAS_LC[temaId];
+    try { localStorage.setItem("lc_tema", JSON.stringify(temaId)); } catch {}
+  }
   const root = document.documentElement;
   Object.entries(tema.vars).forEach(([k,v])=>{ if(k!=="body-bg") root.style.setProperty(k,v); });
   const cont = _contenedorAppLC();

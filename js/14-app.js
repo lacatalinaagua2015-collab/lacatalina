@@ -1374,7 +1374,7 @@ function App() {
         saveVentas(prev=>[...prev,vt]);
         saveClientes(prev=>prev.map(c=>c.id===clienteId?{...c,saldo:(Number(c.saldo)||0)+monto}:c));
       }} onVolver={()=>irA("menu")} ventas={ventas} onEditarCliente={(id,cambios)=>{saveClientes(prev=>prev.map(c=>c.id===id?{...c,...cambios}:c));}} /></React.Fragment>}
-      {pantalla==="clientesDormidos" && <React.Fragment><ClientesTabs activo="dormidos" onIr={irA}/><ClientesDormidos clientes={clientes} ventas={ventas} onPerdida={registrarPerdida} onVolver={()=>irA("menu")} onSeleccionar={c=>{setClienteId(c.id);setDiaActual(c.dia);irA("detalleCliente");}} onEditarCliente={(id,cambios)=>{saveClientes(prev=>prev.map(c=>c.id===id?{...c,...cambios}:c));}} /></React.Fragment>}
+      {pantalla==="clientesDormidos" && <React.Fragment><ClientesTabs activo="dormidos" onIr={irA}/><ClientesDormidos clientes={clientes} ventas={ventas} onPerdida={registrarPerdida} onVolver={()=>irA("menu")} onSeleccionar={c=>{setClienteId(c.id);setDiaActual(c.dia);irA("detalleCliente");}} onEditarCliente={(id,cambios)=>{saveClientes(prev=>prev.map(c=>c.id===id?{...c,...cambios}:c));}} onEliminar={eliminarCliente} /></React.Fragment>}
       {/* Modal resumen del día al completarse */}
       {modalResumenDia&&(()=>{
         const {dia,fechaKey}=modalResumenDia;
