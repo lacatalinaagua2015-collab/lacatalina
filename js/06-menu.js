@@ -1427,7 +1427,11 @@ function PlanillaDelDia({
     paraLlenarCalc[pk] = Math.min(falta, vaciosHoy); // no se puede llenar más de lo que vuelve vacío hoy
     vaciosRestoCalc[pk] = Math.max(0, vaciosHoy - paraLlenarCalc[pk]);
   });
-  const confirmarCierre = () => {
+ const confirmarCierre = () => {
+    if (planilla._diaCerrado) {
+      window.lcAlert ? window.lcAlert("Este día ya fue cerrado. No se puede cerrar el stock dos veces.") : alert("Este día ya fue cerrado.");
+      return;
+    }
     // Usar valores reales si el usuario los modificó, si no usar los calculados
     const llenVuelta = {
       soda: 0,
