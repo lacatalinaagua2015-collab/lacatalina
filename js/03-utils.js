@@ -1080,11 +1080,13 @@ function HeaderApp({
     style: s.backBtn,
     onClick: onVolver
   }, "← Volver"), /*#__PURE__*/React.createElement("span", {
+    onClick: () => window._lcIrA && window._lcIrA("menu"),
     style: {
       ...s.headerTitle,
       whiteSpace: "nowrap",
       overflow: "hidden",
-      textOverflow: "ellipsis"
+      textOverflow: "ellipsis",
+      cursor: "pointer"
     }
   }, titulo ? `${negocio} · ${titulo}` : negocio), /*#__PURE__*/React.createElement(HeaderBotones, null));
 }
