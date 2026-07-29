@@ -554,7 +554,7 @@ function App() {
      const esPrimera = ultimoUpdRemotoRef.current === null;
 const esPropio = upd === window._lcUltimoPulsoPropio;
 ultimoUpdRemotoRef.current = upd;
-if (!esPrimera && !esPropio) traerDeLaNube(true);   cambio real de otro dispositivo → traer ya
+if (!esPrimera && !esPropio) traerDeLaNube(true);   //cambio real de otro dispositivo → traer ya
       }
     }, err => console.warn("Listener Firestore:", err));
     return () => unsub();
