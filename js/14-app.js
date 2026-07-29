@@ -1877,10 +1877,11 @@ function App() {
     planillas: planillas,
     ventas: ventas,
     noVisitas: noVisitas,
-    onSeleccionar: (fk, fo) => {
+   onSeleccionar: (fk, fo) => {
       setFechaActual(fk);
       setFechaObj(fo);
-      irA("planilla");
+      const yaIniciado = planillas[`${diaActual}_${fk}`]?.iniciado;
+      irA(yaIniciado ? "clientes" : "inicioReparto");
     },
     onVolver: () => irA("diaPrincipal")
   }), pantalla === "planilla" && /*#__PURE__*/React.createElement(PlanillaDelDia, {
