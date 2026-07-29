@@ -345,10 +345,10 @@
     try {
       var rawStock = localStorage.getItem('cat_stock_v4');
       if(rawStock) {
-        var s = JSON.parse(rawStock);
-        if(s && !s.soderia) {
-          var newStock = {
-            soderia:{sifon:s.sifon||0,bidon10:s.bidon10||0,bidon20:s.bidon20||0},
+       var stockOld = JSON.parse(rawStock);
+if(stockOld && !stockOld.soderia) {
+  var newStock = {
+    soderia:{sifon:stockOld.sifon||0,bidon10:stockOld.bidon10||0,bidon20:stockOld.bidon20||0},
             casa:   {sifon:0,bidon10:0,bidon20:0},
             camion: {sifon:0,bidon10:0,bidon20:0}
           };
