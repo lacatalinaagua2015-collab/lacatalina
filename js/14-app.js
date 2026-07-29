@@ -1169,10 +1169,11 @@ if (!esPrimera && !esPropio) traerDeLaNube(true);   //cambio real de otro dispos
     }
     setPantalla(p);
     window.scrollTo(0, 0);
-    window.history.pushState({
+   window.history.pushState({
       pantalla: p
     }, '', `#${p}`);
   };
+  window._lcIrA = irA;
 
   // Handle back button
   React.useEffect(() => {
