@@ -548,13 +548,13 @@ function App() {
     const unsub = window.db.collection("meta").doc("pulse").onSnapshot({
       includeMetadataChanges: true
     }, snap => {
-      if (!snap.exists || snap.metadata.hasPendingWrites) return; // ignora el eco de nuestro propio guardado
+     if (!snap.exists || snap.metadata.hasPendingWrites) return; // ignora el eco de nuestro propio guardado (fase local)
       const upd = snap.data()._upd;
       if (upd && upd !== ultimoUpdRemotoRef.current) {
-     const esPrimera = ultimoUpdRemotoRef.current === null;
-const esPropio = upd === window._lcUltimoPulsoPropio;
-ultimoUpdRemotoRef.current = upd;
-if (!esPrimera && !esPropio) traerDeLaNube(true);   //cambio real de otro dispositivo → traer ya
+        const esPrimera = ultimoUpdRemotoRef.current === null;
+        const esPropio = upd === window._lcUltimoPulsoPropio; // el server ya confirmó ESTE MISMO guardado nuestro
+        ultimoUpdRemotoRef.current = upd;
+        if (!esPrimera && !esPropio) traerDeLaNube(true); // cambio real de OTRO dispositivo → recién ahí traer
       }
     }, err => console.warn("Listener Firestore:", err));
     return () => unsub();
