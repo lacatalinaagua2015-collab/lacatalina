@@ -1062,7 +1062,6 @@ function NuevaVenta({
     prod: "",
     cant: ""
   }]);
-  const [envOpen, setEnvOpen] = useState(false);
   const addEnv = (setList, prod) => setList(prev => {
     const idx = prev.findIndex(e => e.prod === prod);
     if (idx >= 0) {
@@ -2020,113 +2019,81 @@ function NuevaVenta({
     style: {
       ...s.card,
       margin: "0 0 10px",
-      padding: 0,
-      overflow: "hidden"
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    style: {
-      width: "100%",
-      padding: "10px 14px",
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      background: "none",
-      border: "none",
-      cursor: "pointer"
-    },
-    onClick: () => setEnvOpen(o => !o)
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 13,
-      fontWeight: 500,
-      color: "var(--color-text-primary)"
-    }
-  }, "📦 Envases", getEnvCnt(envPrest, "Sifón 1.5L") + getEnvCnt(envPrest, "Bidón 10L") + getEnvCnt(envPrest, "Bidón 20L") + getEnvCnt(envDev, "Sifón 1.5L") + getEnvCnt(envDev, "Bidón 10L") + getEnvCnt(envDev, "Bidón 20L") > 0 ? " · hay movimientos" : ""), /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: "var(--color-text-tertiary)",
-      fontSize: 16,
-      transform: envOpen ? "rotate(180deg)" : "rotate(0deg)",
-      transition: "transform 0.2s"
-    }
-  }, "⌃")), envOpen && prodEntrega.map(p => /*#__PURE__*/React.createElement("div", {
-    key: p.nombre,
-    style: {
-      padding: "10px 14px",
-      borderTop: "0.5px solid var(--color-border-tertiary)"
+      padding: "10px 14px"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
       fontSize: 13,
       fontWeight: 500,
-      color: "var(--color-text-primary)"
+      color: "var(--color-text-primary)",
+      marginBottom: 10
     }
-  }, p.nombre), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 11,
-      color: "var(--color-text-tertiary)"
-    }
-  }, getEnvCnt(envPrest, p.nombre) > 0 && `Presté ${getEnvCnt(envPrest, p.nombre)}`, getEnvCnt(envPrest, p.nombre) > 0 && getEnvCnt(envDev, p.nombre) > 0 && " · ", getEnvCnt(envDev, p.nombre) > 0 && `Devolvió ${getEnvCnt(envDev, p.nombre)}`)), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    style: {
-      flex: 1,
-      background: "var(--color-background-info)",
-      color: "var(--color-text-info)",
-      border: "0.5px solid var(--color-border-secondary)",
-      borderRadius: 8,
-      padding: "8px",
-      fontSize: 12,
-      fontWeight: 500,
-      cursor: "pointer"
-    },
-    onClick: () => addEnv(setEnvPrest, p.nombre)
-  }, "+ Presté uno"), /*#__PURE__*/React.createElement("button", {
-    style: {
-      flex: 1,
-      background: "var(--color-background-success)",
-      color: "var(--color-text-success)",
-      border: "0.5px solid var(--color-border-secondary)",
-      borderRadius: 8,
-      padding: "8px",
-      fontSize: 12,
-      fontWeight: 500,
-      cursor: "pointer"
-    },
-    onClick: () => addEnv(setEnvDev, p.nombre)
-  }, "− Devolvió uno")), getEnvCnt(envPrest, p.nombre) > 0 && /*#__PURE__*/React.createElement("button", {
-    style: {
-      marginTop: 6,
-      background: "none",
-      border: "none",
-      fontSize: 11,
-      color: "var(--color-text-tertiary)",
-      cursor: "pointer",
-      padding: 0
-    },
-    onClick: () => subEnv(setEnvPrest, p.nombre)
-  }, "↩ deshacer último prestado"), getEnvCnt(envDev, p.nombre) > 0 && /*#__PURE__*/React.createElement("button", {
-    style: {
-      marginTop: getEnvCnt(envPrest, p.nombre) > 0 ? 2 : 6,
-      background: "none",
-      border: "none",
-      fontSize: 11,
-      color: "var(--color-text-tertiary)",
-      cursor: "pointer",
-      padding: 0,
-      display: "block"
-    },
-    onClick: () => subEnv(setEnvDev, p.nombre)
-  }, "↩ deshacer última devolución")))), /*#__PURE__*/React.createElement("div", {
+  }, "📦 Envases prestados / retirados"), prodEntrega.map(p => {
+    const neto = getEnvCnt(envPrest, p.nombre) - getEnvCnt(envDev, p.nombre);
+    const incrementar = () => {
+      if (neto < 0) subEnv(setEnvDev, p.nombre);else addEnv(setEnvPrest, p.nombre);
+    };
+    const decrementar = () => {
+      if (neto > 0) subEnv(setEnvPrest, p.nombre);else addEnv(setEnvDev, p.nombre);
+    };
+    return /*#__PURE__*/React.createElement("div", {
+      key: p.nombre,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "8px 0",
+        borderTop: "0.5px solid var(--color-border-tertiary)"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        color: "var(--color-text-primary)"
+      }
+    }, p.nombre), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      style: {
+        width: 34,
+        height: 34,
+        borderRadius: 8,
+        border: "0.5px solid var(--color-border-secondary)",
+        background: "var(--color-background-success)",
+        color: "var(--color-text-success)",
+        fontSize: 17,
+        fontWeight: 600,
+        cursor: "pointer"
+      },
+      onClick: decrementar,
+      title: "Devolvió uno"
+    }, "−"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        minWidth: 74,
+        textAlign: "center",
+        fontSize: 12,
+        fontWeight: 600,
+        color: neto > 0 ? "var(--color-text-info)" : neto < 0 ? "var(--color-text-success)" : "var(--color-text-tertiary)"
+      }
+    }, neto > 0 ? `Presté ${neto}` : neto < 0 ? `Devolvió ${-neto}` : "sin cambio"), /*#__PURE__*/React.createElement("button", {
+      style: {
+        width: 34,
+        height: 34,
+        borderRadius: 8,
+        border: "0.5px solid var(--color-border-secondary)",
+        background: "var(--color-background-info)",
+        color: "var(--color-text-info)",
+        fontSize: 17,
+        fontWeight: 600,
+        cursor: "pointer"
+      },
+      onClick: incrementar,
+      title: "Presté uno"
+    }, "+")));
+  })), /*#__PURE__*/React.createElement("div", {
     style: s.divider
   }), /*#__PURE__*/React.createElement("label", {
     style: s.label
