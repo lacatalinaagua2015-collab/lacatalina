@@ -1779,6 +1779,10 @@ function App() {
     }
   });
   window._setScaleIdxLC = setScaleIdx;
+  // Header clickeable: tocar el nombre de la empresa en CUALQUIER pantalla
+  // vuelve al inicio (mismo patrón que _setScaleIdxLC, sin pasar props por
+  // todas las pantallas — HeaderApp se usa en decenas de lugares).
+  window._lcIrInicio = () => irA("menu");
   return /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
