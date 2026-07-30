@@ -2,7 +2,7 @@
 // ◆  14-app.js — Componente App principal
 // ════════════════════════════════════════════════════════════════════
 
-// Barra de pestañas del hub de Clientes (Todos · Prospectos · Fiados · Dormidos · Mapa)
+// Barra de pestañas del hub de Clientes (Todos · Fiados · Dormidos · Mapa)
 function ClientesTabs({
   activo,
   onIr
@@ -2001,42 +2001,6 @@ function App() {
         _upd: Date.now()
       } : v));
     },
-    prospectos: (prospectos || []).filter(p => p.dia === diaActual && p.estado === "activo"),
-    onVerProspecto: p => {
-      setClienteId(p.id);
-      irA("detalleProspecto");
-    },
-    onEditarProspecto: (id, cambios) => {
-      saveProspectos(prev => (prev || []).map(x => x.id === id ? {
-        ...x,
-        ...cambios
-      } : x));
-    },
-    onEliminarProspecto: id => {
-      window.lcConfirm("¿Eliminar este prospecto?", {
-        peligro: true
-      }).then(function (ok) {
-        if (ok) saveProspectos(prev => (prev || []).filter(x => x.id !== id));
-      });
-    },
-    onVentaProspecto: p => {
-      saveClientes(prev => prev.find(c => c.id === p.id) ? prev : [...prev, {
-        ...p,
-        saldo: 0,
-        _esProspecto: true
-      }]);
-      setClienteId(p.id);
-      irA("venta");
-    },
-    onNoEstaProspecto: id => {
-      saveNoVisitas(prev => [...(prev || []).filter(v => !(v.clienteId === id && v.dia === diaActual && v.fecha === fechaActual)), {
-        clienteId: id,
-        dia: diaActual,
-        fecha: fechaActual,
-        motivo: "noesta",
-        _upd: Date.now()
-      }]);
-    },
     onAbrirMapa: () => irA("mapaClientes"),
     onPlanilla: () => irA("planilla")
   }), pantalla === "detalleCliente" && cliente && /*#__PURE__*/React.createElement(DetalleCliente, {
@@ -2294,50 +2258,7 @@ function App() {
       irA("clientes");
     },
     onVolver: () => irA("clientes")
-  }), pantalla === "detalleProspecto" && prospectos && prospectos.find(p => p.id === clienteId) && (() => {
-    const prosp = prospectos.find(p => p.id === clienteId);
-    return /*#__PURE__*/React.createElement(DetalleCliente, {
-      cliente: {
-        ...prosp,
-        saldo: prosp.saldo || 0,
-        tipo: "prospecto"
-      },
-      ventas: ventas.filter(v => v.clienteId === prosp.id),
-      noVisitas: (noVisitas || []).filter(v => v.clienteId === prosp.id),
-      dia: diaActual,
-      fecha: fechaActual,
-      productos: productos,
-      onVenta: () => {
-        saveClientes(prev => prev.find(c => c.id === prosp.id) ? prev : [...prev, {
-          ...prosp,
-          saldo: 0,
-          _esProspecto: true
-        }]);
-        saveProspectos(prev => (prev || []).map(x => x.id === prosp.id ? {
-          ...x,
-          estado: "convertido"
-        } : x));
-        irA("venta");
-      },
-      onVolver: () => irA("clientes"),
-      onEditar: cambios => saveProspectos(prev => (prev || []).map(x => x.id === prosp.id ? {
-        ...x,
-        ...cambios
-      } : x)),
-      onEliminarCliente: () => {
-        window.lcConfirm("¿Eliminar este prospecto?", {
-          peligro: true
-        }).then(function (ok) {
-          if (ok) saveProspectos(prev => (prev || []).filter(x => x.id !== prosp.id));
-          irA("clientes");
-        });
-      },
-      onEliminarVenta: eliminarVenta,
-      onEditarVenta: editarVenta,
-      onNoEstaCliente: () => irA("clientes"),
-      onNoQuiereCliente: () => irA("clientes")
-    });
-  })(), pantalla === "gestionClientes" && /*#__PURE__*/React.createElement(GestionClientes, {
+  }), pantalla === "gestionClientes" && /*#__PURE__*/React.createElement(GestionClientes, {
     onIrTab: irA,
     clientes: clientes,
     onPerdida: registrarPerdida,
