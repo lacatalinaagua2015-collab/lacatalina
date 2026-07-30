@@ -1893,7 +1893,13 @@ function App() {
     onVolver: () => irA("menu")
   }), pantalla === "diaPrincipal" && /*#__PURE__*/React.createElement(DiaPrincipal, {
     dia: diaActual,
-    onIrClientes: () => irA("selectorFechaClientes"),
+    onIrClientes: () => {
+      // Si ya se venía trabajando esta fecha (camión ya cargado hoy), entrar
+      // directo a la lista en vez de pasar de nuevo por el selector de fecha
+      // + la pantalla de "Inicio del reparto".
+      const yaIniciado = fechaActual && planillas[`${diaActual}_${fechaActual}`]?.iniciado;
+      irA(yaIniciado ? "clientes" : "selectorFechaClientes");
+    },
     onIrPlanilla: () => irA("selectorFechaPlanilla"),
     onVolver: () => irA("menu"),
     onVerConfirmaciones: () => irA("confirmacionesDia"),
@@ -1938,7 +1944,10 @@ function App() {
     onSeleccionar: (fk, fo) => {
       setFechaActual(fk);
       setFechaObj(fo);
-      irA("inicioReparto");
+      // Si el camión ya se cargó ese día, no repetir "Inicio del reparto" —
+      // ir directo a la lista de clientes (mismo criterio que selectorFechaPlanilla).
+      const yaIniciado = planillas[`${diaActual}_${fk}`]?.iniciado;
+      irA(yaIniciado ? "clientes" : "inicioReparto");
     },
     onVolver: () => irA("diaPrincipal")
   }), pantalla === "inicioReparto" && /*#__PURE__*/React.createElement(InicioReparto, {
