@@ -24,7 +24,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
-  
+
   <script>
     var firebaseConfig = {
       apiKey: "AIzaSyCqZnFu-I-5MdnSybf7e5t5l7jnyuho4_o",
@@ -202,7 +202,7 @@
         data._config=cfg;
       }
       // pulso para los listeners en tiempo real (equivale al viejo _upd de config)
-    if(ops.length){
+      if(ops.length){
         var _tsPulso = Date.now();
         window._lcUltimoPulsoPropio = _tsPulso; // para que 14-app.js sepa que ESTE pulso es nuestro
         ops.push({tipo:'set', ref:window.db.collection('meta').doc('pulse'), data:{_upd:_tsPulso}});
@@ -349,10 +349,10 @@
     try {
       var rawStock = localStorage.getItem('cat_stock_v4');
       if(rawStock) {
-       var stockOld = JSON.parse(rawStock);
-if(stockOld && !stockOld.soderia) {
-  var newStock = {
-    soderia:{sifon:stockOld.sifon||0,bidon10:stockOld.bidon10||0,bidon20:stockOld.bidon20||0},
+        var s = JSON.parse(rawStock);
+        if(s && !s.soderia) {
+          var newStock = {
+            soderia:{sifon:s.sifon||0,bidon10:s.bidon10||0,bidon20:s.bidon20||0},
             casa:   {sifon:0,bidon10:0,bidon20:0},
             camion: {sifon:0,bidon10:0,bidon20:0}
           };

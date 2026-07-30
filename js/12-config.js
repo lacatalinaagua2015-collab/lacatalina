@@ -1643,7 +1643,8 @@ function Config({
     onClick: () => saveMantVeh(mantVeh.filter((_, j) => mantVeh.length - 1 - j !== i))
   }, "Borrar"))))), mostrarNuevoMant && /*#__PURE__*/React.createElement(VehiculoMantModal, {
     onGuardar: reg => {
-      saveMantVeh([...mantVeh, reg]);
+      const regConId = reg.id != null ? reg : { ...reg, id: 'mant_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7) };
+      saveMantVeh([...mantVeh, regConId]);
       setMostrarNuevoMant(false);
     },
     onCerrar: () => setMostrarNuevoMant(false)
