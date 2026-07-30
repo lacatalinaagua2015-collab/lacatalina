@@ -202,7 +202,11 @@
         data._config=cfg;
       }
       // pulso para los listeners en tiempo real (equivale al viejo _upd de config)
-     if(ops.length){ var _tsPulso=Date.now(); window._lcUltimoPulsoPropio=_tsPulso; ops.push({tipo:'set', ref:window.db.collection('meta').doc('pulse'), data:{_upd:_tsPulso}}); }
+    if(ops.length){
+        var _tsPulso = Date.now();
+        window._lcUltimoPulsoPropio = _tsPulso; // para que 14-app.js sepa que ESTE pulso es nuestro
+        ops.push({tipo:'set', ref:window.db.collection('meta').doc('pulse'), data:{_upd:_tsPulso}});
+      }
       return ops;
     }
 
