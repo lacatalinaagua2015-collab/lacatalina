@@ -56,6 +56,30 @@ function nuevoIdCat() {
 // sueltas repetidas en cada pantalla. Ahora los leen de acá. Se mantiene fallback
 // a props dentro de cada componente, así nada se rompe si alguna sigue pasándose.
 const DatosAppContext = React.createContext(null);
+// Dedupe defensivo de mantVeh por contenido (protege contra duplicados
+// que puedan seguir existiendo en Firestore mientras no se terminen de
+// borrar, evita QuotaExceededError en localStorage sin importar cuántos
+// documentos duplicados haya del lado del servidor).
+function _lcDedupMantVeh(arr) {
+  if (!Array.isArray(arr)) return [];
+  const vistos = new Set();
+  const limpio = [];
+  arr.forEach(function (r) {
+    const clave = r && r.id != null ? String(r.id) : JSON.stringify({
+      km: r && r.km,
+      fecha: r && r.fecha,
+      costo: r && r.costo,
+      proximo: r && r.proximo,
+      desc: r && (r.desc || r.tipo) || ''
+    });
+    if (!vistos.has(clave)) {
+      vistos.add(clave);
+      limpio.push(r);
+    }
+  });
+  return limpio;
+}
+
 function App() {
   const [pantalla, setPantalla] = useState(() => {
     const h = window.location.hash.slice(1) || "portada";
@@ -510,7 +534,7 @@ function App() {
           recordatorios: mergedRec
         }), 2000);
       }
-      if (data.mantVeh?.length) localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh));
+      if (data.mantVeh?.length) localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(_lcDedupMantVeh(data.mantVeh)));
       if (data.horaAvisoCierre) localStorage.setItem("lc_hora_notif_cierre", data.horaAvisoCierre);
       if (data.horasAvisoTrans) localStorage.setItem("lc_horas_notif_trans", JSON.stringify(data.horasAvisoTrans));
       if (data.diasAvisoMant) localStorage.setItem("lc_dias_notif_mant", data.diasAvisoMant.join(','));
@@ -1068,7 +1092,7 @@ function App() {
         if (data.perdidas !== undefined) setPerdidas(data.perdidas || []);
         if (data.prospectos !== undefined) setProspectos(data.prospectos || []);
         if (data.recordatorios !== undefined) setRecordatorios(data.recordatorios || []);
-        if (data.mantVeh !== undefined) localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(data.mantVeh || []));
+        if (data.mantVeh !== undefined) localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(_lcDedupMantVeh(data.mantVeh || [])));
         if (data.histPrecios !== undefined) localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios || []));
         if (data.zonasReparto !== undefined) setZonasReparto(data.zonasReparto || {});
         if (data.cargasDia && Object.keys(data.cargasDia).length) setCargasDia(data.cargasDia);
