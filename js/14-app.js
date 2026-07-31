@@ -60,21 +60,27 @@ const DatosAppContext = React.createContext(null);
 // que puedan seguir existiendo en Firestore mientras no se terminen de
 // borrar, evita QuotaExceededError en localStorage sin importar cuántos
 // documentos duplicados haya del lado del servidor).
+function _lcHashCorto(str) {
+  var h = 0;
+  for (var i = 0; i < str.length; i++) { h = (h * 31 + str.charCodeAt(i)) | 0; }
+  return Math.abs(h).toString(36);
+}
 function _lcDedupMantVeh(arr) {
   if (!Array.isArray(arr)) return [];
   const vistos = new Set();
   const limpio = [];
   arr.forEach(function (r) {
-    const clave = r && r.id != null ? String(r.id) : JSON.stringify({
+    const firma = JSON.stringify({
       km: r && r.km,
       fecha: r && r.fecha,
       costo: r && r.costo,
       proximo: r && r.proximo,
       desc: r && (r.desc || r.tipo) || ''
     });
+    const clave = r && r.id != null ? String(r.id) : firma;
     if (!vistos.has(clave)) {
       vistos.add(clave);
-      limpio.push(r);
+      limpio.push(r && r.id != null ? r : { ...r, id: 'mv_' + _lcHashCorto(firma) });
     }
   });
   return limpio;
