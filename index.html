@@ -26,7 +26,19 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
 
   <script>
-    var firebaseConfig = {
+    // Shim de compatibilidad: lcAlert/lcConfirm nunca estaban definidos en
+// ningun archivo del proyecto (bug preexistente, no introducido por este
+// parche) - cualquier boton que dependiera de ellos (Restaurar respaldo,
+// Eliminar cliente, migracion de datos) fallaba en silencio con
+// "window.lcConfirm is not a function". Se definen aca, ANTES que
+// cualquier otro script los use, como fallback nativo del navegador.
+if (typeof window.lcAlert !== "function") {
+  window.lcAlert = function(msg){ alert(msg); };
+}
+if (typeof window.lcConfirm !== "function") {
+  window.lcConfirm = function(msg, opts){ return Promise.resolve(confirm(msg)); };
+}
+var firebaseConfig = {
       apiKey: "AIzaSyCqZnFu-I-5MdnSybf7e5t5l7jnyuho4_o",
       authDomain: "la-catalina-416d5.firebaseapp.com",
       projectId: "la-catalina-416d5",
