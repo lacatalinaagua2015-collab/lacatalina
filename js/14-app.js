@@ -287,6 +287,12 @@ function App() {
     useEffect
   } = React;
   const ultimoFetchNubeRef = React.useRef(0);
+  // Sello del último cambio de stock hecho EN ESTE dispositivo (ver bloque
+  // "if (data.stock)" más abajo y syncData): protege ediciones locales
+  // recién hechas para que un refetch de la nube que llega antes de que
+  // termine de sincronizar no las pise (mismo problema que ya se resolvía
+  // para clientes/ventas/planillas/noVisitas, pero stock quedaba afuera).
+  const ultimoStockLocalRef = React.useRef(0);
   const traerDeLaNube = React.useCallback(forzar => {
     if (!apiKey || !binId) return;
     const ahora = Date.now();
@@ -441,9 +447,16 @@ function App() {
           }), 2000);
         }
       }
+      // ── Stock: no pisar si la edición local es más nueva que lo que trajo la nube ──
+      // Antes esto reemplazaba stock entero SIEMPRE que llegaba de Firebase,
+      // sin comparar nada (a diferencia de clientes/ventas/planillas, que sí
+      // mergean por _upd). Resultado: un ajuste manual de stock (o el cierre
+      // del día) podía desaparecer sin aviso si un refetch de la nube — por
+      // volver a la app, cambiar de pestaña, u otro dispositivo — llegaba
+      // antes de terminar de sincronizar. Ahora se compara igual que el resto.
       if (data.stock) {
         const ds = data.stock;
-        const normStock = ds.soderia ? ds : {
+        const normStockIn = ds.soderia ? ds : {
           soderia: {
             sifon: ds.sifon || 0,
             bidon10: ds.bidon10 || 0,
@@ -460,7 +473,15 @@ function App() {
             bidon20: 0
           }
         };
-        setStock(normStock);
+        const remoteUpdStock = Number(ds._upd) || 0;
+        if (ultimoStockLocalRef.current > remoteUpdStock) {
+          console.log("Merge: stock local más nuevo que Firebase, sincronizando...");
+          setTimeout(() => syncData({
+            stock: estadoRef.current.stock
+          }), 2000);
+        } else {
+          setStock(normStockIn);
+        }
       }
       if (data.productos?.length) setProductos(data.productos);
       // ── noVisitas: MERGEAR en vez de sobreescribir (mismo problema que clientes/planillas) ──
@@ -806,6 +827,21 @@ function App() {
 
   const syncData = (overrides = {}) => {
     if (!window.db) return;
+    // Estampar el momento del cambio de stock ANTES de mandarlo — es lo que
+    // permite, del otro lado (traerDeLaNube), saber si una edición local es
+    // más nueva que lo que trae un refetch y no pisarla. Único punto por el
+    // que pasan todas las escrituras de stock (StockGeneral, Config, cierre
+    // de día, etc.), así que alcanza con estampar acá.
+    if (overrides.stock) {
+      overrides = {
+        ...overrides,
+        stock: {
+          ...overrides.stock,
+          _upd: Date.now()
+        }
+      };
+      ultimoStockLocalRef.current = overrides.stock._upd;
+    }
     setSyncStatus("saving");
     const mantVehActual = (() => {
       try {
@@ -1297,7 +1333,15 @@ function App() {
     if (JSON.stringify(nueva) !== JSON.stringify(planillaActual)) {
       savePlanilla(planillaKey, nueva);
     }
-    // CIERRE AUTOMÁTICO DEL STOCK — se ejecuta una sola vez por día
+    // AVISO A EMMA CONTROL — se ejecuta una sola vez por día.
+    // OJO: acá ANTES también se recalculaba y sumaba el traspaso de stock
+    // camión→sodería (sobrantes + vacíos) en automático. Se sacó porque
+    // duplicaba el cierre: el mismo traspaso se vuelve a hacer, con revisión
+    // de cantidades reales, en la pantalla "Cierre del día" (confirmarCierre,
+    // 06-menu.js) — que se abre sola apenas el camión salió. Los dos corrían
+    // sin enterarse uno del otro y el stock quedaba sumado dos veces cada
+    // día. Ahora el ÚNICO lugar que mueve stock al cerrar el día es
+    // confirmarCierre en 06-menu.js.
     const camionCerradoKey = `lc_cam_${planillaKey}`;
     if (planillaActual.iniciado && !planillaActual._stockCerrado && !localStorage.getItem(camionCerradoKey)) {
       localStorage.setItem(camionCerradoKey, "1");
@@ -1305,70 +1349,6 @@ function App() {
         ...nueva,
         _stockCerrado: true
       });
-      const prodMap = {
-        "Bidón 10L": "b10",
-        "Bidón 20L": "b20",
-        "Sifón 1.5L": "soda",
-        "Dispenser": "disp"
-      };
-      // Cuánto salió en el camión (según planilla de inicio de reparto)
-      const llenos = {
-        b10: Number(planillaActual.productos?.b10?.llenos || 0),
-        b20: Number(planillaActual.productos?.b20?.llenos || 0),
-        soda: Number(planillaActual.productos?.soda?.llenos || 0),
-        disp: 0
-      };
-      // Cuánto se vendió (cada venta = 1 vacío que vuelve en el intercambio)
-      const vendidos = {
-        b10: 0,
-        b20: 0,
-        soda: 0,
-        disp: 0
-      };
-      ventasDia.forEach(v => v.detalle.forEach(d => {
-        const k = prodMap[d.nombre];
-        if (k) vendidos[k] += d.cantidad;
-      }));
-      // Préstamos (sin recibir vacío) y devoluciones de deudas anteriores
-      const prestados = {
-        b10: 0,
-        b20: 0,
-        soda: 0,
-        disp: 0
-      };
-      const devueltos = {
-        b10: 0,
-        b20: 0,
-        soda: 0,
-        disp: 0
-      };
-      ventasDia.forEach(v => {
-        (v.envPrest || []).forEach(e => {
-          const k = prodMap[e.prod];
-          if (k) prestados[k] += Number(e.cant) || 0;
-        });
-        (v.envDev || []).forEach(e => {
-          const k = prodMap[e.prod];
-          if (k) devueltos[k] += Number(e.cant) || 0;
-        });
-      });
-      setStock(prev => {
-        const s = JSON.parse(JSON.stringify(normStock(prev)));
-        ["b10", "b20", "soda", "disp"].forEach(pk => {
-          const sk = pk === "b10" ? "bidon10" : pk === "b20" ? "bidon20" : pk === "disp" ? "dispenser" : "sifon";
-          const sorb = Math.max(0, llenos[pk] - vendidos[pk] - prestados[pk]); // sobrantes llenos en camión
-          const vacios = vendidos[pk] + devueltos[pk]; // vacíos que vuelven (vendidos + devoluciones)
-          s.soderia[sk] = (s.soderia[sk] || 0) + sorb; // sobrantes llenos → sodería (llenos)
-          s.soderia_vacios[sk] = (s.soderia_vacios[sk] || 0) + vacios; // vacíos que vuelven → sodería (vacíos)
-          s.camion[sk] = Math.max(0, (s.camion[sk] || 0) - sorb - vacios); // camión queda en 0
-          s.casa[sk] = Math.max(0, (s.casa[sk] || 0) - Math.max(0, prestados[pk])); // préstamos salen del depósito
-        });
-        syncData({
-          stock: normStock(s)
-        });
-        return normStock(s);
-      });
-
       // ── Enviar datos del día a Emma Control ──
       if (ecToken && window.enviarAEmmaControl) {
         const cobEf = ventasDia.filter(v => v.pago === "contado").reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
@@ -1388,9 +1368,21 @@ function App() {
       }
     }
   }, [ventas, noVisitas, clientes, diaActual, fechaActual, planillas, ecToken]);
-  const registrarVenta = (detalle, pago, montoPagado, saldoAplicado, envPrest, envDev, obs, opcionSaldo, montoTrans2, saldoDeltaMixto, transConfirmadaInicial) => {
+  // OJO: antes esta función tomaba el cliente del estado global `cliente`
+  // (clientes.find por el clienteId seleccionado en pantalla). Eso andaba
+  // bien mientras solo existía la pantalla completa de venta, pero se rompe
+  // apenas hay una tarjeta compacta EN LA LISTA: si dos cards pudieran estar
+  // abiertas, o si el estado global todavía no se actualizó, la venta podía
+  // quedar registrada al cliente equivocado. Ahora el cliente viaja explícito
+  // como primer argumento — cada llamador (pantalla completa o tarjeta
+  // compacta) pasa el ID del cliente que tiene efectivamente abierto.
+  const registrarVenta = (ventaClienteId, detalle, pago, montoPagado, saldoAplicado, envPrest, envDev, obs, opcionSaldo, montoTrans2, saldoDeltaMixto, transConfirmadaInicial) => {
     montoTrans2 = Number(montoTrans2) || 0; // defensa: siempre número (el desglose mixto depende de esto)
-    const c = cliente;
+    const c = clientes.find(cl => cl.id === ventaClienteId);
+    if (!c) {
+      console.warn("⚠️ registrarVenta: cliente no encontrado", ventaClienteId);
+      return;
+    }
     // ── Guard anti doble-tap: ignora una llamada idéntica al mismo cliente ──
     // dentro de 1.5s (botón sin lock + toque duplicado en el celular)
     const firmaReg = JSON.stringify({
@@ -1598,6 +1590,52 @@ function App() {
 
   // ── Unificación de duplicados SEGURA: prioriza el DOMICILIO ──
   // Mismo nombre+día pero domicilios distintos = probablemente personas diferentes → viene desmarcado
+  // Extraído para poder usarse tanto desde la pantalla completa de venta
+  // (pantalla "venta") como desde la tarjeta compacta en la lista de
+  // clientes: marca "no quiere" y, si quedaron envases prestados/devueltos
+  // cargados, registra igual ese movimiento (mismo comportamiento de antes).
+  const registrarNoQuiereConEnvases = (clienteIdObj, envPrest, envDev) => {
+    const cli = clientes.find(c => c.id === clienteIdObj);
+    const nv = [...(noVisitas || []).filter(v => !(v.clienteId === clienteIdObj && v.dia === diaActual && v.fecha === fechaActual)), {
+      clienteId: clienteIdObj,
+      dia: diaActual,
+      fecha: fechaActual,
+      motivo: "noquiso",
+      _upd: Date.now()
+    }];
+    saveNoVisitas(nv);
+    const _ep = (envPrest || []).filter(e => e.prod && Number(e.cant) > 0);
+    const _ed = (envDev || []).filter(e => e.prod && Number(e.cant) > 0);
+    if (_ep.length || _ed.length) {
+      const fk = new Date().toLocaleDateString("en-CA");
+      saveVentas(prev => [...prev, {
+        id: Date.now(),
+        clienteId: clienteIdObj,
+        cliente: cli ? cli.nombre : "",
+        dia: diaActual,
+        fechaKey: fk,
+        fecha: new Date().toLocaleString("es-AR"),
+        detalle: [{
+          nombre: "Movimiento de envases (No quiere)",
+          cantidad: 1,
+          precio: 0,
+          total: 0
+        }],
+        pago: "-",
+        obs: "Envases marcados al no comprar",
+        neto: 0,
+        bruto: 0,
+        desc: 0,
+        costo: 0,
+        ganancia: 0,
+        pagadoNum: 0,
+        saldoDelta: 0,
+        envPrest: _ep,
+        envDev: _ed,
+        _esAjuste: true
+      }]);
+    }
+  };
   const eliminarVenta = ventaId => {
     // Guard anti doble-tap: ignora un segundo borrado del MISMO id dentro de 2s
     // (el diálogo de confirmación puede tardar en cerrarse y volver a tocarse
@@ -2005,7 +2043,11 @@ function App() {
     dia: diaActual,
     fecha: fechaActual,
     ventas: ventas.filter(v => v.fechaKey === fechaActual && v.dia === diaActual),
+    todasVentas: ventas,
     noVisitas: (noVisitas || []).filter(v => v.dia === diaActual && v.fecha === fechaActual),
+    productos: productos,
+    onGuardarVenta: (clienteIdVenta, ...args) => registrarVenta(clienteIdVenta, ...args),
+    onNoQuiereConEnvases: registrarNoQuiereConEnvases,
     onEditarCliente: (id, cambios) => {
       saveClientes(prev => prev.map(c => c.id === id ? {
         ...c,
@@ -2280,7 +2322,7 @@ function App() {
     },
     onGuardar: (...args) => {
       // Pasa TODOS los argumentos (incluye el desglose del pago mixto: montoTrans2 y saldoDelta)
-      registrarVenta(...args);
+      registrarVenta(clienteId, ...args);
       // Auto-advance to next pending client (noesta = volver al final, no saltar a ellos)
       const clientesDia = clientes.filter(c => c.dia === diaActual).sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
       const visitadosIds = new Set([...ventas.filter(v => v.fechaKey === fechaActual && v.dia === diaActual && !v._esCobro && !v._esAjuste && !v._esMixtoTrans).map(v => v.clienteId), ...(noVisitas || []).filter(v => v.dia === diaActual && v.fecha === fechaActual && (v.motivo === "noquiso" || v.motivo === "noesta2" || v.motivo === "noesta" || v.motivo === "salteado")).map(v => v.clienteId)]);
