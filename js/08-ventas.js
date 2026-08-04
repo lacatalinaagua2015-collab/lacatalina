@@ -985,6 +985,7 @@ function NuevaVenta({
   // Préstamo/retiro de dispenser inline: +1 = le presté uno, -1 = le retiré
   // uno. No es un producto que se cobra — solo mueve cliente.dispenser.
   const [dispDelta, setDispDelta] = React.useState(0);
+  const [mostrarRotoCompacto, setMostrarRotoCompacto] = React.useState(false);
   const [mostrarCambio, setMostrarCambio] = React.useState(false);
   const [productoViejoCambio, setProductoViejoCambio] = React.useState("Bidón 20L");
   const [productoNuevoCambio, setProductoNuevoCambio] = React.useState("Bidón 20L");
@@ -1388,16 +1389,62 @@ function NuevaVenta({
         textAlign: "center",
         color: dispDelta > 0 ? "var(--color-text-info)" : dispDelta < 0 ? "var(--color-text-success)" : "var(--color-text-tertiary)"
       }
-    }, dispDelta > 0 ? `presté ${dispDelta}` : dispDelta < 0 ? `retiré ${-dispDelta}` : "sin cambio")), !mostrarCambio ? /*#__PURE__*/React.createElement("button", {
+    }, dispDelta > 0 ? `presté ${dispDelta}` : dispDelta < 0 ? `retiré ${-dispDelta}` : "sin cambio")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 6,
+        marginBottom: 8
+      }
+    }, dispenser && /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        flex: 1,
+        fontSize: 11,
+        padding: "7px",
+        color: mostrarRotoCompacto ? "#fff" : "var(--color-text-danger)",
+        background: mostrarRotoCompacto ? "#a32d2d" : undefined,
+        border: mostrarRotoCompacto ? "none" : undefined
+      },
+      onClick: () => setMostrarRotoCompacto(r => !r)
+    }, "💔 Dispenser roto"), /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        flex: 1,
+        fontSize: 11,
+        padding: "7px",
+        background: mostrarCambio ? "#185FA5" : undefined,
+        color: mostrarCambio ? "#fff" : undefined,
+        border: mostrarCambio ? "none" : undefined
+      },
+      onClick: () => setMostrarCambio(m => !m)
+    }, "🔄 Cambio de envase")), mostrarRotoCompacto && dispenser && /*#__PURE__*/React.createElement("div", {
+      style: {
+        ...s.card,
+        margin: "0 0 8px",
+        padding: 10,
+        border: "1px solid var(--color-border-danger)"
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      style: {
+        ...s.input,
+        fontSize: 12
+      },
+      type: "number",
+      placeholder: "Precio de reposición $",
+      value: dispRotoPrecio,
+      onChange: e => setDispRotoPrecio(e.target.value)
+    }), /*#__PURE__*/React.createElement("button", {
       style: {
         ...s.btn,
         width: "100%",
-        marginBottom: 8,
-        fontSize: 11,
-        padding: "7px"
+        marginTop: 6,
+        fontSize: 11
       },
-      onClick: () => setMostrarCambio(true)
-    }, "🔄 Cambio de envase (sin cobrar)") : /*#__PURE__*/React.createElement("div", {
+      onClick: () => {
+        setDispRotoPrecio("");
+        setMostrarRotoCompacto(false);
+      }
+    }, "Cancelar")), mostrarCambio && /*#__PURE__*/React.createElement("div", {
       style: {
         ...s.card,
         margin: "0 0 8px",
