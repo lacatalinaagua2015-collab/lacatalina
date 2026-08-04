@@ -398,9 +398,34 @@ function App() {
             cambiosLocales++;
           }
         });
+        // ── Tombstones: honrar ventas BORRADAS localmente ──────────────────
+        // El merge de arriba solo sabe agregar ("está en local pero no en la
+        // nube → la sumo"). No tenía forma de representar un borrado: si vos
+        // borrabas una venta pero la nube todavía tenía la copia vieja (no
+        // llegó a sincronizar antes del próximo refetch), esa venta volvía
+        // sola — quedaba "no puedo eliminar una venta". Ahora eliminarVenta
+        // deja un tombstone (id + cuándo se borró) y acá se respeta: si la
+        // nube trae un id que borramos DESPUÉS de su _upd, no se reincorpora.
+        let cambiosTombstone = 0;
+        try {
+          const tomb = JSON.parse(localStorage.getItem("cat_ventas_tombstone_v1") || "[]");
+          tomb.forEach(t => {
+            const enNubeT = porId[t.id];
+            if (enNubeT && t.ts >= (Number(enNubeT._upd) || 0)) {
+              delete porId[t.id];
+              cambiosTombstone++;
+            }
+          });
+        } catch {}
         const merged = Object.values(porId);
         setVentasRaw(merged);
         // Si el celular tenía versiones más nuevas que la nube, sincronizarlas ahora
+        if (cambiosTombstone > 0) {
+          console.log("Merge: " + cambiosTombstone + " ventas borradas localmente que la nube todavía tenía, re-sincronizando el borrado...");
+          setTimeout(() => syncData({
+            ventas: merged
+          }), 2000);
+        }
         if (cambiosLocales > 0) {
           console.log("Merge: " + cambiosLocales + " ventas locales más nuevas que Firebase, sincronizando...");
           setTimeout(() => syncData({
@@ -1664,6 +1689,21 @@ function App() {
         if ((Number(x.saldoDelta) || 0) !== 0) ajusteSaldoExtra += Number(x.saldoDelta);
       }
     });
+    // Dejar constancia de qué se borró y CUÁNDO (tombstone) — es lo que usa
+    // el merge de traerDeLaNube para no revivir esta venta si la nube todavía
+    // tiene la copia vieja cuando llegue el próximo refetch. Sin esto, borrar
+    // una venta podía no "pegar": desaparecía un instante y volvía sola.
+    try {
+      const ahoraTomb = Date.now();
+      const tombPrevio = JSON.parse(localStorage.getItem("cat_ventas_tombstone_v1") || "[]");
+      const CUARENTA_CINCO_DIAS = 45 * 24 * 60 * 60 * 1000;
+      const tombVivo = tombPrevio.filter(t => ahoraTomb - t.ts < CUARENTA_CINCO_DIAS);
+      const tombNuevo = [...idsABorrar].map(id => ({
+        id,
+        ts: ahoraTomb
+      }));
+      localStorage.setItem("cat_ventas_tombstone_v1", JSON.stringify([...tombVivo, ...tombNuevo]));
+    } catch {}
     // Guardar lo borrado para poder "Deshacer" — antes de tocar nada
     const ventasBorradas = ventas.filter(x => idsABorrar.has(x.id));
     const ajusteTotal = v.saldoDelta + ajusteSaldoExtra;
@@ -1699,6 +1739,13 @@ function App() {
       clienteId,
       ajusteTotal
     } = deshacerVenta;
+    // Sacar del tombstone lo que se está restaurando — si no, el próximo
+    // merge de la nube podría volver a borrarlo solo.
+    try {
+      const idsRestaurados = new Set(ventasBorradas.map(x => x.id));
+      const tombPrevio = JSON.parse(localStorage.getItem("cat_ventas_tombstone_v1") || "[]");
+      localStorage.setItem("cat_ventas_tombstone_v1", JSON.stringify(tombPrevio.filter(t => !idsRestaurados.has(t.id))));
+    } catch {}
     saveVentas(prev => [...prev, ...ventasBorradas]);
     saveClientes(prev => prev.map(x => x.id === clienteId ? {
       ...x,
