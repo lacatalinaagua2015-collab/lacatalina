@@ -10,8 +10,11 @@ function ListaClientes({
   todasVentas,
   noVisitas,
   recordatorios,
+  productos,
   onSeleccionar,
   onEntregar,
+  onGuardarVenta,
+  onNoQuiereConEnvases,
   onNuevoCliente,
   onVolver,
   onReordenar,
@@ -25,6 +28,10 @@ function ListaClientes({
 }) {
   const [busqueda, setBusqueda] = useState("");
   const [clienteMoviendo, setClienteMoviendo] = useState(null); // id del cliente "levantado", esperando destino
+  // Tarjeta de venta compacta expandida in-place (una sola a la vez). Antes
+  // "Entregar" navegaba a otra pantalla (NuevaVenta); ahora expande la
+  // planilla ahí mismo y la lista sigue debajo, sin cambiar de pantalla.
+  const [clienteExpandidoId, setClienteExpandidoId] = useState(null);
   // ventas y noVisitas ya filtradas por fecha+dia desde App
   const atendidos = new Set(ventas.filter(v => !v._esCobro && !v._esAjuste).map(v => v.clienteId));
   const noVMap = {};
@@ -145,6 +152,8 @@ function ListaClientes({
     const atendido = atendidos.has(c.id),
       est = noVMap[c.id];
     const bc = atendido ? "#1D9E75" : est === "noesta" ? "#EF9F27" : est === "noesta2" || est === "noquiso" ? "#E24B4A" : "var(--color-border-tertiary)";
+    const puedeEntregar = (!visitados.has(c.id) || est === "noesta") && !atendido;
+    const expandido = clienteExpandidoId === c.id;
     // Envases extra que tiene el cliente (historial completo + ajuste manual envAjuste)
     const envExtra = {
       sifon: 0,
@@ -383,7 +392,26 @@ function ListaClientes({
         e.stopPropagation();
         setFotoOpen(true);
       }
-    }, "📷"))), (!visitados.has(c.id) || est === "noesta") && !atendido && /*#__PURE__*/React.createElement("div", {
+    }, "📷"), puedeEntregar && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 17,
+        cursor: "pointer",
+        width: 34,
+        height: 34,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: 9,
+        background: expandido ? "#185FA5" : "var(--color-background-tertiary)",
+        color: expandido ? "#e2eaf4" : "var(--color-text-secondary)",
+        border: expandido ? "none" : "0.5px solid var(--color-border-secondary)"
+      },
+      title: expandido ? "Cerrar planilla de venta" : "Registrar entrega acá mismo",
+      onClick: e => {
+        e.stopPropagation();
+        setClienteExpandidoId(id => id === c.id ? null : c.id);
+      }
+    }, expandido ? "▲" : "▼"))), puedeEntregar && !expandido && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 8,
@@ -427,8 +455,34 @@ function ListaClientes({
         fontWeight: 600,
         flex: 2
       },
-      onClick: () => (onEntregar || onSeleccionar)(c)
-    }, "Entregar →")), (est === "noesta2" || est === "noquiso") && !atendido && /*#__PURE__*/React.createElement("div", {
+      onClick: () => setClienteExpandidoId(c.id)
+    }, "Entregar →")), puedeEntregar && expandido && onGuardarVenta && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 10,
+        paddingTop: 10,
+        borderTop: "0.5px solid var(--color-border-tertiary)"
+      }
+    }, /*#__PURE__*/React.createElement(NuevaVenta, {
+      key: `${c.id}-${(todasVentas || ventas).filter(v => v.clienteId === c.id).length}`,
+      compacto: true,
+      cliente: c,
+      productos: productos,
+      fecha: fecha,
+      ventasCliente: (todasVentas || ventas).filter(v => v.clienteId === c.id),
+      onGuardar: (...args) => {
+        onGuardarVenta(c.id, ...args);
+        setClienteExpandidoId(null);
+      },
+      onNoEsta: () => {
+        marcarNoVisita(c.id, est === "noesta" ? "noesta2" : "noesta");
+        setClienteExpandidoId(null);
+      },
+      onNoQuiere: (envPrest, envDev) => {
+        marcarNoVisita(c.id, "noquiso");
+        onNoQuiereConEnvases && onNoQuiereConEnvases(c.id, envPrest, envDev);
+        setClienteExpandidoId(null);
+      }
+    })), (est === "noesta2" || est === "noquiso") && !atendido && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         justifyContent: "flex-end",
