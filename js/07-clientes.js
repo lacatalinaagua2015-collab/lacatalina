@@ -154,6 +154,17 @@ function ListaClientes({
     const bc = atendido ? "#1D9E75" : est === "noesta" ? "#EF9F27" : est === "noesta2" || est === "noquiso" ? "#E24B4A" : "var(--color-border-tertiary)";
     const puedeEntregar = (!visitados.has(c.id) || est === "noesta") && !atendido;
     const expandido = clienteExpandidoId === c.id;
+    // Al terminar con este cliente (venta registrada, "no está" o "no
+    // quiere") saltar directo al siguiente pendiente de la lista en vez de
+    // solo cerrar — así se sigue reparto sin tener que buscar y tocar
+    // "Entregar" de nuevo cada vez. `pendientes` todavía incluye a `c` en
+    // este render (el estado recién se actualiza después), por eso se busca
+    // el próximo con id distinto a partir de su posición.
+    const irAlSiguientePendiente = () => {
+      const idx = pendientes.findIndex(x => x.id === c.id);
+      const siguiente = pendientes.find((x, i) => x.id !== c.id && (idx === -1 || i > idx));
+      setClienteExpandidoId(siguiente ? siguiente.id : null);
+    };
     // Envases extra que tiene el cliente (historial completo + ajuste manual envAjuste)
     const envExtra = {
       sifon: 0,
@@ -392,26 +403,7 @@ function ListaClientes({
         e.stopPropagation();
         setFotoOpen(true);
       }
-    }, "📷"), puedeEntregar && /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 17,
-        cursor: "pointer",
-        width: 34,
-        height: 34,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        borderRadius: 9,
-        background: expandido ? "#185FA5" : "var(--color-background-tertiary)",
-        color: expandido ? "#e2eaf4" : "var(--color-text-secondary)",
-        border: expandido ? "none" : "0.5px solid var(--color-border-secondary)"
-      },
-      title: expandido ? "Cerrar planilla de venta" : "Registrar entrega acá mismo",
-      onClick: e => {
-        e.stopPropagation();
-        setClienteExpandidoId(id => id === c.id ? null : c.id);
-      }
-    }, expandido ? "▲" : "▼"))), puedeEntregar && !expandido && /*#__PURE__*/React.createElement("div", {
+    }, "📷"))), puedeEntregar && !expandido && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 8,
@@ -462,7 +454,16 @@ function ListaClientes({
         paddingTop: 10,
         borderTop: "0.5px solid var(--color-border-tertiary)"
       }
-    }, /*#__PURE__*/React.createElement(NuevaVenta, {
+    }, /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        width: "100%",
+        marginBottom: 10,
+        fontSize: 13,
+        fontWeight: 500
+      },
+      onClick: () => setClienteExpandidoId(null)
+    }, "▲ Cerrar"), /*#__PURE__*/React.createElement(NuevaVenta, {
       key: `${c.id}-${(todasVentas || ventas).filter(v => v.clienteId === c.id).length}`,
       compacto: true,
       cliente: c,
@@ -471,16 +472,16 @@ function ListaClientes({
       ventasCliente: (todasVentas || ventas).filter(v => v.clienteId === c.id),
       onGuardar: (...args) => {
         onGuardarVenta(c.id, ...args);
-        setClienteExpandidoId(null);
+        irAlSiguientePendiente();
       },
       onNoEsta: () => {
         marcarNoVisita(c.id, est === "noesta" ? "noesta2" : "noesta");
-        setClienteExpandidoId(null);
+        irAlSiguientePendiente();
       },
       onNoQuiere: (envPrest, envDev) => {
         marcarNoVisita(c.id, "noquiso");
         onNoQuiereConEnvases && onNoQuiereConEnvases(c.id, envPrest, envDev);
-        setClienteExpandidoId(null);
+        irAlSiguientePendiente();
       }
     })), (est === "noesta2" || est === "noquiso") && !atendido && /*#__PURE__*/React.createElement("div", {
       style: {
