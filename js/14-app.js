@@ -902,10 +902,25 @@ function App() {
       diasAvisoMant: overrides.diasAvisoMant || (localStorage.getItem('lc_dias_notif_mant') || '3,2,1,0').split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n))
     };
     estadoRef.current = data;
+    // OJO — "sr_offline_pending" antes guardaba una FOTO COMPLETA de `data`
+    // (todo el estado de la app en ese momento) en localStorage, para
+    // reintentar más tarde con cloudSave(esaFotoVieja). El problema: si
+    // pasaban minutos u horas hasta el reintento (o si el reintento
+    // periódico de 45s seguía fallando por otro motivo — permisos, cuota,
+    // no solo por señal), esa foto quedaba cada vez más vieja. Cuando por
+    // fin se reintentaba, mandaba de vuelta datos de ESE momento — pisando
+    // ventas ya borradas, ediciones ya guardadas, saldos ya corregidos, todo
+    // lo que hubiera pasado después volvía a como estaba. Esto es lo que
+    // hacía que "no se pudiera" borrar o editar una venta: en algún momento
+    // el reintento con la foto vieja la resucitaba sola.
+    // Ahora "sr_offline_pending" es solo una bandera (sin datos). El
+    // reintento, cuando vuelve la señal, llama a syncData({}) de nuevo —
+    // que arma `data` fresco a partir de estadoRef.current (el estado local
+    // MÁS reciente), nunca una foto vieja.
     debounceSave(() => {
       if (!navigator.onLine) {
         try {
-          localStorage.setItem("sr_offline_pending", JSON.stringify(data));
+          localStorage.setItem("sr_offline_pending", "1");
         } catch {}
         setPendingOfflineSync(true);
         setSyncStatus("offline_pending");
@@ -918,7 +933,7 @@ function App() {
           setSyncStatus("saved");
         } else {
           try {
-            localStorage.setItem("sr_offline_pending", JSON.stringify(data));
+            localStorage.setItem("sr_offline_pending", "1");
           } catch {}
           setPendingOfflineSync(true);
           // Si el navegador dice que hay conexión, esto NO es un problema de
@@ -928,7 +943,7 @@ function App() {
         }
       }).catch(function () {
         try {
-          localStorage.setItem("sr_offline_pending", JSON.stringify(data));
+          localStorage.setItem("sr_offline_pending", "1");
         } catch {}
         setPendingOfflineSync(true);
         setSyncStatus(navigator.onLine ? "error" : "offline_pending");
@@ -943,9 +958,12 @@ function App() {
       const pending = localStorage.getItem("sr_offline_pending");
       if (pending) {
         setSyncStatus("saving");
+        // Reintentar con el estado ACTUAL (estadoRef.current, vía
+        // syncData({})) — no con una foto vieja guardada en localStorage.
+        // syncData ya se encarga de limpiar la bandera sr_offline_pending
+        // si el guardado sale bien, y de re-marcarla si vuelve a fallar.
         try {
-          const data = JSON.parse(pending);
-          cloudSave(data).then(ok => {
+          cloudSave(estadoRef.current).then(ok => {
             if (ok) {
               localStorage.removeItem("sr_offline_pending");
               setPendingOfflineSync(false);

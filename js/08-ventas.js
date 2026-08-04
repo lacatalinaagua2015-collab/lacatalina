@@ -1673,27 +1673,7 @@ function NuevaVenta({
       },
       disabled: detalle.length === 0,
       onClick: confirmarRegistro
-    }, "✓ Registrar entrega"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        justifyContent: "center",
-        gap: 16
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 11,
-        color: "var(--color-text-warning)",
-        cursor: "pointer"
-      },
-      onClick: onNoEsta
-    }, "No está"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 11,
-        color: "var(--color-text-danger)",
-        cursor: "pointer"
-      },
-      onClick: () => onNoQuiere(envPrest, envDev)
-    }, "No quiere")));
+    }, "✓ Registrar entrega"));
   }
 
   return /*#__PURE__*/React.createElement("div", {

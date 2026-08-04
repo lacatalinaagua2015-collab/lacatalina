@@ -496,12 +496,7 @@ function ListaClientes({
         padding: "4px 10px"
       },
       onClick: () => onQuitarNoVisita(c.id)
-    }, "Desmarcar")), onEditarCliente && /*#__PURE__*/React.createElement(PieEnvases, {
-      c: c,
-      ventas: todasVentas || ventas,
-      onEditar: onEditarCliente,
-      onPerdida: onPerdida
-    })), fotoOpen && /*#__PURE__*/React.createElement("div", {
+    }, "Desmarcar"))), fotoOpen && /*#__PURE__*/React.createElement("div", {
       style: {
         position: "fixed",
         top: 0,
