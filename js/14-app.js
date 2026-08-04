@@ -542,8 +542,28 @@ function App() {
             cambiosLocalesNV++;
           } // gana el más nuevo (empate = sin cambio real)
         });
+        // Tombstones: mismo problema que tenían las ventas — "Desmarcar" borra
+        // una marca localmente, pero si la nube todavía tiene la copia vieja
+        // (no llegó a sincronizar antes del próximo refetch), volvía sola.
+        let cambiosTombstoneNV = 0;
+        try {
+          const tombNV = JSON.parse(localStorage.getItem("cat_novisitas_tombstone_v1") || "[]");
+          tombNV.forEach(t => {
+            const enNubeT = porClaveNV[t.clave];
+            if (enNubeT && t.ts >= (Number(enNubeT._upd) || 0)) {
+              delete porClaveNV[t.clave];
+              cambiosTombstoneNV++;
+            }
+          });
+        } catch {}
         const mergedNV = Object.values(porClaveNV);
         setNoVisitas(mergedNV);
+        if (cambiosTombstoneNV > 0) {
+          console.log("Merge: " + cambiosTombstoneNV + " marcas de visita borradas localmente (Desmarcar) que la nube todavía tenía, re-sincronizando el borrado...");
+          setTimeout(() => syncData({
+            noVisitas: mergedNV
+          }), 2000);
+        }
         if (cambiosLocalesNV > 0) {
           console.log("Merge: " + cambiosLocalesNV + " marcas de visita locales más nuevas que Firebase, sincronizando...");
           setTimeout(() => syncData({
@@ -1633,6 +1653,21 @@ function App() {
 
   // ── Unificación de duplicados SEGURA: prioriza el DOMICILIO ──
   // Mismo nombre+día pero domicilios distintos = probablemente personas diferentes → viene desmarcado
+  // Deja constancia de una marca de "no visita" borrada (Desmarcar / eliminar
+  // del historial) — mismo mecanismo que el tombstone de ventas, ver ahí.
+  const registrarTombstoneNoVisita = (clienteIdT, diaT, fechaT) => {
+    try {
+      const ahoraT = Date.now();
+      const prevT = JSON.parse(localStorage.getItem("cat_novisitas_tombstone_v1") || "[]");
+      const CUARENTA_CINCO_DIAS = 45 * 24 * 60 * 60 * 1000;
+      const vivoT = prevT.filter(t => ahoraT - t.ts < CUARENTA_CINCO_DIAS);
+      vivoT.push({
+        clave: `${clienteIdT}|${diaT}|${fechaT}`,
+        ts: ahoraT
+      });
+      localStorage.setItem("cat_novisitas_tombstone_v1", JSON.stringify(vivoT));
+    } catch {}
+  };
   // Extraído para poder usarse tanto desde la pantalla completa de venta
   // (pantalla "venta") como desde la tarjeta compacta en la lista de
   // clientes: marca "no quiere" y, si quedaron envases prestados/devueltos
@@ -2142,6 +2177,7 @@ function App() {
       }]);
     },
     onQuitarNoVisita: clienteId => {
+      registrarTombstoneNoVisita(clienteId, diaActual, fechaActual);
       saveNoVisitas(prev => (prev || []).filter(v => !(v.clienteId === clienteId && v.dia === diaActual && v.fecha === fechaActual)));
     },
     onConfirmarTransfer: (clienteId, ventaId) => {
@@ -2170,6 +2206,7 @@ function App() {
     onEditarVenta: editarVenta,
     onEliminarCliente: () => eliminarCliente(cliente.id),
     onEliminarNoVisita: (nvDia, nvFecha) => {
+      registrarTombstoneNoVisita(cliente.id, nvDia, nvFecha);
       saveNoVisitas(prev => (prev || []).filter(v => !(v.clienteId === cliente.id && v.dia === nvDia && v.fecha === nvFecha)));
     },
     onNoEstaCliente: () => {
