@@ -2266,6 +2266,12 @@ function App() {
         ...cambios
       } : c));
     },
+    onCambiarDispenserCliente: (id, delta) => {
+      saveClientes(prev => prev.map(c => c.id === id ? {
+        ...c,
+        dispenser: Math.max(0, (Number(c.dispenser) || 0) + delta)
+      } : c));
+    },
     onSeleccionar: c => {
       setClienteId(c.id);
       irA("detalleCliente");

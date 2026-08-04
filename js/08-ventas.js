@@ -978,9 +978,13 @@ function NuevaVenta({
   onSaltar,
   ventasCliente,
   progressData,
-  compacto
+  compacto,
+  onCambiarDispenser
 }) {
   const [transConfirmada, setTransConfirmada] = React.useState(false);
+  // Préstamo/retiro de dispenser inline: +1 = le presté uno, -1 = le retiré
+  // uno. No es un producto que se cobra — solo mueve cliente.dispenser.
+  const [dispDelta, setDispDelta] = React.useState(0);
   const [mostrarCambio, setMostrarCambio] = React.useState(false);
   const [productoViejoCambio, setProductoViejoCambio] = React.useState("Bidón 20L");
   const [productoNuevoCambio, setProductoNuevoCambio] = React.useState("Bidón 20L");
@@ -1196,6 +1200,7 @@ function NuevaVenta({
       }
       onGuardar(detalle, pago, montoFinal, saldoApl, envPrest, envDev, obs, opcionSaldo, undefined, undefined, pago === "transferencia" ? transConfirmada : false);
     }
+    if (dispDelta !== 0 && onCambiarDispenser) onCambiarDispenser(dispDelta);
   };
 
   // ── Versión compacta: se usa embebida dentro de la tarjeta del cliente en
@@ -1320,20 +1325,70 @@ function NuevaVenta({
         onClick: incrementarEnv,
         title: "Prestó uno"
       }, "+")));
-    }), dispenser && (cliente.dispenser || 0) > 0 && /*#__PURE__*/React.createElement("div", {
+    }), dispenser && /*#__PURE__*/React.createElement("div", {
       style: {
-        display: "flex",
-        justifyContent: "space-between",
+        display: "grid",
+        gridTemplateColumns: "1fr auto 70px",
         alignItems: "center",
-        padding: "2px 0 10px",
-        fontSize: 12,
-        color: "var(--color-text-secondary)"
+        columnGap: 6,
+        marginBottom: 8
       }
-    }, /*#__PURE__*/React.createElement("span", null, "🧊 Dispenser"), /*#__PURE__*/React.createElement("span", null, "en el cliente: ", /*#__PURE__*/React.createElement("b", {
+    }, /*#__PURE__*/React.createElement("span", {
       style: {
+        fontSize: 12,
         color: "var(--color-text-primary)"
       }
-    }, cliente.dispenser))), !mostrarCambio ? /*#__PURE__*/React.createElement("button", {
+    }, "🧊 Dispenser", /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 10,
+        color: "var(--color-text-tertiary)"
+      }
+    }, "en el cliente: ", cliente.dispenser || 0)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        justifySelf: "center"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        width: 26,
+        height: 26,
+        padding: 0,
+        fontSize: 15,
+        lineHeight: 1
+      },
+      onClick: () => setDispDelta(d => Math.max(-(cliente.dispenser || 0), d - 1)),
+      title: "Retirar dispenser"
+    }, "−"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 15,
+        fontWeight: 500,
+        minWidth: 20,
+        textAlign: "center",
+        color: dispDelta > 0 ? "var(--color-text-info)" : dispDelta < 0 ? "var(--color-text-success)" : "var(--color-text-primary)"
+      }
+    }, dispDelta > 0 ? `+${dispDelta}` : dispDelta), /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        width: 26,
+        height: 26,
+        padding: 0,
+        fontSize: 15,
+        lineHeight: 1
+      },
+      onClick: () => setDispDelta(d => d + 1),
+      title: "Prestar dispenser"
+    }, "+")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        fontWeight: 600,
+        textAlign: "center",
+        color: dispDelta > 0 ? "var(--color-text-info)" : dispDelta < 0 ? "var(--color-text-success)" : "var(--color-text-tertiary)"
+      }
+    }, dispDelta > 0 ? `presté ${dispDelta}` : dispDelta < 0 ? `retiré ${-dispDelta}` : "sin cambio")), !mostrarCambio ? /*#__PURE__*/React.createElement("button", {
       style: {
         ...s.btn,
         width: "100%",

@@ -15,6 +15,7 @@ function ListaClientes({
   onEntregar,
   onGuardarVenta,
   onNoQuiereConEnvases,
+  onCambiarDispenserCliente,
   onNuevoCliente,
   onVolver,
   onReordenar,
@@ -482,7 +483,8 @@ function ListaClientes({
         marcarNoVisita(c.id, "noquiso");
         onNoQuiereConEnvases && onNoQuiereConEnvases(c.id, envPrest, envDev);
         irAlSiguientePendiente();
-      }
+      },
+      onCambiarDispenser: delta => onCambiarDispenserCliente && onCambiarDispenserCliente(c.id, delta)
     })), (est === "noesta2" || est === "noquiso") && !atendido && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
