@@ -397,6 +397,7 @@ function SeguridadHuella() {
 function Config({
   productos,
   setProductos,
+  onEliminarProducto,
   clientes,
   setClientes,
   ventas,
@@ -604,7 +605,10 @@ function Config({
         window.lcConfirm(`¿Eliminar "${p.nombre}"?`, {
           peligro: true
         }).then(function (ok) {
-          if (ok) setProductos(productos.filter(x => x.id !== p.id));
+          if (ok) {
+            onEliminarProducto && onEliminarProducto(p.id);
+            setProductos(productos.filter(x => x.id !== p.id));
+          }
         });
       }
     }, "✕"))) : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {

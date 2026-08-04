@@ -138,7 +138,12 @@ function App() {
   // recordatorio: {id, clienteId, clienteNombre, fecha, hora, motivo, dia, confirmado}
   const saveRecordatorios = r => {
     setRecordatorios(prev => {
-      const next = typeof r === "function" ? r(prev) : r;
+      const base = typeof r === "function" ? r(prev) : r;
+      const _t = Date.now();
+      const next = base.map(x => ({
+        ...x,
+        _upd: _t
+      }));
       syncData({
         recordatorios: next
       });
@@ -355,8 +360,26 @@ function App() {
             cambiosLocalesCli++;
           } // gana el más nuevo
         });
+        // Tombstones: cliente borrado localmente que la nube todavía tenía.
+        let cambiosTombstoneCli = 0;
+        try {
+          const tombCli = JSON.parse(localStorage.getItem("cat_clientes_tombstone_v1") || "[]");
+          tombCli.forEach(t => {
+            const enNubeT = porIdCli[t.id];
+            if (enNubeT && t.ts >= (Number(enNubeT._upd) || 0)) {
+              delete porIdCli[t.id];
+              cambiosTombstoneCli++;
+            }
+          });
+        } catch {}
         const mergedCli = Object.values(porIdCli);
         setClientes(mergedCli);
+        if (cambiosTombstoneCli > 0) {
+          console.log("Merge: " + cambiosTombstoneCli + " clientes borrados localmente que la nube todavía tenía, re-sincronizando el borrado...");
+          setTimeout(() => syncData({
+            clientes: mergedCli
+          }), 2000);
+        }
         if (cambiosLocalesCli > 0) {
           console.log("Merge: " + cambiosLocalesCli + " clientes locales más nuevos que Firebase, sincronizando...");
           setTimeout(() => syncData({
@@ -508,7 +531,62 @@ function App() {
           setStock(normStockIn);
         }
       }
-      if (data.productos?.length) setProductos(data.productos);
+      // ── Productos: MERGEAR por id + _upd (antes se pisaba entero) ──────
+      // Un cambio de precio recién guardado podía perderse si un refetch
+      // llegaba antes de terminar de sincronizar.
+      if (data.productos?.length) {
+        const productosLocales = (() => {
+          try {
+            return JSON.parse(localStorage.getItem("cat_productos_v3") || "[]");
+          } catch {
+            return [];
+          }
+        })();
+        const porIdProd = {};
+        (data.productos || []).forEach(p => {
+          porIdProd[p.id] = p;
+        });
+        let cambiosLocalesProd = 0;
+        productosLocales.forEach(p => {
+          const enNube = porIdProd[p.id];
+          if (!enNube) {
+            porIdProd[p.id] = p;
+            cambiosLocalesProd++;
+            return;
+          }
+          const uL = Number(p._upd) || 0,
+            uN = Number(enNube._upd) || 0;
+          if (uL > uN) {
+            porIdProd[p.id] = p;
+            cambiosLocalesProd++;
+          }
+        });
+        let cambiosTombstoneProd = 0;
+        try {
+          const tombProd = JSON.parse(localStorage.getItem("cat_productos_tombstone_v1") || "[]");
+          tombProd.forEach(t => {
+            const enNubeT = porIdProd[t.id];
+            if (enNubeT && t.ts >= (Number(enNubeT._upd) || 0)) {
+              delete porIdProd[t.id];
+              cambiosTombstoneProd++;
+            }
+          });
+        } catch {}
+        const mergedProd = Object.values(porIdProd);
+        setProductos(mergedProd);
+        if (cambiosTombstoneProd > 0) {
+          console.log("Merge: " + cambiosTombstoneProd + " productos borrados localmente que la nube todavía tenía, re-sincronizando el borrado...");
+          setTimeout(() => syncData({
+            productos: mergedProd
+          }), 2000);
+        }
+        if (cambiosLocalesProd > 0) {
+          console.log("Merge: " + cambiosLocalesProd + " productos locales más nuevos que Firebase, sincronizando...");
+          setTimeout(() => syncData({
+            productos: mergedProd
+          }), 2000);
+        }
+      }
       // ── noVisitas: MERGEAR en vez de sobreescribir (mismo problema que clientes/planillas) ──
       // Acá vive "No está" / "No quiere" / "Saltar". Sin esto, una marca recién
       // hecha podía desaparecer si llegaba un refetch antes de terminar de sincronizar
@@ -571,7 +649,43 @@ function App() {
           }), 2000);
         }
       }
-      if (data.prospectos?.length) setProspectos(data.prospectos);
+      // ── Prospectos: MERGEAR por id + _upd (antes se pisaba entero) ──────
+      if (data.prospectos?.length) {
+        const prospectosLocales = (() => {
+          try {
+            return JSON.parse(localStorage.getItem("cat_prospectos_v1") || "[]");
+          } catch {
+            return [];
+          }
+        })();
+        const porIdPro = {};
+        (data.prospectos || []).forEach(p => {
+          porIdPro[p.id] = p;
+        });
+        let cambiosLocalesPro = 0;
+        prospectosLocales.forEach(p => {
+          const enNube = porIdPro[p.id];
+          if (!enNube) {
+            porIdPro[p.id] = p;
+            cambiosLocalesPro++;
+            return;
+          }
+          const uL = Number(p._upd) || 0,
+            uN = Number(enNube._upd) || 0;
+          if (uL > uN) {
+            porIdPro[p.id] = p;
+            cambiosLocalesPro++;
+          }
+        });
+        const mergedPro = Object.values(porIdPro);
+        setProspectos(mergedPro);
+        if (cambiosLocalesPro > 0) {
+          console.log("Merge: " + cambiosLocalesPro + " prospectos locales más nuevos que Firebase, sincronizando...");
+          setTimeout(() => syncData({
+            prospectos: mergedPro
+          }), 2000);
+        }
+      }
       if (data.recordatorios?.length) {
         const recLocales = (() => {
           try {
@@ -600,8 +714,22 @@ function App() {
             cambiosLocalesRec++;
           }
         });
+        let cambiosTombstoneRec = 0;
+        try {
+          const tombRec = JSON.parse(localStorage.getItem("cat_recordatorios_tombstone_v1") || "[]");
+          tombRec.forEach(t => {
+            const enNubeT = porId[t.id];
+            if (enNubeT && t.ts >= (Number(enNubeT._upd) || 0)) {
+              delete porId[t.id];
+              cambiosTombstoneRec++;
+            }
+          });
+        } catch {}
         const mergedRec = Object.values(porId);
         setRecordatorios(mergedRec);
+        if (cambiosTombstoneRec > 0) setTimeout(() => syncData({
+          recordatorios: mergedRec
+        }), 2000);
         if (cambiosLocalesRec > 0) setTimeout(() => syncData({
           recordatorios: mergedRec
         }), 2000);
@@ -1239,7 +1367,16 @@ function App() {
   };
   const saveProductos = v => {
     setProductos(prev => {
-      const next = typeof v === "function" ? v(prev) : v;
+      const base = typeof v === "function" ? v(prev) : v;
+      // Estampar _upd en cada producto — mismo patrón que saveClientes: sin
+      // esto, un cambio de precio podía perderse si un refetch de la nube
+      // (que antes pisaba productos entero, sin comparar nada) llegaba
+      // antes de terminar de sincronizar.
+      const _t = Date.now();
+      const next = base.map(p => ({
+        ...p,
+        _upd: _t
+      }));
       // Registrar cambio de precio en historial
       const hoy = new Date().toISOString().slice(0, 16);
       const histPrecios = JSON.parse(localStorage.getItem("lc_hist_precios") || "[]");
@@ -1278,7 +1415,12 @@ function App() {
   };
   const saveProspectos = v => {
     setProspectos(prev => {
-      const next = typeof v === "function" ? v(prev) : v;
+      const base = typeof v === "function" ? v(prev) : v;
+      const _t = Date.now();
+      const next = base.map(p => ({
+        ...p,
+        _upd: _t
+      }));
       syncData({
         prospectos: next
       });
@@ -1635,6 +1777,7 @@ function App() {
         }
       }
     }
+    registrarTombstoneId("clientes", clienteId);
     saveClientes(prev => {
       let nc = prev.filter(c => c.id !== clienteId);
       if (eliminado) nc = renumerarTrasEliminar(nc, eliminado);
@@ -1644,6 +1787,13 @@ function App() {
     // ni sus ventas/registros: el prospecto y su historial deben sobrevivir.
     const esProspecto = (prospectos || []).some(p => p.id === clienteId);
     if (!esProspecto) {
+      // Estos son borrados en CASCADA — no pasan por eliminarVenta ni por
+      // onQuitarNoVisita (que ya dejan su propio tombstone), así que hay que
+      // dejarlo acá también. Si no, borrar un cliente podía hacer que sus
+      // ventas o marcas de "no visita" volvieran solas.
+      ventas.filter(v => v.clienteId === clienteId).forEach(v => registrarTombstoneId("ventas", v.id));
+      (noVisitas || []).filter(v => v.clienteId === clienteId).forEach(v => registrarTombstoneNoVisita(v.clienteId, v.dia, v.fecha));
+      (recordatorios || []).filter(r => r.clienteId === clienteId).forEach(r => registrarTombstoneId("recordatorios", r.id));
       saveVentas(prev => prev.filter(v => v.clienteId !== clienteId));
       saveNoVisitas(prev => (prev || []).filter(v => v.clienteId !== clienteId));
       saveRecordatorios(prev => (prev || []).filter(r => r.clienteId !== clienteId));
@@ -1653,6 +1803,29 @@ function App() {
 
   // ── Unificación de duplicados SEGURA: prioriza el DOMICILIO ──
   // Mismo nombre+día pero domicilios distintos = probablemente personas diferentes → viene desmarcado
+  // Tombstone genérico por id — usado para clientes, productos y
+  // recordatorios borrados (mismo problema y misma solución que ventas y
+  // noVisitas: el merge por id/_upd solo sabe "agregar si falta", nunca
+  // "sacar si lo borraron localmente" — sin esto, un borrado podía revivir
+  // solo si la nube todavía tenía la copia vieja en el próximo refetch).
+  const registrarTombstoneId = (entidad, id) => {
+    try {
+      // Mismo formato de clave que ya usan ventas ("cat_ventas_tombstone_v1")
+      // y noVisitas ("cat_novisitas_tombstone_v1") — así el merge de ventas
+      // en cascada (ver eliminarCliente) escribe en el MISMO lugar que ya
+      // lee el filtro de tombstones de ventas.
+      const key = `cat_${entidad}_tombstone_v1`;
+      const ahoraT = Date.now();
+      const prevT = JSON.parse(localStorage.getItem(key) || "[]");
+      const CUARENTA_CINCO_DIAS = 45 * 24 * 60 * 60 * 1000;
+      const vivoT = prevT.filter(t => ahoraT - t.ts < CUARENTA_CINCO_DIAS);
+      vivoT.push({
+        id,
+        ts: ahoraT
+      });
+      localStorage.setItem(key, JSON.stringify(vivoT));
+    } catch {}
+  };
   // Deja constancia de una marca de "no visita" borrada (Desmarcar / eliminar
   // del historial) — mismo mecanismo que el tombstone de ventas, ver ahí.
   const registrarTombstoneNoVisita = (clienteIdT, diaT, fechaT) => {
@@ -2625,7 +2798,10 @@ function App() {
       confirmado: true,
       _upd: Date.now()
     } : r)),
-    onEliminar: id => saveRecordatorios(prev => (prev || []).filter(r => r.id !== id)),
+    onEliminar: id => {
+      registrarTombstoneId("recordatorios", id);
+      saveRecordatorios(prev => (prev || []).filter(r => r.id !== id));
+    },
     onNuevo: datos => {
       const c = clientes.find(x => x.id === datos.clienteId);
       if (!c) {
@@ -2659,6 +2835,7 @@ function App() {
     ventas: ventas,
     productos: productos,
     setProductos: saveProductos,
+    onEliminarProducto: id => registrarTombstoneId("productos", id),
     cargasDia: cargasDia,
     setCargasDia: saveCargasDia,
     planillas: planillas,
@@ -2889,6 +3066,7 @@ function App() {
   })), pantalla === "config" && /*#__PURE__*/React.createElement(Config, {
     productos: productos,
     setProductos: saveProductos,
+    onEliminarProducto: id => registrarTombstoneId("productos", id),
     clientes: clientes,
     setClientes: saveClientes,
     ventas: ventas,
