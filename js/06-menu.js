@@ -1013,17 +1013,7 @@ function DetalleVentasDia({
         fontWeight: 500,
         color: "var(--color-text-primary)"
       }
-    }, v.cliente), cli && cli._esProspecto && /*#__PURE__*/React.createElement("span", {
-      style: {
-        marginLeft: 6,
-        fontSize: 10,
-        padding: "1px 6px",
-        borderRadius: 4,
-        background: "#2e1f06",
-        color: "#f5b942",
-        fontWeight: 600
-      }
-    }, "🚀 Prospecto"), /*#__PURE__*/React.createElement("span", {
+    }, v.cliente), /*#__PURE__*/React.createElement("span", {
       style: {
         marginLeft: 6,
         fontSize: 10,

@@ -45,7 +45,7 @@ function ListaClientes({
     const prev = noVMap[id];
     if (motivo === "noesta" && prev === "noesta") onRegistrarNoVisita(id, "noesta2");else if (prev === motivo) onQuitarNoVisita(id);else onRegistrarNoVisita(id, motivo);
   };
-  const clientesReales = clientes.filter(c => !c._esProspecto);
+  const clientesReales = clientes;
   const clientesOrdenados = [...clientesReales].sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
   const filtrados = clientesOrdenados.filter(c => buscarCliente(c, busqueda) > 0);
   const pendientesNormales = filtrados.filter(c => !visitados.has(c.id) && noVMap[c.id] !== "noesta");

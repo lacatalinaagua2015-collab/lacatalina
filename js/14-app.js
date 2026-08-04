@@ -133,7 +133,6 @@ function App() {
       return next;
     });
   };
-  const [prospectos, setProspectos] = useLS("cat_prospectos_v1", []);
   const [recordatorios, setRecordatorios] = useLS("cat_recordatorios_v1", []);
   // recordatorio: {id, clienteId, clienteNombre, fecha, hora, motivo, dia, confirmado}
   const saveRecordatorios = r => {
@@ -649,43 +648,6 @@ function App() {
           }), 2000);
         }
       }
-      // ── Prospectos: MERGEAR por id + _upd (antes se pisaba entero) ──────
-      if (data.prospectos?.length) {
-        const prospectosLocales = (() => {
-          try {
-            return JSON.parse(localStorage.getItem("cat_prospectos_v1") || "[]");
-          } catch {
-            return [];
-          }
-        })();
-        const porIdPro = {};
-        (data.prospectos || []).forEach(p => {
-          porIdPro[p.id] = p;
-        });
-        let cambiosLocalesPro = 0;
-        prospectosLocales.forEach(p => {
-          const enNube = porIdPro[p.id];
-          if (!enNube) {
-            porIdPro[p.id] = p;
-            cambiosLocalesPro++;
-            return;
-          }
-          const uL = Number(p._upd) || 0,
-            uN = Number(enNube._upd) || 0;
-          if (uL > uN) {
-            porIdPro[p.id] = p;
-            cambiosLocalesPro++;
-          }
-        });
-        const mergedPro = Object.values(porIdPro);
-        setProspectos(mergedPro);
-        if (cambiosLocalesPro > 0) {
-          console.log("Merge: " + cambiosLocalesPro + " prospectos locales más nuevos que Firebase, sincronizando...");
-          setTimeout(() => syncData({
-            prospectos: mergedPro
-          }), 2000);
-        }
-      }
       if (data.recordatorios?.length) {
         const recLocales = (() => {
           try {
@@ -848,7 +810,6 @@ function App() {
     productos,
     noVisitas,
     recordatorios,
-    prospectos,
     cargasDia
   });
   React.useEffect(() => {
@@ -860,7 +821,6 @@ function App() {
       productos,
       noVisitas,
       recordatorios,
-      prospectos,
       zonasReparto,
       cargasDia,
       perdidas
@@ -1034,7 +994,6 @@ function App() {
       ...estadoRef.current,
       ...overrides,
       noVisitas: estadoRef.current.noVisitas || [],
-      prospectos: overrides.prospectos !== undefined ? overrides.prospectos : estadoRef.current.prospectos || [],
       recordatorios: estadoRef.current.recordatorios || [],
       mantVeh: overrides.mantVeh || mantVehActual,
       histPrecios: overrides.histPrecios || histPreciosActual,
@@ -1323,7 +1282,6 @@ function App() {
         if (data.productos !== undefined) setProductos(data.productos || []);
         if (data.noVisitas !== undefined) setNoVisitas(data.noVisitas || []);
         if (data.perdidas !== undefined) setPerdidas(data.perdidas || []);
-        if (data.prospectos !== undefined) setProspectos(data.prospectos || []);
         if (data.recordatorios !== undefined) setRecordatorios(data.recordatorios || []);
         if (data.mantVeh !== undefined) localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(_lcDedupMantVeh(data.mantVeh || [])));
         if (data.histPrecios !== undefined) localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios || []));
@@ -1409,20 +1367,6 @@ function App() {
       const next = typeof v === "function" ? v(prev) : v;
       syncData({
         noVisitas: next
-      });
-      return next;
-    });
-  };
-  const saveProspectos = v => {
-    setProspectos(prev => {
-      const base = typeof v === "function" ? v(prev) : v;
-      const _t = Date.now();
-      const next = base.map(p => ({
-        ...p,
-        _upd: _t
-      }));
-      syncData({
-        prospectos: next
       });
       return next;
     });
@@ -1783,21 +1727,16 @@ function App() {
       if (eliminado) nc = renumerarTrasEliminar(nc, eliminado);
       return nc;
     });
-    // Si el id corresponde a un PROSPECTO (cliente fantasma), NO borrar el prospecto
-    // ni sus ventas/registros: el prospecto y su historial deben sobrevivir.
-    const esProspecto = (prospectos || []).some(p => p.id === clienteId);
-    if (!esProspecto) {
-      // Estos son borrados en CASCADA — no pasan por eliminarVenta ni por
-      // onQuitarNoVisita (que ya dejan su propio tombstone), así que hay que
-      // dejarlo acá también. Si no, borrar un cliente podía hacer que sus
-      // ventas o marcas de "no visita" volvieran solas.
-      ventas.filter(v => v.clienteId === clienteId).forEach(v => registrarTombstoneId("ventas", v.id));
-      (noVisitas || []).filter(v => v.clienteId === clienteId).forEach(v => registrarTombstoneNoVisita(v.clienteId, v.dia, v.fecha));
-      (recordatorios || []).filter(r => r.clienteId === clienteId).forEach(r => registrarTombstoneId("recordatorios", r.id));
-      saveVentas(prev => prev.filter(v => v.clienteId !== clienteId));
-      saveNoVisitas(prev => (prev || []).filter(v => v.clienteId !== clienteId));
-      saveRecordatorios(prev => (prev || []).filter(r => r.clienteId !== clienteId));
-    }
+    // Estos son borrados en CASCADA — no pasan por eliminarVenta ni por
+    // onQuitarNoVisita (que ya dejan su propio tombstone), así que hay que
+    // dejarlo acá también. Si no, borrar un cliente podía hacer que sus
+    // ventas o marcas de "no visita" volvieran solas.
+    ventas.filter(v => v.clienteId === clienteId).forEach(v => registrarTombstoneId("ventas", v.id));
+    (noVisitas || []).filter(v => v.clienteId === clienteId).forEach(v => registrarTombstoneNoVisita(v.clienteId, v.dia, v.fecha));
+    (recordatorios || []).filter(r => r.clienteId === clienteId).forEach(r => registrarTombstoneId("recordatorios", r.id));
+    saveVentas(prev => prev.filter(v => v.clienteId !== clienteId));
+    saveNoVisitas(prev => (prev || []).filter(v => v.clienteId !== clienteId));
+    saveRecordatorios(prev => (prev || []).filter(r => r.clienteId !== clienteId));
     irA("clientes");
   };
 
@@ -2664,7 +2603,7 @@ function App() {
       } : c));
     },
     onEliminar: id => {
-      window.lcConfirm("¿Eliminar cliente? Se quitará de todas las listas (clientes, ventas, prospectos, no-visitas y recordatorios).", {
+      window.lcConfirm("¿Eliminar cliente? Se quitará de todas las listas (clientes, ventas, no-visitas y recordatorios).", {
         peligro: true
       }).then(function (ok) {
         if (ok) {
@@ -3089,7 +3028,6 @@ function App() {
     setEcToken: setEcToken,
     tabInicial: tabConfig,
     noVisitas: noVisitas,
-    prospectos: prospectos,
     onDiagnostico: () => irA("diagnostico")
   }), pantalla === "diagnostico" && /*#__PURE__*/React.createElement(Diagnostico, {
     onVolver: () => irA("config")

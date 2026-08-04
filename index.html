@@ -143,7 +143,6 @@ var firebaseConfig = {
       clientes:      function(it){ return it.id!=null ? String(it.id) : null; },
       ventas:        function(it){ return it.id!=null ? String(it.id) : null; },
       productos:     function(it){ return it.id!=null ? String(it.id) : null; },
-      prospectos:    function(it){ return it.id!=null ? String(it.id) : null; },
       recordatorios: function(it){ return it.id!=null ? String(it.id) : null; },
       mantVeh:       function(it){ return it.id!=null ? String(it.id) : null; },
       noVisitas:     function(it){ return it.id!=null ? String(it.id) : (String(it.clienteId)+'_'+String(it.dia)+'_'+String(it.fecha)); },
@@ -249,7 +248,6 @@ var firebaseConfig = {
         if(cfgDoc.exists){ var c=cfgDoc.data(); LC_CONFIG_KEYS.forEach(function(k){ if(c[k]!==undefined) data[k]=c[k]; }); data._config=c; hayAlgo=true; }
         // defaults (idénticos al cloudLoad viejo)
         if(!data.recordatorios) data.recordatorios=[];
-        if(!data.prospectos) data.prospectos=[];
         if(!data.mantVeh) data.mantVeh=[];
         if(!data.zonasReparto) data.zonasReparto={};
         if(!data.histPrecios) data.histPrecios=[];
@@ -289,12 +287,12 @@ var firebaseConfig = {
       }).catch(function(e){ console.error('migración err', e); return {ok:false, error:(e&&e.message)||String(e)}; });
     };
 
-    // Lee el doc viejo lc2/config + chunks cl_*/vt_* + prospectos (idéntico al cloudLoad legacy).
+    // Lee el doc viejo lc2/config + chunks cl_*/vt_* (idéntico al cloudLoad legacy).
     function _lcLeerLegacy(cfgSnap){
       var col=window.db.collection('lc2');
       var data=cfgSnap.data();
-      return Promise.all([ col.doc('clientes_meta').get(), col.doc('ventas_meta').get(), col.doc('prospectos').get() ]).then(function(r){
-        var cMeta=r[0], vMeta=r[1], prDoc=r[2];
+      return Promise.all([ col.doc('clientes_meta').get(), col.doc('ventas_meta').get() ]).then(function(r){
+        var cMeta=r[0], vMeta=r[1];
         var nc=cMeta.exists?(cMeta.data().n||0):0;
         var vn=vMeta.exists?(vMeta.data().n||0):0;
         var cF=[]; for(var i=0;i<nc;i++) cF.push(col.doc('cl_'+i).get());
@@ -303,7 +301,6 @@ var firebaseConfig = {
           var cD=docs.slice(0,nc), vD=docs.slice(nc);
           data.clientes = cD.reduce(function(a,d){return a.concat(d.exists?(d.data().d||[]):[]);},[]);
           data.ventas   = vD.reduce(function(a,d){return a.concat(d.exists?(d.data().d||[]):[]);},[]);
-          data.prospectos = prDoc.exists ? (prDoc.data().d||[]) : (data.prospectos||[]);
           return data;
         });
       });

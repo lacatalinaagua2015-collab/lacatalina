@@ -83,7 +83,7 @@ function GestionClientes({
     });
     return m;
   }, [ventas]);
-  const filtrados = clientes.filter(c => !c._esProspecto).filter(c => filtroDia === "todos" || c.dia === filtroDia).filter(c => buscarCliente(c, busqueda) > 0).sort((a, b) => {
+  const filtrados = clientes.filter(c => filtroDia === "todos" || c.dia === filtroDia).filter(c => buscarCliente(c, busqueda) > 0).sort((a, b) => {
     // Con búsqueda activa: primero las coincidencias por DOMICILIO
     if (busqueda.trim()) {
       const dif = buscarCliente(b, busqueda) - buscarCliente(a, busqueda);

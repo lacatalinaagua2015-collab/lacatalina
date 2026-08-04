@@ -414,7 +414,6 @@ function Config({
   setEcToken,
   tabInicial,
   noVisitas,
-  prospectos,
   onDiagnostico
 }) {
   const [tab, setTab] = useState(["datos", "vehiculo", "apariencia"].includes(tabInicial) ? tabInicial : "datos");
@@ -1236,61 +1235,7 @@ function Config({
     style: {
       marginTop: 10
     }
-  }, (() => {
-    const fantasmas = (clientes || []).filter(c => c._esProspecto);
-    const idsClientes = new Set((clientes || []).map(c => c.id));
-    const sinCliente = (prospectos || []).filter(p => !idsClientes.has(p.id));
-    const total = fantasmas.length + sinCliente.length;
-    return /*#__PURE__*/React.createElement("button", {
-      disabled: total === 0,
-      style: {
-        ...s.btn,
-        width: "100%",
-        padding: "10px",
-        marginBottom: 8,
-        opacity: total === 0 ? 0.4 : 1,
-        fontSize: 13
-      },
-      onClick: async () => {
-        if (total === 0) return;
-        if (!(await window.lcConfirm(`Se van a pasar ${total} ex-prospecto(s) a tu lista de clientes. ¿Continuar?`))) return;
-        let nuevos = (clientes || []).map(c => {
-          if (c._esProspecto) {
-            const {
-              _esProspecto,
-              ...r
-            } = c;
-            return r;
-          }
-          return c;
-        });
-        const ids = new Set(nuevos.map(c => c.id));
-        (prospectos || []).forEach(p => {
-          if (!ids.has(p.id)) {
-            nuevos.push({
-              id: p.id,
-              nombre: p.nombre,
-              dia: p.dia || "Lunes",
-              barrio: p.barrio || "",
-              calle: p.calle || "",
-              nro: p.nro || "",
-              manzana: p.manzana || "",
-              lote: p.lote || "",
-              sifon: p.sifon || 0,
-              bidon10: p.bidon10 || 0,
-              bidon20: p.bidon20 || 0,
-              dispenser: p.dispenser || 0,
-              telefono: p.telefono || "",
-              maps: p.maps || ""
-            });
-            ids.add(p.id);
-          }
-        });
-        setClientes(nuevos);
-        lcAlert(`✅ ${total} ex-prospecto(s) pasados a clientes.`);
-      }
-    }, total === 0 ? "✅ No hay clientes ocultos" : `🔄 Recuperar ${total} cliente(s) oculto(s)`);
-  })(), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("button", {
     style: {
       ...s.btn,
       width: "100%",
@@ -1306,8 +1251,7 @@ function Config({
           planillas,
           stock,
           productos,
-          noVisitas: noVisitas || [],
-          prospectos: prospectos || []
+          noVisitas: noVisitas || []
         }).then(() => lcAlert("✅ Datos sincronizados.")).catch(() => lcAlert("❌ Error. Verificá tu conexión."));
       });
     }
