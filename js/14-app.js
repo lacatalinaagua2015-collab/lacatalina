@@ -2151,6 +2151,9 @@ function App() {
     onEliminarVenta: eliminarVenta,
     onEditarVenta: editarVenta,
     onEliminarCliente: () => eliminarCliente(cliente.id),
+    onEliminarNoVisita: (nvDia, nvFecha) => {
+      saveNoVisitas(prev => (prev || []).filter(v => !(v.clienteId === cliente.id && v.dia === nvDia && v.fecha === nvFecha)));
+    },
     onNoEstaCliente: () => {
       const nv = [...(noVisitas || []).filter(v => !(v.clienteId === cliente.id && v.dia === diaActual && v.fecha === fechaActual)), {
         clienteId: cliente.id,
