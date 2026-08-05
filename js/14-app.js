@@ -125,7 +125,8 @@ function App() {
         clienteNombre: clienteNombre || null,
         sifon: items.sifon || 0,
         bidon10: items.bidon10 || 0,
-        bidon20: items.bidon20 || 0
+        bidon20: items.bidon20 || 0,
+        _upd: Date.now()
       }];
       syncData({
         perdidas: next
@@ -583,6 +584,45 @@ function App() {
           console.log("Merge: " + cambiosLocalesProd + " productos locales más nuevos que Firebase, sincronizando...");
           setTimeout(() => syncData({
             productos: mergedProd
+          }), 2000);
+        }
+      }
+      // ── Perdidas: MERGEAR por id + _upd (antes no se sincronizaba nada) ──
+      // Registro append-only (nunca se edita ni se borra desde la UI), así
+      // que alcanza con unir por id sin necesitar tombstones.
+      if (data.perdidas?.length) {
+        const perdidasLocales = (() => {
+          try {
+            return JSON.parse(localStorage.getItem("cat_perdidas_v1") || "[]");
+          } catch {
+            return [];
+          }
+        })();
+        const porIdPerd = {};
+        (data.perdidas || []).forEach(p => {
+          porIdPerd[p.id] = p;
+        });
+        let cambiosLocalesPerd = 0;
+        perdidasLocales.forEach(p => {
+          const enNube = porIdPerd[p.id];
+          if (!enNube) {
+            porIdPerd[p.id] = p;
+            cambiosLocalesPerd++;
+            return;
+          }
+          const uL = Number(p._upd) || 0,
+            uN = Number(enNube._upd) || 0;
+          if (uL > uN) {
+            porIdPerd[p.id] = p;
+            cambiosLocalesPerd++;
+          }
+        });
+        const mergedPerd = Object.values(porIdPerd);
+        setPerdidas(mergedPerd);
+        if (cambiosLocalesPerd > 0) {
+          console.log("Merge: " + cambiosLocalesPerd + " pérdidas locales más nuevas, sincronizando...");
+          setTimeout(() => syncData({
+            perdidas: mergedPerd
           }), 2000);
         }
       }
