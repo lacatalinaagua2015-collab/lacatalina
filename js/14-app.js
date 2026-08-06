@@ -2118,6 +2118,7 @@ function App() {
     onGestionClientes: () => irA("gestionClientes"),
     onStock: () => irA("stock"),
     onAgenda: () => irA("agenda"),
+    onNuevoCliente: () => irA("nuevoCliente"),
     onVolver: () => irA("portada"),
     darkMode: darkMode,
     onToggleDark: () => setDarkMode(!darkMode),

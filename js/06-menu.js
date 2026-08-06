@@ -10,6 +10,7 @@ function MenuDias({
   onGestionClientes,
   onStock,
   onAgenda,
+  onNuevoCliente,
   onVolver,
   darkMode,
   onToggleDark,
@@ -592,9 +593,9 @@ function MenuDias({
     lbl: "Agenda",
     fn: () => onAgenda && onAgenda()
   }, {
-    ico: "🔄",
-    lbl: "Transfer.",
-    fn: () => onVerConfirmaciones && onVerConfirmaciones()
+    ico: "➕",
+    lbl: "Nuevo cliente",
+    fn: () => onNuevoCliente && onNuevoCliente()
   }].map(({
     ico,
     lbl,
