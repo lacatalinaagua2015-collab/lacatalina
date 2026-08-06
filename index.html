@@ -38,6 +38,46 @@ if (typeof window.lcAlert !== "function") {
 if (typeof window.lcConfirm !== "function") {
   window.lcConfirm = function(msg, opts){ return Promise.resolve(confirm(msg)); };
 }
+
+// ── Registro de errores para la pantalla de Diagnóstico ───────────────────
+// Bug encontrado: ErrorBoundary (14-app.js) y la pantalla Diagnóstico llaman
+// a window.logError / window.lcGetErrores / window.lcLimpiarErrores, pero
+// esas tres funciones NUNCA estaban definidas en ningún archivo del proyecto.
+// Resultado: cuando algo fallaba y aparecía "Algo salió mal", el error no
+// quedaba registrado en ningún lado (el panel de Diagnóstico siempre
+// aparecía vacío). Se implementan acá, guardando en localStorage (últimos
+// 50), ANTES que cualquier otro script las use.
+var LC_ERR_KEY = "lc_errores_v1";
+window.logError = function(contexto, e){
+  try {
+    var lista = JSON.parse(localStorage.getItem(LC_ERR_KEY) || "[]");
+    lista.unshift({
+      contexto: contexto || "error",
+      mensaje: (e && e.message) || String(e),
+      stack: (e && e.stack) || "",
+      fecha: new Date().toLocaleString("es-AR")
+    });
+    if (lista.length > 50) lista.length = 50;
+    localStorage.setItem(LC_ERR_KEY, JSON.stringify(lista));
+  } catch(_){}
+};
+window.lcGetErrores = function(){
+  try { return JSON.parse(localStorage.getItem(LC_ERR_KEY) || "[]"); }
+  catch(_){ return []; }
+};
+window.lcLimpiarErrores = function(){
+  try { localStorage.removeItem(LC_ERR_KEY); } catch(_){}
+};
+// Atrapa también errores que el ErrorBoundary de React NO puede ver
+// (errores dentro de handlers de eventos, promesas, setTimeout, etc. —
+// justamente donde suelen pasar los bugs de "se borró la carga" o
+// "no guardó bien" que no tiran la pantalla "Algo salió mal").
+window.addEventListener("error", function(ev){
+  try { window.logError("window.onerror", ev.error || {message: ev.message}); } catch(_){}
+});
+window.addEventListener("unhandledrejection", function(ev){
+  try { window.logError("unhandledrejection", (ev.reason && ev.reason.message) ? ev.reason : {message: String(ev.reason)}); } catch(_){}
+});
 var firebaseConfig = {
       apiKey: "AIzaSyCqZnFu-I-5MdnSybf7e5t5l7jnyuho4_o",
       authDomain: "la-catalina-416d5.firebaseapp.com",
@@ -381,8 +421,6 @@ var firebaseConfig = {
   </script>
 </head>
 <body>
-<div id="root"></div>
-
 <div id="root"></div>
 
 <script src="js/01-temas.js"></script>

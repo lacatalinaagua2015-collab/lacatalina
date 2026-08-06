@@ -1030,10 +1030,20 @@ function NuevaVenta({
     return m;
   });
   const [repetido, setRepetido] = useState(() => !!ultimaConProd);
+  // BUG REPORTADO: "se borraba la carga" al entrar cantidades en una venta.
+  // Causa: ventasCliente se recalcula (ventas.filter(...)) en CADA render de
+  // 14-app.js -> nueva referencia de array en cada sync/pulso de Firestore,
+  // aunque el contenido no haya cambiado. Este efecto comparaba por
+  // referencia y, mientras `repetido` seguía false (p.ej. porque el primer
+  // snapshot de Firestore todavía no traía ventas previas), CUALQUIER
+  // re-render pisaba las cantidades ya tipeadas por el usuario con el
+  // preload de "última venta". cantidadesTocadas corta esto en cuanto el
+  // usuario toca un + o un − a mano.
+  const cantidadesTocadas = React.useRef(false);
   // Si Firebase tarda en cargar, actualizar cuando lleguen los datos
   const ventasClienteRef = React.useRef(ventasCliente);
   React.useEffect(() => {
-    if (ventasClienteRef.current === ventasCliente || repetido) return;
+    if (ventasClienteRef.current === ventasCliente || repetido || cantidadesTocadas.current) return;
     ventasClienteRef.current = ventasCliente;
     const nombres = (productos || []).filter(p => !p.esDispenser).map(p => p.nombre);
     const conProd = (ventasCliente || []).filter(v => {
@@ -1255,10 +1265,10 @@ function NuevaVenta({
           fontSize: 15,
           lineHeight: 1
         },
-        onClick: () => setCantidades(q => ({
+        onClick: () => (cantidadesTocadas.current = true, setCantidades(q => ({
           ...q,
           [p.nombre]: Math.max(0, (q[p.nombre] || 0) - 1)
-        }))
+        })))
       }, "−"), /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 15,
@@ -1276,10 +1286,10 @@ function NuevaVenta({
           fontSize: 15,
           lineHeight: 1
         },
-        onClick: () => setCantidades(q => ({
+        onClick: () => (cantidadesTocadas.current = true, setCantidades(q => ({
           ...q,
           [p.nombre]: (q[p.nombre] || 0) + 1
-        }))
+        })))
       }, "+")), /*#__PURE__*/React.createElement("div", {
         style: {
           display: "flex",
@@ -2051,10 +2061,10 @@ function NuevaVenta({
       fontSize: 20,
       lineHeight: 1
     },
-    onClick: () => setCantidades(q => ({
+    onClick: () => (cantidadesTocadas.current = true, setCantidades(q => ({
       ...q,
       [p.nombre]: Math.max(0, (q[p.nombre] || 0) - 1)
-    }))
+    })))
   }, "−"), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 22,
@@ -2070,10 +2080,10 @@ function NuevaVenta({
       fontSize: 20,
       lineHeight: 1
     },
-    onClick: () => setCantidades(q => ({
+    onClick: () => (cantidadesTocadas.current = true, setCantidades(q => ({
       ...q,
       [p.nombre]: (q[p.nombre] || 0) + 1
-    }))
+    })))
   }, "+")))), /*#__PURE__*/React.createElement("div", {
     style: s.divider
   }), /*#__PURE__*/React.createElement("label", {

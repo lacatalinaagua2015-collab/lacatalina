@@ -2353,6 +2353,15 @@ function App() {
     noVisitas: (noVisitas || []).filter(v => v.clienteId === cliente.id),
     dia: diaActual,
     fecha: fechaActual,
+    // BUG REPORTADO: "Editar" en una venta desde el perfil del cliente
+    // rompía la app ("Cannot read properties of undefined (reading
+    // 'forEach')"). Causa: acá nunca se pasaba la prop `productos`, así que
+    // EditVenta (08-ventas.js) recibía productos=undefined y explotaba en
+    // su primer useState (productos.forEach(...)). El otro punto donde se
+    // usa DetalleCliente (pantalla "detalleDesdeGestion", más abajo) sí la
+    // pasaba — por eso desde Gestión funcionaba pero desde la lista normal
+    // de clientes no.
+    productos: productos,
     onVenta: () => {
       const hoyKey = new Date().toLocaleDateString("en-CA");
       if (fechaActual !== hoyKey) setFechaActual(hoyKey);
@@ -2474,7 +2483,17 @@ function App() {
       saveVentas(prev => [...prev, vt]);
     }
   }), pantalla === "venta" && cliente && /*#__PURE__*/React.createElement(NuevaVenta, {
-    key: `${clienteId}-${ventas.filter(v => v.clienteId === cliente.id).length}`,
+    // BUG REPORTADO: mientras se cargaba una venta, las cantidades tipeadas
+    // se borraban solas y a veces quedaba "transferencia" guardada como
+    // "contado". Causa: la key incluía ventas.filter(...).length, que
+    // cambia con cualquier sync de Firestore que toque las ventas de este
+    // cliente (aunque el usuario no haya hecho nada) -> React desmontaba y
+    // volvía a montar NuevaVenta DE CERO en medio de la carga, perdiendo
+    // cantidades, método de pago, etc. Después de guardar, el flujo siempre
+    // navega a otro cliente o a la lista (ver onGuardar más abajo), así que
+    // no hace falta ese .length para "refrescar" el formulario — con
+    // clienteId alcanza.
+    key: clienteId,
     cliente: cliente,
     productos: productos,
     fecha: fechaActual,
