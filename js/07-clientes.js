@@ -1927,7 +1927,7 @@ function DetalleCliente({
           fontSize: 11,
           color: "var(--color-text-tertiary)"
         }
-      }, v.fechaKey || v.dia)), /*#__PURE__*/React.createElement("span", {
+      }, v.fechaKey || v.dia, v.hora ? ` · ${v.hora}` : "")), /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 15,
           fontWeight: 700,
@@ -2171,7 +2171,7 @@ function DetalleCliente({
       color: "var(--color-text-tertiary)",
       marginBottom: 4
     }
-  }, v.fechaKey || v.dia), (v.envPrest || []).map((e, i) => /*#__PURE__*/React.createElement("div", {
+  }, v.fechaKey || v.dia, v.hora ? ` · ${v.hora}` : ""), (v.envPrest || []).map((e, i) => /*#__PURE__*/React.createElement("div", {
     key: "p" + i,
     style: {
       display: "flex",

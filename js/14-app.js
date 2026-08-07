@@ -1655,6 +1655,7 @@ function App() {
       dia: diaActual,
       fechaKey: new Date().toLocaleDateString("en-CA"),
       fecha: new Date().toLocaleString("es-AR"),
+      hora: new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
       detalle,
       pago: pagoReal,
       obs: (obs || "") + obsExtra,
@@ -1694,6 +1695,7 @@ function App() {
         dia: diaActual,
         fechaKey: new Date().toLocaleDateString("en-CA"),
         fecha: new Date().toLocaleString("es-AR"),
+      hora: new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
         detalle: [{
           nombre: "Pago mixto · transferencia",
           cantidad: 1,
@@ -1876,6 +1878,7 @@ function App() {
         dia: diaActual,
         fechaKey: fk,
         fecha: new Date().toLocaleString("es-AR"),
+      hora: new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
         detalle: [{
           nombre: "Movimiento de envases (No quiere)",
           cantidad: 1,
@@ -2485,6 +2488,7 @@ function App() {
         dia: diaActual || cl.dia,
         fechaKey: fk,
         fecha: new Date().toLocaleString("es-AR"),
+      hora: new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
         detalle: det,
         pago,
         obs: `Cobro de deuda ${fmt(monto)} (${pago})`,
@@ -2600,6 +2604,7 @@ function App() {
           dia: diaActual,
           fechaKey: fk,
           fecha: new Date().toLocaleString("es-AR"),
+      hora: new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
           detalle: [{
             nombre: "Movimiento de envases (No quiere)",
             cantidad: 1,
@@ -2831,6 +2836,7 @@ function App() {
           dia: diaActual || cliente.dia,
           fechaKey: fk,
           fecha: new Date().toLocaleString("es-AR"),
+      hora: new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
           detalle: det,
           pago,
           obs: `Cobro de deuda $${monto.toLocaleString("es-AR")} (${pago})`,
@@ -2937,6 +2943,7 @@ function App() {
         dia: cl.dia,
         fechaKey: new Date().toLocaleDateString("en-CA"),
         fecha: new Date().toLocaleString("es-AR"),
+      hora: new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
         detalle: [{
           nombre: "Cobro de deuda",
           cantidad: 1,
