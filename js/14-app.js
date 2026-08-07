@@ -136,14 +136,37 @@ function App() {
   };
   const [recordatorios, setRecordatorios] = useLS("cat_recordatorios_v1", []);
   // recordatorio: {id, clienteId, clienteNombre, fecha, hora, motivo, dia, confirmado}
+  // BUG REPORTADO: clientes (y productos/recordatorios) borrados volvían a
+  // aparecer solos después de unos días. Causa: el patrón de guardado de
+  // acá abajo le ponía un _upd (marca de "última modificación") NUEVO a
+  // TODOS los registros en CADA guardado, hubieran cambiado o no. Como el
+  // borrado usa un "tombstone" (fecha del borrado) que solo gana si es más
+  // nuevo que el _upd que tenga la nube, bastaba con que OTRO dispositivo
+  // (uno que todavía no se había enterado del borrado, por ejemplo un
+  // celular que quedó con una pestaña vieja abierta) guardara CUALQUIER
+  // cosa — aunque fuera un cambio en un cliente totalmente distinto — para
+  // que ese guardado le pisara la fecha al cliente ya borrado con la hora
+  // actual, "ganándole" al tombstone y resucitándolo para todos. Esta
+  // función solo renueva el _upd de los registros que realmente cambiaron.
+  const _soloUpdCambiados = (prevArr, baseArr, _t) => {
+    const porId = {};
+    (prevArr || []).forEach(x => {
+      if (x && x.id != null) porId[x.id] = x;
+    });
+    return (baseArr || []).map(x => {
+      if (!x || x.id == null) return { ...x, _upd: _t }; // sin id: no se puede comparar, se estampa
+      const antes = porId[x.id];
+      if (!antes) return { ...x, _upd: _t }; // nuevo
+      const sinUpdAntes = JSON.stringify({ ...antes, _upd: undefined });
+      const sinUpdAhora = JSON.stringify({ ...x, _upd: undefined });
+      return sinUpdAntes !== sinUpdAhora ? { ...x, _upd: _t } : x; // solo si cambió algo más que _upd
+    });
+  };
   const saveRecordatorios = r => {
     setRecordatorios(prev => {
       const base = typeof r === "function" ? r(prev) : r;
       const _t = Date.now();
-      const next = base.map(x => ({
-        ...x,
-        _upd: _t
-      }));
+      const next = _soloUpdCambiados(prev, base, _t);
       syncData({
         recordatorios: next
       });
@@ -156,10 +179,7 @@ function App() {
     setProspectos(prev => {
       const base = typeof r === "function" ? r(prev) : r;
       const _t = Date.now();
-      const next = base.map(x => ({
-        ...x,
-        _upd: _t
-      }));
+      const next = _soloUpdCambiados(prev, base, _t);
       syncData({
         prospectos: next
       });
@@ -1247,10 +1267,7 @@ function App() {
     setClientes(prev => {
       const base = typeof v === "function" ? v(prev) : v;
       const _t = Date.now();
-      const vv = base.map(c => ({
-        ...c,
-        _upd: _t
-      }));
+      const vv = _soloUpdCambiados(prev, base, _t);
       syncData({
         clientes: vv
       });
@@ -1384,15 +1401,11 @@ function App() {
   const saveProductos = v => {
     setProductos(prev => {
       const base = typeof v === "function" ? v(prev) : v;
-      // Estampar _upd en cada producto — mismo patrón que saveClientes: sin
-      // esto, un cambio de precio podía perderse si un refetch de la nube
-      // (que antes pisaba productos entero, sin comparar nada) llegaba
-      // antes de terminar de sincronizar.
+      // _upd solo se renueva en los productos que realmente cambiaron (ver
+      // _soloUpdCambiados) — antes se pisaba en TODOS en cada guardado, lo
+      // que podía resucitar un producto ya borrado (mismo bug que clientes).
       const _t = Date.now();
-      const next = base.map(p => ({
-        ...p,
-        _upd: _t
-      }));
+      const next = _soloUpdCambiados(prev, base, _t);
       // Registrar cambio de precio en historial
       const hoy = new Date().toISOString().slice(0, 16);
       const histPrecios = JSON.parse(localStorage.getItem("lc_hist_precios") || "[]");
