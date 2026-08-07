@@ -741,6 +741,13 @@ function StockGeneral({
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 5,
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
       fontSize: 12,
       color: "var(--color-text-primary)",
       overflow: "hidden",
@@ -753,7 +760,23 @@ function StockGeneral({
       fontSize: 11,
       color: "var(--color-text-tertiary)"
     }
-  }, c.dia)), modoArqueo === "fijos" ? ["sifon", "bidon10", "bidon20", "dispenser"].map(k => /*#__PURE__*/React.createElement("input", {
+  }, c.dia)),
+  // Contacto rápido para recuperar envases: si el cliente tiene algo
+  // prestado y hay teléfono cargado, un toque abre WhatsApp con un mensaje
+  // listo — útil cuando no lo encontrás en la casa o se mudó y hay que
+  // coordinar la devolución.
+  modoArqueo === "prestados" && c.telefono && ["sifon", "bidon10", "bidon20", "dispenser"].some(k => prestadoDe(c, k) > 0) && /*#__PURE__*/React.createElement("a", {
+    href: `https://wa.me/54${c.telefono}?text=${encodeURIComponent(`Hola ${c.nombre}! Te escribo de La Catalina para coordinar la devolución de los envases que tenés prestados. ¿Cuándo te queda bien?`)}`,
+    target: "_blank",
+    rel: "noreferrer",
+    title: "Contactar por WhatsApp para recuperar envases",
+    style: {
+      fontSize: 15,
+      textDecoration: "none",
+      flexShrink: 0
+    },
+    onClick: e => e.stopPropagation()
+  }, "💬")), modoArqueo === "fijos" ? ["sifon", "bidon10", "bidon20", "dispenser"].map(k => /*#__PURE__*/React.createElement("input", {
     key: k,
     type: "number",
     value: c[k] || 0,

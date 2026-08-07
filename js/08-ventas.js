@@ -2704,14 +2704,17 @@ function NuevaVenta({
 }
 function NuevoCliente({
   diaActual,
+  prefill,
   onGuardar,
   onVolver
 }) {
   // Usa el FormCliente UNIFICADO (definido en 03-utils.js) — mismo formulario en toda la app
+  // Si viene de "Convertir en cliente" de un prospecto, prefill trae
+  // nombre/teléfono/calle/barrio ya cargados.
   return /*#__PURE__*/React.createElement("div", {
     style: s.screen
   }, /*#__PURE__*/React.createElement(HeaderApp, {
-    titulo: "Nuevo cliente",
+    titulo: prefill ? "Nuevo cliente (desde prospecto)" : "Nuevo cliente",
     onVolver: onVolver
   }), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2719,7 +2722,8 @@ function NuevoCliente({
     }
   }, /*#__PURE__*/React.createElement(FormCliente, {
     inicial: {
-      dia: diaActual || "Martes"
+      dia: diaActual || "Martes",
+      ...(prefill || {})
     },
     textoGuardar: "Agregar cliente",
     onGuardar: onGuardar

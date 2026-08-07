@@ -151,6 +151,24 @@ function App() {
     });
   };
   const recordatoriosActivos = (recordatorios || []).filter(r => !r.confirmado); // [{clienteId,dia,fecha,motivo}]
+  const [prospectos, setProspectos] = useLS("cat_prospectos_v1", []);
+  const saveProspectos = r => {
+    setProspectos(prev => {
+      const base = typeof r === "function" ? r(prev) : r;
+      const _t = Date.now();
+      const next = base.map(x => ({
+        ...x,
+        _upd: _t
+      }));
+      syncData({
+        prospectos: next
+      });
+      return next;
+    });
+  };
+  // Cuando se toca "Convertir en cliente" en un prospecto, se guarda acá
+  // para precargar el formulario de Nuevo Cliente con nombre/teléfono/dirección.
+  const [prospectoAConvertir, setProspectoAConvertir] = useState(null);
   const [clientes, setClientes] = useLS("cat_clientes_v3", CLIENTES_INICIALES);
   const [ventasRaw, setVentasRaw] = useLS("cat_ventas_v3", []);
   const normalizarFechaKey = v => {
@@ -2119,6 +2137,7 @@ function App() {
     onStock: () => irA("stock"),
     onAgenda: () => irA("agenda"),
     onNuevoCliente: () => irA("nuevoCliente"),
+    onPromociones: () => irA("prospectos"),
     onVolver: () => irA("portada"),
     darkMode: darkMode,
     onToggleDark: () => setDarkMode(!darkMode),
@@ -2637,6 +2656,12 @@ function App() {
     onVolver: () => irA("detalleCliente")
   }), pantalla === "nuevoCliente" && /*#__PURE__*/React.createElement(NuevoCliente, {
     diaActual: diaActual,
+    prefill: prospectoAConvertir ? {
+      nombre: prospectoAConvertir.nombre,
+      telefono: prospectoAConvertir.telefono,
+      calle: prospectoAConvertir.calle,
+      barrio: prospectoAConvertir.barrio
+    } : null,
     onGuardar: datos => {
       const orden = datos.orden;
       saveClientes(prevC => {
@@ -2654,9 +2679,35 @@ function App() {
           dispenser: datos.dispenser || 0
         }].sort((a, b) => DIAS.indexOf(a.dia) - DIAS.indexOf(b.dia) || (a.orden || 9999) - (b.orden || 9999));
       });
-      irA("clientes");
+      // Si venía de "Convertir en cliente" desde un prospecto, lo marcamos
+      // como convertido (no se borra, queda el historial) y volvemos a la
+      // lista de prospectos en vez de a la lista de clientes.
+      if (prospectoAConvertir) {
+        const idProsp = prospectoAConvertir.id;
+        setProspectoAConvertir(null);
+        saveProspectos(prev => (prev || []).map(p => p.id === idProsp ? {
+          ...p,
+          estado: "convertido"
+        } : p));
+        irA("prospectos");
+      } else {
+        irA("clientes");
+      }
     },
-    onVolver: () => irA("clientes")
+    onVolver: () => {
+      const veniaDeProspecto = !!prospectoAConvertir;
+      setProspectoAConvertir(null);
+      irA(veniaDeProspecto ? "prospectos" : "clientes");
+    }
+  }), pantalla === "prospectos" && /*#__PURE__*/React.createElement(Prospectos, {
+    prospectos: prospectos,
+    onGuardar: p => saveProspectos(prev => [...(prev || []), p]),
+    onEliminar: id => saveProspectos(prev => (prev || []).filter(p => p.id !== id)),
+    onConvertir: p => {
+      setProspectoAConvertir(p);
+      irA("nuevoCliente");
+    },
+    onVolver: () => irA("menu")
   }), pantalla === "gestionClientes" && /*#__PURE__*/React.createElement(GestionClientes, {
     onIrTab: irA,
     clientes: clientes,

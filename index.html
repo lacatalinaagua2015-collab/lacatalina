@@ -187,7 +187,8 @@ var firebaseConfig = {
       mantVeh:       function(it){ return it.id!=null ? String(it.id) : null; },
       noVisitas:     function(it){ return it.id!=null ? String(it.id) : (String(it.clienteId)+'_'+String(it.dia)+'_'+String(it.fecha)); },
       histPrecios:   function(it){ return it.id!=null ? String(it.id) : ('hp_'+String(it.fecha||'').replace(/[^0-9A-Za-z_-]/g,'')); },
-      perdidas:      function(it){ return it.id!=null ? String(it.id) : null; }
+      perdidas:      function(it){ return it.id!=null ? String(it.id) : null; },
+      prospectos:    function(it){ return it.id!=null ? String(it.id) : null; }
     };
     // Entidades tipo MAPA (objeto {clave:valor}) -> colección; docId = clave.
     var LC_MAPAS = ['planillas','cargasDia','zonasReparto'];
@@ -292,6 +293,7 @@ var firebaseConfig = {
         if(!data.mantVeh) data.mantVeh=[];
         if(!data.zonasReparto) data.zonasReparto={};
         if(!data.histPrecios) data.histPrecios=[];
+        if(!data.prospectos) data.prospectos=[];
         if(!data.horaAvisoCierre) data.horaAvisoCierre='18:00';
         if(!data.horasAvisoTrans) data.horasAvisoTrans=['13:00','19:00'];
         if(!data.diasAvisoMant) data.diasAvisoMant=[3,2,1,0];

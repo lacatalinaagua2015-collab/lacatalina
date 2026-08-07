@@ -11,6 +11,7 @@ function MenuDias({
   onStock,
   onAgenda,
   onNuevoCliente,
+  onPromociones,
   onVolver,
   darkMode,
   onToggleDark,
@@ -585,9 +586,9 @@ function MenuDias({
       padding: "4px 0 8px"
     }
   }, [{
-    ico: "🛒",
-    lbl: "Venta extra",
-    fn: () => onGestionClientes && onGestionClientes()
+    ico: "📣",
+    lbl: "Promociones",
+    fn: () => onPromociones && onPromociones()
   }, {
     ico: "📅",
     lbl: "Agenda",
