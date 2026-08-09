@@ -107,6 +107,10 @@ function App() {
   }, []);
   const [fechaActual, setFechaActual] = useLS("cat_fecha_actual", ""); // ISO date key YYYY-MM-DD
   const [fechaObj, setFechaObj] = useState(null);
+  // De donde vino la seleccion de fecha ("planilla" o "clientes") - para que
+  // el paso de "Inicio del reparto" (cuando el dia aun no se cargo) sepa a
+  // donde volver despues: directo a la planilla, o a la lista de clientes.
+  const [origenFecha, setOrigenFecha] = useState("clientes");
   const [clienteId, setClienteId] = useState(null);
   const [pinOk, setPinOk] = React.useState(false);
   const [noVisitas, setNoVisitas] = useLS("cat_novisitas_v1", []);
@@ -2144,6 +2148,11 @@ function App() {
       setDiaActual(d);
       irA("diaPrincipal");
     },
+    onDiaParaPlanilla: d => {
+      setDiaActual(d);
+      setOrigenFecha("planilla");
+      irA("selectorFechaPlanilla");
+    },
     onResumen: () => irA("resumen"),
     onConfig: tab => {
       setTabConfig(tab || "stock");
@@ -2248,8 +2257,9 @@ function App() {
    onSeleccionar: (fk, fo) => {
       setFechaActual(fk);
       setFechaObj(fo);
+      setOrigenFecha("planilla");
       const yaIniciado = planillas[`${diaActual}_${fk}`]?.iniciado;
-      irA(yaIniciado ? "clientes" : "inicioReparto");
+      irA(yaIniciado ? "planilla" : "inicioReparto");
     },
     onVolver: () => irA("diaPrincipal")
   }), pantalla === "planilla" && /*#__PURE__*/React.createElement(PlanillaDelDia, {
@@ -2280,6 +2290,7 @@ function App() {
     onSeleccionar: (fk, fo) => {
       setFechaActual(fk);
       setFechaObj(fo);
+      setOrigenFecha("clientes");
       // Si el camión ya se cargó ese día, no repetir "Inicio del reparto" —
       // ir directo a la lista de clientes (mismo criterio que selectorFechaPlanilla).
       const yaIniciado = planillas[`${diaActual}_${fk}`]?.iniciado;
@@ -2323,9 +2334,9 @@ function App() {
           }
         }));
       }
-      irA("clientes");
+      irA(origenFecha === "planilla" ? "planilla" : "clientes");
     },
-    onVolver: () => irA("selectorFechaClientes")
+    onVolver: () => irA(origenFecha === "planilla" ? "selectorFechaPlanilla" : "selectorFechaClientes")
   }), pantalla === "clientes" && /*#__PURE__*/React.createElement(ListaClientes, {
     clientes: clientes.filter(c => c.dia === diaActual),
     dia: diaActual,

@@ -32,9 +32,15 @@ function MenuDias({
   noVisitas,
   onFiados,
   onMapaClientes,
-  onDormidos
+  onDormidos,
+  onDiaParaPlanilla
 }) {
   const [editandoZona, setEditandoZona] = React.useState(null);
+  // Modo "acceso directo a planilla": se activa desde el icono Planilla de
+  // abajo; mientras esta activo, tocar un dia de la lista de arriba va
+  // directo al selector de fecha -> planilla de ese dia (sin pasar por
+  // clientes ni por la pantalla principal del dia).
+  const [modoPlanilla, setModoPlanilla] = React.useState(false);
   const hoyDiaNombre = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"][new Date().getDay()];
   // Usar hora LOCAL para evitar bug de zona horaria (Argentina UTC-3)
   const hoyFechaKey = (() => {
@@ -206,7 +212,33 @@ function MenuDias({
     }
   }, fecha))))), /*#__PURE__*/React.createElement("span", {
     style: s.sectionTitle
-  }, "Días de reparto"), /*#__PURE__*/React.createElement("div", {
+  }, "Días de reparto"), modoPlanilla && /*#__PURE__*/React.createElement("div", {
+    style: {
+      margin: "0 16px 8px",
+      padding: "9px 12px",
+      borderRadius: 10,
+      background: "#1e3a5f",
+      border: "0.5px solid var(--color-border-info)",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-info)"
+    }
+  }, "\u{1F4CB} Elegí un día para ver su planilla"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setModoPlanilla(false),
+    style: {
+      background: "none",
+      border: "none",
+      color: "var(--color-text-secondary)",
+      fontSize: 12,
+      cursor: "pointer"
+    }
+  }, "Cancelar")), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "0 16px",
       display: "flex",
@@ -238,7 +270,7 @@ function MenuDias({
         alignItems: "center",
         padding: "14px 16px"
       },
-      onClick: () => onDia(d)
+      onClick: () => modoPlanilla ? (setModoPlanilla(false), onDiaParaPlanilla && onDiaParaPlanilla(d)) : onDia(d)
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
@@ -581,18 +613,23 @@ function MenuDias({
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
-      gridTemplateColumns: "1fr 1fr 1fr",
-      gap: 8,
+      gridTemplateColumns: "1fr 1fr 1fr 1fr",
+      gap: 6,
       padding: "4px 0 8px"
     }
   }, [{
-    ico: "📣",
-    lbl: "Promociones",
-    fn: () => onPromociones && onPromociones()
-  }, {
     ico: "📅",
     lbl: "Agenda",
     fn: () => onAgenda && onAgenda()
+  }, {
+    ico: "📋",
+    lbl: "Planilla",
+    activo: modoPlanilla,
+    fn: () => setModoPlanilla(v => !v)
+  }, {
+    ico: "📣",
+    lbl: "Promociones",
+    fn: () => onPromociones && onPromociones()
   }, {
     ico: "➕",
     lbl: "Nuevo cliente",
@@ -600,7 +637,8 @@ function MenuDias({
   }].map(({
     ico,
     lbl,
-    fn
+    fn,
+    activo
   }) => /*#__PURE__*/React.createElement("button", {
     key: lbl,
     onClick: fn,
@@ -612,9 +650,9 @@ function MenuDias({
       padding: "10px 4px",
       borderRadius: 11,
       cursor: "pointer",
-      border: "none",
-      background: "var(--color-background-tertiary)",
-      color: "var(--color-text-secondary)"
+      border: activo ? "0.5px solid var(--color-border-info)" : "none",
+      background: activo ? "#1e3a5f" : "var(--color-background-tertiary)",
+      color: activo ? "var(--color-text-info)" : "var(--color-text-secondary)"
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
@@ -624,7 +662,7 @@ function MenuDias({
     style: {
       fontSize: 9,
       fontWeight: 500,
-      color: "var(--color-text-tertiary)"
+      color: activo ? "var(--color-text-info)" : "var(--color-text-tertiary)"
     }
   }, lbl)))), /*#__PURE__*/React.createElement("div", {
     style: s.divider
