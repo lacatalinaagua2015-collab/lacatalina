@@ -3100,7 +3100,8 @@ function AtajoPlanillaSemana({
     }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 15,
-        fontWeight: 500
+        fontWeight: 500,
+        color: "var(--color-text-primary)"
       }
     }, dia), /*#__PURE__*/React.createElement("div", {
       style: {
