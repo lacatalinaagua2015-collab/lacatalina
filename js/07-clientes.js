@@ -33,6 +33,10 @@ function ListaClientes({
   // "Entregar" navegaba a otra pantalla (NuevaVenta); ahora expande la
   // planilla ahí mismo y la lista sigue debajo, sin cambiar de pantalla.
   const [clienteExpandidoId, setClienteExpandidoId] = useState(null);
+  // Auto-scroll al botón "Ir a la planilla del día" apenas se termina de
+  // registrar el último cliente pendiente — antes había que darse cuenta y
+  // bajar manualmente.
+  const btnPlanillaRef = React.useRef(null);
   // ventas y noVisitas ya filtradas por fecha+dia desde App
   const atendidos = new Set(ventas.filter(v => !v._esCobro && !v._esAjuste).map(v => v.clienteId));
   const noVMap = {};
@@ -54,6 +58,15 @@ function ListaClientes({
   const pendientes = [...pendientesNormales, ...volverAlFinal];
   const sinEntrega = filtrados.filter(c => visitadosSinVenta.has(c.id));
   const listos = filtrados.filter(c => atendidos.has(c.id));
+  const todosListos = clientesReales.length > 0 && clientesReales.filter(c => visitados.has(c.id)).length >= clientesReales.length;
+  React.useEffect(() => {
+    if (todosListos && btnPlanillaRef.current) {
+      btnPlanillaRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
+    }
+  }, [todosListos]);
   const abrirRuta = () => {
     const cp = pendientes.filter(c => c.maps).slice(0, 9);
     if (!cp.length) {
@@ -710,7 +723,8 @@ function ListaClientes({
   }, "Sin entrega (", sinEntrega.length, ")"), sinEntrega.map(c => /*#__PURE__*/React.createElement(Card, {
     key: c.id,
     c: c
-  }))), onPlanilla && clientesReales.length > 0 && clientesReales.filter(c => visitados.has(c.id)).length >= clientesReales.length && /*#__PURE__*/React.createElement("div", {
+  }))), onPlanilla && todosListos && /*#__PURE__*/React.createElement("div", {
+    ref: btnPlanillaRef,
     style: {
       padding: "18px 16px 8px"
     }
