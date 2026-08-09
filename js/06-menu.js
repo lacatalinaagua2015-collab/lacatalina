@@ -3042,6 +3042,15 @@ function AtajoPlanillaSemana({
     }
     cur.setDate(cur.getDate() - 1);
   }
+  // Mostrar siempre en orden Lunes -> Viernes (no por cercanía a hoy)
+  const ORDEN_DIA = {
+    "Lunes": 1,
+    "Martes": 2,
+    "Miércoles": 3,
+    "Jueves": 4,
+    "Viernes": 5
+  };
+  dias5.sort((a, b) => ORDEN_DIA[a.dia] - ORDEN_DIA[b.dia]);
   return /*#__PURE__*/React.createElement("div", {
     style: s.screen
   }, /*#__PURE__*/React.createElement(HeaderApp, {
@@ -3090,17 +3099,17 @@ function AtajoPlanillaSemana({
       }
     }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: 14,
-        fontWeight: 500,
+        fontSize: 15,
+        fontWeight: 500
+      }
+    }, dia), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "var(--color-text-tertiary)",
+        marginTop: 2,
         textTransform: "capitalize"
       }
-    }, label), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: "var(--color-text-tertiary)",
-        marginTop: 2
-      }
-    }, dia, totalClientes ? ` · ${entregas}/${totalClientes} entregas` : "")), /*#__PURE__*/React.createElement("div", {
+    }, label, totalClientes ? ` · ${entregas}/${totalClientes} entregas` : "")), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         alignItems: "center",
