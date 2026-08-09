@@ -33,14 +33,9 @@ function MenuDias({
   onFiados,
   onMapaClientes,
   onDormidos,
-  onDiaParaPlanilla
+  onPlanillaAtajo
 }) {
   const [editandoZona, setEditandoZona] = React.useState(null);
-  // Modo "acceso directo a planilla": se activa desde el icono Planilla de
-  // abajo; mientras esta activo, tocar un dia de la lista de arriba va
-  // directo al selector de fecha -> planilla de ese dia (sin pasar por
-  // clientes ni por la pantalla principal del dia).
-  const [modoPlanilla, setModoPlanilla] = React.useState(false);
   const hoyDiaNombre = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"][new Date().getDay()];
   // Usar hora LOCAL para evitar bug de zona horaria (Argentina UTC-3)
   const hoyFechaKey = (() => {
@@ -212,33 +207,7 @@ function MenuDias({
     }
   }, fecha))))), /*#__PURE__*/React.createElement("span", {
     style: s.sectionTitle
-  }, "Días de reparto"), modoPlanilla && /*#__PURE__*/React.createElement("div", {
-    style: {
-      margin: "0 16px 8px",
-      padding: "9px 12px",
-      borderRadius: 10,
-      background: "#1e3a5f",
-      border: "0.5px solid var(--color-border-info)",
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: "var(--color-text-info)"
-    }
-  }, "\u{1F4CB} Elegí un día para ver su planilla"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setModoPlanilla(false),
-    style: {
-      background: "none",
-      border: "none",
-      color: "var(--color-text-secondary)",
-      fontSize: 12,
-      cursor: "pointer"
-    }
-  }, "Cancelar")), /*#__PURE__*/React.createElement("div", {
+  }, "Días de reparto"), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "0 16px",
       display: "flex",
@@ -270,7 +239,7 @@ function MenuDias({
         alignItems: "center",
         padding: "14px 16px"
       },
-      onClick: () => modoPlanilla ? (setModoPlanilla(false), onDiaParaPlanilla && onDiaParaPlanilla(d)) : onDia(d)
+      onClick: () => onDia(d)
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
@@ -624,8 +593,7 @@ function MenuDias({
   }, {
     ico: "📋",
     lbl: "Planilla",
-    activo: modoPlanilla,
-    fn: () => setModoPlanilla(v => !v)
+    fn: () => onPlanillaAtajo && onPlanillaAtajo()
   }, {
     ico: "📣",
     lbl: "Promociones",
@@ -637,8 +605,7 @@ function MenuDias({
   }].map(({
     ico,
     lbl,
-    fn,
-    activo
+    fn
   }) => /*#__PURE__*/React.createElement("button", {
     key: lbl,
     onClick: fn,
@@ -650,9 +617,9 @@ function MenuDias({
       padding: "10px 4px",
       borderRadius: 11,
       cursor: "pointer",
-      border: activo ? "0.5px solid var(--color-border-info)" : "none",
-      background: activo ? "#1e3a5f" : "var(--color-background-tertiary)",
-      color: activo ? "var(--color-text-info)" : "var(--color-text-secondary)"
+      border: "none",
+      background: "var(--color-background-tertiary)",
+      color: "var(--color-text-secondary)"
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
@@ -662,7 +629,7 @@ function MenuDias({
     style: {
       fontSize: 9,
       fontWeight: 500,
-      color: activo ? "var(--color-text-info)" : "var(--color-text-tertiary)"
+      color: "var(--color-text-tertiary)"
     }
   }, lbl)))), /*#__PURE__*/React.createElement("div", {
     style: s.divider
@@ -3049,4 +3016,121 @@ function InicioReparto({
       color: v > 0 ? "var(--color-text-primary)" : "var(--color-text-danger)"
     }
   }, v || 0))))));
+}
+
+// ── Atajo: Planilla de los últimos días (lun-vie) sin pasar por Clientes ──
+function AtajoPlanillaSemana({
+  planillas,
+  ventas,
+  clientes,
+  onSeleccionar,
+  onVolver
+}) {
+  const DIAS_NOMBRE = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+  const dias5 = [];
+  const cur = new Date();
+  cur.setHours(0, 0, 0, 0);
+  while (dias5.length < 5) {
+    const dow = cur.getDay();
+    if (dow !== 0 && dow !== 6) {
+      const fechaKey = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
+      dias5.push({
+        fecha: new Date(cur),
+        fechaKey,
+        dia: DIAS_NOMBRE[dow]
+      });
+    }
+    cur.setDate(cur.getDate() - 1);
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: s.screen
+  }, /*#__PURE__*/React.createElement(HeaderApp, {
+    titulo: "Planilla · Últimos días",
+    onVolver: onVolver
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "0 16px 4px",
+      fontSize: 12,
+      color: "var(--color-text-secondary)"
+    }
+  }, "Tocá una fecha para ir directo a su planilla."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "8px 16px",
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, dias5.map(({
+    fecha,
+    fechaKey,
+    dia
+  }) => {
+    const pl = (planillas || {})[`${dia}_${fechaKey}`];
+    const cerrada = !!(pl && pl._diaCerrado);
+    const iniciada = !!(pl && pl.iniciado);
+    const totalClientes = (clientes || []).filter(c => c.dia === dia).length;
+    const entregas = (ventas || []).filter(v => v.fechaKey === fechaKey).length;
+    const label = fecha.toLocaleDateString("es-AR", {
+      weekday: "short",
+      day: "numeric",
+      month: "short"
+    });
+    return /*#__PURE__*/React.createElement("button", {
+      key: fechaKey + "_" + dia,
+      onClick: () => onSeleccionar(fechaKey, dia),
+      style: {
+        ...s.card,
+        margin: 0,
+        textAlign: "left",
+        cursor: "pointer",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "13px 14px"
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 14,
+        fontWeight: 500,
+        textTransform: "capitalize"
+      }
+    }, label), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--color-text-tertiary)",
+        marginTop: 2
+      }
+    }, dia, totalClientes ? ` · ${entregas}/${totalClientes} entregas` : "")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8
+      }
+    }, cerrada ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        padding: "3px 8px",
+        borderRadius: 20,
+        background: "var(--color-background-success)",
+        color: "var(--color-text-success)"
+      }
+    }, "Cerrada ✓") : iniciada ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        padding: "3px 8px",
+        borderRadius: 20,
+        background: "var(--color-background-warning)",
+        color: "var(--color-text-warning)"
+      }
+    }, "En curso") : /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "var(--color-text-tertiary)"
+      }
+    }, "Sin iniciar"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "var(--color-text-tertiary)"
+      }
+    }, "→")));
+  })));
 }

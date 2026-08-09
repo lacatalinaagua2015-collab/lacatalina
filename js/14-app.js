@@ -2148,11 +2148,7 @@ function App() {
       setDiaActual(d);
       irA("diaPrincipal");
     },
-    onDiaParaPlanilla: d => {
-      setDiaActual(d);
-      setOrigenFecha("planilla");
-      irA("selectorFechaPlanilla");
-    },
+    onPlanillaAtajo: () => irA("atajoPlanillaSemana"),
     onResumen: () => irA("resumen"),
     onConfig: tab => {
       setTabConfig(tab || "stock");
@@ -2236,6 +2232,17 @@ function App() {
       } : v));
     },
     onVolver: () => irA("menu")
+  }), pantalla === "atajoPlanillaSemana" && /*#__PURE__*/React.createElement(AtajoPlanillaSemana, {
+    planillas: planillas,
+    ventas: ventas,
+    clientes: clientes,
+    onSeleccionar: (fk, dia) => {
+      setDiaActual(dia);
+      setFechaActual(fk);
+      setOrigenFecha("atajo");
+      irA("planilla");
+    },
+    onVolver: () => irA("menu")
   }), pantalla === "diaPrincipal" && /*#__PURE__*/React.createElement(DiaPrincipal, {
     dia: diaActual,
     onIrClientes: () => {
@@ -2276,11 +2283,11 @@ function App() {
     cargasDia: cargasDia,
     onGuardar: d => {
       savePlanilla(`${diaActual}_${fechaActual}`, d);
-      if (!d._diaCerrado) irA("selectorFechaPlanilla");
+      if (!d._diaCerrado) irA(origenFecha === "atajo" ? "atajoPlanillaSemana" : "selectorFechaPlanilla");
       // Si es cierre de d\xc3\xada, no navega: setMostrarCierre(false) vuelve a la planilla normal
     },
     onAutoGuardar: d => savePlanilla(`${diaActual}_${fechaActual}`, d),
-    onVolver: () => irA("selectorFechaPlanilla"),
+    onVolver: () => irA(origenFecha === "atajo" ? "atajoPlanillaSemana" : "selectorFechaPlanilla"),
     noVisitas: noVisitas
   }), pantalla === "selectorFechaClientes" && /*#__PURE__*/React.createElement(SelectorFecha, {
     dia: diaActual,
