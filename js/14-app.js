@@ -2,6 +2,46 @@
 // ◆  14-app.js — Componente App principal
 // ════════════════════════════════════════════════════════════════════
 
+// Al cobrar una deuda, marca las ventas fiado más viejas del cliente como
+// pagadas (o parcialmente pagadas) en orden FIFO, hasta agotar el monto
+// cobrado. No toca ventas que no sean fiado, ni cobros/ajustes/cambios.
+function aplicarCobroAVentasFiado(ventasPrev, clienteId, monto) {
+  let restante = Number(monto) || 0;
+  const idsAfectados = [];
+  const cambios = {};
+  const pendientes = ventasPrev.filter(v => v.clienteId === clienteId && v.pago === "fiado" && !v._esCobro && !v._esAjuste && !v._esCambio && !v._pagada).sort((a, b) => (a.id || 0) - (b.id || 0));
+  for (const v of pendientes) {
+    if (restante <= 0) break;
+    const yaPagado = Number(v._montoPagadoAcum) || 0;
+    const debe = (Number(v.neto) || 0) - yaPagado;
+    if (debe <= 0) continue;
+    if (restante >= debe) {
+      cambios[v.id] = {
+        _pagada: true,
+        _montoPagadoAcum: Number(v.neto) || 0,
+        _upd: Date.now()
+      };
+      restante -= debe;
+    } else {
+      cambios[v.id] = {
+        _pagada: false,
+        _montoPagadoAcum: yaPagado + restante,
+        _upd: Date.now()
+      };
+      restante = 0;
+    }
+    idsAfectados.push(v.id);
+  }
+  const ventasActualizadas = ventasPrev.map(v => cambios[v.id] ? {
+    ...v,
+    ...cambios[v.id]
+  } : v);
+  return {
+    ventasActualizadas,
+    idsAfectados
+  };
+}
+
 // Barra de pestañas del hub de Clientes (Todos · Fiados · Dormidos · Mapa)
 function ClientesTabs({
   activo,
@@ -1731,7 +1771,19 @@ function App() {
     // Forma funcional: agrega sobre el ventas/clientes MÁS RECIENTE, no sobre
     // el que había cuando se abrió esta pantalla (evita perder ventas o saldo
     // si esto se dispara más de una vez seguida).
-    saveVentas(prev => [...prev, ...ventasNuevas]);
+    saveVentas(prev => {
+      const base = [...prev, ...ventasNuevas];
+      // Si esta venta es un cobro de deuda (opción del formulario, no el
+      // botón rápido), también marcamos las ventas fiado más viejas.
+      if (opcionSaldo === "cobro_deuda" && saldoExtra > 0) {
+        const { ventasActualizadas, idsAfectados } = aplicarCobroAVentasFiado(base, c.id, saldoExtra);
+        return ventasActualizadas.map(v => v.id === nuevaVenta.id ? {
+          ...v,
+          _ventasSaldadas: idsAfectados
+        } : v);
+      }
+      return base;
+    });
     saveClientes(prev => prev.map(c2 => c2.id === c.id ? {
       ...c2,
       saldo: (Number(c2.saldo) || 0) + saldoExtra
@@ -2525,7 +2577,10 @@ function App() {
         _esCobro: true,
         _upd: Date.now()
       };
-      saveVentas(prev => [...prev, vt]);
+      saveVentas(prev => {
+        const { ventasActualizadas, idsAfectados } = aplicarCobroAVentasFiado(prev, cl.id, monto);
+        return [...ventasActualizadas, { ...vt, _ventasSaldadas: idsAfectados }];
+      });
       saveClientes(prev => prev.map(x => x.id === cl.id ? {
         ...x,
         saldo: (Number(x.saldo) || 0) + monto
@@ -2873,7 +2928,10 @@ function App() {
           _esCobro: true,
           _upd: Date.now()
         };
-        saveVentas(prev => [...prev, vt]);
+        saveVentas(prev => {
+          const { ventasActualizadas, idsAfectados } = aplicarCobroAVentasFiado(prev, cliente.id, monto);
+          return [...ventasActualizadas, { ...vt, _ventasSaldadas: idsAfectados }];
+        });
         saveClientes(prev => prev.map(x => x.id === cliente.id ? {
           ...x,
           saldo: (Number(x.saldo) || 0) + monto
@@ -2984,7 +3042,10 @@ function App() {
         _esCobro: true,
         _upd: Date.now()
       };
-      saveVentas(prev => [...prev, vt]);
+      saveVentas(prev => {
+        const { ventasActualizadas, idsAfectados } = aplicarCobroAVentasFiado(prev, clienteId, monto);
+        return [...ventasActualizadas, { ...vt, _ventasSaldadas: idsAfectados }];
+      });
       saveClientes(prev => prev.map(c => c.id === clienteId ? {
         ...c,
         saldo: (Number(c.saldo) || 0) + monto
