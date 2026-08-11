@@ -42,6 +42,82 @@ function aplicarCobroAVentasFiado(ventasPrev, clienteId, monto) {
   };
 }
 
+const KEY_PROD_ENV = {
+  "Sifón 1.5L": "sifon",
+  "Bidón 10L": "bidon10",
+  "Bidón 20L": "bidon20"
+};
+
+// Prestado histórico de un cliente para un producto — se usa UNA sola vez,
+// para sembrar el campo c.prestado la primera vez que se toca ese cliente
+// con este sistema. Después, c.prestado se mantiene solo con sumas y restas
+// directas (ya no hace falta recorrer todo el historial de nuevo).
+function prestadoHistoricoDe(ventasPrev, clienteId, k) {
+  let n = 0;
+  (ventasPrev || []).forEach(v => {
+    if (v.clienteId !== clienteId) return;
+    (v.envPrest || []).forEach(e => {
+      if (KEY_PROD_ENV[e.prod] === k) n += Number(e.cant) || 0;
+    });
+    (v.envDev || []).forEach(e => {
+      if (KEY_PROD_ENV[e.prod] === k) n -= Number(e.cant) || 0;
+    });
+  });
+  return Math.max(0, n);
+}
+
+// Aplica el movimiento de envases de UNA venta al cliente:
+// - Préstamo: se suma directo a c.prestado[k].
+// - Devolución: primero descuenta de c.prestado[k]. Si devuelve más de lo
+//   que tenía prestado, el resto se descuenta del stock FIJO del cliente
+//   (c.sifon/bidon10/bidon20) — ya no es devolver un préstamo, es que se
+//   queda con menos envases propios.
+function aplicarMovimientoEnvases(clientesPrev, ventasPrev, clienteId, envPrest, envDev) {
+  return (clientesPrev || []).map(c => {
+    if (c.id !== clienteId) return c;
+    const prestado = {
+      sifon: c.prestado?.sifon,
+      bidon10: c.prestado?.bidon10,
+      bidon20: c.prestado?.bidon20
+    };
+    const fijo = {
+      sifon: Number(c.sifon) || 0,
+      bidon10: Number(c.bidon10) || 0,
+      bidon20: Number(c.bidon20) || 0
+    };
+    const seed = k => {
+      if (prestado[k] === undefined) prestado[k] = prestadoHistoricoDe(ventasPrev, clienteId, k);
+    };
+    (envPrest || []).forEach(e => {
+      const k = KEY_PROD_ENV[e.prod];
+      const cant = Number(e.cant) || 0;
+      if (!k || cant <= 0) return;
+      seed(k);
+      prestado[k] += cant;
+    });
+    (envDev || []).forEach(e => {
+      const k = KEY_PROD_ENV[e.prod];
+      let cant = Number(e.cant) || 0;
+      if (!k || cant <= 0) return;
+      seed(k);
+      const deLoPrestado = Math.min(prestado[k], cant);
+      prestado[k] -= deLoPrestado;
+      cant -= deLoPrestado;
+      if (cant > 0) fijo[k] = Math.max(0, fijo[k] - cant);
+    });
+    ["sifon", "bidon10", "bidon20"].forEach(k => {
+      if (prestado[k] === undefined) prestado[k] = c.prestado?.[k] || 0;
+    });
+    return {
+      ...c,
+      prestado,
+      sifon: fijo.sifon,
+      bidon10: fijo.bidon10,
+      bidon20: fijo.bidon20
+    };
+  });
+}
+
 // Barra de pestañas del hub de Clientes (Todos · Fiados · Dormidos · Mapa)
 function ClientesTabs({
   activo,
@@ -1784,7 +1860,7 @@ function App() {
       }
       return base;
     });
-    saveClientes(prev => prev.map(c2 => c2.id === c.id ? {
+    saveClientes(prev => aplicarMovimientoEnvases(prev, ventas, c.id, nuevaVenta.envPrest, nuevaVenta.envDev).map(c2 => c2.id === c.id ? {
       ...c2,
       saldo: (Number(c2.saldo) || 0) + saldoExtra
     } : c2));
@@ -1954,6 +2030,7 @@ function App() {
         envDev: _ed,
         _esAjuste: true
       }]);
+      saveClientes(prev => aplicarMovimientoEnvases(prev, ventas, clienteIdObj, _ep, _ed));
     }
   };
   const eliminarVenta = ventaId => {
@@ -2021,10 +2098,21 @@ function App() {
     });
     // El saldo se resta sobre el saldo REAL más reciente del cliente (prev),
     // así ninguna reversión se pierde si borrás varias ventas seguidas.
-    saveClientes(prev => prev.map(x => x.id === v.clienteId ? {
-      ...x,
-      saldo: (Number(x.saldo) || 0) - v.saldoDelta - ajusteSaldoExtra
-    } : x));
+    // Los envases también se revierten: lo que esa venta prestó se le
+    // devuelve al cliente (se resta de prestado) y lo que devolvió se le
+    // vuelve a prestar (se suma a prestado) — mismo helper, roles invertidos.
+    saveClientes(prev => {
+      let out = prev;
+      ventasBorradas.forEach(x => {
+        if ((x.envPrest?.length || 0) > 0 || (x.envDev?.length || 0) > 0) {
+          out = aplicarMovimientoEnvases(out, ventas, x.clienteId, x.envDev, x.envPrest);
+        }
+      });
+      return out.map(x => x.id === v.clienteId ? {
+        ...x,
+        saldo: (Number(x.saldo) || 0) - v.saldoDelta - ajusteSaldoExtra
+      } : x);
+    });
   };
   const deshacerUltimaVenta = () => {
     if (!deshacerVenta) return;
@@ -2042,10 +2130,18 @@ function App() {
       localStorage.setItem("cat_ventas_tombstone_v1", JSON.stringify(tombPrevio.filter(t => !idsRestaurados.has(t.id))));
     } catch {}
     saveVentas(prev => [...prev, ...ventasBorradas]);
-    saveClientes(prev => prev.map(x => x.id === clienteId ? {
-      ...x,
-      saldo: (Number(x.saldo) || 0) + ajusteTotal
-    } : x));
+    saveClientes(prev => {
+      let out = prev;
+      ventasBorradas.forEach(x => {
+        if ((x.envPrest?.length || 0) > 0 || (x.envDev?.length || 0) > 0) {
+          out = aplicarMovimientoEnvases(out, ventas, x.clienteId, x.envPrest, x.envDev);
+        }
+      });
+      return out.map(x => x.id === clienteId ? {
+        ...x,
+        saldo: (Number(x.saldo) || 0) + ajusteTotal
+      } : x);
+    });
     setDeshacerVenta(null);
   };
 
@@ -2325,6 +2421,7 @@ function App() {
     dia: diaActual,
     fecha: fechaActual,
     ventas: ventas.filter(v => v.fechaKey === fechaActual),
+    todasLasVentas: ventas,
     clientes: clientes,
     planilla: planillas[`${diaActual}_${fechaActual}`] || planillaDiaVacia(),
     productos: productos,
@@ -2697,6 +2794,7 @@ function App() {
           envDev: _ed,
           _esAjuste: true
         }]);
+        saveClientes(prev => aplicarMovimientoEnvases(prev, ventas, clienteId, _ep, _ed));
       }
       const clientesDia = clientes.filter(c => c.dia === diaActual).sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
       const ventasIds = new Set(ventas.filter(v => v.fechaKey === fechaActual && v.dia === diaActual && !v._esCobro && !v._esAjuste && !v._esMixtoTrans).map(v => v.clienteId));

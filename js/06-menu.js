@@ -1367,31 +1367,38 @@ function PlanillaDelDia({
     b10: stock?.casa?.bidon10 || 0,
     b20: stock?.casa?.bidon20 || 0
   };
-  // Envases PRESTADOS en poder de clientes = TODO lo prestado históricamente
-  // menos todo lo devuelto históricamente (no solo lo de hoy) más el ajuste
-  // manual por cliente (envAjuste), igual que en el Arqueo de Stock.
+  // Envases PRESTADOS en poder de clientes: se lee directo de c.prestado por
+  // cliente (se mantiene solo en cada venta — ver aplicarMovimientoEnvases en
+  // 14-app.js, mismo criterio que el Arqueo de Stock). Si un cliente todavía
+  // no tiene ese campo, se usa el cálculo por historial completo como
+  // referencia inicial.
   const enClientesActual = {
     soda: 0,
     b10: 0,
     b20: 0
   };
+  const historialPorCliente = {};
   (todasLasVentas || ventas).forEach(v => {
+    if (!historialPorCliente[v.clienteId]) historialPorCliente[v.clienteId] = {
+      soda: 0,
+      b10: 0,
+      b20: 0
+    };
     (v.envPrest || []).forEach(e => {
       const k = prodKeyPl[e.prod];
-      if (k) enClientesActual[k] += Number(e.cant) || 0;
+      if (k) historialPorCliente[v.clienteId][k] += Number(e.cant) || 0;
     });
     (v.envDev || []).forEach(e => {
       const k = prodKeyPl[e.prod];
-      if (k) enClientesActual[k] -= Number(e.cant) || 0;
+      if (k) historialPorCliente[v.clienteId][k] -= Number(e.cant) || 0;
     });
   });
-  ["soda", "b10", "b20"].forEach(pk => {
-    enClientesActual[pk] = Math.max(0, enClientesActual[pk]);
-  });
   clientesReales.forEach(c => {
-    enClientesActual.soda += Number(c.envAjuste?.sifon) || 0;
-    enClientesActual.b10 += Number(c.envAjuste?.bidon10) || 0;
-    enClientesActual.b20 += Number(c.envAjuste?.bidon20) || 0;
+    ["soda", "b10", "b20"].forEach(pk => {
+      const sk = planKeyToSk[pk];
+      const valor = c.prestado && c.prestado[sk] !== undefined ? c.prestado[sk] : Math.max(0, historialPorCliente[c.id]?.[pk] || 0);
+      enClientesActual[pk] += valor;
+    });
   });
   ventas.forEach(v => {
     v.detalle.forEach(d => {

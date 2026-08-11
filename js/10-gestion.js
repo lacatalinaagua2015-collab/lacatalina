@@ -1066,7 +1066,7 @@ function MapaClientes({
       const marker = L.marker([c.lat, c.lng], {
         icon
       }).addTo(map);
-      const dir = c.calle ? c.calle + " " + (c.nro || "") : c.manzana ? "Mz " + c.manzana + " L " + (c.lote || "") : c.barrio || "";
+      const dir = direccionCliente(c);
       marker.bindPopup(`<div style="font-family:sans-serif;min-width:160px">
           <b style="font-size:13px">${c.nombre}</b><br/>
           <span style="font-size:11px;color:#666">${c.dia} · Orden ${c.orden || "-"}</span><br/>

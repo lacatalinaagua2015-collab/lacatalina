@@ -120,19 +120,37 @@ function StockGeneral({
     });
     return m;
   }, [ventas]);
-  // Prestado TOTAL de un cliente = lo calculado de ventas + el ajuste manual (envAjuste)
-  const prestadoDe = (c, k) => (extraPorCliente[c.id]?.[k] || 0) + (c.envAjuste?.[k] || 0);
-  // Al editar, el usuario escribe el TOTAL que el cliente tiene → guardamos envAjuste = total − calculado
+  // Prestado TOTAL de un cliente: para sifón/bidón10/bidón20 se lee directo
+  // de c.prestado (se mantiene solo, sumando/restando en cada venta — ver
+  // aplicarMovimientoEnvases en 14-app.js). Si un cliente todavía no tiene
+  // ese campo (no tuvo ventas con envases desde que se agregó), se usa el
+  // cálculo viejo por historial + ajuste manual como referencia inicial.
+  // Dispenser no tiene campo directo, sigue con el cálculo por historial.
+  const prestadoDe = (c, k) => {
+    if (k !== "dispenser" && c.prestado && c.prestado[k] !== undefined) return c.prestado[k];
+    return Math.max(0, (extraPorCliente[c.id]?.[k] || 0) + (c.envAjuste?.[k] || 0));
+  };
+  // Al editar a mano en el Arqueo: sifón/bidón10/bidón20 se guardan directo
+  // en c.prestado. Dispenser (sin campo directo) sigue usando envAjuste.
   const setClientePrestado = (id, k, val) => {
-    const n = Math.round(Number(val) || 0);
+    const n = Math.max(0, Math.round(Number(val) || 0));
     setClientes((clientes || []).map(c => {
       if (c.id !== id) return c;
-      const ex = extraPorCliente[id]?.[k] || 0;
+      if (k === "dispenser") {
+        const ex = extraPorCliente[id]?.[k] || 0;
+        return {
+          ...c,
+          envAjuste: {
+            ...(c.envAjuste || {}),
+            [k]: n - ex
+          }
+        };
+      }
       return {
         ...c,
-        envAjuste: {
-          ...(c.envAjuste || {}),
-          [k]: n - ex
+        prestado: {
+          ...(c.prestado || {}),
+          [k]: n
         }
       };
     }));
@@ -1479,7 +1497,7 @@ function ConfirmacionesDia({
       color: "var(--color-text-secondary)",
       marginTop: 2
     }
-  }, c?.calle ? `${c.calle} ${c.nro || ""}` : c?.manzana ? `Mz ${c.manzana} L ${c.lote}` : "", c?.barrio ? ` · ${c.barrio}` : "")), c?.telefono && /*#__PURE__*/React.createElement("a", {
+  }, direccionCliente(c))), c?.telefono && /*#__PURE__*/React.createElement("a", {
     href: `https://wa.me/54${c.telefono}`,
     target: "_blank",
     rel: "noreferrer",
