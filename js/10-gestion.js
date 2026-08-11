@@ -753,37 +753,12 @@ function MapaClientes({
   const [modoCarga, setModoCarga] = React.useState(false);
   const ventasHoy = (ventas || []).filter(v => v.fechaKey === fecha);
   const noVisHoy = (noVisitas || []).filter(v => v.fecha === fecha);
-  const _coordsURL = url => {
-    if (!url) return null;
-    let m;
-    m = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-    if (m) return {
-      lat: +m[1],
-      lng: +m[2]
-    };
-    m = url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
-    if (m) return {
-      lat: +m[1],
-      lng: +m[2]
-    };
-    m = url.match(/[?&](?:q|ll|destination)=(-?\d+\.\d+),(-?\d+\.\d+)/);
-    if (m) return {
-      lat: +m[1],
-      lng: +m[2]
-    };
-    m = url.match(/(-?\d{1,2}\.\d{4,}),\s*(-?\d{1,3}\.\d{4,})/);
-    if (m) return {
-      lat: +m[1],
-      lng: +m[2]
-    };
-    return null;
-  };
   const _getCoords = c => {
     if (c.lat && c.lng) return {
       lat: c.lat,
       lng: c.lng
     };
-    return _coordsURL(c.maps);
+    return extraerCoordsDeURL(c.maps);
   };
   const clientesFiltrados = (clientes || []).filter(c => {
     if (filtroDia !== "todos" && c.dia !== filtroDia) return false;

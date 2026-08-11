@@ -1692,10 +1692,10 @@ function App() {
     // camión→sodería (sobrantes + vacíos) en automático. Se sacó porque
     // duplicaba el cierre: el mismo traspaso se vuelve a hacer, con revisión
     // de cantidades reales, en la pantalla "Cierre del día" (confirmarCierre,
-    // 06-menu.js) — que se abre sola apenas el camión salió. Los dos corrían
+    // 07-menu.js) — que se abre sola apenas el camión salió. Los dos corrían
     // sin enterarse uno del otro y el stock quedaba sumado dos veces cada
     // día. Ahora el ÚNICO lugar que mueve stock al cerrar el día es
-    // confirmarCierre en 06-menu.js.
+    // confirmarCierre en 07-menu.js.
     const camionCerradoKey = `lc_cam_${planillaKey}`;
     if (planillaActual.iniciado && !planillaActual._stockCerrado && !localStorage.getItem(camionCerradoKey)) {
       localStorage.setItem(camionCerradoKey, "1");
@@ -2574,7 +2574,7 @@ function App() {
     // BUG REPORTADO: "Editar" en una venta desde el perfil del cliente
     // rompía la app ("Cannot read properties of undefined (reading
     // 'forEach')"). Causa: acá nunca se pasaba la prop `productos`, así que
-    // EditVenta (08-ventas.js) recibía productos=undefined y explotaba en
+    // EditVenta (09-ventas.js) recibía productos=undefined y explotaba en
     // su primer useState (productos.forEach(...)). El otro punto donde se
     // usa DetalleCliente (pantalla "detalleDesdeGestion", más abajo) sí la
     // pasaba — por eso desde Gestión funcionaba pero desde la lista normal
