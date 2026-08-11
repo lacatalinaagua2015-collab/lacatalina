@@ -1,0 +1,2529 @@
+// ════════════════════════════════════════════════════════════════════
+// ◆  09-ventas.js — EditVenta, Modals, NuevaVenta, NuevoCliente
+// ════════════════════════════════════════════════════════════════════
+
+function EditVenta({
+  venta,
+  productos,
+  onGuardar,
+  onCancelar
+}) {
+  // onGuardar(detalle,pago,monto,saldoApl,obs,montoTrans2)
+  const esMixtaOrig = (Number(venta.montoTrans) || 0) > 0; // venta mixta guardada: pago "contado" + desglose
+  const [cantidades, setCantidades] = useState(() => {
+    const m = {};
+    productos.forEach(p => {
+      m[p.nombre] = 0;
+    });
+    venta.detalle.forEach(d => {
+      m[d.nombre] = d.cantidad;
+    });
+    return m;
+  });
+  const [pago, setPago] = useState(esMixtaOrig ? "mixto" : venta.pago || "contado");
+  const [monto, setMonto] = useState(() => String(venta.pagadoNum || venta.neto || ""));
+  const [montoEfec, setMontoEfec] = useState(esMixtaOrig ? String(venta.montoEfec || "") : "");
+  const [montoTrans, setMontoTrans] = useState(esMixtaOrig ? String(venta.montoTrans || "") : "");
+  const [obs, setObs] = useState((venta.obs || "").replace(/\s*\[Mixto:[^\]]*\]/g, ""));
+  const detalle = productos.map(p => ({
+    nombre: p.nombre,
+    cantidad: cantidades[p.nombre] || 0,
+    precio: p.precio,
+    total: (cantidades[p.nombre] || 0) * p.precio
+  })).filter(d => d.cantidad > 0);
+  const bruto = detalle.reduce((a, d) => a + d.total, 0);
+  const neto = bruto;
+  const sonarTrans = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [523, 659, 784].forEach((f, i) => {
+        const o = ctx.createOscillator(),
+          g = ctx.createGain();
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.frequency.value = f;
+        g.gain.value = 0.3;
+        o.start(ctx.currentTime + i * 0.15);
+        o.stop(ctx.currentTime + i * 0.15 + 0.15);
+      });
+    } catch (e) {}
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      margin: 0,
+      background: "var(--color-background-secondary)"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 13,
+      fontWeight: 500,
+      color: "var(--color-text-primary)",
+      marginBottom: 10
+    }
+  }, "Editando venta"), productos.map(p => /*#__PURE__*/React.createElement("div", {
+    key: p.id,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "var(--color-text-primary)"
+    }
+  }, p.nombre), /*#__PURE__*/React.createElement("div", {
+    style: s.row
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      padding: "3px 12px",
+      fontSize: 17
+    },
+    onClick: () => setCantidades(q => ({
+      ...q,
+      [p.nombre]: Math.max(0, (q[p.nombre] || 0) - 1)
+    }))
+  }, "−"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      minWidth: 24,
+      textAlign: "center",
+      fontWeight: 500,
+      fontSize: 15,
+      color: "var(--color-text-primary)"
+    }
+  }, cantidades[p.nombre] || 0), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      padding: "3px 12px",
+      fontSize: 17
+    },
+    onClick: () => setCantidades(q => ({
+      ...q,
+      [p.nombre]: (q[p.nombre] || 0) + 1
+    }))
+  }, "+")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      margin: "10px 0"
+    }
+  }, [["contado", "Contado"], ["transferencia", "Transfer."], ["fiado", "Fiado"], ["mixto", "Mixto"]].map(([v, l]) => /*#__PURE__*/React.createElement("button", {
+    key: v,
+    style: {
+      ...s.btn,
+      flex: 1,
+      fontSize: 12,
+      padding: "8px 2px",
+      background: pago === v ? "#185FA5" : undefined,
+      color: pago === v ? "#fff" : undefined,
+      border: pago === v ? "none" : undefined
+    },
+    onClick: () => setPago(v)
+  }, l))), pago === "mixto" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      margin: "0 0 8px",
+      background: "var(--color-background-tertiary)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-secondary)",
+      marginBottom: 6
+    }
+  }, "Total: ", fmt(neto)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: s.label
+  }, "Efectivo $"), /*#__PURE__*/React.createElement("input", {
+    style: s.input,
+    type: "number",
+    placeholder: "0",
+    value: montoEfec,
+    onChange: e => {
+      const ef = e.target.value;
+      setMontoEfec(ef);
+      const r = neto - (Number(ef) || 0);
+      setMontoTrans(r > 0 ? String(Math.round(r)) : "");
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: s.label
+  }, "Transferencia $"), /*#__PURE__*/React.createElement("input", {
+    style: s.input,
+    type: "number",
+    placeholder: "0",
+    value: montoTrans,
+    onChange: e => setMontoTrans(e.target.value)
+  }))), Number(montoEfec || 0) + Number(montoTrans || 0) > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-secondary)",
+      marginTop: 4
+    }
+  }, "Pagado: ", fmt(Number(montoEfec || 0) + Number(montoTrans || 0)), Number(montoEfec || 0) + Number(montoTrans || 0) < neto && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "var(--color-text-warning)"
+    }
+  }, " · Saldo: ", fmt(neto - Number(montoEfec || 0) - Number(montoTrans || 0))))), pago !== "fiado" && pago !== "mixto" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: s.label
+  }, "Monto cobrado (vacío = ", fmt(neto), " exacto)"), /*#__PURE__*/React.createElement("input", {
+    style: s.input,
+    type: "number",
+    value: monto,
+    onChange: e => setMonto(e.target.value),
+    placeholder: String(Math.round(neto))
+  })), pago === "transferencia" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      margin: "0 0 8px",
+      background: "#1e3a5f",
+      border: "0.5px solid #5daaff"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#5daaff"
+    }
+  }, "Transferencia — se aplica al guardar"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      background: "#185FA5",
+      color: "#fff",
+      border: "none",
+      borderRadius: 6,
+      padding: "6px 12px",
+      fontSize: 12,
+      cursor: "pointer",
+      fontWeight: 600
+    },
+    onClick: () => {
+      sonarTrans();
+      onGuardar(detalle, pago, monto, venta.saldoAplicado || 0, obs);
+    }
+  }, "✓ Confirmar y guardar"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: s.label
+  }, "Observaciones"), /*#__PURE__*/React.createElement("input", {
+    style: s.input,
+    value: obs,
+    onChange: e => setObs(e.target.value)
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      padding: "8px 0",
+      fontSize: 14,
+      fontWeight: 500,
+      color: "var(--color-text-primary)",
+      borderTop: "0.5px solid var(--color-border-tertiary)"
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Total"), /*#__PURE__*/React.createElement("span", null, fmt(neto))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      flex: 1
+    },
+    onClick: onCancelar
+  }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btnPrimary,
+      flex: 2,
+      padding: "10px"
+    },
+    onClick: () => {
+      if (pago === "mixto") {
+        const ef = Number(montoEfec || 0),
+          tr = Number(montoTrans || 0);
+        if (ef + tr === 0) {
+          alert("⚠️ Completá el desglose: cuánto en efectivo y cuánto por transferencia.");
+          return;
+        }
+        onGuardar(detalle, "mixto", String(ef), venta.saldoAplicado || 0, obs, tr);
+      } else {
+        onGuardar(detalle, pago, pago === "fiado" ? "" : monto, venta.saldoAplicado || 0, obs);
+      }
+    }
+  }, "Guardar")));
+}
+function VehiculoMantModal({
+  onGuardar,
+  onCerrar
+}) {
+  const [tipo, setTipo] = React.useState("aceite");
+  const [otroDetalle, setOtroDetalle] = React.useState("");
+  const [descripcion, setDescripcion] = React.useState("");
+  const [km, setKm] = React.useState("");
+  const [costo, setCosto] = React.useState("");
+  const [proximo, setProximo] = React.useState("");
+  const [proximaFechaISO, setProximaFechaISO] = React.useState("");
+  const [fechaISO, setFechaISO] = React.useState(new Date().toISOString().slice(0, 10));
+  const fechaDisplay = fechaISO ? new Date(fechaISO + 'T12:00:00').toLocaleDateString("es-AR") : "";
+  const tipos = [{
+    id: "aceite",
+    label: "🛢 Cambio de aceite",
+    color: "#f5b942"
+  }, {
+    id: "preventivo",
+    label: "🔩 Mantenimiento preventivo",
+    color: "#4dd9a0"
+  }, {
+    id: "embrague",
+    label: "⚙️ Cambio de embrague",
+    color: "#e05c5c"
+  }, {
+    id: "reparacion",
+    label: "🛠 Reparación",
+    color: "#5daaff"
+  }, {
+    id: "gnc",
+    label: "🟢 Oblea GNC",
+    color: "#22c55e"
+  }, {
+    id: "vtv",
+    label: "🔵 VTV",
+    color: "#3b82f6"
+  }, {
+    id: "otro",
+    label: "📋 Otro",
+    color: "#a0aec0"
+  }];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "rgba(0,0,0,0.75)",
+      zIndex: 1200,
+      display: "flex",
+      alignItems: "flex-end",
+      justifyContent: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--color-background-secondary)",
+      borderRadius: "16px 16px 0 0",
+      padding: "20px 16px 32px",
+      width: "100%",
+      maxWidth: 480,
+      maxHeight: "90vh",
+      overflowY: "auto"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 16,
+      fontWeight: 600,
+      color: "var(--color-text-primary)"
+    }
+  }, "🔧 Registrar mantenimiento"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      background: "none",
+      border: "none",
+      fontSize: 22,
+      color: "var(--color-text-secondary)",
+      cursor: "pointer"
+    },
+    onClick: onCerrar
+  }, "✕")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-secondary)",
+      display: "block",
+      marginBottom: 4
+    }
+  }, "📅 Fecha del mantenimiento"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    style: {
+      width: "100%",
+      background: "var(--color-background-tertiary)",
+      border: "1px solid var(--color-border-secondary)",
+      borderRadius: 8,
+      padding: "8px 10px",
+      color: "var(--color-text-primary)",
+      fontSize: 13,
+      boxSizing: "border-box"
+    },
+    value: fechaISO,
+    onChange: e => setFechaISO(e.target.value)
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-secondary)",
+      display: "block",
+      marginBottom: 6
+    }
+  }, "Tipo"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 6
+    }
+  }, tipos.map(t => /*#__PURE__*/React.createElement("button", {
+    key: t.id,
+    onClick: () => setTipo(t.id),
+    style: {
+      padding: "7px 12px",
+      borderRadius: 8,
+      border: `2px solid ${tipo === t.id ? t.color : "var(--color-border-tertiary)"}`,
+      background: tipo === t.id ? t.color + "22" : "transparent",
+      color: tipo === t.id ? t.color : "var(--color-text-secondary)",
+      fontSize: 12,
+      cursor: "pointer",
+      fontWeight: tipo === t.id ? 600 : 400
+    }
+  }, t.label)))), tipo === "otro" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-secondary)",
+      display: "block",
+      marginBottom: 4
+    }
+  }, "¿Qué es? (detalle del \"Otro\")"), /*#__PURE__*/React.createElement("input", {
+    style: {
+      width: "100%",
+      background: "var(--color-background-tertiary)",
+      border: "2px solid #a0aec0",
+      borderRadius: 8,
+      padding: "8px 10px",
+      color: "var(--color-text-primary)",
+      fontSize: 14,
+      boxSizing: "border-box",
+      fontWeight: 500
+    },
+    placeholder: "Ej: Cambio de gomas, batería, luces...",
+    value: otroDetalle,
+    onChange: e => setOtroDetalle(e.target.value)
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-secondary)",
+      display: "block",
+      marginBottom: 4
+    }
+  }, "Descripción / detalle adicional"), /*#__PURE__*/React.createElement("textarea", {
+    style: {
+      width: "100%",
+      background: "var(--color-background-tertiary)",
+      border: "1px solid var(--color-border-secondary)",
+      borderRadius: 8,
+      padding: "8px 10px",
+      color: "var(--color-text-primary)",
+      fontSize: 13,
+      resize: "none",
+      boxSizing: "border-box",
+      minHeight: 60
+    },
+    placeholder: "Ej: Cambio aceite 10W-40 + filtro...",
+    value: descripcion,
+    onChange: e => setDescripcion(e.target.value)
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 10,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-secondary)",
+      display: "block",
+      marginBottom: 4
+    }
+  }, "Km actuales"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    style: {
+      width: "100%",
+      background: "var(--color-background-tertiary)",
+      border: "1px solid var(--color-border-secondary)",
+      borderRadius: 8,
+      padding: "8px 10px",
+      color: "var(--color-text-primary)",
+      fontSize: 13,
+      boxSizing: "border-box"
+    },
+    placeholder: "Ej: 125000",
+    value: km,
+    onChange: e => setKm(e.target.value)
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-secondary)",
+      display: "block",
+      marginBottom: 4
+    }
+  }, "Costo ($)"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    style: {
+      width: "100%",
+      background: "var(--color-background-tertiary)",
+      border: "1px solid var(--color-border-secondary)",
+      borderRadius: 8,
+      padding: "8px 10px",
+      color: "var(--color-text-primary)",
+      fontSize: 13,
+      boxSizing: "border-box"
+    },
+    placeholder: "Ej: 85000",
+    value: costo,
+    onChange: e => setCosto(e.target.value)
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-secondary)",
+      display: "block",
+      marginBottom: 4
+    }
+  }, "Próximo mantenimiento (notas)"), /*#__PURE__*/React.createElement("input", {
+    style: {
+      width: "100%",
+      background: "var(--color-background-tertiary)",
+      border: "1px solid var(--color-border-secondary)",
+      borderRadius: 8,
+      padding: "8px 10px",
+      color: "var(--color-text-primary)",
+      fontSize: 13,
+      boxSizing: "border-box"
+    },
+    placeholder: "Ej: 135.000 km / junio 2026",
+    value: proximo,
+    onChange: e => setProximo(e.target.value)
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 18,
+      background: "rgba(255,193,7,0.08)",
+      border: "1px solid rgba(255,193,7,0.3)",
+      borderRadius: 10,
+      padding: "10px 12px"
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-secondary)",
+      display: "block",
+      marginBottom: 4
+    }
+  }, "📅 Fecha próximo mantenimiento ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#f5b942",
+      fontSize: 11
+    }
+  }, "(para notificación)")), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    style: {
+      width: "100%",
+      background: "var(--color-background-tertiary)",
+      border: "1px solid var(--color-border-secondary)",
+      borderRadius: 8,
+      padding: "8px 10px",
+      color: "var(--color-text-primary)",
+      fontSize: 13,
+      boxSizing: "border-box"
+    },
+    value: proximaFechaISO,
+    onChange: e => setProximaFechaISO(e.target.value)
+  }), !proximaFechaISO && /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11,
+      color: "var(--color-text-tertiary)",
+      margin: "4px 0 0"
+    }
+  }, "Opcional — si completás, te avisamos 3 días antes")), /*#__PURE__*/React.createElement("button", {
+    style: {
+      width: "100%",
+      padding: "13px",
+      borderRadius: 10,
+      border: "none",
+      background: "#185FA5",
+      color: "#e2eaf4",
+      fontSize: 15,
+      fontWeight: 600,
+      cursor: "pointer"
+    },
+    onClick: () => {
+      if (!tipo) return;
+      onGuardar({
+        tipo,
+        descripcion,
+        km,
+        costo,
+        proximo,
+        proximaFechaISO,
+        fecha: fechaDisplay,
+        fechaISO,
+        otroDetalle: tipo === "otro" ? otroDetalle : ""
+      });
+    }
+  }, "Guardar registro")));
+}
+function RecordatorioModal({
+  cliente,
+  onGuardar,
+  onCerrar
+}) {
+  const hoy = new Date(Date.now() - 3 * 60 * 60 * 1000);
+  const [fecha, setFecha] = React.useState(hoy.toISOString().slice(0, 10));
+  const [hora, setHora] = React.useState("10:00");
+  const [tipo, setTipo] = React.useState("visita"); // visita | cobro
+  const [motivo, setMotivo] = React.useState("");
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "rgba(0,0,0,0.7)",
+      zIndex: 999,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--color-background-secondary)",
+      borderRadius: 16,
+      padding: 20,
+      width: "100%",
+      maxWidth: 400,
+      boxShadow: "0 8px 32px rgba(0,0,0,0.4)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 16,
+      fontWeight: 500,
+      color: "var(--color-text-primary)",
+      marginBottom: 4
+    }
+  }, "🔔 Nuevo recordatorio"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "var(--color-text-secondary)",
+      marginBottom: 12
+    }
+  }, cliente.nombre), /*#__PURE__*/React.createElement(TipoRecordatorioSelector, {
+    tipo: tipo,
+    onCambiarTipo: setTipo
+  }), /*#__PURE__*/React.createElement(FechaHoraRow, {
+    fecha: fecha,
+    hora: hora,
+    onCambiarFecha: setFecha,
+    onCambiarHora: setHora
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: s.label
+  }, "Detalle"), /*#__PURE__*/React.createElement("textarea", {
+    style: {
+      ...s.input,
+      minHeight: 60,
+      resize: "vertical"
+    },
+    placeholder: tipo === "cobro" ? "ej: Cobrar deuda $5.000, pago parcial..." : "ej: Pasar a ver al cliente, entregar pedido...",
+    value: motivo,
+    onChange: e => setMotivo(e.target.value)
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      flex: 1
+    },
+    onClick: onCerrar
+  }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btnPrimary,
+      flex: 2
+    },
+    onClick: () => {
+      if (!motivo.trim()) {
+        alert("Ingresá el detalle");
+        return;
+      }
+      onGuardar({
+        id: Date.now(),
+        fecha,
+        hora,
+        tipo,
+        motivo: motivo.trim(),
+        confirmado: false
+      });
+    }
+  }, "Guardar recordatorio"))));
+}
+function PagoSaldoPanel({
+  saldo,
+  onCobrar,
+  onCerrar
+}) {
+  const deuda = Math.abs(saldo || 0);
+  const [monto, setMonto] = React.useState(String(deuda));
+  const [pago, setPago] = React.useState("contado");
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--color-background-secondary)",
+      borderRadius: 16,
+      padding: 20,
+      width: "100%",
+      maxWidth: 400,
+      boxShadow: "0 8px 32px rgba(0,0,0,0.4)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 16,
+      fontWeight: 500,
+      color: "var(--color-text-primary)",
+      marginBottom: 4
+    }
+  }, "💰 Cobrar deuda"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "var(--color-text-danger)",
+      marginBottom: 16
+    }
+  }, "Total pendiente: ", fmt(deuda)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginBottom: 12
+    }
+  }, [["contado", "Efectivo"], ["transferencia", "Transferencia"]].map(([v, l]) => /*#__PURE__*/React.createElement("button", {
+    key: v,
+    style: {
+      ...s.btn,
+      flex: 1,
+      fontSize: 14,
+      padding: "10px 4px",
+      background: pago === v ? "#185FA5" : undefined,
+      color: pago === v ? "#fff" : undefined,
+      border: pago === v ? "none" : undefined
+    },
+    onClick: () => setPago(v)
+  }, l))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: s.label
+  }, "Monto cobrado"), /*#__PURE__*/React.createElement("input", {
+    style: s.input,
+    type: "number",
+    value: monto,
+    onChange: e => setMonto(e.target.value),
+    placeholder: String(deuda)
+  }), Number(monto) < deuda && Number(monto) > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-warning)",
+      marginTop: 4
+    }
+  }, "Pago parcial · Queda pendiente: ", fmt(deuda - Number(monto)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      flex: 1
+    },
+    onClick: onCerrar
+  }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btnPrimary,
+      flex: 2,
+      fontSize: 15
+    },
+    onClick: () => {
+      const m = Number(monto) || deuda;
+      if (m <= 0) {
+        alert("Ingresá el monto");
+        return;
+      }
+      onCobrar(m, pago);
+    }
+  }, "Confirmar cobro")));
+}
+function CobroDeudaPanel({
+  saldo,
+  onCobrar
+}) {
+  const [monto, setMonto] = React.useState("");
+  const [pago, setPago] = React.useState("contado");
+  const [open, setOpen] = React.useState(false);
+  const deuda = Math.abs(saldo);
+  if (!open) return /*#__PURE__*/React.createElement("button", {
+    style: {
+      width: "100%",
+      padding: "12px",
+      fontSize: 14,
+      fontWeight: 500,
+      borderRadius: 10,
+      border: "1px solid var(--color-border-danger)",
+      background: "var(--color-background-danger)",
+      color: "var(--color-text-danger)",
+      cursor: "pointer",
+      marginBottom: 8,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8
+    },
+    onClick: () => setOpen(true)
+  }, "💰 Cobrar deuda — ", fmt(deuda));
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      margin: "0 0 10px",
+      background: "var(--color-background-danger)",
+      border: "0.5px solid var(--color-border-danger)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 500,
+      color: "var(--color-text-danger)",
+      marginBottom: 10
+    }
+  }, "Cobrar deuda · Total pendiente: ", fmt(deuda)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginBottom: 10
+    }
+  }, [["contado", "Efectivo"], ["transferencia", "Transfer."]].map(([v, l]) => /*#__PURE__*/React.createElement("button", {
+    key: v,
+    style: {
+      ...s.btn,
+      flex: 1,
+      fontSize: 13,
+      padding: "9px 4px",
+      background: pago === v ? "#185FA5" : undefined,
+      color: pago === v ? "#fff" : undefined,
+      border: pago === v ? "none" : undefined
+    },
+    onClick: () => setPago(v)
+  }, l))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: s.label
+  }, "Monto cobrado (vacío = todo ", fmt(deuda), ")"), /*#__PURE__*/React.createElement("input", {
+    style: s.input,
+    type: "number",
+    placeholder: String(deuda),
+    value: monto,
+    onChange: e => setMonto(e.target.value)
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      flex: 1
+    },
+    onClick: () => setOpen(false)
+  }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btnPrimary,
+      flex: 2
+    },
+    onClick: () => {
+      const m = Number(monto) || deuda;
+      if (m > deuda) {
+        if (!window.confirm(`El monto ingresado ($${m.toLocaleString("es-AR")}) es MAYOR que la deuda ($${deuda.toLocaleString("es-AR")}). La diferencia ($${(m - deuda).toLocaleString("es-AR")}) quedará como SALDO A FAVOR del cliente. ¿Continuar?`)) return;
+      }
+      onCobrar(m, pago);
+    }
+  }, "Registrar cobro")));
+}
+function NuevaVenta({
+  cliente,
+  productos,
+  fecha,
+  onGuardar,
+  onNoEsta,
+  onNoQuiere,
+  onVolver,
+  onSaltar,
+  ventasCliente,
+  progressData,
+  compacto,
+  onCambiarDispenser
+}) {
+  const [transConfirmada, setTransConfirmada] = React.useState(false);
+  // Préstamo/retiro de dispenser inline: +1 = le presté uno, -1 = le retiré
+  // uno. No es un producto que se cobra — solo mueve cliente.dispenser.
+  const [dispDelta, setDispDelta] = React.useState(0);
+  const [mostrarRotoCompacto, setMostrarRotoCompacto] = React.useState(false);
+  const [mostrarCambio, setMostrarCambio] = React.useState(false);
+  const sonarTransferencia = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [523, 659, 784].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = freq;
+        gain.gain.value = 0.3;
+        osc.start(ctx.currentTime + i * 0.15);
+        osc.stop(ctx.currentTime + i * 0.15 + 0.15);
+      });
+    } catch (e) {}
+  };
+  // 🔁 Pre-cargar cantidades de la última venta del cliente
+  const nombresEntrega = (productos || []).filter(p => !p.esDispenser).map(p => p.nombre);
+  const ultimaConProd = (() => {
+    const todas = ventasCliente || [];
+    // Buscar la más reciente que tenga productos entregados (sin importar si detalle es array u objeto)
+    const conProd = todas.filter(v => {
+      const det = Array.isArray(v.detalle) ? v.detalle : v.detalle ? Object.values(v.detalle) : [];
+      return det.some(d => (d.cantidad || 0) > 0 && !d._esDispRoto && nombresEntrega.includes(d.nombre));
+    });
+    return conProd.length ? [...conProd].sort((a, b) => (b.id || 0) - (a.id || 0))[0] : null;
+  })();
+  const [cantidades, setCantidades] = useState(() => {
+    const m = {};
+    (productos || []).forEach(p => {
+      m[p.nombre] = 0;
+    });
+    if (ultimaConProd) {
+      const det = Array.isArray(ultimaConProd.detalle) ? ultimaConProd.detalle : Object.values(ultimaConProd.detalle || {});
+      det.forEach(d => {
+        if (!d._esDispRoto && nombresEntrega.includes(d.nombre)) m[d.nombre] = d.cantidad || 0;
+      });
+    }
+    return m;
+  });
+  const [repetido, setRepetido] = useState(() => !!ultimaConProd);
+  // BUG REPORTADO: "se borraba la carga" al entrar cantidades en una venta.
+  // Causa: ventasCliente se recalcula (ventas.filter(...)) en CADA render de
+  // 14-app.js -> nueva referencia de array en cada sync/pulso de Firestore,
+  // aunque el contenido no haya cambiado. Este efecto comparaba por
+  // referencia y, mientras `repetido` seguía false (p.ej. porque el primer
+  // snapshot de Firestore todavía no traía ventas previas), CUALQUIER
+  // re-render pisaba las cantidades ya tipeadas por el usuario con el
+  // preload de "última venta". cantidadesTocadas corta esto en cuanto el
+  // usuario toca un + o un − a mano.
+  const cantidadesTocadas = React.useRef(false);
+  // Si Firebase tarda en cargar, actualizar cuando lleguen los datos
+  const ventasClienteRef = React.useRef(ventasCliente);
+  React.useEffect(() => {
+    if (ventasClienteRef.current === ventasCliente || repetido || cantidadesTocadas.current) return;
+    ventasClienteRef.current = ventasCliente;
+    const nombres = (productos || []).filter(p => !p.esDispenser).map(p => p.nombre);
+    const conProd = (ventasCliente || []).filter(v => {
+      const det = Array.isArray(v.detalle) ? v.detalle : Object.values(v.detalle || {});
+      return det.some(d => (d.cantidad || 0) > 0 && !d._esDispRoto && nombres.includes(d.nombre));
+    });
+    if (!conProd.length) return;
+    const ultima = [...conProd].sort((a, b) => (b.id || 0) - (a.id || 0))[0];
+    const m = {};
+    (productos || []).forEach(p => {
+      m[p.nombre] = 0;
+    });
+    const det = Array.isArray(ultima.detalle) ? ultima.detalle : Object.values(ultima.detalle || {});
+    det.forEach(d => {
+      if (!d._esDispRoto && nombres.includes(d.nombre)) m[d.nombre] = d.cantidad || 0;
+    });
+    setCantidades(m);
+    setRepetido(true);
+  }, [ventasCliente]);
+  const [pago, setPago] = useState("contado");
+  const [monto, setMonto] = useState("");
+  const [montoEfec, setMontoEfec] = useState(""); // pago mixto: parte efectivo
+  const [montoTrans, setMontoTrans] = useState(""); // pago mixto: parte transferencia
+  const [transConfMixto, setTransConfMixto] = useState(false);
+  const [usarSaldo, setUsarSaldo] = useState(false);
+  const [opcionSaldo, setOpcionSaldo] = useState("compra"); // compra | todo | parcial
+  const [envPrest, setEnvPrest] = useState([{
+    prod: "",
+    cant: ""
+  }]);
+  const [envDev, setEnvDev] = useState([{
+    prod: "",
+    cant: ""
+  }]);
+  const addEnv = (setList, prod) => setList(prev => {
+    const idx = prev.findIndex(e => e.prod === prod);
+    if (idx >= 0) {
+      const n = [...prev];
+      n[idx] = {
+        ...n[idx],
+        cant: String((Number(n[idx].cant) || 0) + 1)
+      };
+      return n;
+    }
+    return [...prev.filter(e => e.prod !== ""), {
+      prod,
+      cant: "1"
+    }];
+  });
+  const subEnv = (setList, prod) => setList(prev => {
+    const idx = prev.findIndex(e => e.prod === prod);
+    if (idx < 0) return prev;
+    const n = [...prev];
+    const nc = Math.max(0, (Number(n[idx].cant) || 0) - 1);
+    if (nc === 0) return n.filter((_, i) => i !== idx);
+    n[idx] = {
+      ...n[idx],
+      cant: String(nc)
+    };
+    return n;
+  });
+  const getEnvCnt = (list, prod) => list.filter(e => e.prod === prod).reduce((a, e) => a + (Number(e.cant) || 0), 0);
+  const [obs, setObs] = useState("");
+  const [dispRotoPrecio, setDispRotoPrecio] = React.useState("");
+  const [masOpciones, setMasOpciones] = React.useState(false);
+  const dispenser = productos.find(p => p.esDispenser);
+  const prodEntrega = productos.filter(p => !p.esDispenser);
+  const rotoPrecioNum = Number(dispRotoPrecio) || 0;
+  const detalle = [...prodEntrega.map(p => ({
+    nombre: p.nombre,
+    cantidad: cantidades[p.nombre] || 0,
+    precio: p.precio,
+    total: (cantidades[p.nombre] || 0) * p.precio
+  })).filter(d => d.cantidad > 0), ...(rotoPrecioNum > 0 ? [{
+    nombre: "Dispenser (rotura)",
+    cantidad: 1,
+    precio: rotoPrecioNum,
+    total: rotoPrecioNum,
+    _esDispRoto: true
+  }] : [])];
+  const bruto = detalle.reduce((a, d) => a + d.total, 0);
+  const desc = 0; // retención informativa solo en planilla
+  const neto = bruto - desc;
+  const saldoDisp = cliente.saldo > 0 ? cliente.saldo : 0;
+  const saldoApl = usarSaldo && pago !== "fiado" ? Math.min(saldoDisp, neto) : 0;
+  const aPagar = neto - saldoApl;
+  // Deuda anterior del cliente (si el saldo es negativo) y total combinado a cobrar
+  const deudaPrevia = cliente.saldo < 0 ? Math.abs(cliente.saldo) : 0;
+  const pagaTodo = deudaPrevia > 0 && pago !== "fiado" && opcionSaldo === "todo";
+  const totalACobrar = pagaTodo ? deudaPrevia + aPagar : aPagar;
+  // Cuando se elige "Paga deuda + compra", autocompletar el monto con el total combinado
+  React.useEffect(() => {
+    if (pago === "fiado") return;
+    if (opcionSaldo === "todo" && deudaPrevia > 0) {
+      setMonto(String(Math.round(deudaPrevia + aPagar)));
+    } else if (opcionSaldo === "compra") {
+      setMonto("");
+    }
+  }, [opcionSaldo, aPagar, deudaPrevia, pago]);
+  const ER = ({
+    list,
+    setList,
+    i
+  }) => /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.row,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("select", {
+    style: {
+      ...s.select,
+      flex: 2
+    },
+    value: list[i].prod,
+    onChange: e => {
+      const n = [...list];
+      n[i].prod = e.target.value;
+      setList(n);
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "— Producto —"), productos.map(p => /*#__PURE__*/React.createElement("option", {
+    key: p.id,
+    value: p.nombre
+  }, p.nombre))), /*#__PURE__*/React.createElement("input", {
+    style: {
+      ...s.input,
+      flex: 1
+    },
+    type: "number",
+    placeholder: "Cant",
+    value: list[i].cant,
+    onChange: e => {
+      const n = [...list];
+      n[i].cant = e.target.value;
+      setList(n);
+    }
+  }));
+  // Extraído para poder usarlo tanto desde el botón de la pantalla completa
+  // como desde el botón de la tarjeta compacta (misma lógica, cero cambios).
+  const confirmarRegistro = () => {
+    const envIncompleto = [...envPrest, ...envDev].some(e => {
+      const tieneProd = !!e.prod;
+      const tieneCant = String(e.cant || "").trim() !== "" && Number(e.cant) > 0;
+      return tieneProd && !tieneCant || !tieneProd && tieneCant;
+    });
+    if (envIncompleto) {
+      alert("⚠️ Hay un envase cargado a medias: falta elegir el producto o poner la cantidad. Completalo o borrá esa fila antes de registrar, así no se pierde la devolución o el préstamo.");
+      return;
+    }
+    if (pago === "mixto") {
+      const ef = Number(montoEfec || 0),
+        tr = Number(montoTrans || 0);
+      const totalPagado = ef + tr;
+      if (totalACobrar > 0 && totalPagado > totalACobrar * 3 && totalPagado > totalACobrar + 10000) {
+        if (!window.confirm(`Estás cobrando ${fmt(totalPagado)}, bastante más que el total a cobrar (${fmt(totalACobrar)}). ¿Está bien?`)) return;
+      }
+      const saldoDelta = totalPagado - totalACobrar;
+      if (ef > 0) onGuardar(detalle, "contado", String(ef), saldoApl, envPrest, envDev, obs, "mixto_ef", tr, saldoDelta, transConfMixto);else if (tr > 0) onGuardar(detalle, "transferencia", String(tr), saldoApl, envPrest, envDev, obs, "mixto_tr", ef, saldoDelta, transConfMixto);
+    } else {
+      const montoFinal = opcionSaldo === "todo" && !monto ? String(Math.round(Math.abs(cliente.saldo) + aPagar)) : monto;
+      const pagadoNum = Number(montoFinal) || 0;
+      if (pago !== "fiado" && totalACobrar > 0 && pagadoNum > totalACobrar * 3 && pagadoNum > totalACobrar + 10000) {
+        if (!window.confirm(`Estás cobrando ${fmt(pagadoNum)}, bastante más que el total a cobrar (${fmt(totalACobrar)}). ¿Está bien?`)) return;
+      }
+      onGuardar(detalle, pago, montoFinal, saldoApl, envPrest, envDev, obs, opcionSaldo, undefined, undefined, pago === "transferencia" ? transConfirmada : false);
+    }
+    if (dispDelta !== 0 && onCambiarDispenser) onCambiarDispenser(dispDelta);
+  };
+
+  // ── Versión compacta: se usa embebida dentro de la tarjeta del cliente en
+  // ListaClientes, en vez de navegar a una pantalla aparte. Misma lógica y
+  // mismos datos que arriba (cantidades, pago, envases, saldo, deuda) — acá
+  // solo cambia cómo se dibuja. Los casos menos frecuentes (saldo a favor,
+  // deuda previa, cobrar deuda, observaciones) quedan atrás de "Más opciones"
+  // para no alargar la tarjeta en el caso común.
+  if (compacto) {
+    return /*#__PURE__*/React.createElement(React.Fragment, null, prodEntrega.map(p => {
+      const netoEnv = getEnvCnt(envPrest, p.nombre) - getEnvCnt(envDev, p.nombre);
+      const incrementarEnv = () => {
+        if (netoEnv < 0) subEnv(setEnvDev, p.nombre);else addEnv(setEnvPrest, p.nombre);
+      };
+      const decrementarEnv = () => {
+        if (netoEnv > 0) subEnv(setEnvPrest, p.nombre);else addEnv(setEnvDev, p.nombre);
+      };
+      return /*#__PURE__*/React.createElement("div", {
+        key: p.id,
+        style: {
+          display: "grid",
+          gridTemplateColumns: "1fr auto 70px",
+          alignItems: "center",
+          columnGap: 6,
+          marginBottom: 8
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: "var(--color-text-primary)"
+        }
+      }, p.nombre, /*#__PURE__*/React.createElement("span", {
+        style: {
+          display: "block",
+          fontSize: 10,
+          color: "var(--color-text-tertiary)"
+        }
+      }, fmt(p.precio))), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          justifySelf: "center"
+        }
+      }, /*#__PURE__*/React.createElement("button", {
+        style: {
+          ...s.btn,
+          width: 26,
+          height: 26,
+          padding: 0,
+          fontSize: 15,
+          lineHeight: 1
+        },
+        onClick: () => (cantidadesTocadas.current = true, setCantidades(q => ({
+          ...q,
+          [p.nombre]: Math.max(0, (q[p.nombre] || 0) - 1)
+        })))
+      }, "−"), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 15,
+          fontWeight: 500,
+          minWidth: 14,
+          textAlign: "center",
+          color: "var(--color-text-primary)"
+        }
+      }, cantidades[p.nombre] || 0), /*#__PURE__*/React.createElement("button", {
+        style: {
+          ...s.btn,
+          width: 26,
+          height: 26,
+          padding: 0,
+          fontSize: 15,
+          lineHeight: 1
+        },
+        onClick: () => (cantidadesTocadas.current = true, setCantidades(q => ({
+          ...q,
+          [p.nombre]: (q[p.nombre] || 0) + 1
+        })))
+      }, "+")), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 3
+        }
+      }, /*#__PURE__*/React.createElement("button", {
+        style: {
+          width: 20,
+          height: 20,
+          borderRadius: 5,
+          border: "0.5px solid var(--color-border-secondary)",
+          background: "var(--color-background-tertiary)",
+          color: "var(--color-text-secondary)",
+          fontSize: 12,
+          lineHeight: 1,
+          cursor: "pointer",
+          padding: 0
+        },
+        onClick: decrementarEnv,
+        title: "Devolvió uno"
+      }, "−"), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 9,
+          fontWeight: 600,
+          minWidth: 30,
+          textAlign: "center",
+          color: netoEnv > 0 ? "var(--color-text-info)" : netoEnv < 0 ? "var(--color-text-success)" : "var(--color-text-tertiary)"
+        }
+      }, netoEnv > 0 ? `P.${netoEnv}` : netoEnv < 0 ? `D.${-netoEnv}` : "env."), /*#__PURE__*/React.createElement("button", {
+        style: {
+          width: 20,
+          height: 20,
+          borderRadius: 5,
+          border: "0.5px solid var(--color-border-secondary)",
+          background: "var(--color-background-tertiary)",
+          color: "var(--color-text-secondary)",
+          fontSize: 12,
+          lineHeight: 1,
+          cursor: "pointer",
+          padding: 0
+        },
+        onClick: incrementarEnv,
+        title: "Prestó uno"
+      }, "+")));
+    }), dispenser && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "1fr auto 70px",
+        alignItems: "center",
+        columnGap: 6,
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12,
+        color: "var(--color-text-primary)"
+      }
+    }, "🧊 Dispenser", /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 10,
+        color: "var(--color-text-tertiary)"
+      }
+    }, "en el cliente: ", cliente.dispenser || 0)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        justifySelf: "center"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        width: 26,
+        height: 26,
+        padding: 0,
+        fontSize: 15,
+        lineHeight: 1
+      },
+      onClick: () => setDispDelta(d => Math.max(-(cliente.dispenser || 0), d - 1)),
+      title: "Retirar dispenser"
+    }, "−"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 15,
+        fontWeight: 500,
+        minWidth: 20,
+        textAlign: "center",
+        color: dispDelta > 0 ? "var(--color-text-info)" : dispDelta < 0 ? "var(--color-text-success)" : "var(--color-text-primary)"
+      }
+    }, dispDelta > 0 ? `+${dispDelta}` : dispDelta), /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        width: 26,
+        height: 26,
+        padding: 0,
+        fontSize: 15,
+        lineHeight: 1
+      },
+      onClick: () => setDispDelta(d => d + 1),
+      title: "Prestar dispenser"
+    }, "+")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        fontWeight: 600,
+        textAlign: "center",
+        color: dispDelta > 0 ? "var(--color-text-info)" : dispDelta < 0 ? "var(--color-text-success)" : "var(--color-text-tertiary)"
+      }
+    }, dispDelta > 0 ? `presté ${dispDelta}` : dispDelta < 0 ? `retiré ${-dispDelta}` : "sin cambio")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 6,
+        marginBottom: 8
+      }
+    }, dispenser && /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        flex: 1,
+        fontSize: 11,
+        padding: "7px",
+        color: mostrarRotoCompacto ? "#fff" : "var(--color-text-danger)",
+        background: mostrarRotoCompacto ? "#a32d2d" : undefined,
+        border: mostrarRotoCompacto ? "none" : undefined
+      },
+      onClick: () => setMostrarRotoCompacto(r => !r)
+    }, "💔 Dispenser roto"), /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        flex: 1,
+        fontSize: 11,
+        padding: "7px",
+        background: mostrarCambio ? "#185FA5" : undefined,
+        color: mostrarCambio ? "#fff" : undefined,
+        border: mostrarCambio ? "none" : undefined
+      },
+      onClick: () => setMostrarCambio(m => !m)
+    }, "🔄 Cambio de envase")), mostrarRotoCompacto && dispenser && /*#__PURE__*/React.createElement("div", {
+      style: {
+        ...s.card,
+        margin: "0 0 8px",
+        padding: 10,
+        border: "1px solid var(--color-border-danger)"
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      style: {
+        ...s.input,
+        fontSize: 12
+      },
+      type: "number",
+      placeholder: "Precio de reposición $",
+      value: dispRotoPrecio,
+      onChange: e => setDispRotoPrecio(e.target.value)
+    }), /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        width: "100%",
+        marginTop: 6,
+        fontSize: 11
+      },
+      onClick: () => {
+        setDispRotoPrecio("");
+        setMostrarRotoCompacto(false);
+      }
+    }, "Cancelar")), mostrarCambio && /*#__PURE__*/React.createElement(CambioEnvasePanel, {
+      productos: productos,
+      onConfirmar: (productoViejo, productoNuevo, motivo) => {
+        const obsTxt = `Cambio: ${productoViejo} → ${productoNuevo}${motivo.trim() ? ` · ${motivo.trim()}` : ""}`;
+        onGuardar([{
+          nombre: "Cambio de envase",
+          cantidad: 1,
+          precio: 0,
+          total: 0
+        }], "cambio", "0", 0, [{
+          prod: productoNuevo,
+          cant: 1
+        }], [{
+          prod: productoViejo,
+          cant: 1
+        }], obsTxt, "cambio_envase");
+        setMostrarCambio(false);
+      },
+      onCancelar: () => setMostrarCambio(false)
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 5,
+        marginBottom: 8
+      }
+    }, [["contado", "Contado"], ["transferencia", "Transfer."], ["fiado", "Fiado"], ["mixto", "Mixto"]].map(([v, l]) => /*#__PURE__*/React.createElement("button", {
+      key: v,
+      style: {
+        ...s.btn,
+        flex: 1,
+        fontSize: 11,
+        padding: "6px 2px",
+        background: pago === v ? "#185FA5" : undefined,
+        color: pago === v ? "#fff" : undefined,
+        border: pago === v ? "none" : undefined
+      },
+      onClick: () => setPago(v)
+    }, l))), pago === "transferencia" && /*#__PURE__*/React.createElement("div", {
+      style: {
+        ...s.card,
+        margin: "0 0 8px",
+        padding: "8px 10px",
+        background: transConfirmada ? "#0a2e1f" : "#1e3a5f",
+        border: transConfirmada ? "0.5px solid #4dd9a0" : "0.5px solid #5daaff"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: transConfirmada ? "#4dd9a0" : "#5daaff"
+      }
+    }, transConfirmada ? "✓ Transfer. confirmada" : "⏳ Confirmar transferencia"), /*#__PURE__*/React.createElement("button", {
+      style: {
+        background: transConfirmada ? "#4dd9a0" : "#185FA5",
+        color: transConfirmada ? "#0a2e1f" : "#fff",
+        border: "none",
+        borderRadius: 6,
+        padding: "4px 9px",
+        fontSize: 10,
+        cursor: "pointer"
+      },
+      onClick: () => {
+        setTransConfirmada(!transConfirmada);
+        if (!transConfirmada) sonarTransferencia();
+      }
+    }, transConfirmada ? "✓ OK" : "Confirmar"))), pago === "mixto" && /*#__PURE__*/React.createElement("div", {
+      style: {
+        ...s.card,
+        margin: "0 0 8px",
+        padding: 10,
+        background: "var(--color-background-tertiary)"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 6,
+        marginBottom: 6
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      style: {
+        ...s.input,
+        fontSize: 12
+      },
+      type: "number",
+      placeholder: "Efectivo $",
+      value: montoEfec,
+      onChange: e => {
+        const ef = e.target.value;
+        setMontoEfec(ef);
+        const resto = totalACobrar - (Number(ef) || 0);
+        setMontoTrans(resto > 0 ? String(Math.round(resto)) : "");
+      }
+    }), /*#__PURE__*/React.createElement("input", {
+      style: {
+        ...s.input,
+        fontSize: 12
+      },
+      type: "number",
+      placeholder: "Transfer. $",
+      value: montoTrans,
+      onChange: e => setMontoTrans(e.target.value)
+    })), Number(montoTrans || 0) > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: transConfMixto ? "#4dd9a0" : "#5daaff"
+      }
+    }, transConfMixto ? "✓ Transfer. confirmada" : "⏳ Confirmar transferencia"), /*#__PURE__*/React.createElement("button", {
+      style: {
+        background: transConfMixto ? "#4dd9a0" : "#185FA5",
+        color: transConfMixto ? "#0a2e1f" : "#fff",
+        border: "none",
+        borderRadius: 6,
+        padding: "4px 9px",
+        fontSize: 10,
+        cursor: "pointer"
+      },
+      onClick: () => {
+        setTransConfMixto(!transConfMixto);
+        if (!transConfMixto) sonarTransferencia();
+      }
+    }, transConfMixto ? "✓ OK" : "Confirmar"))), pago !== "fiado" && pago !== "mixto" && /*#__PURE__*/React.createElement("input", {
+      style: {
+        ...s.input,
+        fontSize: 12,
+        marginBottom: 8
+      },
+      type: "number",
+      placeholder: `Monto cobrado (vacío = ${fmt(aPagar)})`,
+      value: monto,
+      onChange: e => setMonto(e.target.value)
+    }), (saldoDisp > 0 || cliente.saldo < 0) && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "var(--color-text-info)",
+        cursor: "pointer"
+      },
+      onClick: () => setMasOpciones(m => !m)
+    }, masOpciones ? "▲ Menos opciones" : "▼ Más opciones (saldo, deuda, notas)"), masOpciones && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 8
+      }
+    }, saldoDisp > 0 && pago !== "fiado" && /*#__PURE__*/React.createElement("div", {
+      style: {
+        ...s.card,
+        margin: "0 0 8px",
+        padding: "8px 10px",
+        background: "var(--color-background-success)",
+        border: "0.5px solid var(--color-border-success)",
+        cursor: "pointer"
+      },
+      onClick: () => setUsarSaldo(!usarSaldo)
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      type: "checkbox",
+      checked: usarSaldo,
+      onChange: e => setUsarSaldo(e.target.checked),
+      style: {
+        width: 16,
+        height: 16,
+        cursor: "pointer",
+        accentColor: "#0F6E56"
+      }
+    }), /*#__PURE__*/React.createElement("label", {
+      style: {
+        fontSize: 12,
+        color: "var(--color-text-success)",
+        cursor: "pointer",
+        fontWeight: 500
+      }
+    }, "Usar saldo a favor — ", fmt(saldoDisp)))), cliente.saldo < 0 && pago !== "fiado" && /*#__PURE__*/React.createElement("div", {
+      style: {
+        ...s.card,
+        margin: "0 0 8px",
+        padding: "8px 10px",
+        background: "var(--color-background-danger)",
+        border: "0.5px solid var(--color-border-danger)"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        fontWeight: 500,
+        color: "var(--color-text-danger)",
+        marginBottom: 6
+      }
+    }, "Deuda pendiente: ", fmt(Math.abs(cliente.saldo))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 5
+      }
+    }, [["todo", "Paga deuda + compra de hoy", Math.abs(cliente.saldo) + aPagar], ["compra", "Solo la compra de hoy", null], ["parcial", "Pago parcial (ingresá el monto)", null]].map(([op, label, total]) => /*#__PURE__*/React.createElement("button", {
+      key: op,
+      style: {
+        textAlign: "left",
+        padding: "6px 10px",
+        borderRadius: 7,
+        border: "0.5px solid var(--color-border-danger)",
+        background: opcionSaldo === op ? "#7f1d1d" : "transparent",
+        color: "var(--color-text-danger)",
+        fontSize: 11,
+        cursor: "pointer",
+        fontWeight: opcionSaldo === op ? 500 : 400
+      },
+      onClick: () => setOpcionSaldo(op)
+    }, opcionSaldo === op ? "✓ " : "", label, total ? ` — ${fmt(total)}` : "")))), cliente.saldo < 0 && /*#__PURE__*/React.createElement(CobroDeudaPanel, {
+      saldo: cliente.saldo,
+      onCobrar: (mCobro, pCobro) => {
+        onGuardar([{
+          nombre: "Cobro de deuda",
+          cantidad: 1,
+          precio: 0,
+          total: 0
+        }], pCobro, String(mCobro), 0, [], [], `Cobro de deuda $${mCobro.toLocaleString("es-AR")} (${pCobro})`, "cobro_deuda");
+      }
+    }), /*#__PURE__*/React.createElement("textarea", {
+      style: {
+        ...s.input,
+        minHeight: 40,
+        fontSize: 12,
+        marginBottom: 8
+      },
+      value: obs,
+      onChange: e => setObs(e.target.value),
+      placeholder: "Notas opcionales..."
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "var(--color-text-tertiary)"
+      }
+    }, "A cobrar"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 16,
+        fontWeight: 500,
+        color: "var(--color-text-primary)"
+      }
+    }, fmt(totalACobrar))), /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btnPrimary,
+        marginBottom: 6,
+        padding: "9px",
+        fontSize: 13,
+        opacity: detalle.length === 0 ? 0.45 : 1
+      },
+      disabled: detalle.length === 0,
+      onClick: confirmarRegistro
+    }, "✓ Registrar entrega"));
+  }
+
+  return /*#__PURE__*/React.createElement("div", {
+    style: s.screen
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "sticky",
+      top: 0,
+      zIndex: 15,
+      background: "var(--color-background-primary)"
+    }
+  }, /*#__PURE__*/React.createElement(HeaderApp, {
+    titulo: `Clientes · ${cliente.dia || ""}`,
+    onVolver: onVolver
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--color-background-secondary)",
+      borderBottom: "0.5px solid var(--color-border-tertiary)",
+      boxShadow: "0 3px 8px rgba(0,0,0,0.18)",
+      padding: "10px 14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 15,
+      fontWeight: 600,
+      color: "var(--color-text-primary)"
+    }
+  }, cliente.nombre), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--color-text-secondary)",
+      marginTop: 1
+    }
+  }, direccionCliente(cliente), cliente.orden ? ` · #${cliente.orden}` : "")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      fontSize: 17,
+      flexShrink: 0
+    }
+  }, (cliente.maps || cliente.lat && cliente.lng) && /*#__PURE__*/React.createElement("a", {
+    href: cliente.maps || `https://www.google.com/maps?q=${cliente.lat},${cliente.lng}`,
+    target: "_blank",
+    rel: "noreferrer",
+    style: {
+      textDecoration: "none"
+    },
+    onClick: e => e.stopPropagation()
+  }, "📍"), cliente.telefono && /*#__PURE__*/React.createElement("a", {
+    href: `https://wa.me/54${cliente.telefono}`,
+    target: "_blank",
+    rel: "noreferrer",
+    style: {
+      textDecoration: "none"
+    },
+    onClick: e => e.stopPropagation()
+  }, "💬"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      flexWrap: "wrap",
+      alignItems: "center",
+      marginTop: 8
+    }
+  }, cliente.saldo < 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      fontWeight: 500,
+      padding: "2px 8px",
+      borderRadius: 5,
+      background: "var(--color-background-danger)",
+      color: "var(--color-text-danger)"
+    }
+  }, "Debe ", fmt(Math.abs(cliente.saldo))), cliente.saldo > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      fontWeight: 500,
+      padding: "2px 8px",
+      borderRadius: 5,
+      background: "var(--color-background-success)",
+      color: "var(--color-text-success)"
+    }
+  }, "A favor ", fmt(cliente.saldo)), cliente.sifon > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      padding: "2px 8px",
+      borderRadius: 5,
+      background: "var(--color-background-info)",
+      color: "var(--color-text-info)"
+    }
+  }, "Sifón×", cliente.sifon), cliente.bidon10 > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      padding: "2px 8px",
+      borderRadius: 5,
+      background: "var(--color-background-info)",
+      color: "var(--color-text-info)"
+    }
+  }, "10L×", cliente.bidon10), cliente.bidon20 > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      padding: "2px 8px",
+      borderRadius: 5,
+      background: "var(--color-background-info)",
+      color: "var(--color-text-info)"
+    }
+  }, "20L×", cliente.bidon20), cliente.dispenser > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      padding: "2px 8px",
+      borderRadius: 5,
+      background: "var(--color-background-tertiary)",
+      color: "var(--color-text-secondary)"
+    }
+  }, "Disp×", cliente.dispenser), (() => {
+    const pres = {
+      sifon: prestadoClienteDe(cliente, "sifon", ventasCliente),
+      bidon10: prestadoClienteDe(cliente, "bidon10", ventasCliente),
+      bidon20: prestadoClienteDe(cliente, "bidon20", ventasCliente)
+    };
+    const items = [];
+    if (pres.sifon > 0) items.push(`+${pres.sifon} sif.`);
+    if (pres.bidon10 > 0) items.push(`+${pres.bidon10} 10L`);
+    if (pres.bidon20 > 0) items.push(`+${pres.bidon20} 20L`);
+    return items.length > 0 ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        padding: "2px 8px",
+        borderRadius: 5,
+        background: "var(--color-background-warning)",
+        color: "var(--color-text-warning)"
+      }
+    }, items.join(" "), " prest.") : null;
+  })(), cliente.notas && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--color-text-warning)"
+    }
+  }, "📝 ", cliente.notas)))), progressData && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--color-background-tertiary)",
+      borderBottom: "0.5px solid var(--color-border-tertiary)",
+      padding: "6px 14px",
+      display: "flex",
+      gap: 10,
+      alignItems: "center",
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      flex: 1,
+      minWidth: 120
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      height: 5,
+      borderRadius: 3,
+      background: "var(--color-background-secondary)",
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: "100%",
+      borderRadius: 3,
+      background: "#185FA5",
+      width: `${Math.round(progressData.visitados / Math.max(progressData.total, 1) * 100)}%`
+    }
+  })), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--color-text-secondary)",
+      whiteSpace: "nowrap"
+    }
+  }, progressData.visitados, "/", progressData.total)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--color-text-success)",
+      fontWeight: 500
+    }
+  }, fmt(progressData.montoHoy)), progressData.stock && Object.entries(progressData.stock).map(([k, v]) => v > 0 ? /*#__PURE__*/React.createElement("span", {
+    key: k,
+    style: {
+      fontSize: 10,
+      color: "var(--color-text-tertiary)"
+    }
+  }, k, ":", v) : null)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: 16
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      ...s.sectionTitle,
+      padding: "0 0 10px"
+    }
+  }, "Cantidades entregadas"), repetido && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 8,
+      background: "var(--color-background-info)",
+      border: "0.5px solid var(--color-border-tertiary)",
+      borderRadius: 8,
+      padding: "8px 12px",
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-info)",
+      fontWeight: 500
+    }
+  }, "🔁 Repetido de la última venta"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      background: "none",
+      border: "1px solid var(--color-border-secondary)",
+      borderRadius: 6,
+      padding: "3px 10px",
+      fontSize: 12,
+      color: "var(--color-text-secondary)",
+      cursor: "pointer"
+    },
+    onClick: () => {
+      const m = {};
+      productos.forEach(p => {
+        m[p.nombre] = 0;
+      });
+      setCantidades(m);
+      setRepetido(false);
+    }
+  }, "Vaciar")), prodEntrega.map(p => /*#__PURE__*/React.createElement("div", {
+    key: p.id,
+    style: {
+      ...s.card,
+      margin: "0 0 8px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      fontWeight: 500,
+      color: "var(--color-text-primary)"
+    }
+  }, p.nombre), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-secondary)"
+    }
+  }, fmt(p.precio), " c/u")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      padding: "5px 16px",
+      fontSize: 20,
+      lineHeight: 1
+    },
+    onClick: () => (cantidadesTocadas.current = true, setCantidades(q => ({
+      ...q,
+      [p.nombre]: Math.max(0, (q[p.nombre] || 0) - 1)
+    })))
+  }, "−"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 22,
+      fontWeight: 500,
+      minWidth: 32,
+      textAlign: "center",
+      color: "var(--color-text-primary)"
+    }
+  }, cantidades[p.nombre] || 0), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      padding: "5px 16px",
+      fontSize: 20,
+      lineHeight: 1
+    },
+    onClick: () => (cantidadesTocadas.current = true, setCantidades(q => ({
+      ...q,
+      [p.nombre]: (q[p.nombre] || 0) + 1
+    })))
+  }, "+")))), /*#__PURE__*/React.createElement("div", {
+    style: s.divider
+  }), /*#__PURE__*/React.createElement("label", {
+    style: {
+      ...s.label,
+      fontSize: 13,
+      marginBottom: 8
+    }
+  }, "Forma de pago"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 12
+    }
+  }, [["contado", "Contado"], ["transferencia", "Transfer."], ["fiado", "Fiado"], ["mixto", "Mixto"]].map(([v, l]) => /*#__PURE__*/React.createElement("button", {
+    key: v,
+    style: {
+      ...s.btn,
+      flex: 1,
+      background: pago === v ? "#185FA5" : undefined,
+      color: pago === v ? "#fff" : undefined,
+      border: pago === v ? "none" : undefined,
+      padding: "9px 4px",
+      fontSize: 13
+    },
+    onClick: () => setPago(v)
+  }, l))), pago === "transferencia" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      margin: "0 0 10px",
+      background: transConfirmada ? "#0a2e1f" : "#1e3a5f",
+      border: transConfirmada ? "0.5px solid #4dd9a0" : "0.5px solid #5daaff"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: transConfirmada ? "#4dd9a0" : "#5daaff"
+    }
+  }, transConfirmada ? "✓ Transfer. confirmada" : "⏳ Confirmar transferencia"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      background: transConfirmada ? "#4dd9a0" : "#185FA5",
+      color: transConfirmada ? "#0a2e1f" : "#fff",
+      border: "none",
+      borderRadius: 6,
+      padding: "5px 10px",
+      fontSize: 11,
+      cursor: "pointer"
+    },
+    onClick: () => {
+      setTransConfirmada(!transConfirmada);
+      if (!transConfirmada) sonarTransferencia();
+    }
+  }, transConfirmada ? "✓ OK" : "Confirmar"))), pago === "mixto" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      margin: "0 0 10px",
+      background: "var(--color-background-tertiary)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 500,
+      color: "var(--color-text-primary)",
+      marginBottom: 8
+    }
+  }, "Desglose del pago mixto"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: s.label
+  }, "Efectivo $"), /*#__PURE__*/React.createElement("input", {
+    style: s.input,
+    type: "number",
+    placeholder: "0",
+    value: montoEfec,
+    onChange: e => {
+      const ef = e.target.value;
+      setMontoEfec(ef);
+      const resto = totalACobrar - (Number(ef) || 0);
+      setMontoTrans(resto > 0 ? String(Math.round(resto)) : "");
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: s.label
+  }, "Transferencia $"), /*#__PURE__*/React.createElement("input", {
+    style: s.input,
+    type: "number",
+    placeholder: "0",
+    value: montoTrans,
+    onChange: e => setMontoTrans(e.target.value)
+  }))), Number(montoEfec || 0) + Number(montoTrans || 0) > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-secondary)"
+    }
+  }, "Total pagado: ", fmt(Number(montoEfec || 0) + Number(montoTrans || 0)), " de ", fmt(totalACobrar), Number(montoEfec || 0) + Number(montoTrans || 0) < totalACobrar && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "var(--color-text-warning)"
+    }
+  }, " · Queda ", fmt(totalACobrar - Number(montoEfec || 0) - Number(montoTrans || 0)), " de saldo")), Number(montoTrans || 0) > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      margin: "8px 0 0",
+      background: transConfMixto ? "#0a2e1f" : "#1e3a5f",
+      border: transConfMixto ? "0.5px solid #4dd9a0" : "0.5px solid #5daaff"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: transConfMixto ? "#4dd9a0" : "#5daaff"
+    }
+  }, transConfMixto ? "✓ Transfer. confirmada" : "⏳ Confirmar transferencia"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      background: transConfMixto ? "#4dd9a0" : "#185FA5",
+      color: transConfMixto ? "#0a2e1f" : "#fff",
+      border: "none",
+      borderRadius: 6,
+      padding: "5px 10px",
+      fontSize: 11,
+      cursor: "pointer"
+    },
+    onClick: () => {
+      setTransConfMixto(!transConfMixto);
+      if (!transConfMixto) sonarTransferencia();
+    }
+  }, transConfMixto ? "✓ OK" : "Confirmar")))), saldoDisp > 0 && pago !== "fiado" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      margin: "0 0 10px",
+      background: "var(--color-background-success)",
+      border: "0.5px solid var(--color-border-success)",
+      cursor: "pointer"
+    },
+    onClick: () => setUsarSaldo(!usarSaldo)
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: usarSaldo,
+    onChange: e => setUsarSaldo(e.target.checked),
+    style: {
+      width: 18,
+      height: 18,
+      cursor: "pointer",
+      accentColor: "#0F6E56"
+    }
+  }), /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 14,
+      color: "var(--color-text-success)",
+      cursor: "pointer",
+      fontWeight: 500
+    }
+  }, "Usar saldo a favor — ", fmt(saldoDisp))), usarSaldo && saldoApl > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-success)",
+      marginTop: 4,
+      paddingLeft: 28
+    }
+  }, "Se descuentan ", fmt(saldoApl), " del total")), cliente.saldo < 0 && pago !== "fiado" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      margin: "0 0 10px",
+      background: "var(--color-background-danger)",
+      border: "0.5px solid var(--color-border-danger)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 500,
+      color: "var(--color-text-danger)",
+      marginBottom: 8
+    }
+  }, "Deuda pendiente: ", fmt(Math.abs(cliente.saldo))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 6
+    }
+  }, [["todo", "Paga deuda + compra de hoy", Math.abs(cliente.saldo) + aPagar], ["compra", "Solo la compra de hoy", null], ["parcial", "Pago parcial (ingresá el monto)", null]].map(([op, label, total]) => /*#__PURE__*/React.createElement("button", {
+    key: op,
+    style: {
+      textAlign: "left",
+      padding: "8px 12px",
+      borderRadius: 8,
+      border: "0.5px solid var(--color-border-danger)",
+      background: opcionSaldo === op ? "#7f1d1d" : "transparent",
+      color: "var(--color-text-danger)",
+      fontSize: 12,
+      cursor: "pointer",
+      fontWeight: opcionSaldo === op ? 500 : 400
+    },
+    onClick: () => setOpcionSaldo(op)
+  }, opcionSaldo === op ? "✓ " : "", label, total ? ` — ${fmt(total)}` : "")))), pago !== "fiado" && pago !== "mixto" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: s.label
+  }, opcionSaldo === "parcial" ? "Monto que paga (parcial)" : opcionSaldo === "todo" ? "Total a cobrar (deuda + compra):" : `Monto cobrado (vacío = ${fmt(aPagar)} exacto)`), /*#__PURE__*/React.createElement("input", {
+    style: s.input,
+    type: "number",
+    placeholder: opcionSaldo === "todo" ? String(Math.round(Math.abs(cliente.saldo) + aPagar)) : String(Math.round(aPagar)),
+    value: monto,
+    onChange: e => setMonto(e.target.value)
+  })), /*#__PURE__*/React.createElement("div", {
+    style: s.divider
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      margin: "0 0 12px",
+      background: "var(--color-background-secondary)"
+    }
+  }, bruto > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "var(--color-text-secondary)"
+    }
+  }, "Subtotal"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "var(--color-text-primary)"
+    }
+  }, fmt(bruto))), desc > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "var(--color-text-secondary)"
+    }
+  }, "Descuento 2.5%"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "var(--color-text-danger)"
+    }
+  }, "−", fmt(desc))), saldoApl > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "var(--color-text-secondary)"
+    }
+  }, "Saldo a favor"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "var(--color-text-success)"
+    }
+  }, "−", fmt(saldoApl))), pagaTodo && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "var(--color-text-danger)"
+    }
+  }, "Deuda anterior"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "var(--color-text-danger)"
+    }
+  }, "+", fmt(deudaPrevia))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: "0.5px solid var(--color-border-tertiary)",
+      paddingTop: 10,
+      marginTop: 6,
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "baseline"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 16,
+      fontWeight: 500,
+      color: "var(--color-text-primary)"
+    }
+  }, "A cobrar"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 26,
+      fontWeight: 500,
+      color: "var(--color-text-primary)"
+    }
+  }, fmt(totalACobrar)))), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btnPrimary,
+      marginBottom: 10,
+      opacity: detalle.length === 0 ? 0.45 : 1
+    },
+    disabled: detalle.length === 0,
+    onClick: confirmarRegistro
+  }, "✓ Registrar entrega"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      flex: 1,
+      background: "var(--color-background-warning)",
+      color: "var(--color-text-warning)",
+      border: "0.5px solid var(--color-border-warning)",
+      borderRadius: 8,
+      padding: "11px 8px",
+      fontSize: 13,
+      fontWeight: 500,
+      cursor: "pointer"
+    },
+    onClick: onNoEsta
+  }, "🔄 No está"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      flex: 1,
+      background: "var(--color-background-danger)",
+      color: "var(--color-text-danger)",
+      border: "0.5px solid var(--color-border-danger)",
+      borderRadius: 8,
+      padding: "11px 8px",
+      fontSize: 13,
+      fontWeight: 500,
+      cursor: "pointer"
+    },
+    onClick: () => onNoQuiere(envPrest, envDev)
+  }, "🚫 No quiere"), onSaltar && /*#__PURE__*/React.createElement("button", {
+    style: {
+      flex: 1,
+      background: "var(--color-background-tertiary)",
+      color: "var(--color-text-secondary)",
+      border: "0.5px solid var(--color-border-secondary)",
+      borderRadius: 8,
+      padding: "11px 8px",
+      fontSize: 13,
+      fontWeight: 500,
+      cursor: "pointer"
+    },
+    onClick: onSaltar
+  }, "⏭ Saltar")), cliente.saldo < 0 && /*#__PURE__*/React.createElement(CobroDeudaPanel, {
+    saldo: cliente.saldo,
+    onCobrar: (mCobro, pCobro) => {
+      onGuardar([{
+        nombre: "Cobro de deuda",
+        cantidad: 1,
+        precio: 0,
+        total: 0
+      }], pCobro, String(mCobro), 0, [], [], `Cobro de deuda $${mCobro.toLocaleString("es-AR")} (${pCobro})`, "cobro_deuda");
+    }
+  }), !mostrarCambio ? /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      width: "100%",
+      marginBottom: 10,
+      fontSize: 12,
+      padding: "8px"
+    },
+    onClick: () => setMostrarCambio(true)
+  }, "🔄 Cambio de envase (sin cobrar)") : /*#__PURE__*/React.createElement(CambioEnvasePanel, {
+    productos: productos,
+    onConfirmar: (productoViejo, productoNuevo, motivo) => {
+      const obsTxt = `Cambio: ${productoViejo} → ${productoNuevo}${motivo.trim() ? ` · ${motivo.trim()}` : ""}`;
+      onGuardar([{
+        nombre: "Cambio de envase",
+        cantidad: 1,
+        precio: 0,
+        total: 0
+      }], "cambio", "0", 0, [{
+        prod: productoNuevo,
+        cant: 1
+      }], [{
+        prod: productoViejo,
+        cant: 1
+      }], obsTxt, "cambio_envase");
+      setMostrarCambio(false);
+    },
+    onCancelar: () => setMostrarCambio(false)
+  }), /*#__PURE__*/React.createElement("div", {
+    style: s.divider
+  }), dispenser && (cliente.dispenser || 0) > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      margin: "0 0 10px",
+      padding: "10px 14px",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 500,
+      color: "var(--color-text-primary)"
+    }
+  }, "🧊 Dispenser"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-secondary)"
+    }
+  }, "En el cliente: ", /*#__PURE__*/React.createElement("b", {
+    style: {
+      color: "var(--color-text-primary)"
+    }
+  }, cliente.dispenser))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      margin: "0 0 10px",
+      padding: "10px 14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 500,
+      color: "var(--color-text-primary)",
+      marginBottom: 10
+    }
+  }, "📦 Envases prestados / retirados"), prodEntrega.map(p => {
+    const neto = getEnvCnt(envPrest, p.nombre) - getEnvCnt(envDev, p.nombre);
+    const incrementar = () => {
+      if (neto < 0) subEnv(setEnvDev, p.nombre);else addEnv(setEnvPrest, p.nombre);
+    };
+    const decrementar = () => {
+      if (neto > 0) subEnv(setEnvPrest, p.nombre);else addEnv(setEnvDev, p.nombre);
+    };
+    return /*#__PURE__*/React.createElement("div", {
+      key: p.nombre,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "8px 0",
+        borderTop: "0.5px solid var(--color-border-tertiary)"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        color: "var(--color-text-primary)"
+      }
+    }, p.nombre), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      style: {
+        width: 34,
+        height: 34,
+        borderRadius: 8,
+        border: "0.5px solid var(--color-border-secondary)",
+        background: "var(--color-background-success)",
+        color: "var(--color-text-success)",
+        fontSize: 17,
+        fontWeight: 600,
+        cursor: "pointer"
+      },
+      onClick: decrementar,
+      title: "Devolvió uno"
+    }, "−"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        minWidth: 74,
+        textAlign: "center",
+        fontSize: 12,
+        fontWeight: 600,
+        color: neto > 0 ? "var(--color-text-info)" : neto < 0 ? "var(--color-text-success)" : "var(--color-text-tertiary)"
+      }
+    }, neto > 0 ? `Presté ${neto}` : neto < 0 ? `Devolvió ${-neto}` : "sin cambio"), /*#__PURE__*/React.createElement("button", {
+      style: {
+        width: 34,
+        height: 34,
+        borderRadius: 8,
+        border: "0.5px solid var(--color-border-secondary)",
+        background: "var(--color-background-info)",
+        color: "var(--color-text-info)",
+        fontSize: 17,
+        fontWeight: 600,
+        cursor: "pointer"
+      },
+      onClick: incrementar,
+      title: "Presté uno"
+    }, "+")));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: s.divider
+  }), /*#__PURE__*/React.createElement("label", {
+    style: s.label
+  }, "Observaciones"), /*#__PURE__*/React.createElement("textarea", {
+    style: {
+      ...s.input,
+      minHeight: 60,
+      resize: "vertical",
+      marginBottom: 14
+    },
+    value: obs,
+    onChange: e => setObs(e.target.value),
+    placeholder: "Notas opcionales..."
+  })));
+}
+function NuevoCliente({
+  diaActual,
+  prefill,
+  onGuardar,
+  onVolver
+}) {
+  // Usa el FormCliente UNIFICADO (definido en 03-utils.js) — mismo formulario en toda la app
+  // Si viene de "Convertir en cliente" de un prospecto, prefill trae
+  // nombre/teléfono/calle/barrio ya cargados.
+  return /*#__PURE__*/React.createElement("div", {
+    style: s.screen
+  }, /*#__PURE__*/React.createElement(HeaderApp, {
+    titulo: prefill ? "Nuevo cliente (desde prospecto)" : "Nuevo cliente",
+    onVolver: onVolver
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: 16
+    }
+  }, /*#__PURE__*/React.createElement(FormCliente, {
+    inicial: {
+      dia: diaActual || "Martes",
+      ...(prefill || {})
+    },
+    textoGuardar: "Agregar cliente",
+    onGuardar: onGuardar
+  })));
+}
