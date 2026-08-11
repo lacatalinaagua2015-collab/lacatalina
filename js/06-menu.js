@@ -1338,19 +1338,38 @@ function PlanillaDelDia({
     "Bidón 10L": "b10",
     "Bidón 20L": "b20"
   };
-  // Stock TOTAL fijo de la sodería (nunca cambia): 25 cajones de soda,
-  // 70 bidones de 10L, 21 bidones de 20L. En cualquier momento, esto tiene
-  // que estar repartido entre sodería (lleno/vacío/a llenar) y lo que está
-  // en poder de los clientes (prestado y todavía no devuelto) — si no
+  // Stock TOTAL fijo de la sodería+camión (nunca cambia): 25 cajones de
+  // soda, 70 bidones de 10L, 21 bidones de 20L. En todo momento tiene que
+  // estar repartido entre 4 lugares: sodería+camión (lleno/vacío/a llenar),
+  // depósito (stock.casa), clientes fijos (c.sifon/bidon10/bidon20) y
+  // clientes prestados (envases de más, historial + ajuste manual) — si no
   // cuadra, algo se perdió o falta cargar un movimiento.
   const CAPACIDAD_FIJA = {
     soda: 25 * CAJON,
     b10: 70,
     b20: 21
   };
-  // Envases en poder de clientes = TODO lo prestado históricamente menos
-  // todo lo devuelto históricamente (no solo lo de hoy) — usa el historial
-  // completo (todasLasVentas), no las ventas filtradas del día.
+  const clientesReales = clientes || [];
+  // Clientes FIJOS: el stock base que cada cliente siempre tiene (no se mueve con las ventas)
+  const totClientesFijos = {
+    soda: 0,
+    b10: 0,
+    b20: 0
+  };
+  clientesReales.forEach(c => {
+    totClientesFijos.soda += Number(c.sifon) || 0;
+    totClientesFijos.b10 += Number(c.bidon10) || 0;
+    totClientesFijos.b20 += Number(c.bidon20) || 0;
+  });
+  // Depósito: stock guardado aparte de la sodería (stock.casa)
+  const enDeposito = {
+    soda: stock?.casa?.sifon || 0,
+    b10: stock?.casa?.bidon10 || 0,
+    b20: stock?.casa?.bidon20 || 0
+  };
+  // Envases PRESTADOS en poder de clientes = TODO lo prestado históricamente
+  // menos todo lo devuelto históricamente (no solo lo de hoy) más el ajuste
+  // manual por cliente (envAjuste), igual que en el Arqueo de Stock.
   const enClientesActual = {
     soda: 0,
     b10: 0,
@@ -1368,6 +1387,11 @@ function PlanillaDelDia({
   });
   ["soda", "b10", "b20"].forEach(pk => {
     enClientesActual[pk] = Math.max(0, enClientesActual[pk]);
+  });
+  clientesReales.forEach(c => {
+    enClientesActual.soda += Number(c.envAjuste?.sifon) || 0;
+    enClientesActual.b10 += Number(c.envAjuste?.bidon10) || 0;
+    enClientesActual.b20 += Number(c.envAjuste?.bidon20) || 0;
   });
   ventas.forEach(v => {
     v.detalle.forEach(d => {
@@ -1502,6 +1526,15 @@ function PlanillaDelDia({
         vacios: dv
       };
     });
+    // Sobra o falta del día (lo que volvió vs lo esperado según lo que salió,
+    // se prestó y se devolvió) se ajusta contra el depósito: si sobra, se
+    // suma al depósito; si falta, se resta.
+    const diffDeposito = {};
+    ["soda", "b10", "b20"].forEach(pk => {
+      const esperadoPk = llenosCargados[pk] + devueltosDia[pk] - prestadosDia[pk];
+      const vuelveTotalPk = llenVuelta[pk] + vacVuelta[pk];
+      diffDeposito[pk] = vuelveTotalPk - esperadoPk;
+    });
     setStock(prev => {
       const s = JSON.parse(JSON.stringify(prev || {}));
       if (!s.soderia) s.soderia = {
@@ -1514,10 +1547,16 @@ function PlanillaDelDia({
         bidon10: 0,
         bidon20: 0
       };
+      if (!s.casa) s.casa = {
+        sifon: 0,
+        bidon10: 0,
+        bidon20: 0
+      };
       ["soda", "b10", "b20"].forEach(pk => {
         const sk = planKeyToSkL[pk];
         s.soderia[sk] = (s.soderia[sk] || 0) + llenVuelta[pk];
         s.soderia_vacios[sk] = (s.soderia_vacios[sk] || 0) + vacVuelta[pk];
+        s.casa[sk] = (s.casa[sk] || 0) + diffDeposito[pk];
       });
       s.camion = {
         sifon: 0,
@@ -1725,7 +1764,8 @@ function PlanillaDelDia({
       const cuadra = vuelveTotal === esperado;
       const quedaLleno = (soderiaActual[planKeyToSk[pk]] || 0) + llenReal;
       const quedaVacio = (soderiaVaciosActual[planKeyToSk[pk]] || 0) + vacReal;
-      const totalFlota = quedaLleno + quedaVacio + paraLlenarReal;
+      const totalFlota = quedaLleno + quedaVacio + paraLlenarReal + enDeposito[pk] + totClientesFijos[pk] + enClientesActual[pk];
+      const cuadraFijo = totalFlota === CAPACIDAD_FIJA[pk];
       const filaCampo = (titulo, valor, color) => {
         const etiqueta = /*#__PURE__*/React.createElement("span", {
           style: {
@@ -1905,7 +1945,22 @@ function PlanillaDelDia({
         style: {
           color: AMBAR
         }
-      }, "● Vacío ", div(quedaVacio)))), /*#__PURE__*/React.createElement("div", {
+      }, "● Vacío ", div(quedaVacio))), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          gap: 12,
+          fontSize: 12,
+          marginTop: 4
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: "var(--color-text-secondary)"
+        }
+      }, "● Depósito ", div(enDeposito[pk])), /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: "var(--color-text-secondary)"
+        }
+      }, "● Clientes ", div(totClientesFijos[pk] + enClientesActual[pk])))), /*#__PURE__*/React.createElement("div", {
         style: {
           textAlign: "center",
           marginTop: 8,
@@ -1913,7 +1968,15 @@ function PlanillaDelDia({
           fontWeight: 600,
           color: cuadra ? "var(--color-text-success)" : "var(--color-text-danger)"
         }
-      }, cuadra ? `✓ Cuadra: ${div(vuelveTotal)} de ${div(esperado)}` : `⚠ No cuadra: ${div(vuelveTotal)} de ${div(esperado)} esperados`));
+      }, cuadra ? `✓ Cuadra: ${div(vuelveTotal)} de ${div(esperado)}` : `⚠ No cuadra: ${div(vuelveTotal)} de ${div(esperado)} esperados`), /*#__PURE__*/React.createElement("div", {
+        style: {
+          textAlign: "center",
+          marginTop: 4,
+          fontSize: 11,
+          fontWeight: 600,
+          color: cuadraFijo ? "var(--color-text-success)" : "var(--color-text-warning)"
+        }
+      }, cuadraFijo ? `✓ Cuadra con el fijo: ${div(totalFlota)} de ${div(CAPACIDAD_FIJA[pk])}` : `⚠ No cuadra con el fijo: ${div(totalFlota)} de ${div(CAPACIDAD_FIJA[pk])} (${totalFlota > CAPACIDAD_FIJA[pk] ? "sobran " + div(totalFlota - CAPACIDAD_FIJA[pk]) : "faltan " + div(CAPACIDAD_FIJA[pk] - totalFlota)})`));
     }), /*#__PURE__*/React.createElement("button", {
       style: {
         width: "100%",

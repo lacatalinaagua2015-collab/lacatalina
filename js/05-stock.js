@@ -1479,7 +1479,7 @@ function ConfirmacionesDia({
       color: "var(--color-text-secondary)",
       marginTop: 2
     }
-  }, direccionCliente(c))), c?.telefono && /*#__PURE__*/React.createElement("a", {
+  }, c?.calle ? `${c.calle} ${c.nro || ""}` : c?.manzana ? `Mz ${c.manzana} L ${c.lote}` : "", c?.barrio ? ` · ${c.barrio}` : "")), c?.telefono && /*#__PURE__*/React.createElement("a", {
     href: `https://wa.me/54${c.telefono}`,
     target: "_blank",
     rel: "noreferrer",
