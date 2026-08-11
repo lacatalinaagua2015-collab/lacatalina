@@ -2325,6 +2325,7 @@ function App() {
     dia: diaActual,
     fecha: fechaActual,
     ventas: ventas.filter(v => v.fechaKey === fechaActual),
+    todasLasVentas: ventas,
     clientes: clientes,
     planilla: planillas[`${diaActual}_${fechaActual}`] || planillaDiaVacia(),
     productos: productos,

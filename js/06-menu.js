@@ -1163,6 +1163,7 @@ function PlanillaDelDia({
   dia,
   fecha,
   ventas,
+  todasLasVentas,
   clientes,
   planilla,
   productos,
@@ -1337,6 +1338,37 @@ function PlanillaDelDia({
     "Bidón 10L": "b10",
     "Bidón 20L": "b20"
   };
+  // Stock TOTAL fijo de la sodería (nunca cambia): 25 cajones de soda,
+  // 70 bidones de 10L, 21 bidones de 20L. En cualquier momento, esto tiene
+  // que estar repartido entre sodería (lleno/vacío/a llenar) y lo que está
+  // en poder de los clientes (prestado y todavía no devuelto) — si no
+  // cuadra, algo se perdió o falta cargar un movimiento.
+  const CAPACIDAD_FIJA = {
+    soda: 25 * CAJON,
+    b10: 70,
+    b20: 21
+  };
+  // Envases en poder de clientes = TODO lo prestado históricamente menos
+  // todo lo devuelto históricamente (no solo lo de hoy) — usa el historial
+  // completo (todasLasVentas), no las ventas filtradas del día.
+  const enClientesActual = {
+    soda: 0,
+    b10: 0,
+    b20: 0
+  };
+  (todasLasVentas || ventas).forEach(v => {
+    (v.envPrest || []).forEach(e => {
+      const k = prodKeyPl[e.prod];
+      if (k) enClientesActual[k] += Number(e.cant) || 0;
+    });
+    (v.envDev || []).forEach(e => {
+      const k = prodKeyPl[e.prod];
+      if (k) enClientesActual[k] -= Number(e.cant) || 0;
+    });
+  });
+  ["soda", "b10", "b20"].forEach(pk => {
+    enClientesActual[pk] = Math.max(0, enClientesActual[pk]);
+  });
   ventas.forEach(v => {
     v.detalle.forEach(d => {
       const k = prodKeyPl[d.nombre];
@@ -1753,7 +1785,7 @@ function PlanillaDelDia({
         style: {
           fontSize: 20,
           fontWeight: 700,
-          color: "var(--color-text-primary)"
+          color: cuadraFijo ? "var(--color-text-primary)" : "var(--color-text-danger)"
         }
       }, div(totalFlota), " ", /*#__PURE__*/React.createElement("span", {
         style: {
