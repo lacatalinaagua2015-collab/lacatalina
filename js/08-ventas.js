@@ -625,20 +625,6 @@ function RecordatorioModal({
   const [hora, setHora] = React.useState("10:00");
   const [tipo, setTipo] = React.useState("visita"); // visita | cobro
   const [motivo, setMotivo] = React.useState("");
-  const tipoConfig = {
-    visita: {
-      ico: "🏠",
-      label: "Visita",
-      color: "#5daaff",
-      bg: "#1e3a5f"
-    },
-    cobro: {
-      ico: "💰",
-      label: "Cobro",
-      color: "#f5b942",
-      bg: "#2e1f06"
-    }
-  };
   return /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
@@ -675,63 +661,15 @@ function RecordatorioModal({
       color: "var(--color-text-secondary)",
       marginBottom: 12
     }
-  }, cliente.nombre), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      marginBottom: 12
-    }
-  }, Object.entries(tipoConfig).map(([k, tc]) => /*#__PURE__*/React.createElement("button", {
-    key: k,
-    style: {
-      flex: 1,
-      padding: "10px 8px",
-      borderRadius: 10,
-      border: `2px solid ${tipo === k ? tc.color : "var(--color-border-secondary)"}`,
-      background: tipo === k ? tc.bg : "transparent",
-      color: tipo === k ? tc.color : "var(--color-text-secondary)",
-      fontSize: 13,
-      fontWeight: 500,
-      cursor: "pointer",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      gap: 3
-    },
-    onClick: () => setTipo(k)
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 20
-    }
-  }, tc.ico), tc.label))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 2
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "Fecha"), /*#__PURE__*/React.createElement("input", {
-    type: "date",
-    style: s.input,
-    value: fecha,
-    onChange: e => setFecha(e.target.value)
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "Hora"), /*#__PURE__*/React.createElement("input", {
-    type: "time",
-    style: s.input,
-    value: hora,
-    onChange: e => setHora(e.target.value)
-  }))), /*#__PURE__*/React.createElement("div", {
+  }, cliente.nombre), /*#__PURE__*/React.createElement(TipoRecordatorioSelector, {
+    tipo: tipo,
+    onCambiarTipo: setTipo
+  }), /*#__PURE__*/React.createElement(FechaHoraRow, {
+    fecha: fecha,
+    hora: hora,
+    onCambiarFecha: setFecha,
+    onCambiarHora: setHora
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 16
     }
@@ -987,9 +925,6 @@ function NuevaVenta({
   const [dispDelta, setDispDelta] = React.useState(0);
   const [mostrarRotoCompacto, setMostrarRotoCompacto] = React.useState(false);
   const [mostrarCambio, setMostrarCambio] = React.useState(false);
-  const [productoViejoCambio, setProductoViejoCambio] = React.useState("Bidón 20L");
-  const [productoNuevoCambio, setProductoNuevoCambio] = React.useState("Bidón 20L");
-  const [motivoCambio, setMotivoCambio] = React.useState("Agua en mal estado");
   const sonarTransferencia = () => {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1454,85 +1389,26 @@ function NuevaVenta({
         setDispRotoPrecio("");
         setMostrarRotoCompacto(false);
       }
-    }, "Cancelar")), mostrarCambio && /*#__PURE__*/React.createElement("div", {
-      style: {
-        ...s.card,
-        margin: "0 0 8px",
-        border: "1px solid #818cf8",
-        padding: 10
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 6,
-        marginBottom: 6
-      }
-    }, /*#__PURE__*/React.createElement("select", {
-      style: {
-        ...s.select,
-        fontSize: 12
-      },
-      value: productoViejoCambio,
-      onChange: e => setProductoViejoCambio(e.target.value)
-    }, (productos || []).map(p => /*#__PURE__*/React.createElement("option", {
-      key: p.id,
-      value: p.nombre
-    }, p.nombre))), /*#__PURE__*/React.createElement("select", {
-      style: {
-        ...s.select,
-        fontSize: 12
-      },
-      value: productoNuevoCambio,
-      onChange: e => setProductoNuevoCambio(e.target.value)
-    }, (productos || []).map(p => /*#__PURE__*/React.createElement("option", {
-      key: p.id,
-      value: p.nombre
-    }, p.nombre)))), /*#__PURE__*/React.createElement("input", {
-      style: {
-        ...s.input,
-        fontSize: 12,
-        marginBottom: 6
-      },
-      placeholder: "Motivo",
-      value: motivoCambio,
-      onChange: e => setMotivoCambio(e.target.value)
-    }), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 6
-      }
-    }, /*#__PURE__*/React.createElement("button", {
-      style: {
-        ...s.btn,
-        flex: 1,
-        fontSize: 12
-      },
-      onClick: () => setMostrarCambio(false)
-    }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
-      style: {
-        ...s.btnPrimary,
-        flex: 2,
-        fontSize: 12,
-        padding: "8px"
-      },
-      onClick: () => {
-        const obsTxt = `Cambio: ${productoViejoCambio} → ${productoNuevoCambio}${motivoCambio.trim() ? ` · ${motivoCambio.trim()}` : ""}`;
+    }, "Cancelar")), mostrarCambio && /*#__PURE__*/React.createElement(CambioEnvasePanel, {
+      productos: productos,
+      onConfirmar: (productoViejo, productoNuevo, motivo) => {
+        const obsTxt = `Cambio: ${productoViejo} → ${productoNuevo}${motivo.trim() ? ` · ${motivo.trim()}` : ""}`;
         onGuardar([{
           nombre: "Cambio de envase",
           cantidad: 1,
           precio: 0,
           total: 0
         }], "cambio", "0", 0, [{
-          prod: productoNuevoCambio,
+          prod: productoNuevo,
           cant: 1
         }], [{
-          prod: productoViejoCambio,
+          prod: productoViejo,
           cant: 1
         }], obsTxt, "cambio_envase");
         setMostrarCambio(false);
-        setMotivoCambio("Agua en mal estado");
-      }
-    }, "✓ Registrar cambio"))), /*#__PURE__*/React.createElement("div", {
+      },
+      onCancelar: () => setMostrarCambio(false)
+    }), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 5,
@@ -2485,108 +2361,26 @@ function NuevaVenta({
       padding: "8px"
     },
     onClick: () => setMostrarCambio(true)
-  }, "🔄 Cambio de envase (sin cobrar)") : /*#__PURE__*/React.createElement("div", {
-    style: {
-      ...s.card,
-      margin: "0 0 10px",
-      border: "1px solid #818cf8"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "var(--color-text-secondary)",
-      marginBottom: 8,
-      fontWeight: 500
-    }
-  }, "🔄 Cambio de envase (no se cobra)"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: {
-      ...s.label,
-      marginBottom: 4
-    }
-  }, "Se retira"), /*#__PURE__*/React.createElement("select", {
-    style: s.select,
-    value: productoViejoCambio,
-    onChange: e => setProductoViejoCambio(e.target.value)
-  }, (productos || []).map(p => /*#__PURE__*/React.createElement("option", {
-    key: p.id,
-    value: p.nombre
-  }, p.nombre)))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: {
-      ...s.label,
-      marginBottom: 4
-    }
-  }, "Se entrega"), /*#__PURE__*/React.createElement("select", {
-    style: s.select,
-    value: productoNuevoCambio,
-    onChange: e => setProductoNuevoCambio(e.target.value)
-  }, (productos || []).map(p => /*#__PURE__*/React.createElement("option", {
-    key: p.id,
-    value: p.nombre
-  }, p.nombre))))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: {
-      ...s.label,
-      marginBottom: 4
-    }
-  }, "Motivo"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    placeholder: "Ej: Agua en mal estado",
-    value: motivoCambio,
-    onChange: e => setMotivoCambio(e.target.value)
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 6
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...s.btn,
-      flex: 1,
-      fontSize: 12
-    },
-    onClick: () => setMostrarCambio(false)
-  }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...s.btnPrimary,
-      flex: 2,
-      fontSize: 12,
-      padding: "8px"
-    },
-    onClick: () => {
-      const obsTxt = `Cambio: ${productoViejoCambio} → ${productoNuevoCambio}${motivoCambio.trim() ? ` · ${motivoCambio.trim()}` : ""}`;
+  }, "🔄 Cambio de envase (sin cobrar)") : /*#__PURE__*/React.createElement(CambioEnvasePanel, {
+    productos: productos,
+    onConfirmar: (productoViejo, productoNuevo, motivo) => {
+      const obsTxt = `Cambio: ${productoViejo} → ${productoNuevo}${motivo.trim() ? ` · ${motivo.trim()}` : ""}`;
       onGuardar([{
         nombre: "Cambio de envase",
         cantidad: 1,
         precio: 0,
         total: 0
       }], "cambio", "0", 0, [{
-        prod: productoNuevoCambio,
+        prod: productoNuevo,
         cant: 1
       }], [{
-        prod: productoViejoCambio,
+        prod: productoViejo,
         cant: 1
       }], obsTxt, "cambio_envase");
       setMostrarCambio(false);
-      setMotivoCambio("Agua en mal estado");
-    }
-  }, "✓ Registrar cambio"))), /*#__PURE__*/React.createElement("div", {
+    },
+    onCancelar: () => setMostrarCambio(false)
+  }), /*#__PURE__*/React.createElement("div", {
     style: s.divider
   }), dispenser && (cliente.dispenser || 0) > 0 && /*#__PURE__*/React.createElement("div", {
     style: {

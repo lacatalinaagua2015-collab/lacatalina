@@ -54,6 +54,320 @@ function prestadoClienteDe(c, k, ventasHistoricas) {
   });
   return Math.max(0, n + (Number(c.envAjuste?.[k]) || 0));
 }
+// ════════════════════════════════════════════════════════════════════
+// ◆  CambioEnvasePanel — panel "🔄 Cambio de envase" UNIFICADO (venta,
+//    detalle de cliente, gestión). Solo maneja la UI y el estado local
+//    (producto que se retira, que se entrega, motivo) — quien lo usa decide
+//    cómo registrar el cambio (onConfirmar) y qué hacer al cancelar (onCancelar).
+//    Uso: {mostrar && <CambioEnvasePanel productos={productos}
+//            onConfirmar={(viejo,nuevo,motivo)=>{...registrar...; cerrar();}}
+//            onCancelar={cerrar} />}
+// ════════════════════════════════════════════════════════════════════
+function CambioEnvasePanel({
+  productos,
+  onConfirmar,
+  onCancelar
+}) {
+  const [productoViejo, setProductoViejo] = React.useState("Bidón 20L");
+  const [productoNuevo, setProductoNuevo] = React.useState("Bidón 20L");
+  const [motivo, setMotivo] = React.useState("Agua en mal estado");
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      margin: "0 0 10px",
+      border: "1px solid #818cf8"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-secondary)",
+      marginBottom: 8,
+      fontWeight: 500
+    }
+  }, "🔄 Cambio de envase (no se cobra)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      ...s.label,
+      marginBottom: 4
+    }
+  }, "Se retira"), /*#__PURE__*/React.createElement("select", {
+    style: s.select,
+    value: productoViejo,
+    onChange: e => setProductoViejo(e.target.value)
+  }, (productos || []).map(p => /*#__PURE__*/React.createElement("option", {
+    key: p.id,
+    value: p.nombre
+  }, p.nombre)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      ...s.label,
+      marginBottom: 4
+    }
+  }, "Se entrega"), /*#__PURE__*/React.createElement("select", {
+    style: s.select,
+    value: productoNuevo,
+    onChange: e => setProductoNuevo(e.target.value)
+  }, (productos || []).map(p => /*#__PURE__*/React.createElement("option", {
+    key: p.id,
+    value: p.nombre
+  }, p.nombre))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      ...s.label,
+      marginBottom: 4
+    }
+  }, "Motivo"), /*#__PURE__*/React.createElement("input", {
+    style: s.input,
+    placeholder: "Ej: Agua en mal estado",
+    value: motivo,
+    onChange: e => setMotivo(e.target.value)
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      flex: 1,
+      fontSize: 12
+    },
+    onClick: onCancelar
+  }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btnPrimary,
+      flex: 2,
+      fontSize: 12,
+      padding: "8px"
+    },
+    onClick: () => {
+      onConfirmar(productoViejo, productoNuevo, motivo);
+      setMotivo("Agua en mal estado");
+    }
+  }, "✓ Registrar cambio")));
+}
+// ════════════════════════════════════════════════════════════════════
+// ◆  FotoClienteModal — visor/editor de foto de cliente a pantalla
+//    completa UNIFICADO (📷 Cámara / 🖼 Galería / 🗑 Eliminar).
+//    Uso: {abierto && <FotoClienteModal cliente={c} onCerrar={()=>setX(false)}
+//            onGuardarFoto={b64 => ...guardar b64 en el cliente...} />}
+// ════════════════════════════════════════════════════════════════════
+function FotoClienteModal({
+  cliente,
+  onCerrar,
+  onGuardarFoto
+}) {
+  if (!cliente) return null;
+  const subir = async e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const b64 = await comprimirFoto(f);
+    onGuardarFoto(b64);
+    onCerrar();
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "rgba(0,0,0,0.92)",
+      zIndex: 2000,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 20
+    },
+    onClick: e => {
+      e.stopPropagation();
+      onCerrar();
+    }
+  }, cliente.foto ? /*#__PURE__*/React.createElement("img", {
+    src: cliente.foto,
+    alt: "Domicilio",
+    style: {
+      maxWidth: "100%",
+      maxHeight: "60vh",
+      borderRadius: 10,
+      objectFit: "contain",
+      marginBottom: 16
+    }
+  }) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "#aaa",
+      fontSize: 14,
+      marginBottom: 20
+    }
+  }, "Sin foto · ", cliente.nombre), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 12
+    },
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      background: "#185FA5",
+      color: "#e2eaf4",
+      padding: "12px 20px",
+      borderRadius: 10,
+      fontSize: 14,
+      fontWeight: 600,
+      cursor: "pointer",
+      textAlign: "center"
+    }
+  }, "📷 Cámara", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: "image/*",
+    capture: "environment",
+    style: {
+      display: "none"
+    },
+    onChange: subir
+  })), /*#__PURE__*/React.createElement("label", {
+    style: {
+      background: "#2a3a4a",
+      color: "#e2eaf4",
+      padding: "12px 20px",
+      borderRadius: 10,
+      fontSize: 14,
+      fontWeight: 600,
+      cursor: "pointer",
+      textAlign: "center"
+    }
+  }, "🖼 Galería", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: "image/*",
+    style: {
+      display: "none"
+    },
+    onChange: subir
+  })), cliente.foto && /*#__PURE__*/React.createElement("button", {
+    style: {
+      background: "#3a2020",
+      color: "#e05c5c",
+      padding: "10px 14px",
+      borderRadius: 10,
+      fontSize: 13,
+      fontWeight: 600,
+      cursor: "pointer",
+      border: "none"
+    },
+    onClick: () => {
+      onGuardarFoto("");
+      onCerrar();
+    }
+  }, "🗑")), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#aaa",
+      fontSize: 11,
+      marginTop: 14
+    }
+  }, "Tocá fuera para cerrar"));
+}
+const TIPO_RECORDATORIO_CONFIG = {
+  visita: {
+    ico: "🏠",
+    label: "Visita",
+    color: "#5daaff",
+    bg: "#1e3a5f"
+  },
+  cobro: {
+    ico: "💰",
+    label: "Cobro",
+    color: "#f5b942",
+    bg: "#2e1f06"
+  }
+};
+// ── Selector "Visita/Cobro" para recordatorios, UNIFICADO entre el modal de
+//    venta (RecordatorioModal) y el formulario de la Agenda (NuevoRecordatorioForm).
+function TipoRecordatorioSelector({
+  tipo,
+  onCambiarTipo
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 12
+    }
+  }, Object.entries(TIPO_RECORDATORIO_CONFIG).map(([k, tc]) => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    style: {
+      flex: 1,
+      padding: "10px 8px",
+      borderRadius: 10,
+      border: `2px solid ${tipo === k ? tc.color : "var(--color-border-secondary)"}`,
+      background: tipo === k ? tc.bg : "transparent",
+      color: tipo === k ? tc.color : "var(--color-text-secondary)",
+      fontSize: 13,
+      fontWeight: 500,
+      cursor: "pointer",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 3
+    },
+    onClick: () => onCambiarTipo(k)
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 20
+    }
+  }, tc.ico), tc.label)));
+}
+// ── Fila Fecha/Hora para recordatorios, misma unificación.
+function FechaHoraRow({
+  fecha,
+  hora,
+  onCambiarFecha,
+  onCambiarHora
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 2
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: s.label
+  }, "Fecha"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    style: s.input,
+    value: fecha,
+    onChange: e => onCambiarFecha(e.target.value)
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: s.label
+  }, "Hora"), /*#__PURE__*/React.createElement("input", {
+    type: "time",
+    style: s.input,
+    value: hora,
+    onChange: e => onCambiarHora(e.target.value)
+  })));
+}
 function fmtFechaHoraVenta(f) {
   if (!f) return "";
   const limpio = String(f).replace(",", " ").replace(/\s+/g, " ").trim();

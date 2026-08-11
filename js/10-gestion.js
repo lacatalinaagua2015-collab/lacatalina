@@ -24,9 +24,6 @@ function GestionClientes({
   const [modoNuevo, setModoNuevo] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [cambioId, setCambioId] = useState(null);
-  const [productoViejoCambio, setProductoViejoCambio] = useState("Bidón 20L");
-  const [productoNuevoCambio, setProductoNuevoCambio] = useState("Bidón 20L");
-  const [motivoCambio, setMotivoCambio] = useState("Agua en mal estado");
   const [clienteMoviendo, setClienteMoviendo] = useState(null); // id del cliente "levantado", esperando destino (mismo día)
 
   const moverCliente = (idOrigen, idDestino) => {
@@ -435,91 +432,10 @@ function GestionClientes({
       setEditandoId(c.id);
     }
   }, "✏️ Editar")), cambioId === c.id && /*#__PURE__*/React.createElement("div", {
-    style: {
-      ...s.card,
-      margin: "8px 0 0",
-      border: "1px solid #818cf8"
-    },
     onClick: e => e.stopPropagation()
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "var(--color-text-secondary)",
-      marginBottom: 8,
-      fontWeight: 500
-    }
-  }, "🔄 Cambio de envase (no se cobra)"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: {
-      ...s.label,
-      marginBottom: 4
-    }
-  }, "Se retira"), /*#__PURE__*/React.createElement("select", {
-    style: s.select,
-    value: productoViejoCambio,
-    onChange: e => setProductoViejoCambio(e.target.value)
-  }, (productos || []).map(p => /*#__PURE__*/React.createElement("option", {
-    key: p.id,
-    value: p.nombre
-  }, p.nombre)))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: {
-      ...s.label,
-      marginBottom: 4
-    }
-  }, "Se entrega"), /*#__PURE__*/React.createElement("select", {
-    style: s.select,
-    value: productoNuevoCambio,
-    onChange: e => setProductoNuevoCambio(e.target.value)
-  }, (productos || []).map(p => /*#__PURE__*/React.createElement("option", {
-    key: p.id,
-    value: p.nombre
-  }, p.nombre))))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: {
-      ...s.label,
-      marginBottom: 4
-    }
-  }, "Motivo"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    placeholder: "Ej: Agua en mal estado",
-    value: motivoCambio,
-    onChange: e => setMotivoCambio(e.target.value)
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 6
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...s.btn,
-      flex: 1,
-      fontSize: 12
-    },
-    onClick: () => setCambioId(null)
-  }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...s.btnPrimary,
-      flex: 2,
-      fontSize: 12,
-      padding: "8px"
-    },
-    onClick: () => {
+  }, /*#__PURE__*/React.createElement(CambioEnvasePanel, {
+    productos: productos,
+    onConfirmar: (productoViejo, productoNuevo, motivo) => {
       const vt = {
         id: Date.now(),
         clienteId: c.id,
@@ -534,7 +450,7 @@ function GestionClientes({
           total: 0
         }],
         pago: "cambio",
-        obs: `Cambio: ${productoViejoCambio} → ${productoNuevoCambio}${motivoCambio.trim() ? ` · ${motivoCambio.trim()}` : ""}`,
+        obs: `Cambio: ${productoViejo} → ${productoNuevo}${motivo.trim() ? ` · ${motivo.trim()}` : ""}`,
         neto: 0,
         bruto: 0,
         desc: 0,
@@ -543,11 +459,11 @@ function GestionClientes({
         pagadoNum: 0,
         saldoDelta: 0,
         envDev: [{
-          prod: productoViejoCambio,
+          prod: productoViejo,
           cant: 1
         }],
         envPrest: [{
-          prod: productoNuevoCambio,
+          prod: productoNuevo,
           cant: 1
         }],
         _esCambio: true,
@@ -555,130 +471,24 @@ function GestionClientes({
       };
       onGuardarCambio && onGuardarCambio(vt);
       setCambioId(null);
-      setMotivoCambio("Agua en mal estado");
-    }
-  }, "✓ Registrar cambio")))))), filtrados.length === 0 && !modoNuevo && /*#__PURE__*/React.createElement("div", {
+    },
+    onCancelar: () => setCambioId(null)
+  }))))), filtrados.length === 0 && !modoNuevo && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
       padding: "40px 20px",
       color: "var(--color-text-tertiary)",
       fontSize: 14
     }
-  }, "No hay clientes", filtroDia !== "todos" ? ` en ${filtroDia}` : "", ".")), fotoClienteId && /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: "fixed",
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: "rgba(0,0,0,0.92)",
-      zIndex: 2000,
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: 20
-    },
-    onClick: () => setFotoClienteId(null)
-  }, fotoCliente && fotoCliente.foto ? /*#__PURE__*/React.createElement("img", {
-    src: fotoCliente.foto,
-    alt: "Domicilio",
-    style: {
-      maxWidth: "100%",
-      maxHeight: "60vh",
-      borderRadius: 10,
-      objectFit: "contain",
-      marginBottom: 16
-    }
-  }) : /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: "#aaa",
-      fontSize: 14,
-      marginBottom: 20
-    }
-  }, "Sin foto aún · ", fotoCliente && fotoCliente.nombre), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 12
-    },
-    onClick: e => e.stopPropagation()
-  }, /*#__PURE__*/React.createElement("label", {
-    style: {
-      background: "#185FA5",
-      color: "#e2eaf4",
-      padding: "12px 20px",
-      borderRadius: 10,
-      fontSize: 14,
-      fontWeight: 600,
-      cursor: "pointer",
-      textAlign: "center"
-    }
-  }, "📷 Cámara", /*#__PURE__*/React.createElement("input", {
-    type: "file",
-    accept: "image/*",
-    capture: "environment",
-    style: {
-      display: "none"
-    },
-    onChange: async e => {
-      const f = e.target.files[0];
-      if (!f) return;
-      const b64 = await comprimirFoto(f);
+  }, "No hay clientes", filtroDia !== "todos" ? ` en ${filtroDia}` : "", ".")), fotoClienteId && /*#__PURE__*/React.createElement(FotoClienteModal, {
+    cliente: fotoCliente,
+    onCerrar: () => setFotoClienteId(null),
+    onGuardarFoto: b64 => {
       onEditar(fotoClienteId, {
         foto: b64
       });
-      setFotoClienteId(null);
     }
-  })), /*#__PURE__*/React.createElement("label", {
-    style: {
-      background: "#2a3a4a",
-      color: "#e2eaf4",
-      padding: "12px 20px",
-      borderRadius: 10,
-      fontSize: 14,
-      fontWeight: 600,
-      cursor: "pointer",
-      textAlign: "center"
-    }
-  }, "🖼 Galería", /*#__PURE__*/React.createElement("input", {
-    type: "file",
-    accept: "image/*",
-    style: {
-      display: "none"
-    },
-    onChange: async e => {
-      const f = e.target.files[0];
-      if (!f) return;
-      const b64 = await comprimirFoto(f);
-      onEditar(fotoClienteId, {
-        foto: b64
-      });
-      setFotoClienteId(null);
-    }
-  })), fotoCliente && fotoCliente.foto && /*#__PURE__*/React.createElement("button", {
-    style: {
-      background: "#3a2020",
-      color: "#e05c5c",
-      padding: "12px 14px",
-      borderRadius: 10,
-      fontSize: 14,
-      fontWeight: 600,
-      cursor: "pointer",
-      border: "none"
-    },
-    onClick: () => {
-      onEditar(fotoClienteId, {
-        foto: ""
-      });
-      setFotoClienteId(null);
-    }
-  }, "🗑")), /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: "#aaa",
-      fontSize: 11,
-      marginTop: 14
-    }
-  }, "Tocá fuera para cerrar")));
+  }));
 }
 
 // ── CargaGPSMasiva ────────────────────────────────────────────────────────────
