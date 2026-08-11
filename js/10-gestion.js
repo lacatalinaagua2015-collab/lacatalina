@@ -56,33 +56,6 @@ function GestionClientes({
     } : c));
   };
 
-  // Calcular envases extra por cliente
-  const extraEnvases = React.useMemo(() => {
-    const m = {};
-    const KP = {
-      "Sifón 1.5L": "sifon",
-      "Bidón 10L": "bidon10",
-      "Bidón 20L": "bidon20",
-      "Dispenser": "dispenser"
-    };
-    (ventas || []).forEach(v => {
-      if (!m[v.clienteId]) m[v.clienteId] = {
-        sifon: 0,
-        bidon10: 0,
-        bidon20: 0,
-        dispenser: 0
-      };
-      (v.envPrest || []).forEach(e => {
-        const k = KP[e.prod];
-        if (k) m[v.clienteId][k] += Number(e.cant) || 0;
-      });
-      (v.envDev || []).forEach(e => {
-        const k = KP[e.prod];
-        if (k) m[v.clienteId][k] -= Number(e.cant) || 0;
-      });
-    });
-    return m;
-  }, [ventas]);
   const filtrados = clientes.filter(c => filtroDia === "todos" || c.dia === filtroDia).filter(c => buscarCliente(c, busqueda) > 0).sort((a, b) => {
     // Con búsqueda activa: primero las coincidencias por DOMICILIO
     if (busqueda.trim()) {
@@ -339,12 +312,10 @@ function GestionClientes({
   }, "Debe ", fmt(Math.abs(c.saldo))), c.saldo > 0 && /*#__PURE__*/React.createElement("span", {
     style: s.badge("success")
   }, "A favor ", fmt(c.saldo)), (() => {
-    const ex = extraEnvases[c.id] || {};
-    const aj = c.envAjuste || {};
     const real = {
-      sifon: Math.max(0, (Number(c.sifon) || 0) + (ex.sifon || 0) + (aj.sifon || 0)),
-      bidon10: Math.max(0, (Number(c.bidon10) || 0) + (ex.bidon10 || 0) + (aj.bidon10 || 0)),
-      bidon20: Math.max(0, (Number(c.bidon20) || 0) + (ex.bidon20 || 0) + (aj.bidon20 || 0))
+      sifon: Math.max(0, (Number(c.sifon) || 0) + prestadoClienteDe(c, "sifon", ventas)),
+      bidon10: Math.max(0, (Number(c.bidon10) || 0) + prestadoClienteDe(c, "bidon10", ventas)),
+      bidon20: Math.max(0, (Number(c.bidon20) || 0) + prestadoClienteDe(c, "bidon20", ventas))
     };
     const pill = txt => /*#__PURE__*/React.createElement("span", {
       style: {

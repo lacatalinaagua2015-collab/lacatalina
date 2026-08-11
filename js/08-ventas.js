@@ -1913,11 +1913,15 @@ function NuevaVenta({
       color: "var(--color-text-secondary)"
     }
   }, "Disp×", cliente.dispenser), (() => {
-    const aj = cliente.envAjuste || {};
+    const pres = {
+      sifon: prestadoClienteDe(cliente, "sifon", ventasCliente),
+      bidon10: prestadoClienteDe(cliente, "bidon10", ventasCliente),
+      bidon20: prestadoClienteDe(cliente, "bidon20", ventasCliente)
+    };
     const items = [];
-    if ((aj.sifon || 0) > 0) items.push(`+${aj.sifon} sif.`);
-    if ((aj.bidon10 || 0) > 0) items.push(`+${aj.bidon10} 10L`);
-    if ((aj.bidon20 || 0) > 0) items.push(`+${aj.bidon20} 20L`);
+    if (pres.sifon > 0) items.push(`+${pres.sifon} sif.`);
+    if (pres.bidon10 > 0) items.push(`+${pres.bidon10} 10L`);
+    if (pres.bidon20 > 0) items.push(`+${pres.bidon20} 20L`);
     return items.length > 0 ? /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,

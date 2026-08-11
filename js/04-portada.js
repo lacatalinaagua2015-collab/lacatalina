@@ -260,20 +260,6 @@ function SelectorFecha({
     }
   }))));
 }
-function SetupScreen({
-  onSetup
-}) {
-  React.useEffect(() => {
-    onSetup("firebase", "firebase");
-  }, []);
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: 40,
-      textAlign: "center",
-      color: "var(--color-text-secondary)"
-    }
-  }, "Conectando con Firebase...");
-}
 function SyncBar({
   status,
   isOnline

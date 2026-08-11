@@ -26,6 +26,34 @@ function direccionCliente(c) {
   if (c.barrio) partes.push(c.barrio);
   return partes.join(" · ");
 }
+const KEY_PROD_ENV = {
+  "Sifón 1.5L": "sifon",
+  "Bidón 10L": "bidon10",
+  "Bidón 20L": "bidon20",
+  "Dispenser": "dispenser"
+};
+// ── Cuánto tiene PRESTADO un cliente de un producto ("sifon"|"bidon10"|
+//    "bidon20"|"dispenser"). Para sifón/bidón10/bidón20 se lee directo de
+//    c.prestado (campo que se mantiene solo, sumando/restando en cada venta
+//    — ver aplicarMovimientoEnvases en 14-app.js). Si el cliente todavía no
+//    tiene ese campo, o es dispenser (que no tiene campo directo), se
+//    calcula del historial de ventas de ese cliente + el ajuste manual
+//    (c.envAjuste). Usar SIEMPRE esta función en vez de recalcular a mano
+//    — así todas las pantallas muestran el mismo número.
+function prestadoClienteDe(c, k, ventasHistoricas) {
+  if (k !== "dispenser" && c.prestado && c.prestado[k] !== undefined) return c.prestado[k];
+  let n = 0;
+  (ventasHistoricas || []).forEach(v => {
+    if (v.clienteId !== c.id) return;
+    (v.envPrest || []).forEach(e => {
+      if (KEY_PROD_ENV[e.prod] === k) n += Number(e.cant) || 0;
+    });
+    (v.envDev || []).forEach(e => {
+      if (KEY_PROD_ENV[e.prod] === k) n -= Number(e.cant) || 0;
+    });
+  });
+  return Math.max(0, n + (Number(c.envAjuste?.[k]) || 0));
+}
 function fmtFechaHoraVenta(f) {
   if (!f) return "";
   const limpio = String(f).replace(",", " ").replace(/\s+/g, " ").trim();
@@ -359,7 +387,7 @@ function extraerCoordsDeURL(url) {
 // ════════════════════════════════════════════════════════════════════
 // ◆  PieEnvases — pie de tarjeta de cliente UNIFICADO (todas las listas)
 //    Botón ♻️ Envases + botones propios de cada pantalla + panel con Confirmar.
-//    Guarda SIEMPRE en c.envAjuste (mecanismo único).
+//    Guarda en c.prestado (sifón/bidón10/bidón20) y c.envAjuste (dispenser, sin campo directo).
 //    Uso: <PieEnvases c={c} ventas={ventas} onEditar={(id,cambios)=>...}
 //           izquierda={<botón opcional/>}> {botones derecha opcionales} </PieEnvases>
 // ════════════════════════════════════════════════════════════════════
@@ -415,18 +443,25 @@ function PieEnvases({
     return ex;
   };
   const abrir = () => {
-    const ex = calcExtra(),
-      aj = c.envAjuste || {};
     setDraft({
       fijos: Object.fromEntries(KEYS.map(k => [k, Number(c[k]) || 0])),
-      prest: Object.fromEntries(KEYS.map(k => [k, (ex[k] || 0) + (aj[k] || 0)]))
+      prest: Object.fromEntries(KEYS.map(k => [k, prestadoClienteDe(c, k, ventas)]))
     });
   };
   const confirmar = () => {
+    // Sifón/bidón10/bidón20 se guardan directo en c.prestado. Dispenser no
+    // tiene campo directo, sigue calculándose como ajuste sobre el historial.
     const ex = calcExtra();
     onEditar(c.id, {
       ...Object.fromEntries(KEYS.map(k => [k, Math.max(0, draft.fijos[k])])),
-      envAjuste: Object.fromEntries(KEYS.map(k => [k, draft.prest[k] - (ex[k] || 0)]))
+      prestado: {
+        ...(c.prestado || {}),
+        ...Object.fromEntries(KEYS.filter(k => k !== "dispenser").map(k => [k, Math.max(0, draft.prest[k])]))
+      },
+      envAjuste: {
+        ...(c.envAjuste || {}),
+        dispenser: draft.prest.dispenser - (ex.dispenser || 0)
+      }
     });
     setDraft(null);
   };

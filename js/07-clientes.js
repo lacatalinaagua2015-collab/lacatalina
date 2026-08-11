@@ -179,26 +179,12 @@ function ListaClientes({
       const siguiente = pendientes.find((x, i) => x.id !== c.id && (idx === -1 || i > idx));
       setClienteExpandidoId(siguiente ? siguiente.id : null);
     };
-    // Envases extra que tiene el cliente (historial completo + ajuste manual envAjuste)
+    // Envases extra que tiene el cliente (usa la misma función que Arqueo y Planilla)
     const envExtra = {
-      sifon: 0,
-      bidon10: 0,
-      bidon20: 0
+      sifon: prestadoClienteDe(c, "sifon", todasVentas || ventas),
+      bidon10: prestadoClienteDe(c, "bidon10", todasVentas || ventas),
+      bidon20: prestadoClienteDe(c, "bidon20", todasVentas || ventas)
     };
-    (todasVentas || ventas).filter(v => v.clienteId === c.id).forEach(v => {
-      (v.envPrest || []).forEach(e => {
-        const k = e.prod === "Sifón 1.5L" ? "sifon" : e.prod === "Bidón 10L" ? "bidon10" : e.prod === "Bidón 20L" ? "bidon20" : null;
-        if (k) envExtra[k] += Number(e.cant) || 0;
-      });
-      (v.envDev || []).forEach(e => {
-        const k = e.prod === "Sifón 1.5L" ? "sifon" : e.prod === "Bidón 10L" ? "bidon10" : e.prod === "Bidón 20L" ? "bidon20" : null;
-        if (k) envExtra[k] -= Number(e.cant) || 0;
-      });
-    });
-    const ajC = c.envAjuste || {};
-    envExtra.sifon += Number(ajC.sifon) || 0;
-    envExtra.bidon10 += Number(ajC.bidon10) || 0;
-    envExtra.bidon20 += Number(ajC.bidon20) || 0;
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: {
         ...s.card,
@@ -2053,32 +2039,10 @@ function DetalleCliente({
       }
     }, "Ajustar fijos y prestados")
   })), (() => {
-    const pkEnv = {
-      "Sifón 1.5L": "sifon",
-      "Bidón 10L": "bidon10",
-      "Bidón 20L": "bidon20"
-    };
-    const extra = {
-      sifon: 0,
-      bidon10: 0,
-      bidon20: 0
-    };
-    historial.forEach(v => {
-      (v.envPrest || []).forEach(e => {
-        const k = pkEnv[e.prod];
-        if (k) extra[k] += Number(e.cant) || 0;
-      });
-      (v.envDev || []).forEach(e => {
-        const k = pkEnv[e.prod];
-        if (k) extra[k] -= Number(e.cant) || 0;
-      });
-    });
-    // Sumar ajuste manual
-    const aj = cliente.envAjuste || {};
     const exTotal = {
-      sifon: extra.sifon + (aj.sifon || 0),
-      bidon10: extra.bidon10 + (aj.bidon10 || 0),
-      bidon20: extra.bidon20 + (aj.bidon20 || 0)
+      sifon: prestadoClienteDe(cliente, "sifon", historial),
+      bidon10: prestadoClienteDe(cliente, "bidon10", historial),
+      bidon20: prestadoClienteDe(cliente, "bidon20", historial)
     };
     const hab = {
       sifon: cliente.sifon || 0,
