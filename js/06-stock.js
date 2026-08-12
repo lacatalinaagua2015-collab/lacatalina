@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════
-// ◆  06-stock.js — StockGeneral, ConfirmacionesDia
+// ◆  05-stock.js — StockGeneral, ConfirmacionesDia
 // ════════════════════════════════════════════════════════════════════
 
 function StockGeneral({

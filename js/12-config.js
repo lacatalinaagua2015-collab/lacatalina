@@ -320,7 +320,7 @@ function NotifConfig({
   }, "📅 Recordatorios de agenda → a la hora exacta")));
 }
 
-// Toggle de huella — usa las funciones ya definidas en 05-portada.js (lcBioRegistrar/LC_BIO_KEY)
+// Toggle de huella — usa las funciones ya definidas en 04-portada.js (lcBioRegistrar/LC_BIO_KEY)
 function SeguridadHuella() {
   const [enrolado, setEnrolado] = React.useState(lcBioEnrolado());
   const [msg, setMsg] = React.useState("");

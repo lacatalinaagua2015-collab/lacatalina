@@ -365,12 +365,18 @@ function App() {
       camion: e()
     };
     if (!s || typeof s !== "object") return base;
+    const capacidadFija = s.capacidadFija && typeof s.capacidadFija === "object" ? {
+      soda: s.capacidadFija.soda || 0,
+      b10: s.capacidadFija.b10 || 0,
+      b20: s.capacidadFija.b20 || 0
+    } : undefined;
     if (s.soderia && typeof s.soderia === "object") {
       return {
         soderia: pick(s.soderia),
         soderia_vacios: pick(s.soderia_vacios),
         casa: pick(s.casa),
-        camion: e() /* auto-heal: "camion" es vestigial (nada lo incrementa, solo se le resta al cerrar el dia); cualquier valor viejo es basura y se descarta en cada lectura para que nunca vuelva a inflar el Total General */
+        camion: e(), /* auto-heal: "camion" es vestigial (nada lo incrementa, solo se le resta al cerrar el dia); cualquier valor viejo es basura y se descarta en cada lectura para que nunca vuelva a inflar el Total General */
+        ...(capacidadFija ? { capacidadFija } : {})
       };
     }
     // formato viejo (plano) → todo a sodería llenos
@@ -378,7 +384,8 @@ function App() {
       soderia: pick(s),
       soderia_vacios: e(),
       casa: e(),
-      camion: e()
+      camion: e(),
+      ...(capacidadFija ? { capacidadFija } : {})
     };
   };
   const [stockRaw, setStockRaw] = useLS("cat_stock_v4", {

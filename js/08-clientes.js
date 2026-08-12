@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════
-// ◆  08-clientes.js — ListaClientes, DetalleCliente (formulario: FormCliente unificado en 03-utils)
+// ◆  07-clientes.js — ListaClientes, DetalleCliente (formulario: FormCliente unificado en 03-utils)
 // ════════════════════════════════════════════════════════════════════
 
 function ListaClientes({

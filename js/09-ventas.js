@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════
-// ◆  09-ventas.js — EditVenta, Modals, NuevaVenta, NuevoCliente
+// ◆  08-ventas.js — EditVenta, Modals, NuevaVenta, NuevoCliente
 // ════════════════════════════════════════════════════════════════════
 
 function EditVenta({
