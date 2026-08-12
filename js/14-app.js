@@ -2445,6 +2445,7 @@ function App() {
     syncData: syncData,
     autoCierre: !!planillas[`${diaActual}_${fechaActual}`]?.iniciado,
     cargasDia: cargasDia,
+    setCargasDia: saveCargasDia,
     onGuardar: d => {
       savePlanilla(`${diaActual}_${fechaActual}`, d);
       if (!d._diaCerrado) irA(origenFecha === "atajo" ? "atajoPlanillaSemana" : "selectorFechaPlanilla");
