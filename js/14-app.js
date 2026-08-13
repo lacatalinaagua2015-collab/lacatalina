@@ -365,18 +365,12 @@ function App() {
       camion: e()
     };
     if (!s || typeof s !== "object") return base;
-    const capacidadFija = s.capacidadFija && typeof s.capacidadFija === "object" ? {
-      soda: s.capacidadFija.soda || 0,
-      b10: s.capacidadFija.b10 || 0,
-      b20: s.capacidadFija.b20 || 0
-    } : undefined;
     if (s.soderia && typeof s.soderia === "object") {
       return {
         soderia: pick(s.soderia),
         soderia_vacios: pick(s.soderia_vacios),
         casa: pick(s.casa),
-        camion: e(), /* auto-heal: "camion" es vestigial (nada lo incrementa, solo se le resta al cerrar el dia); cualquier valor viejo es basura y se descarta en cada lectura para que nunca vuelva a inflar el Total General */
-        ...(capacidadFija ? { capacidadFija } : {})
+        camion: e() /* auto-heal: "camion" es vestigial (nada lo incrementa, solo se le resta al cerrar el dia); cualquier valor viejo es basura y se descarta en cada lectura para que nunca vuelva a inflar el Total General */
       };
     }
     // formato viejo (plano) → todo a sodería llenos
@@ -384,8 +378,7 @@ function App() {
       soderia: pick(s),
       soderia_vacios: e(),
       casa: e(),
-      camion: e(),
-      ...(capacidadFija ? { capacidadFija } : {})
+      camion: e()
     };
   };
   const [stockRaw, setStockRaw] = useLS("cat_stock_v4", {
@@ -1912,10 +1905,13 @@ function App() {
     };
     const eliminado = clientes.find(c => c.id === clienteId);
     if (eliminado) {
+      // Incluye tanto el fijo del cliente como lo prestado (extra que pidió
+      // de más y no devolvió) — si no, lo prestado desaparecía sin quedar
+      // registrado ni en depósito ni como pérdida.
       const env = {
-        sifon: Number(eliminado.sifon) || 0,
-        bidon10: Number(eliminado.bidon10) || 0,
-        bidon20: Number(eliminado.bidon20) || 0
+        sifon: (Number(eliminado.sifon) || 0) + (Number(eliminado.prestado?.sifon) || 0),
+        bidon10: (Number(eliminado.bidon10) || 0) + (Number(eliminado.prestado?.bidon10) || 0),
+        bidon20: (Number(eliminado.bidon20) || 0) + (Number(eliminado.prestado?.bidon20) || 0)
       };
       const totalEnv = env.sifon + env.bidon10 + env.bidon20;
       if (totalEnv > 0) {
@@ -2491,6 +2487,22 @@ function App() {
         const b20 = Number(p.productos?.b20?.llenos || 0);
         setStock(prev => {
           const s = JSON.parse(JSON.stringify(normStock(prev)));
+          // Si no hay suficientes llenos para completar la carga, se
+          // completan con vacíos (se dan por llenados en este momento) —
+          // así los vacíos que vuelven día a día no se acumulan para
+          // siempre sin usarse nunca.
+          const llenarSiFalta = (sk, necesario) => {
+            const disponible = s.soderia[sk] || 0;
+            if (disponible < necesario) {
+              const faltante = necesario - disponible;
+              const tomar = Math.min(faltante, s.soderia_vacios[sk] || 0);
+              s.soderia_vacios[sk] = (s.soderia_vacios[sk] || 0) - tomar;
+              s.soderia[sk] = (s.soderia[sk] || 0) + tomar;
+            }
+          };
+          llenarSiFalta("sifon", soda);
+          llenarSiFalta("bidon10", b10);
+          llenarSiFalta("bidon20", b20);
           s.soderia.sifon = Math.max(0, (s.soderia.sifon || 0) - soda);
           s.soderia.bidon10 = Math.max(0, (s.soderia.bidon10 || 0) - b10);
           s.soderia.bidon20 = Math.max(0, (s.soderia.bidon20 || 0) - b20);
