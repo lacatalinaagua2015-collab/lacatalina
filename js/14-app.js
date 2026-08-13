@@ -2,6 +2,136 @@
 // ◆  14-app.js — Componente App principal
 // ════════════════════════════════════════════════════════════════════
 
+// Al cobrar una deuda, marca las ventas fiado más viejas del cliente como
+// pagadas (o parcialmente pagadas) en orden FIFO, hasta agotar el monto
+// cobrado. No toca ventas que no sean fiado, ni cobros/ajustes/cambios.
+function aplicarCobroAVentasFiado(ventasPrev, clienteId, monto) {
+  let restante = Number(monto) || 0;
+  const idsAfectados = [];
+  const cambios = {};
+  const pendientes = ventasPrev.filter(v => v.clienteId === clienteId && v.pago === "fiado" && !v._esCobro && !v._esAjuste && !v._esCambio && !v._pagada).sort((a, b) => (a.id || 0) - (b.id || 0));
+  for (const v of pendientes) {
+    if (restante <= 0) break;
+    const yaPagado = Number(v._montoPagadoAcum) || 0;
+    const debe = (Number(v.neto) || 0) - yaPagado;
+    if (debe <= 0) continue;
+    if (restante >= debe) {
+      cambios[v.id] = {
+        _pagada: true,
+        _montoPagadoAcum: Number(v.neto) || 0,
+        _upd: Date.now()
+      };
+      restante -= debe;
+    } else {
+      cambios[v.id] = {
+        _pagada: false,
+        _montoPagadoAcum: yaPagado + restante,
+        _upd: Date.now()
+      };
+      restante = 0;
+    }
+    idsAfectados.push(v.id);
+  }
+  const ventasActualizadas = ventasPrev.map(v => cambios[v.id] ? {
+    ...v,
+    ...cambios[v.id]
+  } : v);
+  return {
+    ventasActualizadas,
+    idsAfectados
+  };
+}
+
+// KEY_PROD_ENV está definido en 03-utils.js (se comparte, mismo alcance global).
+
+// Prestado histórico de un cliente para un producto — se usa UNA sola vez,
+// para sembrar el campo c.prestado la primera vez que se toca ese cliente
+// con este sistema. Después, c.prestado se mantiene solo con sumas y restas
+// directas (ya no hace falta recorrer todo el historial de nuevo).
+function prestadoHistoricoDe(ventasPrev, clienteId, k) {
+  let n = 0;
+  (ventasPrev || []).forEach(v => {
+    if (v.clienteId !== clienteId) return;
+    (v.envPrest || []).forEach(e => {
+      if (KEY_PROD_ENV[e.prod] === k) n += Number(e.cant) || 0;
+    });
+    (v.envDev || []).forEach(e => {
+      if (KEY_PROD_ENV[e.prod] === k) n -= Number(e.cant) || 0;
+    });
+  });
+  return Math.max(0, n);
+}
+
+// Aplica el movimiento de envases de UNA venta al cliente:
+// - Préstamo: se suma directo a c.prestado[k].
+// - Devolución: primero descuenta de c.prestado[k]. Si devuelve más de lo
+//   que tenía prestado, el resto se descuenta del stock FIJO del cliente
+//   (c.sifon/bidon10/bidon20) — ya no es devolver un préstamo, es que se
+//   queda con menos envases propios.
+function aplicarMovimientoEnvases(clientesPrev, ventasPrev, clienteId, envPrest, envDev) {
+  return (clientesPrev || []).map(c => {
+    if (c.id !== clienteId) return c;
+    const prestado = {
+      sifon: c.prestado?.sifon,
+      bidon10: c.prestado?.bidon10,
+      bidon20: c.prestado?.bidon20
+    };
+    const fijo = {
+      sifon: Number(c.sifon) || 0,
+      bidon10: Number(c.bidon10) || 0,
+      bidon20: Number(c.bidon20) || 0
+    };
+    const seed = k => {
+      if (prestado[k] === undefined) prestado[k] = prestadoHistoricoDe(ventasPrev, clienteId, k);
+    };
+    (envPrest || []).forEach(e => {
+      const k = KEY_PROD_ENV[e.prod];
+      const cant = Number(e.cant) || 0;
+      if (!k || cant <= 0) return;
+      seed(k);
+      prestado[k] += cant;
+    });
+    (envDev || []).forEach(e => {
+      const k = KEY_PROD_ENV[e.prod];
+      let cant = Number(e.cant) || 0;
+      if (!k || cant <= 0) return;
+      seed(k);
+      const deLoPrestado = Math.min(prestado[k], cant);
+      prestado[k] -= deLoPrestado;
+      cant -= deLoPrestado;
+      if (cant > 0) fijo[k] = Math.max(0, fijo[k] - cant);
+    });
+    ["sifon", "bidon10", "bidon20"].forEach(k => {
+      if (prestado[k] === undefined) prestado[k] = c.prestado?.[k] || 0;
+    });
+    return {
+      ...c,
+      prestado,
+      sifon: fijo.sifon,
+      bidon10: fijo.bidon10,
+      bidon20: fijo.bidon20
+    };
+  });
+}
+
+// Busca el próximo cliente pendiente del día (sin venta ni "no quiso"/"no
+// está" x2 registrados hoy) para saltar automático después de marcar "no
+// está" o "no quiere". Los marcados "no está" (una sola vez) van de segunda
+// prioridad, así se los visita al final en vez de saltarlos del todo.
+function siguientePendienteId(clientes, ventas, noVisitasHoy, dia, fecha, excluirId) {
+  const clientesDia = (clientes || []).filter(c => c.dia === dia).sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
+  const ventasIds = new Set((ventas || []).filter(v => v.fechaKey === fecha && v.dia === dia && !v._esCobro && !v._esAjuste && !v._esMixtoTrans).map(v => v.clienteId));
+  const noVMap = {};
+  (noVisitasHoy || []).filter(v => v.dia === dia && v.fecha === fecha).forEach(v => {
+    noVMap[v.clienteId] = v.motivo;
+  });
+  const terminados = new Set(clientesDia.filter(c => ventasIds.has(c.id) || noVMap[c.id] === "noquiso" || noVMap[c.id] === "noesta2").map(c => c.id));
+  const normalPend = clientesDia.filter(c => !terminados.has(c.id) && noVMap[c.id] !== "noesta" && c.id !== excluirId);
+  const noestaPend = clientesDia.filter(c => noVMap[c.id] === "noesta" && !terminados.has(c.id) && c.id !== excluirId);
+  const sig = normalPend[0] || noestaPend[0];
+  return sig ? sig.id : null;
+}
+
 // Barra de pestañas del hub de Clientes (Todos · Fiados · Dormidos · Mapa)
 function ClientesTabs({
   activo,
@@ -263,7 +393,7 @@ function App() {
       soderia_vacios: e(),
       casa: e(),
       camion: e(),
-      capacidadFija: { ...BASE_DEFAULT_FIJA }
+      capacidadFija: pickFija(s.capacidadFija)
     };
   };
   const [stockRaw, setStockRaw] = useLS("cat_stock_v4", {
@@ -291,7 +421,12 @@ function App() {
       bidon20: 0,
       dispenser: 0
     },
-    capacidadFija: { ...BASE_DEFAULT_FIJA }
+    capacidadFija: {
+      sifon: 150,
+      bidon10: 70,
+      bidon20: 21,
+      dispenser: 0
+    }
   });
   const stockNorm = React.useMemo(() => normStock(stockRaw), [JSON.stringify(stockRaw)]);
   const setStock = sOrFn => {
@@ -1497,10 +1632,12 @@ function App() {
     return () => window.removeEventListener('popstate', handler);
   }, []);
   const updateCliente = (id, cambios) => {
+    const antes = clientes.find(c => c.id === id);
     saveClientes(prev => prev.map(c => c.id === id ? {
       ...c,
       ...cambios
     } : c));
+    if (antes) ajustarStockFijoCliente(antes, { ...antes, ...cambios });
   };
   const savePlanilla = (dia, datos) => {
     savePlanillasCloud(prev => ({
@@ -1747,8 +1884,20 @@ function App() {
     // Forma funcional: agrega sobre el ventas/clientes MÁS RECIENTE, no sobre
     // el que había cuando se abrió esta pantalla (evita perder ventas o saldo
     // si esto se dispara más de una vez seguida).
-    saveVentas(prev => [...prev, ...ventasNuevas]);
-    saveClientes(prev => prev.map(c2 => c2.id === c.id ? {
+    saveVentas(prev => {
+      const base = [...prev, ...ventasNuevas];
+      // Si esta venta es un cobro de deuda (opción del formulario, no el
+      // botón rápido), también marcamos las ventas fiado más viejas.
+      if (opcionSaldo === "cobro_deuda" && saldoExtra > 0) {
+        const { ventasActualizadas, idsAfectados } = aplicarCobroAVentasFiado(base, c.id, saldoExtra);
+        return ventasActualizadas.map(v => v.id === nuevaVenta.id ? {
+          ...v,
+          _ventasSaldadas: idsAfectados
+        } : v);
+      }
+      return base;
+    });
+    saveClientes(prev => aplicarMovimientoEnvases(prev, ventas, c.id, nuevaVenta.envPrest, nuevaVenta.envDev).map(c2 => c2.id === c.id ? {
       ...c2,
       saldo: (Number(c2.saldo) || 0) + saldoExtra
     } : c2));
@@ -1835,10 +1984,12 @@ function App() {
     irA("clientes");
   };
 
-  // Envases/dispenser FIJOS de un cliente salen del depósito (Casa) cuando se
-  // le asignan, y vuelven a Casa si se le sacan. "antes" y "despues" son los
-  // valores fijos {sifon,bidon10,bidon20,dispenser} previos y nuevos del
-  // cliente — se usa tanto al crear (antes=null) como al editar un cliente.
+  // ── Ajusta stock.casa (depósito) cuando se crea o edita el fijo de
+  // envases/dispenser de un cliente. Antes esto NO pasaba en ningún lado:
+  // al dar de alta un cliente con envases fijos (o un dispenser), esos
+  // envases nunca se descontaban del depósito — el stock quedaba mal desde
+  // el primer día. "antes" = valores previos (null si es alta nueva),
+  // "despues" = valores nuevos.
   const ajustarStockFijoCliente = (antes, despues) => {
     const a = antes || {};
     const d = despues || {};
@@ -1947,7 +2098,9 @@ function App() {
         envDev: _ed,
         _esAjuste: true
       }]);
+      saveClientes(prev => aplicarMovimientoEnvases(prev, ventas, clienteIdObj, _ep, _ed));
     }
+    return nv;
   };
   const eliminarVenta = ventaId => {
     // Guard anti doble-tap: ignora un segundo borrado del MISMO id dentro de 2s
@@ -2014,10 +2167,21 @@ function App() {
     });
     // El saldo se resta sobre el saldo REAL más reciente del cliente (prev),
     // así ninguna reversión se pierde si borrás varias ventas seguidas.
-    saveClientes(prev => prev.map(x => x.id === v.clienteId ? {
-      ...x,
-      saldo: (Number(x.saldo) || 0) - v.saldoDelta - ajusteSaldoExtra
-    } : x));
+    // Los envases también se revierten: lo que esa venta prestó se le
+    // devuelve al cliente (se resta de prestado) y lo que devolvió se le
+    // vuelve a prestar (se suma a prestado) — mismo helper, roles invertidos.
+    saveClientes(prev => {
+      let out = prev;
+      ventasBorradas.forEach(x => {
+        if ((x.envPrest?.length || 0) > 0 || (x.envDev?.length || 0) > 0) {
+          out = aplicarMovimientoEnvases(out, ventas, x.clienteId, x.envDev, x.envPrest);
+        }
+      });
+      return out.map(x => x.id === v.clienteId ? {
+        ...x,
+        saldo: (Number(x.saldo) || 0) - v.saldoDelta - ajusteSaldoExtra
+      } : x);
+    });
   };
   const deshacerUltimaVenta = () => {
     if (!deshacerVenta) return;
@@ -2035,10 +2199,18 @@ function App() {
       localStorage.setItem("cat_ventas_tombstone_v1", JSON.stringify(tombPrevio.filter(t => !idsRestaurados.has(t.id))));
     } catch {}
     saveVentas(prev => [...prev, ...ventasBorradas]);
-    saveClientes(prev => prev.map(x => x.id === clienteId ? {
-      ...x,
-      saldo: (Number(x.saldo) || 0) + ajusteTotal
-    } : x));
+    saveClientes(prev => {
+      let out = prev;
+      ventasBorradas.forEach(x => {
+        if ((x.envPrest?.length || 0) > 0 || (x.envDev?.length || 0) > 0) {
+          out = aplicarMovimientoEnvases(out, ventas, x.clienteId, x.envPrest, x.envDev);
+        }
+      });
+      return out.map(x => x.id === clienteId ? {
+        ...x,
+        saldo: (Number(x.saldo) || 0) + ajusteTotal
+      } : x);
+    });
     setDeshacerVenta(null);
   };
 
@@ -2318,6 +2490,7 @@ function App() {
     dia: diaActual,
     fecha: fechaActual,
     ventas: ventas.filter(v => v.fechaKey === fechaActual),
+    todasLasVentas: ventas,
     clientes: clientes,
     planilla: planillas[`${diaActual}_${fechaActual}`] || planillaDiaVacia(),
     productos: productos,
@@ -2364,18 +2537,6 @@ function App() {
         const b20 = Number(p.productos?.b20?.llenos || 0);
         setStock(prev => {
           const s = JSON.parse(JSON.stringify(normStock(prev)));
-          const llenarSiFalta = (sk, necesario) => {
-            const disponible = s.soderia[sk] || 0;
-            if (disponible < necesario) {
-              const faltante = necesario - disponible;
-              const tomar = Math.min(faltante, s.soderia_vacios[sk] || 0);
-              s.soderia_vacios[sk] = (s.soderia_vacios[sk] || 0) - tomar;
-              s.soderia[sk] = (s.soderia[sk] || 0) + tomar;
-            }
-          };
-          llenarSiFalta("sifon", soda);
-          llenarSiFalta("bidon10", b10);
-          llenarSiFalta("bidon20", b20);
           s.soderia.sifon = Math.max(0, (s.soderia.sifon || 0) - soda);
           s.soderia.bidon10 = Math.max(0, (s.soderia.bidon10 || 0) - b10);
           s.soderia.bidon20 = Math.max(0, (s.soderia.bidon20 || 0) - b20);
@@ -2425,7 +2586,7 @@ function App() {
         ...c,
         dispenser: Math.max(0, (Number(c.dispenser) || 0) + delta)
       } : c));
-      if (antes) ajustarStockFijoCliente({ dispenser: Number(antes.dispenser) || 0 }, { dispenser: Math.max(0, (Number(antes.dispenser) || 0) + delta) });
+      if (antes) ajustarStockFijoCliente(antes, { ...antes, dispenser: Math.max(0, (Number(antes.dispenser) || 0) + delta) });
     },
     onSeleccionar: c => {
       setClienteId(c.id);
@@ -2500,18 +2661,9 @@ function App() {
         _upd: Date.now()
       }];
       saveNoVisitas(nv);
-      const clientesDia = clientes.filter(c => c.dia === diaActual).sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
-      const ventasIds = new Set(ventas.filter(v => v.fechaKey === fechaActual && v.dia === diaActual && !v._esCobro && !v._esAjuste && !v._esMixtoTrans).map(v => v.clienteId));
-      const noVMap = {};
-      nv.filter(v => v.dia === diaActual && v.fecha === fechaActual).forEach(v => {
-        noVMap[v.clienteId] = v.motivo;
-      });
-      const terminados = new Set(clientesDia.filter(c => ventasIds.has(c.id) || noVMap[c.id] === "noquiso" || noVMap[c.id] === "noesta2").map(c => c.id));
-      const normalPend = clientesDia.filter(c => !terminados.has(c.id) && noVMap[c.id] !== "noesta" && c.id !== cliente.id);
-      const noestaPend = clientesDia.filter(c => noVMap[c.id] === "noesta" && !terminados.has(c.id) && c.id !== cliente.id);
-      const sig = normalPend[0] || noestaPend[0];
-      if (sig) {
-        setClienteId(sig.id);
+      const sigId = siguientePendienteId(clientes, ventas, nv, diaActual, fechaActual, cliente.id);
+      if (sigId) {
+        setClienteId(sigId);
         irA("detalleCliente");
       } else irA("clientes");
     },
@@ -2524,18 +2676,9 @@ function App() {
         _upd: Date.now()
       }];
       saveNoVisitas(nv);
-      const clientesDia = clientes.filter(c => c.dia === diaActual).sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
-      const ventasIds = new Set(ventas.filter(v => v.fechaKey === fechaActual && v.dia === diaActual && !v._esCobro && !v._esAjuste && !v._esMixtoTrans).map(v => v.clienteId));
-      const noVMap = {};
-      nv.filter(v => v.dia === diaActual && v.fecha === fechaActual).forEach(v => {
-        noVMap[v.clienteId] = v.motivo;
-      });
-      const terminados = new Set(clientesDia.filter(c => ventasIds.has(c.id) || noVMap[c.id] === "noquiso" || noVMap[c.id] === "noesta2").map(c => c.id));
-      const normalPend = clientesDia.filter(c => !terminados.has(c.id) && noVMap[c.id] !== "noesta" && c.id !== cliente.id);
-      const noestaPend = clientesDia.filter(c => noVMap[c.id] === "noesta" && !terminados.has(c.id) && c.id !== cliente.id);
-      const sig = normalPend[0] || noestaPend[0];
-      if (sig) {
-        setClienteId(sig.id);
+      const sigId = siguientePendienteId(clientes, ventas, nv, diaActual, fechaActual, cliente.id);
+      if (sigId) {
+        setClienteId(sigId);
         irA("detalleCliente");
       } else irA("clientes");
     },
@@ -2586,7 +2729,10 @@ function App() {
         _esCobro: true,
         _upd: Date.now()
       };
-      saveVentas(prev => [...prev, vt]);
+      saveVentas(prev => {
+        const { ventasActualizadas, idsAfectados } = aplicarCobroAVentasFiado(prev, cl.id, monto);
+        return [...ventasActualizadas, { ...vt, _ventasSaldadas: idsAfectados }];
+      });
       saveClientes(prev => prev.map(x => x.id === cl.id ? {
         ...x,
         saldo: (Number(x.saldo) || 0) + monto
@@ -2647,75 +2793,17 @@ function App() {
         _upd: Date.now()
       }];
       saveNoVisitas(nv);
-      const clientesDia = clientes.filter(c => c.dia === diaActual).sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
-      const ventasIds = new Set(ventas.filter(v => v.fechaKey === fechaActual && v.dia === diaActual && !v._esCobro && !v._esAjuste && !v._esMixtoTrans).map(v => v.clienteId));
-      const noVMap = {};
-      nv.filter(v => v.dia === diaActual && v.fecha === fechaActual).forEach(v => {
-        noVMap[v.clienteId] = v.motivo;
-      });
-      const terminados = new Set(clientesDia.filter(c => ventasIds.has(c.id) || noVMap[c.id] === "noquiso" || noVMap[c.id] === "noesta2").map(c => c.id));
-      // 1ro: pendientes normales, 2do: los que no estaban, nunca sale si quedan clientes
-      const normalPend = clientesDia.filter(c => !terminados.has(c.id) && noVMap[c.id] !== "noesta" && c.id !== clienteId);
-      const noestaPend = clientesDia.filter(c => noVMap[c.id] === "noesta" && !terminados.has(c.id) && c.id !== clienteId);
-      const sig = normalPend[0] || noestaPend[0];
-      if (sig) {
-        setClienteId(sig.id);
+      const sigId = siguientePendienteId(clientes, ventas, nv, diaActual, fechaActual, clienteId);
+      if (sigId) {
+        setClienteId(sigId);
         irA("venta");
       } else irA("clientes");
     },
     onNoQuiere: (envPrest, envDev) => {
-      const nv = [...(noVisitas || []).filter(v => !(v.clienteId === clienteId && v.dia === diaActual && v.fecha === fechaActual)), {
-        clienteId,
-        dia: diaActual,
-        fecha: fechaActual,
-        motivo: "noquiso",
-        _upd: Date.now()
-      }];
-      saveNoVisitas(nv);
-      const _ep = (envPrest || []).filter(e => e.prod && Number(e.cant) > 0);
-      const _ed = (envDev || []).filter(e => e.prod && Number(e.cant) > 0);
-      if (_ep.length || _ed.length) {
-        const fk = new Date().toLocaleDateString("en-CA");
-        saveVentas(prev => [...prev, {
-          id: Date.now(),
-          clienteId,
-          cliente: cliente ? cliente.nombre : "",
-          dia: diaActual,
-          fechaKey: fk,
-          fecha: new Date().toLocaleString("es-AR"),
-      hora: new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
-          detalle: [{
-            nombre: "Movimiento de envases (No quiere)",
-            cantidad: 1,
-            precio: 0,
-            total: 0
-          }],
-          pago: "-",
-          obs: "Envases marcados al no comprar",
-          neto: 0,
-          bruto: 0,
-          desc: 0,
-          costo: 0,
-          ganancia: 0,
-          pagadoNum: 0,
-          saldoDelta: 0,
-          envPrest: _ep,
-          envDev: _ed,
-          _esAjuste: true
-        }]);
-      }
-      const clientesDia = clientes.filter(c => c.dia === diaActual).sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
-      const ventasIds = new Set(ventas.filter(v => v.fechaKey === fechaActual && v.dia === diaActual && !v._esCobro && !v._esAjuste && !v._esMixtoTrans).map(v => v.clienteId));
-      const noVMap = {};
-      nv.filter(v => v.dia === diaActual && v.fecha === fechaActual).forEach(v => {
-        noVMap[v.clienteId] = v.motivo;
-      });
-      const terminados = new Set(clientesDia.filter(c => ventasIds.has(c.id) || noVMap[c.id] === "noquiso" || noVMap[c.id] === "noesta2").map(c => c.id));
-      const normalPend = clientesDia.filter(c => !terminados.has(c.id) && noVMap[c.id] !== "noesta" && c.id !== clienteId);
-      const noestaPend = clientesDia.filter(c => noVMap[c.id] === "noesta" && !terminados.has(c.id) && c.id !== clienteId);
-      const sig = normalPend[0] || noestaPend[0];
-      if (sig) {
-        setClienteId(sig.id);
+      const nv = registrarNoQuiereConEnvases(clienteId, envPrest, envDev);
+      const sigId = siguientePendienteId(clientes, ventas, nv, diaActual, fechaActual, clienteId);
+      if (sigId) {
+        setClienteId(sigId);
         irA("venta");
       } else irA("clientes");
     },
@@ -2940,7 +3028,10 @@ function App() {
           _esCobro: true,
           _upd: Date.now()
         };
-        saveVentas(prev => [...prev, vt]);
+        saveVentas(prev => {
+          const { ventasActualizadas, idsAfectados } = aplicarCobroAVentasFiado(prev, cliente.id, monto);
+          return [...ventasActualizadas, { ...vt, _ventasSaldadas: idsAfectados }];
+        });
         saveClientes(prev => prev.map(x => x.id === cliente.id ? {
           ...x,
           saldo: (Number(x.saldo) || 0) + monto
@@ -3051,7 +3142,10 @@ function App() {
         _esCobro: true,
         _upd: Date.now()
       };
-      saveVentas(prev => [...prev, vt]);
+      saveVentas(prev => {
+        const { ventasActualizadas, idsAfectados } = aplicarCobroAVentasFiado(prev, clienteId, monto);
+        return [...ventasActualizadas, { ...vt, _ventasSaldadas: idsAfectados }];
+      });
       saveClientes(prev => prev.map(c => c.id === clienteId ? {
         ...c,
         saldo: (Number(c.saldo) || 0) + monto
