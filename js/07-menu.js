@@ -1306,6 +1306,21 @@ function PlanillaDelDia({
     b10: "",
     b20: ""
   });
+  const [realesVendido, setRealesVendido] = useState({
+    soda: "",
+    b10: "",
+    b20: ""
+  });
+  const [realesPrestado, setRealesPrestado] = useState({
+    soda: "",
+    b10: "",
+    b20: ""
+  });
+  const [realesDevuelto, setRealesDevuelto] = useState({
+    soda: "",
+    b10: "",
+    b20: ""
+  });
 
   // ── Cálculo de stock para el cierre del día ──────────────────
   const CAJON = 6;
@@ -1695,7 +1710,9 @@ function PlanillaDelDia({
         color: "var(--color-text-tertiary)",
         margin: "-4px 0 12px"
       }
-    }, "Salió, vuelve y lo que queda. Si algo no coincide con lo cargado, corregilo vos."), [["Soda", "soda"], ["Bidón 10L", "b10"], ["Bidón 20L", "b20"]].map(([label, pk]) => {
+    }, "Salió, vuelve y lo que queda. Si algo no coincide con lo cargado, corregilo vos."), (() => {
+      const filasResumen = [];
+      const productCards = [["Soda", "soda"], ["Bidón 10L", "b10"], ["Bidón 20L", "b20"]].map(([label, pk]) => {
       const cajon = pk === "soda" ? CAJON : 1;
       const unidad = pk === "soda" ? "cajones" : "unidades";
       const div = n => pk === "soda" ? Math.floor(n / cajon) : n;
@@ -1717,6 +1734,11 @@ function PlanillaDelDia({
       // falta (por ejemplo por un préstamo) se descuenta de ahí (ver
       // confirmarCierre).
       const diffDeposito = div(vuelveTotal) - div(esperado);
+      // Base de referencia de sodería (se edita solo desde la pantalla
+      // Stock, acá es de solo lectura para tener el número a la vista).
+      const BASE_DEFAULT_REF = { sifon: 150, bidon10: 70, bidon20: 21 };
+      const baseRef = stock?.capacidadFija?.[planKeyToSk[pk]] ?? BASE_DEFAULT_REF[planKeyToSk[pk]] ?? 0;
+      const fmtDual = raw => pk === "soda" ? `${raw} sif / ${div(raw)} caj` : `${raw} un`;
       const filaCampo = (titulo, valor, color) => {
         const etiqueta = /*#__PURE__*/React.createElement("span", {
           style: {
@@ -1750,6 +1772,15 @@ function PlanillaDelDia({
           }
         }, etiqueta, valorEl);
       };
+      filasResumen.push({
+        label,
+        quedaLleno,
+        quedaVacio,
+        paraLlenarReal,
+        baseRef,
+        div,
+        unidad
+      });
       return /*#__PURE__*/React.createElement("div", {
         key: pk,
         style: {
@@ -1760,17 +1791,11 @@ function PlanillaDelDia({
       }, /*#__PURE__*/React.createElement("div", {
         style: {
           display: "flex",
-          justifyContent: "space-between",
-          alignItems: "baseline",
+          flexDirection: "column",
+          gap: 2,
           marginBottom: 8,
           paddingBottom: 8,
           borderBottom: "0.5px solid var(--color-border-tertiary)"
-        }
-      }, /*#__PURE__*/React.createElement("div", {
-        style: {
-          display: "flex",
-          flexDirection: "column",
-          gap: 2
         }
       }, /*#__PURE__*/React.createElement("span", {
         style: {
@@ -1778,140 +1803,112 @@ function PlanillaDelDia({
           fontWeight: 600,
           color: "var(--color-text-primary)"
         }
-      }, label)), /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: 20,
-          fontWeight: 700,
-          color: diffDeposito === 0 ? "var(--color-text-primary)" : "var(--color-text-danger)"
-        }
-      }, div(vuelveTotal), " ", /*#__PURE__*/React.createElement("span", {
+      }, label), /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 11,
-          fontWeight: 400,
           color: "var(--color-text-tertiary)"
         }
-      }, unidad))), filaCampo("Salió hoy", salio, "var(--color-text-tertiary)"), filaCampo("Vuelve lleno", llenReal, AZUL), filaCampo("Vuelve vacío", vacReal + paraLlenarReal, AMBAR), /*#__PURE__*/React.createElement("div", {
+      }, "Base: ", fmtDual(baseRef))), /*#__PURE__*/React.createElement("div", {
         style: {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          padding: "6px 0 6px 14px"
+          marginBottom: 8
         }
       }, /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 12,
-          color: VIOLETA
+          color: "var(--color-text-tertiary)"
         }
-      }, "↳ ¿Cuántos llenás hoy?"), /*#__PURE__*/React.createElement("input", {
-        type: "number",
-        min: 0,
-        value: realesParaLlenar[pk],
-        placeholder: String(paraLlenarCalc[pk]),
+      }, "Salió hoy"), /*#__PURE__*/React.createElement("span", {
         style: {
-          padding: "5px 2px",
-          borderRadius: 7,
-          border: `1.5px solid ${VIOLETA}`,
-          background: "var(--color-background-tertiary)",
-          color: VIOLETA,
-          fontSize: 14,
-          fontWeight: 600,
-          textAlign: "center",
-          width: 64,
-          boxSizing: "border-box"
-        },
-        onChange: e => setRealesParaLlenar(r => ({
-          ...r,
-          [pk]: e.target.value
-        }))
-      })), /*#__PURE__*/React.createElement("div", {
+          fontSize: 12,
+          color: "var(--color-text-primary)",
+          fontWeight: 600
+        }
+      }, fmtDual(salio))), /*#__PURE__*/React.createElement("div", {
         style: {
           display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 8,
-          margin: "8px 0 4px"
-        }
-      }, /*#__PURE__*/React.createElement("input", {
-        type: "number",
-        min: 0,
-        value: realesLlenos[pk],
-        placeholder: String(Math.floor(sobrantes[pk] / cajon)),
-        title: "Corregir Vuelve lleno",
-        style: {
-          padding: "5px 2px",
-          borderRadius: 7,
-          border: `1px solid ${AZUL}`,
-          background: "var(--color-background-tertiary)",
-          color: AZUL,
-          fontSize: 12,
+          gridTemplateColumns: "repeat(4,1fr)",
+          gap: 4,
+          fontSize: 10,
+          color: "var(--color-text-tertiary)",
           textAlign: "center",
-          width: "100%",
-          boxSizing: "border-box"
-        },
-        onChange: e => setRealesLlenos(r => ({
-          ...r,
-          [pk]: e.target.value
-        }))
-      }), /*#__PURE__*/React.createElement("input", {
-        type: "number",
-        min: 0,
-        value: realesVacios[pk],
-        placeholder: String(vaciosRestoCalc[pk]),
-        title: "Corregir Vuelve vacío (resto)",
-        style: {
-          padding: "5px 2px",
-          borderRadius: 7,
-          border: `1px solid ${AMBAR}`,
-          background: "var(--color-background-tertiary)",
-          color: AMBAR,
-          fontSize: 12,
-          textAlign: "center",
-          width: "100%",
-          boxSizing: "border-box"
-        },
-        onChange: e => setRealesVacios(r => ({
-          ...r,
-          [pk]: e.target.value
-        }))
-      })), /*#__PURE__*/React.createElement("div", {
-        style: {
-          borderTop: "0.5px solid var(--color-border-tertiary)",
-          marginTop: 8,
-          paddingTop: 8
+          marginBottom: 2
         }
-      }, /*#__PURE__*/React.createElement("div", {
+      }, "Llenos", "Vendido", "Prestado", "Devuelto"), /*#__PURE__*/React.createElement("div", {
         style: {
+          display: "grid",
+          gridTemplateColumns: "repeat(4,1fr)",
+          gap: 4,
+          fontSize: 14,
+          fontWeight: 600,
+          color: "var(--color-text-primary)",
+          textAlign: "center",
+          marginBottom: 8
+        }
+      }, div(sobrantes[pk]), div(vendidosDia[pk]), div(prestadosDia[pk]), div(devueltosDia[pk])), /*#__PURE__*/React.createElement("div", {
+        style: {
+          textAlign: "center",
           fontSize: 11,
           color: "var(--color-text-tertiary)",
           marginBottom: 4
         }
-      }, "Queda en sodería"), /*#__PURE__*/React.createElement("div", {
+      }, "corregir si hace falta"), /*#__PURE__*/React.createElement("div", {
         style: {
-          display: "flex",
-          gap: 12,
-          fontSize: 12
+          display: "grid",
+          gridTemplateColumns: "repeat(4,1fr)",
+          gap: 4,
+          marginBottom: 8
         }
-      }, /*#__PURE__*/React.createElement("span", {
+      }, [["Llenos", realesLlenos, setRealesLlenos], ["Vendido", realesVendido, setRealesVendido], ["Prestado", realesPrestado, setRealesPrestado], ["Devuelto", realesDevuelto, setRealesDevuelto]].map(([col, val, setVal]) => /*#__PURE__*/React.createElement("input", {
+        key: col,
+        type: "number",
+        min: 0,
+        value: val[pk],
+        placeholder: "-",
+        title: `Corregir ${col}`,
         style: {
-          color: AZUL
-        }
-      }, "● Lleno ", div(quedaLleno)), /*#__PURE__*/React.createElement("span", {
-        style: {
-          color: VIOLETA
-        }
-      }, "● A llenar ", div(paraLlenarReal)), /*#__PURE__*/React.createElement("span", {
-        style: {
-          color: AMBAR
-        }
-      }, "● Vacío ", div(quedaVacio)))), /*#__PURE__*/React.createElement("div", {
+          padding: "5px 2px",
+          borderRadius: 7,
+          border: "1px solid var(--color-border-tertiary)",
+          background: "var(--color-background-tertiary)",
+          color: "var(--color-text-primary)",
+          fontSize: 12,
+          textAlign: "center",
+          width: "100%",
+          boxSizing: "border-box"
+        },
+        onChange: e => setVal(r => ({
+          ...r,
+          [pk]: e.target.value
+        }))
+      }))), /*#__PURE__*/React.createElement("div", {
         style: {
           textAlign: "center",
-          marginTop: 8,
           fontSize: 11,
           fontWeight: 600,
           color: diffDeposito === 0 ? "var(--color-text-success)" : "var(--color-text-warning)"
         }
       }, diffDeposito === 0 ? "✓ Cuadra" : diffDeposito > 0 ? `⚠ Sobran ${diffDeposito} ${unidad} → depósito` : `⚠ Faltan ${-diffDeposito} ${unidad} → depósito`));
-    }), /*#__PURE__*/React.createElement("button", {
+      });
+      const resumenTabla = /*#__PURE__*/React.createElement("div", {
+        key: "resumen",
+        style: { ...s.card, margin: "0 0 10px", padding: "12px" }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: { fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 8 }
+      }, "Total sodería al cerrar"), /*#__PURE__*/React.createElement("div", {
+        style: { display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr 1fr 1fr", gap: 4, fontSize: 10, color: "var(--color-text-tertiary)", marginBottom: 4 }
+      }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Llenos"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Vacíos"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Pllenar"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Total"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Falta")), filasResumen.map(f => {
+        const totalF = f.quedaLleno + f.quedaVacio + f.paraLlenarReal;
+        const faltaF = f.div(f.baseRef) - f.div(totalF);
+        return /*#__PURE__*/React.createElement("div", {
+          key: f.label,
+          style: { display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr 1fr 1fr", gap: 4, alignItems: "center", padding: "5px 0", borderTop: "0.5px solid var(--color-border-tertiary)" }
+        }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: "var(--color-text-primary)" } }, f.label), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: "var(--color-text-secondary)" } }, f.div(f.quedaLleno)), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: "var(--color-text-secondary)" } }, f.div(f.quedaVacio)), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: "var(--color-text-secondary)" } }, f.div(f.paraLlenarReal)), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: "var(--color-text-secondary)" } }, f.div(totalF)), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, fontWeight: 600, color: faltaF === 0 ? "var(--color-text-success)" : "var(--color-text-warning)" } }, faltaF));
+      }));
+      return [productCards, resumenTabla];
+    })(), /*#__PURE__*/React.createElement("button", {
       style: {
         width: "100%",
         padding: "16px",

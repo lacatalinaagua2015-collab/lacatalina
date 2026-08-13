@@ -399,7 +399,7 @@ function StockGeneral({
   }, abiertoSoderia ? "▲" : "▼")), abiertoSoderia && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
-      gridTemplateColumns: "1fr 52px 52px 46px",
+      gridTemplateColumns: "1fr 52px 52px 46px 52px",
       gap: 6,
       fontSize: 12,
       color: "var(--color-text-tertiary)",
@@ -418,14 +418,21 @@ function StockGeneral({
       textAlign: "center",
       color: "var(--color-text-secondary)"
     }
-  }, "Total")), PRODS.map(([k, lbl]) => {
+  }, "Total"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      textAlign: "center",
+      color: "var(--color-text-info)"
+    }
+  }, "Base")), PRODS.map(([k, lbl]) => {
     const ll = stock.soderia?.[k] || 0,
       va = stock.soderia_vacios?.[k] || 0;
+    const BASE_DEFAULT = { sifon: 150, bidon10: 70, bidon20: 21, dispenser: 0 };
+    const base = stock.capacidadFija?.[k] ?? BASE_DEFAULT[k] ?? 0;
     return /*#__PURE__*/React.createElement("div", {
       key: k,
       style: {
         display: "grid",
-        gridTemplateColumns: "1fr 52px 52px 46px",
+        gridTemplateColumns: "1fr 52px 52px 46px 52px",
         gap: 6,
         alignItems: "center",
         marginBottom: 5
@@ -459,7 +466,21 @@ function StockGeneral({
         color: "var(--color-text-tertiary)",
         fontWeight: 400
       }
-    }, Math.floor((ll + va) / 6), " caj")));
+    }, Math.floor((ll + va) / 6), " caj")), /*#__PURE__*/React.createElement("div", {
+      style: { textAlign: "center" }
+    }, /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      value: base,
+      onChange: e => setLoc("capacidadFija", k, e.target.value),
+      style: { ...inNum, borderColor: "var(--color-border-info)" }
+    }), k === "sifon" && /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 11,
+        color: "var(--color-text-tertiary)",
+        fontWeight: 400
+      }
+    }, Math.floor(base / 6), " caj")));
   }))), /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
