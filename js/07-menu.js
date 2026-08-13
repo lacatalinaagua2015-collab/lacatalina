@@ -3132,7 +3132,7 @@ function InicioReparto({
       display: "flex",
       gap: 16
     }
-  }, [["Sifón", stock?.soderia?.sifon || 0], ["Bidón 10L", stock?.soderia?.bidon10 || 0], ["Bidón 20L", stock?.soderia?.bidon20 || 0]].map(([l, v]) => /*#__PURE__*/React.createElement("div", {
+  }, [["Sifón", stock?.soderia?.sifon || 0, stock?.soderia_vacios?.sifon || 0], ["Bidón 10L", stock?.soderia?.bidon10 || 0, stock?.soderia_vacios?.bidon10 || 0], ["Bidón 20L", stock?.soderia?.bidon20 || 0, stock?.soderia_vacios?.bidon20 || 0]].map(([l, lleno, vacio]) => /*#__PURE__*/React.createElement("div", {
     key: l,
     style: {
       textAlign: "center"
@@ -3146,9 +3146,34 @@ function InicioReparto({
     style: {
       fontSize: 18,
       fontWeight: 500,
-      color: v > 0 ? "var(--color-text-primary)" : "var(--color-text-danger)"
+      color: lleno > 0 ? "var(--color-text-primary)" : "var(--color-text-danger)"
     }
-  }, v || 0))))));
+  }, lleno || 0, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      fontWeight: 400,
+      color: "var(--color-text-tertiary)"
+    }
+  }, " lleno")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 500,
+      color: "var(--color-text-secondary)"
+    }
+  }, vacio || 0, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      fontWeight: 400,
+      color: "var(--color-text-tertiary)"
+    }
+  }, " vacío")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 600,
+      color: "var(--color-text-info)",
+      marginTop: 2
+    }
+  }, "= ", lleno + vacio, " total"))))));
 }
 
 // ── Atajo: Planilla de los últimos días (lun-vie) sin pasar por Clientes ──
