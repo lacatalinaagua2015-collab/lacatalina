@@ -1836,7 +1836,7 @@ function PlanillaDelDia({
           textAlign: "center",
           marginBottom: 2
         }
-      }, "Llenos", "Vendido", "Prestado", "Devuelto"), /*#__PURE__*/React.createElement("div", {
+      }, ["Llenos", "Vendido", "Prestado", "Devuelto"].map(t => /*#__PURE__*/React.createElement("span", { key: t }, t))), /*#__PURE__*/React.createElement("div", {
         style: {
           display: "grid",
           gridTemplateColumns: "repeat(4,1fr)",
@@ -1847,7 +1847,7 @@ function PlanillaDelDia({
           textAlign: "center",
           marginBottom: 8
         }
-      }, div(sobrantes[pk]), div(vendidosDia[pk]), div(prestadosDia[pk]), div(devueltosDia[pk])), /*#__PURE__*/React.createElement("div", {
+      }, [div(sobrantes[pk]), div(vendidosDia[pk]), div(prestadosDia[pk]), div(devueltosDia[pk])].map((v, i) => /*#__PURE__*/React.createElement("span", { key: i }, v))), /*#__PURE__*/React.createElement("div", {
         style: {
           textAlign: "center",
           fontSize: 11,
