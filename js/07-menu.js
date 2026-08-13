@@ -1791,24 +1791,25 @@ function PlanillaDelDia({
       }, /*#__PURE__*/React.createElement("div", {
         style: {
           display: "flex",
-          flexDirection: "column",
-          gap: 2,
+          justifyContent: "space-between",
+          alignItems: "center",
           marginBottom: 8,
           paddingBottom: 8,
           borderBottom: "0.5px solid var(--color-border-tertiary)"
         }
       }, /*#__PURE__*/React.createElement("span", {
         style: {
-          fontSize: 13,
+          fontSize: 14,
           fontWeight: 600,
           color: "var(--color-text-primary)"
         }
       }, label), /*#__PURE__*/React.createElement("span", {
         style: {
-          fontSize: 11,
-          color: "var(--color-text-tertiary)"
+          fontSize: 14,
+          fontWeight: 600,
+          color: "var(--color-text-primary)"
         }
-      }, "Base: ", fmtDual(baseRef))), /*#__PURE__*/React.createElement("div", {
+      }, fmtDual(baseRef))), /*#__PURE__*/React.createElement("div", {
         style: {
           display: "flex",
           justifyContent: "space-between",
@@ -1854,27 +1855,28 @@ function PlanillaDelDia({
           color: "var(--color-text-tertiary)",
           marginBottom: 4
         }
-      }, "corregir si hace falta"), /*#__PURE__*/React.createElement("div", {
+      }, "↳ ¿Cuántos llenás hoy?"), /*#__PURE__*/React.createElement("div", {
         style: {
           display: "grid",
-          gridTemplateColumns: "repeat(4,1fr)",
-          gap: 4,
+          gridTemplateColumns: "1fr 1fr",
+          gap: 10,
           marginBottom: 8
         }
-      }, [["Llenos", realesLlenos, setRealesLlenos], ["Vendido", realesVendido, setRealesVendido], ["Prestado", realesPrestado, setRealesPrestado], ["Devuelto", realesDevuelto, setRealesDevuelto]].map(([col, val, setVal]) => /*#__PURE__*/React.createElement("input", {
+      }, [["Llenos", realesLlenos, setRealesLlenos, AZUL, Math.floor(sobrantes[pk] / cajon)], ["Vacío", realesVacios, setRealesVacios, AMBAR, vaciosRestoCalc[pk]]].map(([col, val, setVal, color, ph]) => /*#__PURE__*/React.createElement("input", {
         key: col,
         type: "number",
         min: 0,
         value: val[pk],
-        placeholder: "-",
+        placeholder: String(ph),
         title: `Corregir ${col}`,
         style: {
-          padding: "5px 2px",
-          borderRadius: 7,
-          border: "1px solid var(--color-border-tertiary)",
+          padding: "10px 4px",
+          borderRadius: 9,
+          border: `1.5px solid ${color}`,
           background: "var(--color-background-tertiary)",
-          color: "var(--color-text-primary)",
-          fontSize: 12,
+          color: color,
+          fontSize: 16,
+          fontWeight: 600,
           textAlign: "center",
           width: "100%",
           boxSizing: "border-box"
