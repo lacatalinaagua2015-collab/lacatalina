@@ -2773,7 +2773,8 @@ function App() {
           ...datos,
           id: nuevoIdCat(),
           saldo: 0,
-          dispenser: datos.dispenser || 0
+          dispenser: datos.dispenser || 0,
+          creadoFecha: new Date().toLocaleDateString("en-CA")
         }].sort((a, b) => DIAS.indexOf(a.dia) - DIAS.indexOf(b.dia) || (a.orden || 9999) - (b.orden || 9999));
       });
       ajustarStockFijoCliente(null, datos);
@@ -2846,7 +2847,8 @@ function App() {
           ...datos,
           id: nuevoIdCat(),
           saldo: 0,
-          dispenser: datos.dispenser || 0
+          dispenser: datos.dispenser || 0,
+          creadoFecha: new Date().toLocaleDateString("en-CA")
         }].sort((a, b) => DIAS.indexOf(a.dia) - DIAS.indexOf(b.dia) || (a.orden || 9999) - (b.orden || 9999));
       });
       ajustarStockFijoCliente(null, datos);
