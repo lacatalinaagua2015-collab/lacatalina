@@ -1480,7 +1480,12 @@ function PlanillaDelDia({
       const calcPL = paraLlenarCalc[pk];
       const calcV = vaciosRestoCalc[pk];
       const cajon = pk === "soda" ? CAJON : 1;
-      const llenosReal = realesLlenos[pk] !== "" ? Number(realesLlenos[pk]) * cajon : calcL;
+      // Si el cajón de soda quedó a medio vender, los sifones sueltos que le
+      // quedan siguen llenos — no se pierden solo porque no llenan un cajón
+      // entero. Se suman siempre, tanto si el usuario dejó el cálculo como
+      // si tipeó la cantidad de cajones a mano.
+      const sueltosLL = pk === "soda" ? sobrantes[pk] % CAJON : 0;
+      const llenosReal = realesLlenos[pk] !== "" ? Number(realesLlenos[pk]) * cajon + sueltosLL : calcL;
       const paraLlenarReal = realesParaLlenar[pk] !== "" ? Number(realesParaLlenar[pk]) * cajon : calcPL * cajon;
       const vaciosReal = realesVacios[pk] !== "" ? Number(realesVacios[pk]) * cajon : calcV * cajon;
       // "Para llenar" se llena antes de salir mañana — para el stock ya
@@ -1731,7 +1736,12 @@ function PlanillaDelDia({
       const AZUL = "#5daaff",
         AMBAR = "#f5b942",
         VIOLETA = "#b794f6";
-      const llenReal = realesLlenos[pk] !== "" ? Number(realesLlenos[pk]) * cajon : sobrantes[pk];
+      // Si el cajón de soda quedó a medio vender, los sifones sueltos que le
+      // quedan siguen llenos — no se pierden solo porque no llenan un cajón
+      // entero. Se suman siempre, tanto si el usuario dejó el cálculo como
+      // si tipeó la cantidad de cajones a mano.
+      const sueltosLL = pk === "soda" ? sobrantes[pk] % cajon : 0;
+      const llenReal = realesLlenos[pk] !== "" ? Number(realesLlenos[pk]) * cajon + sueltosLL : sobrantes[pk];
       const paraLlenarReal = realesParaLlenar[pk] !== "" ? Number(realesParaLlenar[pk]) * cajon : paraLlenarCalc[pk] * cajon;
       const vacReal = realesVacios[pk] !== "" ? Number(realesVacios[pk]) * cajon : vaciosRestoCalc[pk] * cajon;
       const salio = llenosCargados[pk];
@@ -1867,7 +1877,7 @@ function PlanillaDelDia({
           color: "var(--color-text-tertiary)",
           marginBottom: 4
         }
-      }, "↳ ¿Cuántos llenás hoy?"), /*#__PURE__*/React.createElement("div", {
+      }, "↳ ¿Cuántos llenás hoy?", pk === "soda" && sueltosLL > 0 ? ` (+${sueltosLL} suelto lleno, ya contado)` : ""), /*#__PURE__*/React.createElement("div", {
         style: {
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
