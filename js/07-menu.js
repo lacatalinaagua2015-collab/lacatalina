@@ -1480,10 +1480,6 @@ function PlanillaDelDia({
       const calcPL = paraLlenarCalc[pk];
       const calcV = vaciosRestoCalc[pk];
       const cajon = pk === "soda" ? CAJON : 1;
-      // Si el cajón de soda quedó a medio vender, los sifones sueltos que le
-      // quedan siguen llenos — no se pierden solo porque no llenan un cajón
-      // entero. Se suman siempre, tanto si el usuario dejó el cálculo como
-      // si tipeó la cantidad de cajones a mano.
       const sueltosLL = pk === "soda" ? sobrantes[pk] % CAJON : 0;
       const llenosReal = realesLlenos[pk] !== "" ? Number(realesLlenos[pk]) * cajon + sueltosLL : calcL;
       const paraLlenarReal = realesParaLlenar[pk] !== "" ? Number(realesParaLlenar[pk]) * cajon : calcPL * cajon;
@@ -1508,9 +1504,15 @@ function PlanillaDelDia({
     // préstamo hoy hace que vuelva menos de lo que salió; el depósito repone
     // esa diferencia para que sodería se mantenga siempre en su número
     // fijo). Si sobra, se suma al depósito; si falta, se resta.
+    // IMPORTANTE: lo esperado tiene que contemplar los préstamos/devoluciones
+    // del día, porque ese movimiento YA está incluido en vaciosRec (y por lo
+    // tanto en vacVuelta) — si no se ajusta acá, cada devolución se contaba
+    // dos veces (una en sodería/vacíos por el flujo normal, y otra de nuevo
+    // acá sumándose al depósito), lo que inflaba el total combinado y hacía
+    // que pareciera que "se acumulan envases" en la sodería día tras día.
     const diffDeposito = {};
     ["soda", "b10", "b20"].forEach(pk => {
-      const esperadoPk = llenosCargados[pk];
+      const esperadoPk = llenosCargados[pk] + devueltosDia[pk] - prestadosDia[pk];
       const vuelveTotalPk = llenVuelta[pk] + vacVuelta[pk];
       diffDeposito[pk] = vuelveTotalPk - esperadoPk;
     });
@@ -1736,10 +1738,6 @@ function PlanillaDelDia({
       const AZUL = "#5daaff",
         AMBAR = "#f5b942",
         VIOLETA = "#b794f6";
-      // Si el cajón de soda quedó a medio vender, los sifones sueltos que le
-      // quedan siguen llenos — no se pierden solo porque no llenan un cajón
-      // entero. Se suman siempre, tanto si el usuario dejó el cálculo como
-      // si tipeó la cantidad de cajones a mano.
       const sueltosLL = pk === "soda" ? sobrantes[pk] % cajon : 0;
       const llenReal = realesLlenos[pk] !== "" ? Number(realesLlenos[pk]) * cajon + sueltosLL : sobrantes[pk];
       const paraLlenarReal = realesParaLlenar[pk] !== "" ? Number(realesParaLlenar[pk]) * cajon : paraLlenarCalc[pk] * cajon;
@@ -1748,7 +1746,11 @@ function PlanillaDelDia({
       const vuelveTotal = llenReal + paraLlenarReal + vacReal;
       // Sodería solo controla que vuelva todo lo que salió cargado — los
       // préstamos/devoluciones son un asunto del depósito, no de acá.
-      const esperado = salio;
+      // Por eso lo esperado se ajusta por los préstamos/devoluciones del
+      // día (ya están incluidos en vacReal vía vaciosRec): si no se ajusta,
+      // esta planilla y confirmarCierre no coinciden y además cada
+      // devolución se cuenta dos veces (ver nota en confirmarCierre).
+      const esperado = salio + devueltosDia[pk] - prestadosDia[pk];
       const quedaLleno = (soderiaActual[planKeyToSk[pk]] || 0) + llenReal;
       const quedaVacio = (soderiaVaciosActual[planKeyToSk[pk]] || 0) + vacReal;
       // Diferencia entre lo que volvió y lo que salió — esta planilla es

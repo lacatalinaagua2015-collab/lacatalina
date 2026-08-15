@@ -330,6 +330,7 @@ function PieEnvases({
   ventas,
   onEditar,
   onPerdida,
+  onPerdidaCliente,
   izquierda,
   children
 }) {
@@ -347,34 +348,25 @@ function PieEnvases({
   const confirmarPerdidaCliente = () => {
     const cant = Math.round(Number(cantPerdida) || 0);
     if (cant <= 0) return;
-    const nuevoValor = Math.max(0, (Number(c[prodPerdida]) || 0) - cant);
-    onEditar(c.id, {
-      [prodPerdida]: nuevoValor
-    });
-    onPerdida && onPerdida({
-      [prodPerdida]: cant
-    }, "Roto/perdido en lo del cliente", c.nombre);
+    // OJO: acá NO se usa onEditar (ese asume que lo que baja del fijo del
+    // cliente volvió al depósito, ver ajustarStockFijoCliente en 14-app.js).
+    // Un envase roto/perdido nunca volvió a ningún lado — se da de baja
+    // directo con onPerdidaCliente, que reduce el fijo del cliente sin
+    // acreditarle nada a Casa.
+    if (onPerdidaCliente) {
+      onPerdidaCliente(c.id, prodPerdida, cant);
+    } else {
+      // Fallback por si algún lugar todavía no pasa el prop nuevo.
+      const nuevoValor = Math.max(0, (Number(c[prodPerdida]) || 0) - cant);
+      onEditar(c.id, {
+        [prodPerdida]: nuevoValor
+      });
+      onPerdida && onPerdida({
+        [prodPerdida]: cant
+      }, "Roto/perdido en lo del cliente", c.nombre);
+    }
     setMostrarPerdida(false);
     setCantPerdida("");
-  };
-  const calcExtra = () => {
-    const ex = {
-      sifon: 0,
-      bidon10: 0,
-      bidon20: 0,
-      dispenser: 0
-    };
-    (ventas || []).filter(v => v.clienteId === c.id).forEach(v => {
-      (v.envPrest || []).forEach(e => {
-        const k = KP[e.prod];
-        if (k) ex[k] += Number(e.cant) || 0;
-      });
-      (v.envDev || []).forEach(e => {
-        const k = KP[e.prod];
-        if (k) ex[k] -= Number(e.cant) || 0;
-      });
-    });
-    return ex;
   };
   const abrir = () => {
     setDraft({
@@ -383,18 +375,17 @@ function PieEnvases({
     });
   };
   const confirmar = () => {
-    // Sifón/bidón10/bidón20 se guardan directo en c.prestado. Dispenser no
-    // tiene campo directo, sigue calculándose como ajuste sobre el historial.
-    const ex = calcExtra();
+    // Los 4 productos (incluido dispenser) se guardan directo en c.prestado
+    // — es un campo estable que se mantiene solo, sumando/restando en cada
+    // venta (ver aplicarMovimientoEnvases en 14-app.js). Antes dispenser
+    // quedaba afuera de este modelo y la edición manual acá se guardaba en
+    // envAjuste, un campo que prestadoClienteDe ya no lee una vez que
+    // c.prestado.dispenser existe — la edición manual quedaba "perdida".
     onEditar(c.id, {
       ...Object.fromEntries(KEYS.map(k => [k, Math.max(0, draft.fijos[k])])),
       prestado: {
         ...(c.prestado || {}),
-        ...Object.fromEntries(KEYS.filter(k => k !== "dispenser").map(k => [k, Math.max(0, draft.prest[k])]))
-      },
-      envAjuste: {
-        ...(c.envAjuste || {}),
-        dispenser: draft.prest.dispenser - (ex.dispenser || 0)
+        ...Object.fromEntries(KEYS.map(k => [k, Math.max(0, draft.prest[k])]))
       }
     });
     setDraft(null);

@@ -38,15 +38,15 @@ const KEY_PROD_ENV = {
   "Dispenser": "dispenser"
 };
 // ── Cuánto tiene PRESTADO un cliente de un producto ("sifon"|"bidon10"|
-//    "bidon20"|"dispenser"). Para sifón/bidón10/bidón20 se lee directo de
-//    c.prestado (campo que se mantiene solo, sumando/restando en cada venta
-//    — ver aplicarMovimientoEnvases en 14-app.js). Si el cliente todavía no
-//    tiene ese campo, o es dispenser (que no tiene campo directo), se
-//    calcula del historial de ventas de ese cliente + el ajuste manual
-//    (c.envAjuste). Usar SIEMPRE esta función en vez de recalcular a mano
-//    — así todas las pantallas muestran el mismo número.
+//    "bidon20"|"dispenser"). Se lee directo de c.prestado (campo que se
+//    mantiene solo, sumando/restando en cada venta — ver
+//    aplicarMovimientoEnvases en 14-app.js). Si el cliente todavía no tiene
+//    ese campo (no tuvo ventas con envases desde que se agregó este modelo),
+//    se calcula del historial de ventas de ese cliente + el ajuste manual
+//    (c.envAjuste) como referencia inicial. Usar SIEMPRE esta función en vez
+//    de recalcular a mano — así todas las pantallas muestran el mismo número.
 function prestadoClienteDe(c, k, ventasHistoricas) {
-  if (k !== "dispenser" && c.prestado && c.prestado[k] !== undefined) return c.prestado[k];
+  if (c.prestado && c.prestado[k] !== undefined) return c.prestado[k];
   let n = 0;
   (ventasHistoricas || []).forEach(v => {
     if (v.clienteId !== c.id) return;

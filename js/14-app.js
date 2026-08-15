@@ -74,7 +74,8 @@ function aplicarMovimientoEnvases(clientesPrev, ventasPrev, clienteId, envPrest,
     const prestado = {
       sifon: c.prestado?.sifon,
       bidon10: c.prestado?.bidon10,
-      bidon20: c.prestado?.bidon20
+      bidon20: c.prestado?.bidon20,
+      dispenser: c.prestado?.dispenser
     };
     const fijo = {
       sifon: Number(c.sifon) || 0,
@@ -101,7 +102,7 @@ function aplicarMovimientoEnvases(clientesPrev, ventasPrev, clienteId, envPrest,
       cant -= deLoPrestado;
       if (cant > 0) fijo[k] = Math.max(0, fijo[k] - cant);
     });
-    ["sifon", "bidon10", "bidon20"].forEach(k => {
+    ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
       if (prestado[k] === undefined) prestado[k] = c.prestado?.[k] || 0;
     });
     return {
@@ -250,7 +251,7 @@ function App() {
   // después cuánto se está perdiendo y por qué.
   const [perdidas, setPerdidas] = useLS("cat_perdidas_v1", []);
   const registrarPerdida = (items, motivo, clienteNombre) => {
-    // items: {sifon,bidon10,bidon20} — cantidades perdidas de cada producto
+    // items: {sifon,bidon10,bidon20,dispenser} — cantidades perdidas de cada producto
     setPerdidas(prev => {
       const next = [...prev, {
         id: Date.now() + "_" + Math.random().toString(36).slice(2, 7),
@@ -260,6 +261,7 @@ function App() {
         sifon: items.sifon || 0,
         bidon10: items.bidon10 || 0,
         bidon20: items.bidon20 || 0,
+        dispenser: items.dispenser || 0,
         _upd: Date.now()
       }];
       syncData({
@@ -538,14 +540,32 @@ function App() {
         (data.clientes || []).forEach(c => {
           porIdCli[c.id] = c;
         }); // base: lo de la nube
+        // "Vistos en la nube alguna vez": para distinguir un cliente GENUINAMENTE
+        // nuevo (creado en este aparato, todavía no llegó a subirse) de un
+        // cliente que se borró en OTRO aparato. Antes, si faltaba de la nube se
+        // asumía siempre "solo local → lo agrego", lo que resucitaba clientes
+        // borrados desde otro celular/PC cada vez que este aparato sincronizaba
+        // (y encima los volvía a subir, deshaciendo el borrado para todos).
+        let vistosNubeCli = [];
+        try {
+          vistosNubeCli = JSON.parse(localStorage.getItem("cat_clientes_vistos_nube_v1") || "[]");
+        } catch {}
+        const vistosNubeSet = new Set(vistosNubeCli);
         let cambiosLocalesCli = 0;
+        let resucitadosEvitados = 0;
         clientesLocales.forEach(c => {
           const enNube = porIdCli[c.id];
           if (!enNube) {
+            if (vistosNubeSet.has(c.id)) {
+              // Ya lo habíamos visto confirmado en la nube antes, y ahora no
+              // está: se borró en otro aparato. No lo resucitamos.
+              resucitadosEvitados++;
+              return;
+            }
             porIdCli[c.id] = c;
             cambiosLocalesCli++;
             return;
-          } // solo en local → lo agrego
+          } // solo en local, nunca visto en la nube → recién creado, lo agrego
           const uL = Number(c._upd) || 0,
             uN = Number(enNube._upd) || 0;
           if (uL > uN) {
@@ -565,6 +585,14 @@ function App() {
             }
           });
         } catch {}
+        // Actualizar la lista de "vistos en la nube" con lo que la nube tiene
+        // AHORA MISMO (confirmado), para la próxima sincronización.
+        try {
+          localStorage.setItem("cat_clientes_vistos_nube_v1", JSON.stringify((data.clientes || []).map(c => c.id)));
+        } catch {}
+        if (resucitadosEvitados > 0) {
+          console.log("Merge: " + resucitadosEvitados + " clientes borrados en otro aparato, no se resucitan.");
+        }
         const mergedCli = Object.values(porIdCli);
         setClientes(mergedCli);
         if (cambiosTombstoneCli > 0) {
@@ -1932,7 +1960,7 @@ function App() {
         sifon: (Number(eliminado.sifon) || 0) + (Number(eliminado.prestado?.sifon) || 0),
         bidon10: (Number(eliminado.bidon10) || 0) + (Number(eliminado.prestado?.bidon10) || 0),
         bidon20: (Number(eliminado.bidon20) || 0) + (Number(eliminado.prestado?.bidon20) || 0),
-        dispenser: Number(eliminado.dispenser) || 0
+        dispenser: (Number(eliminado.dispenser) || 0) + (Number(eliminado.prestado?.dispenser) || 0)
       };
       const totalEnv = env.sifon + env.bidon10 + env.bidon20 + env.dispenser;
       if (totalEnv > 0) {
@@ -2011,6 +2039,41 @@ function App() {
       });
       return s;
     });
+  };
+
+  // ── Registrar un envase roto/perdido EN CASA DE UN CLIENTE (sin borrarlo) ──
+  // Usado por el panel de "romper/perder" en la ficha del cliente. A
+  // diferencia de un editar cliente común, acá el envase NO volvió al
+  // depósito — se rompió o se perdió estando afuera. Por eso reduce el fijo
+  // del cliente directamente (sin pasar por ajustarStockFijoCliente, que
+  // asumiría que volvió a Casa) y lo deja anotado en el historial de
+  // pérdidas para poder revisarlo después.
+  const registrarPerdidaCliente = (clienteId, producto, cantidad) => {
+    let cant = Math.round(Number(cantidad) || 0);
+    if (cant <= 0) return;
+    const cli = clientes.find(c => c.id === clienteId);
+    if (!cli) return;
+    // Igual criterio que aplicarMovimientoEnvases: descuenta primero de lo
+    // PRESTADO (el envase roto puede ser uno prestado, no necesariamente
+    // uno de los fijos) y, si sobra cantidad, recién ahí del fijo. Antes
+    // esto siempre restaba del fijo aunque el cliente no tuviera fijos de
+    // ese producto (ej. dispenser fijo=0, prestado=1) — quedaba clampeado
+    // en 0 sin descontar nada, y el total "en clientes" no bajaba aunque
+    // la pérdida ya se hubiera anotado en el historial.
+    const prestadoActual = prestadoClienteDe(cli, producto, ventas);
+    const deLoPrestado = Math.min(prestadoActual, cant);
+    const nuevoPrestado = prestadoActual - deLoPrestado;
+    cant -= deLoPrestado;
+    const nuevoValor = Math.max(0, (Number(cli[producto]) || 0) - cant);
+    saveClientes(prev => prev.map(c => c.id === clienteId ? {
+      ...c,
+      [producto]: nuevoValor,
+      prestado: {
+        ...(c.prestado || {}),
+        [producto]: nuevoPrestado
+      }
+    } : c));
+    registrarPerdida({ [producto]: Math.round(Number(cantidad) || 0) }, "Roto/perdido en lo del cliente", cli.nombre);
   };
 
   // ── Unificación de duplicados SEGURA: prioriza el DOMICILIO ──
@@ -2344,6 +2407,8 @@ function App() {
       todasVentas: ventas,
       recordatorios,
       onPerdida: registrarPerdida,
+    onPerdidaCliente: registrarPerdidaCliente,
+      onPerdidaCliente: registrarPerdidaCliente,
       clientes,
       ventas,
       stock: stockNorm,
@@ -2899,6 +2964,7 @@ function App() {
     onIrTab: irA,
     clientes: clientes,
     onPerdida: registrarPerdida,
+    onPerdidaCliente: registrarPerdidaCliente,
     onReordenarTodo: lista => saveClientes(lista),
     onEditar: (id, cambios) => {
       const antes = clientes.find(c => c.id === id);
@@ -3107,6 +3173,7 @@ function App() {
   }), /*#__PURE__*/React.createElement(FiadosPendientes, {
     clientes: clientes,
     onPerdida: registrarPerdida,
+    onPerdidaCliente: registrarPerdidaCliente,
     onCobrar: (clienteId, monto, pago) => {
       const cl = clientes.find(c => c.id === clienteId);
       if (!cl) return;
@@ -3168,6 +3235,7 @@ function App() {
     clientes: clientes,
     ventas: ventas,
     onPerdida: registrarPerdida,
+    onPerdidaCliente: registrarPerdidaCliente,
     onVolver: () => irA("menu"),
     onSeleccionar: c => {
       setClienteId(c.id);

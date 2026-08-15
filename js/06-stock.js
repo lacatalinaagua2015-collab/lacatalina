@@ -120,32 +120,24 @@ function StockGeneral({
     });
     return m;
   }, [ventas]);
-  // Prestado TOTAL de un cliente: para sifón/bidón10/bidón20 se lee directo
-  // de c.prestado (se mantiene solo, sumando/restando en cada venta — ver
-  // aplicarMovimientoEnvases en 14-app.js). Si un cliente todavía no tiene
-  // ese campo (no tuvo ventas con envases desde que se agregó), se usa el
-  // cálculo viejo por historial + ajuste manual como referencia inicial.
-  // Dispenser no tiene campo directo, sigue con el cálculo por historial.
+  // Prestado TOTAL de un cliente: los 4 productos (incluido dispenser) se
+  // leen directo de c.prestado (se mantiene solo, sumando/restando en cada
+  // venta — ver aplicarMovimientoEnvases en 14-app.js). Si un cliente
+  // todavía no tiene ese campo (no tuvo ventas con envases desde que se
+  // agregó), se usa el cálculo viejo por historial + ajuste manual como
+  // referencia inicial.
   const prestadoDe = (c, k) => {
-    if (k !== "dispenser" && c.prestado && c.prestado[k] !== undefined) return c.prestado[k];
+    if (c.prestado && c.prestado[k] !== undefined) return c.prestado[k];
     return Math.max(0, (extraPorCliente[c.id]?.[k] || 0) + (c.envAjuste?.[k] || 0));
   };
-  // Al editar a mano en el Arqueo: sifón/bidón10/bidón20 se guardan directo
-  // en c.prestado. Dispenser (sin campo directo) sigue usando envAjuste.
+  // Al editar a mano en el Arqueo, los 4 productos se guardan directo en
+  // c.prestado (antes dispenser quedaba afuera y se guardaba en envAjuste,
+  // un campo que prestadoDe/prestadoClienteDe ya no leen una vez que
+  // c.prestado.dispenser existe — la edición manual quedaba "perdida").
   const setClientePrestado = (id, k, val) => {
     const n = Math.max(0, Math.round(Number(val) || 0));
     setClientes((clientes || []).map(c => {
       if (c.id !== id) return c;
-      if (k === "dispenser") {
-        const ex = extraPorCliente[id]?.[k] || 0;
-        return {
-          ...c,
-          envAjuste: {
-            ...(c.envAjuste || {}),
-            [k]: n - ex
-          }
-        };
-      }
       return {
         ...c,
         prestado: {
@@ -201,12 +193,14 @@ function StockGeneral({
   const totalPerdidas = {
     sifon: 0,
     bidon10: 0,
-    bidon20: 0
+    bidon20: 0,
+    dispenser: 0
   };
   (perdidas || []).forEach(p => {
     totalPerdidas.sifon += p.sifon || 0;
     totalPerdidas.bidon10 += p.bidon10 || 0;
     totalPerdidas.bidon20 += p.bidon20 || 0;
+    totalPerdidas.dispenser += p.dispenser || 0;
   });
   const inNum = {
     ...s.inputNum,
@@ -905,7 +899,19 @@ function StockGeneral({
     style: {
       color: "var(--color-text-danger)"
     }
-  }, totalPerdidas.bidon20))), /*#__PURE__*/React.createElement("div", {
+  }, totalPerdidas.bidon20)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: "var(--color-background-tertiary)",
+      borderRadius: 6,
+      padding: "3px 8px",
+      fontSize: 12,
+      color: "var(--color-text-secondary)"
+    }
+  }, "Dispenser ", /*#__PURE__*/React.createElement("b", {
+    style: {
+      color: "var(--color-text-danger)"
+    }
+  }, totalPerdidas.dispenser))), /*#__PURE__*/React.createElement("div", {
     style: {
       background: "var(--color-background-tertiary)",
       borderRadius: 8,
@@ -1023,7 +1029,7 @@ function StockGeneral({
       marginBottom: 6
     }
   }, "Historial (", perdidas.length, ")"), [...perdidas].reverse().slice(0, 20).map(p => {
-    const items = [p.sifon && `${p.sifon} Sifón`, p.bidon10 && `${p.bidon10} 10L`, p.bidon20 && `${p.bidon20} 20L`].filter(Boolean).join(" · ");
+    const items = [p.sifon && `${p.sifon} Sifón`, p.bidon10 && `${p.bidon10} 10L`, p.bidon20 && `${p.bidon20} 20L`, p.dispenser && `${p.dispenser} Dispenser`].filter(Boolean).join(" · ");
     const fecha = new Date(p.fecha).toLocaleDateString("es-AR");
     return /*#__PURE__*/React.createElement("div", {
       key: p.id,
