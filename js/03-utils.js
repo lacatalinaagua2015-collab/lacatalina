@@ -393,15 +393,21 @@ function extraerCoordsDeURL(url) {
 // ◆  buscarCliente — búsqueda UNIFICADA priorizando el DOMICILIO
 //    Devuelve: 2 = coincide el domicilio · 1 = coincide nombre/tel/notas · 0 = no
 //    Entiende: "juramento 59", "mz f l 28", "policial 3", barrios, sectores...
+//    Ignora tildes/ñ tanto en lo buscado como en lo guardado (normalizar):
+//    antes buscar "maria" NO encontraba a "María" — muy común al tipear
+//    rápido desde el celular, sin tildes.
 // ════════════════════════════════════════════════════════════════════
+function _normalizarBusqueda(s) {
+  return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
 function buscarCliente(c, q) {
-  const t = (q || "").trim().toLowerCase();
+  const t = _normalizarBusqueda(q).trim();
   if (!t) return 1; // sin búsqueda: todos pasan
-  const domicilio = [c.calle, c.nro, c.calle && c.nro ? `${c.calle} ${c.nro}` : "", c.barrio, c.sector, c.aclaracion, c.manzana, c.lote, c.manzana ? `mz ${c.manzana}` : "", c.lote ? `l ${c.lote}` : "", c.manzana && c.lote ? `mz ${c.manzana} l ${c.lote}` : "", c.manzana && c.lote ? `manzana ${c.manzana} lote ${c.lote}` : ""].filter(Boolean).join(" · ").toLowerCase();
+  const domicilio = _normalizarBusqueda([c.calle, c.nro, c.calle && c.nro ? `${c.calle} ${c.nro}` : "", c.barrio, c.sector, c.aclaracion, c.manzana, c.lote, c.manzana ? `mz ${c.manzana}` : "", c.lote ? `l ${c.lote}` : "", c.manzana && c.lote ? `mz ${c.manzana} l ${c.lote}` : "", c.manzana && c.lote ? `manzana ${c.manzana} lote ${c.lote}` : ""].filter(Boolean).join(" · "));
   if (domicilio.includes(t)) return 2;
-  if ((c.nombre || "").toLowerCase().includes(t)) return 1;
+  if (_normalizarBusqueda(c.nombre).includes(t)) return 1;
   if (String(c.telefono || "").includes(t)) return 1;
-  if ((c.notas || "").toLowerCase().includes(t)) return 1;
+  if (_normalizarBusqueda(c.notas).includes(t)) return 1;
   return 0;
 }
 
