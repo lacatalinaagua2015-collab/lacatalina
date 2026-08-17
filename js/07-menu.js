@@ -1301,8 +1301,14 @@ function PlanillaDelDia({
     ...d,
     [k]: v
   }));
-  const yaCerrado = !!planilla._diaCerrado;
-  const [mostrarCierre, setMostrarCierre] = useState(() => autoCierre && !planilla._diaCerrado);
+  const cierreKey = `cierre_${dia}_${fecha}`;
+  // Si ya se confirmó el cierre alguna vez para este día (localStorage se
+  // marca de inmediato en confirmarCierre, antes incluso de que la planilla
+  // sincronizada vuelva a bajar como prop), no hay que volver a pedir la
+  // verificación de envases.
+  const yaCerrado = !!planilla._diaCerrado || !!localStorage.getItem(cierreKey);
+  const [mostrarCierre, setMostrarCierre] = useState(() => autoCierre && !(planilla._diaCerrado || localStorage.getItem(cierreKey)));
+  const [enviandoCierre, setEnviandoCierre] = useState(false);
   const [realesLlenos, setRealesLlenos] = useState({
     soda: "",
     b10: "",
@@ -1459,6 +1465,13 @@ function PlanillaDelDia({
     vaciosRestoCalc[pk] = Math.max(0, vaciosHoy - paraLlenarCalc[pk]);
   });
   const confirmarCierre = () => {
+    if (enviandoCierre) return;
+    // Bloquear el botón de inmediato: sin este freno, un doble-toque podía
+    // ejecutar confirmarCierre() dos veces seguidas y sumar los mismos
+    // envases a sodería dos veces (causa real de acumulación de envases,
+    // encontrada y corregida en Individual/Multiple — mismo arreglo acá).
+    setEnviandoCierre(true);
+    localStorage.setItem(cierreKey, "1"); // marcar como confirmado
     // Usar valores reales si el usuario los modificó, si no usar los calculados
     const llenVuelta = {
       soda: 0,
@@ -1944,10 +1957,12 @@ function PlanillaDelDia({
         color: "#f5b942",
         fontSize: 15,
         fontWeight: 700,
-        cursor: "pointer"
+        cursor: enviandoCierre ? "default" : "pointer",
+        opacity: enviandoCierre ? 0.7 : 1
       },
+      disabled: enviandoCierre,
       onClick: confirmarCierre
-    }, "✓ Cerrar día y actualizar stock")));
+    }, enviandoCierre ? "⏳ Cerrando día..." : "✓ Cerrar día y actualizar stock")));
   }
   return /*#__PURE__*/React.createElement("div", {
     style: s.screen

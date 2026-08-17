@@ -2595,19 +2595,33 @@ function App() {
     cargasDia: cargasDia,
     stock: stockNorm,
     onGuardar: (p, descontar) => {
-      savePlanilla(`${diaActual}_${fechaActual}`, p);
+      const planillaKeyIR = `${diaActual}_${fechaActual}`;
+      const prevPlanillaIR = planillas[planillaKeyIR] || planillaDiaVacia();
+      savePlanilla(planillaKeyIR, p);
       if (descontar) {
         const soda = Number(p.productos?.soda?.llenos || 0);
         const b10 = Number(p.productos?.b10?.llenos || 0);
         const b20 = Number(p.productos?.b20?.llenos || 0);
+        // Si el día YA estaba iniciado (se está corrigiendo una cantidad, no
+        // cargando por primera vez), sólo hay que mover la DIFERENCIA. Restar
+        // el total cada vez que se toca "Actualizar y continuar" —incluso sin
+        // cambiar nada— vaciaba sodería de más en cada visita repetida a esta
+        // pantalla (mismo bug encontrado y corregido en Individual/Multiple).
+        const yaEstabaIniciadoIR = !!prevPlanillaIR.iniciado;
+        const sodaPrev = yaEstabaIniciadoIR ? Number(prevPlanillaIR.productos?.soda?.llenos || 0) : 0;
+        const b10Prev = yaEstabaIniciadoIR ? Number(prevPlanillaIR.productos?.b10?.llenos || 0) : 0;
+        const b20Prev = yaEstabaIniciadoIR ? Number(prevPlanillaIR.productos?.b20?.llenos || 0) : 0;
+        const dSoda = soda - sodaPrev,
+          dB10 = b10 - b10Prev,
+          dB20 = b20 - b20Prev;
         setStock(prev => {
           const s = JSON.parse(JSON.stringify(normStock(prev)));
-          s.soderia.sifon = Math.max(0, (s.soderia.sifon || 0) - soda);
-          s.soderia.bidon10 = Math.max(0, (s.soderia.bidon10 || 0) - b10);
-          s.soderia.bidon20 = Math.max(0, (s.soderia.bidon20 || 0) - b20);
-          s.camion.sifon = (s.camion.sifon || 0) + soda;
-          s.camion.bidon10 = (s.camion.bidon10 || 0) + b10;
-          s.camion.bidon20 = (s.camion.bidon20 || 0) + b20;
+          s.soderia.sifon = Math.max(0, (s.soderia.sifon || 0) - dSoda);
+          s.soderia.bidon10 = Math.max(0, (s.soderia.bidon10 || 0) - dB10);
+          s.soderia.bidon20 = Math.max(0, (s.soderia.bidon20 || 0) - dB20);
+          s.camion.sifon = Math.max(0, (s.camion.sifon || 0) + dSoda);
+          s.camion.bidon10 = Math.max(0, (s.camion.bidon10 || 0) + dB10);
+          s.camion.bidon20 = Math.max(0, (s.camion.bidon20 || 0) + dB20);
           syncData({
             stock: normStock(s)
           });
