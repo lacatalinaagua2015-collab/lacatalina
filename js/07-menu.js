@@ -33,9 +33,16 @@ function MenuDias({
   onFiados,
   onMapaClientes,
   onDormidos,
-  onPlanillaAtajo
+  onPlanillaAtajo,
+  onIrPlanillaDia,
+  onIrClientesDia
 }) {
   const [editandoZona, setEditandoZona] = React.useState(null);
+  // Antes, tocar un día llevaba a una pantalla intermedia ("Día Principal")
+  // que solo mostraba 2 botones sin datos ("Planilla del día" / "Clientes
+  // del día") antes de recién ahí elegir la fecha. Se saca esa pantalla de
+  // en medio: tocar el día expande estos 2 botones ACÁ MISMO, en la fila.
+  const [diaExpandido, setDiaExpandido] = React.useState(null);
   const hoyDiaNombre = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"][new Date().getDay()];
   // Usar hora LOCAL para evitar bug de zona horaria (Argentina UTC-3)
   const hoyFechaKey = (() => {
@@ -239,7 +246,7 @@ function MenuDias({
         alignItems: "center",
         padding: "14px 16px"
       },
-      onClick: () => onDia(d)
+      onClick: () => setDiaExpandido(diaExpandido === d ? null : d)
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
@@ -444,141 +451,48 @@ function MenuDias({
         e.stopPropagation();
         setEditandoZona(d);
       }
-    }, "editar zona")), false && idx === dias.length - 1 && stock && (() => {
-      const CAJON = 6;
-      const sCaj = Math.floor((stock.soderia?.sifon || 0) / CAJON);
-      const cCaj = Math.floor((stock.casa?.sifon || 0) / CAJON);
-      const sB10 = stock.soderia?.bidon10 || 0,
-        cB10 = stock.casa?.bidon10 || 0;
-      const sB20 = stock.soderia?.bidon20 || 0,
-        cB20 = stock.casa?.bidon20 || 0;
-      const envC = {
-        sifon: 0,
-        bidon10: 0,
-        bidon20: 0
-      };
-      (clientes || []).forEach(c => {
-        envC.sifon += c.sifon || 0;
-        envC.bidon10 += c.bidon10 || 0;
-        envC.bidon20 += c.bidon20 || 0;
-      });
-      (ventas || []).forEach(v => {
-        (v.envPrest || []).forEach(e => {
-          const k = e.prod === "Sifón 1.5L" ? "sifon" : e.prod === "Bidón 10L" ? "bidon10" : e.prod === "Bidón 20L" ? "bidon20" : null;
-          if (k) envC[k] += Number(e.cant) || 0;
-        });
-        (v.envDev || []).forEach(e => {
-          const k = e.prod === "Sifón 1.5L" ? "sifon" : e.prod === "Bidón 10L" ? "bidon10" : e.prod === "Bidón 20L" ? "bidon20" : null;
-          if (k) envC[k] -= Number(e.cant) || 0;
-        });
-      });
-      const envCCaj = Math.floor(envC.sifon / CAJON);
-      const totCaj = sCaj + cCaj + envCCaj,
-        totB10 = sB10 + cB10 + envC.bidon10,
-        totB20 = sB20 + cB20 + envC.bidon20;
-      const StockCard = () => {
-        const [open, setOpen] = React.useState(false);
-        return /*#__PURE__*/React.createElement("div", {
-          style: {
-            ...s.card,
-            margin: "4px 0 0",
-            background: "var(--color-background-secondary)",
-            border: "0.5px solid var(--color-border-secondary)"
-          }
-        }, /*#__PURE__*/React.createElement("div", {
-          style: {
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            cursor: "pointer"
-          },
-          onClick: () => setOpen(o => !o)
-        }, /*#__PURE__*/React.createElement("div", {
-          style: {
-            display: "flex",
-            alignItems: "center",
-            gap: 10
-          }
-        }, /*#__PURE__*/React.createElement("span", {
-          style: {
-            fontSize: 13,
-            fontWeight: 500,
-            color: "var(--color-text-primary)"
-          }
-        }, "📦 Stock"), /*#__PURE__*/React.createElement("div", {
-          style: {
-            display: "flex",
-            gap: 6
-          }
-        }, [[totCaj, "caj"], [totB10, "10L"], [totB20, "20L"]].map(([v, u], i) => /*#__PURE__*/React.createElement("span", {
-          key: i,
-          style: {
-            fontSize: 12,
-            fontWeight: 600,
-            color: Number(v) < 3 ? "var(--color-text-danger)" : Number(v) < 8 ? "var(--color-text-warning)" : "var(--color-text-info)"
-          }
-        }, v, /*#__PURE__*/React.createElement("span", {
-          style: {
-            fontSize: 10,
-            fontWeight: 400,
-            color: "var(--color-text-tertiary)",
-            marginLeft: 1
-          }
-        }, u))))), /*#__PURE__*/React.createElement("span", {
-          style: {
-            fontSize: 13,
-            color: "var(--color-text-tertiary)",
-            transition: "transform 0.2s",
-            display: "inline-block",
-            transform: open ? "rotate(180deg)" : "rotate(0deg)"
-          }
-        }, "▾")), open && /*#__PURE__*/React.createElement("div", {
-          style: {
-            marginTop: 12
-          }
-        }, [["🏭 Sodería", [sCaj, sB10, sB20], "primary"], ["👥 En clientes", [envCCaj, envC.bidon10, envC.bidon20], "info"], ["📦 Total general", [totCaj, totB10, totB20], "info"]].map(([titulo, vals, color], gi) => /*#__PURE__*/React.createElement("div", {
-          key: gi,
-          style: {
-            marginBottom: gi < 2 ? 10 : 0
-          }
-        }, /*#__PURE__*/React.createElement("div", {
-          style: {
-            fontSize: 10,
-            color: "var(--color-text-tertiary)",
-            marginBottom: 4,
-            textTransform: "uppercase",
-            letterSpacing: "0.05em"
-          }
-        }, titulo), /*#__PURE__*/React.createElement("div", {
-          style: {
-            display: "flex",
-            gap: 6
-          }
-        }, vals.map((v, i) => /*#__PURE__*/React.createElement("div", {
-          key: i,
-          style: {
-            textAlign: "center",
-            flex: 1,
-            background: gi === 2 ? "#1e3a5f" : "var(--color-background-tertiary)",
-            borderRadius: 8,
-            padding: "6px 4px",
-            border: gi === 2 ? "0.5px solid var(--color-border-info)" : "none"
-          }
-        }, /*#__PURE__*/React.createElement("div", {
-          style: {
-            fontSize: 18,
-            fontWeight: gi === 2 ? 700 : 600,
-            color: gi === 0 ? Number(v) < 3 ? "var(--color-text-danger)" : Number(v) < 8 ? "var(--color-text-warning)" : "var(--color-text-primary)" : `var(--color-text-${color})`
-          }
-        }, v), /*#__PURE__*/React.createElement("div", {
-          style: {
-            fontSize: 10,
-            color: "var(--color-text-tertiary)"
-          }
-        }, ["caj", "10L", "20L"][i]))))))));
-      };
-      return /*#__PURE__*/React.createElement(StockCard, null);
-    })());
+    }, "editar zona")), diaExpandido === d && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 6,
+        marginTop: 2
+      },
+      onClick: e => e.stopPropagation()
+    }, /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.card,
+        margin: 0,
+        flex: 1,
+        cursor: "pointer",
+        textAlign: "center",
+        padding: "12px 8px",
+        background: "var(--color-background-tertiary)"
+      },
+      onClick: () => onIrPlanillaDia(d)
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        fontWeight: 500,
+        color: "var(--color-text-primary)"
+      }
+    }, "📋 Planilla")), /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.card,
+        margin: 0,
+        flex: 1,
+        cursor: "pointer",
+        textAlign: "center",
+        padding: "12px 8px",
+        background: "var(--color-background-tertiary)"
+      },
+      onClick: () => onIrClientesDia(d)
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        fontWeight: 500,
+        color: "var(--color-text-primary)"
+      }
+    }, "👥 Clientes"))));
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",

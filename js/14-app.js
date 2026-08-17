@@ -2407,7 +2407,6 @@ function App() {
       todasVentas: ventas,
       recordatorios,
       onPerdida: registrarPerdida,
-    onPerdidaCliente: registrarPerdidaCliente,
       onPerdidaCliente: registrarPerdidaCliente,
       clientes,
       ventas,
@@ -2501,7 +2500,21 @@ function App() {
     noVisitas: noVisitas || [],
     onFiados: () => irA("fiadosPendientes"),
     onMapaClientes: () => irA("mapaClientes"),
-    onDormidos: () => irA("clientesDormidos")
+    onDormidos: () => irA("clientesDormidos"),
+    // Reemplazan a "diaPrincipal" (pantalla intermedia sin datos que solo
+    // preguntaba Planilla-o-Clientes): ahora esa elección se hace en el
+    // propio menú, tocando el día, y estos dos props van directo al mismo
+    // destino al que iba diaPrincipal — mismo criterio de "saltar Inicio del
+    // reparto si el camión ya salió hoy" que ya usaba onIrClientes.
+    onIrPlanillaDia: d => {
+      setDiaActual(d);
+      irA("selectorFechaPlanilla");
+    },
+    onIrClientesDia: d => {
+      setDiaActual(d);
+      const yaIniciado = fechaActual && planillas[`${d}_${fechaActual}`]?.iniciado;
+      irA(yaIniciado ? "clientes" : "selectorFechaClientes");
+    }
   }), pantalla === "confirmacionesDia" && /*#__PURE__*/React.createElement(ConfirmacionesDia, {
     dia: diaActual || "todos los días",
     ventas: ventas.filter(v => v.pago === "transferencia" && (!diaActual || v.dia === diaActual)),
@@ -3117,6 +3130,15 @@ function App() {
           saldo: (Number(x.saldo) || 0) + monto
         } : x));
       }
+    },
+    // BUG REPORTADO: el ajuste de saldo de un cliente se perdía en silencio
+    // al entrar por Gestión de clientes / Mapa / Agenda (esta pantalla), a
+    // diferencia de entrar por la lista diaria normal (pantalla
+    // "detalleCliente", más arriba) — porque acá nunca se pasaba
+    // onGuardarAjuste, y DetalleCliente lo llama con "&&" de guarda (no
+    // explota, pero tampoco guarda nada). Mismo criterio que la otra pantalla.
+    onGuardarAjuste: vt => {
+      saveVentas(prev => [...prev, vt]);
     },
     onGuardarCambio: vt => {
       saveVentas(prev => [...prev, vt]);

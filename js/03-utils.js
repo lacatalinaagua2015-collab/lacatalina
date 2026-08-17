@@ -1,6 +1,6 @@
 // ════════════════════════════════════════════════════════════════════
 // ◆  03-utils.js — funciones puras / helpers de datos (SIN JSX):
-//    direccionCliente, KEY_PROD_ENV, prestadoClienteDe, fmtFechaHoraVenta,
+//    direccionCliente, KEY_PROD_ENV, prestadoClienteDe,
 //    debounceSave, useLS, s (estilos), calcVenta, comprimirFoto,
 //    extraerCoordsDeURL, buscarCliente.
 //    Los componentes de UI compartidos (CambioEnvasePanel, FotoClienteModal,
@@ -58,16 +58,6 @@ function prestadoClienteDe(c, k, ventasHistoricas) {
     });
   });
   return Math.max(0, n + (Number(c.envAjuste?.[k]) || 0));
-}
-function fmtFechaHoraVenta(f) {
-  if (!f) return "";
-  const limpio = String(f).replace(",", " ").replace(/\s+/g, " ").trim();
-  const partes = limpio.split(" ");
-  const fecha = partes[0] || "";
-  let hora = partes[1] || "";
-  const hm = hora.split(":");
-  if (hm.length >= 2) hora = hm[0].padStart(2, "0") + ":" + hm[1];
-  return hora ? fecha + " · " + hora : fecha;
 }
 function debounceSave(fn) {
   _saveQueue = fn;
