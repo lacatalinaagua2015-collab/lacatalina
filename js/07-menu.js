@@ -1599,10 +1599,10 @@ function PlanillaDelDia({
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         display: "grid",
-        gridTemplateColumns: "2fr 1fr 1fr 1fr",
+        gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr",
         marginBottom: 8
       }
-    }, ["", "Vendido", "Prestado", "Devuelto"].map(h => /*#__PURE__*/React.createElement("div", {
+    }, ["", "Vendido", "Prestado", "Devuelto", "Neto"].map(h => /*#__PURE__*/React.createElement("div", {
       key: h,
       style: {
         fontSize: 11,
@@ -1614,7 +1614,7 @@ function PlanillaDelDia({
       key: pk,
       style: {
         display: "grid",
-        gridTemplateColumns: "2fr 1fr 1fr 1fr",
+        gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr",
         padding: "7px 0",
         borderTop: "0.5px solid var(--color-border-tertiary)",
         alignItems: "center"
@@ -1645,7 +1645,20 @@ function PlanillaDelDia({
         fontWeight: 600,
         color: devueltosDia[pk] > 0 ? "var(--color-text-success)" : "var(--color-text-tertiary)"
       }
-    }, devueltosDia[pk] > 0 ? `+${pk === "soda" ? Math.floor(devueltosDia[pk] / CAJON) : devueltosDia[pk]}` : "0")))))), /*#__PURE__*/React.createElement("span", {
+    }, devueltosDia[pk] > 0 ? `+${pk === "soda" ? Math.floor(devueltosDia[pk] / CAJON) : devueltosDia[pk]}` : "0"), (() => {
+      // Total redondeado de Prestado vs Devuelto — pedido del usuario:
+      // "prestado 5 devuelto 1 sería faltan 4".
+      const netoDiv = pk === "soda" ? CAJON : 1;
+      const neto = Math.round((devueltosDia[pk] - prestadosDia[pk]) / netoDiv);
+      return /*#__PURE__*/React.createElement("span", {
+        style: {
+          textAlign: "center",
+          fontSize: 13,
+          fontWeight: 700,
+          color: neto < 0 ? "var(--color-text-warning)" : neto > 0 ? "var(--color-text-success)" : "var(--color-text-tertiary)"
+        }
+      }, neto < 0 ? `faltan ${-neto}` : neto > 0 ? `+${neto}` : "0");
+    })()))))), /*#__PURE__*/React.createElement("span", {
       style: {
         ...s.sectionTitle,
         padding: "0 0 8px"
@@ -1813,8 +1826,17 @@ function PlanillaDelDia({
           gap: 10,
           marginBottom: 8
         }
-      }, [["Llenos", realesLlenos, setRealesLlenos, AZUL, Math.floor(sobrantes[pk] / cajon)], ["Vacío", realesVacios, setRealesVacios, AMBAR, vaciosRestoCalc[pk]]].map(([col, val, setVal, color, ph]) => /*#__PURE__*/React.createElement("input", {
-        key: col,
+      }, [["Llenos", realesLlenos, setRealesLlenos, AZUL, Math.floor(sobrantes[pk] / cajon)], ["Vacío", realesVacios, setRealesVacios, AMBAR, vaciosRestoCalc[pk]]].map(([col, val, setVal, color, ph]) => /*#__PURE__*/React.createElement("div", {
+        key: col
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 10,
+          fontWeight: 700,
+          color: color,
+          textAlign: "center",
+          marginBottom: 3
+        }
+      }, col), /*#__PURE__*/React.createElement("input", {
         type: "number",
         min: 0,
         value: val[pk] !== "" ? val[pk] : ph,
@@ -1835,7 +1857,7 @@ function PlanillaDelDia({
           ...r,
           [pk]: e.target.value
         }))
-      }))), /*#__PURE__*/React.createElement("div", {
+      })))), /*#__PURE__*/React.createElement("div", {
         style: {
           textAlign: "center",
           fontSize: 11,
@@ -1849,15 +1871,23 @@ function PlanillaDelDia({
         style: { ...s.card, margin: "0 0 10px", padding: "12px" }
       }, /*#__PURE__*/React.createElement("div", {
         style: { fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 8 }
-      }, "Total sodería al cerrar"), /*#__PURE__*/React.createElement("div", {
+      }, "Total sodería al cerrar"), /*#__PURE__*/React.createElement("p", {
+        style: { fontSize: 11, color: "var(--color-text-tertiary)", margin: "-4px 0 8px" }
+      }, "\"Con clientes\" = cuántos de esa base fija están afuera prestados. Si da negativo (⚠), hay más stock cargado en sodería del que la base fija admite — revisar los números en la pantalla Stock."), /*#__PURE__*/React.createElement("div", {
         style: { display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr 1fr 1fr", gap: 4, fontSize: 10, color: "var(--color-text-tertiary)", marginBottom: 4 }
-      }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Llenos"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Vacíos"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Pllenar"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Total"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Falta")), filasResumen.map(f => {
+      }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Llenos"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Vacíos"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Pllenar"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Total"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Con clientes")), filasResumen.map(f => {
         const totalF = f.quedaLleno + f.quedaVacio + f.paraLlenarReal;
+        // Esto NO es "lo que falta llenar": es la base fija (sodería + lo
+        // prestado a clientes, un total invariante) menos lo que hay ahora
+        // en sodería — o sea, cuánto de esa base está afuera con clientes.
+        // Si da negativo significa que sodería tiene MÁS que la base fija
+        // configurada, algo físicamente imposible: hay que revisar/corregir
+        // los números de stock (soderia/soderia_vacios o la Base) a mano.
         const faltaF = f.div(f.baseRef) - f.div(totalF);
         return /*#__PURE__*/React.createElement("div", {
           key: f.label,
           style: { display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr 1fr 1fr", gap: 4, alignItems: "center", padding: "5px 0", borderTop: "0.5px solid var(--color-border-tertiary)" }
-        }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: "var(--color-text-primary)" } }, f.label), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: "var(--color-text-secondary)" } }, f.div(f.quedaLleno)), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: "var(--color-text-secondary)" } }, f.div(f.quedaVacio)), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: "var(--color-text-secondary)" } }, f.div(f.paraLlenarReal)), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: "var(--color-text-secondary)" } }, f.div(totalF)), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, fontWeight: 600, color: faltaF === 0 ? "var(--color-text-success)" : "var(--color-text-warning)" } }, faltaF));
+        }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: "var(--color-text-primary)" } }, f.label), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: "var(--color-text-secondary)" } }, f.div(f.quedaLleno)), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: "var(--color-text-secondary)" } }, f.div(f.quedaVacio)), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: "var(--color-text-secondary)" } }, f.div(f.paraLlenarReal)), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: "var(--color-text-secondary)" } }, f.div(totalF)), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, fontWeight: 700, color: faltaF < 0 ? "#ff6b6b" : faltaF === 0 ? "var(--color-text-success)" : "var(--color-text-secondary)" } }, faltaF < 0 ? `⚠ ${faltaF}` : faltaF));
       }));
       return [productCards, resumenTabla];
     })(), /*#__PURE__*/React.createElement("button", {
