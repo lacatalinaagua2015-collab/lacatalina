@@ -1438,10 +1438,23 @@ function PlanillaDelDia({
     // acá sumándose al depósito), lo que inflaba el total combinado y hacía
     // que pareciera que "se acumulan envases" en la sodería día tras día.
     const diffDeposito = {};
+    // BUG REAL encontrado (causa de la acumulación "sin sentido" en sodería):
+    // acá abajo se sumaba TODO lo que volvió (llenVuelta+vacVuelta) a sodería
+    // Y ADEMÁS, por separado, la diferencia contra "esperado" se sumaba al
+    // depósito — contando esa diferencia dos veces cada vez que el usuario
+    // corrige un número a mano (algo que pasa todos los días). Resultado:
+    // sodería nunca volvía a su número fijo, solo crecía. Ahora sodería
+    // recibe SOLO lo esperado (mantiene su número fijo, tal cual el flujo
+    // real) y el depósito se lleva toda la diferencia — no ambos.
+    const llenVueltaFijo = {},
+      vacVueltaFijo = {};
     ["soda", "b10", "b20"].forEach(pk => {
       const esperadoPk = llenosCargados[pk] + devueltosDia[pk] - prestadosDia[pk];
       const vuelveTotalPk = llenVuelta[pk] + vacVuelta[pk];
       diffDeposito[pk] = vuelveTotalPk - esperadoPk;
+      const factor = vuelveTotalPk > 0 ? esperadoPk / vuelveTotalPk : 1;
+      llenVueltaFijo[pk] = Math.max(0, Math.round(llenVuelta[pk] * factor));
+      vacVueltaFijo[pk] = Math.max(0, Math.round(vacVuelta[pk] * factor));
     });
     setStock(prev => {
       const s = JSON.parse(JSON.stringify(prev || {}));
@@ -1462,8 +1475,8 @@ function PlanillaDelDia({
       };
       ["soda", "b10", "b20"].forEach(pk => {
         const sk = planKeyToSkL[pk];
-        s.soderia[sk] = (s.soderia[sk] || 0) + llenVuelta[pk];
-        s.soderia_vacios[sk] = (s.soderia_vacios[sk] || 0) + vacVuelta[pk];
+        s.soderia[sk] = (s.soderia[sk] || 0) + llenVueltaFijo[pk];
+        s.soderia_vacios[sk] = (s.soderia_vacios[sk] || 0) + vacVueltaFijo[pk];
         s.casa[sk] = (s.casa[sk] || 0) + diffDeposito[pk];
       });
       s.camion = {
