@@ -2603,6 +2603,10 @@ function App() {
       setDiaActual(dia);
       setFechaActual(fechaKey);
       setFechaObj(new Date(fechaKey + "T12:00:00"));
+      // Atajo directo desde el menú (día ya "Listo") a la planilla, saltando
+      // selectorFechaPlanilla/diaPrincipal — "Volver" tiene que deshacer ese
+      // mismo salto (mismo criterio que origenClientes para "clientes").
+      setOrigenFecha("menu");
       irA("planilla");
     },
     noVisitas: noVisitas || [],
@@ -2688,11 +2692,11 @@ function App() {
     cargasDia: cargasDia,
     onGuardar: d => {
       savePlanilla(`${diaActual}_${fechaActual}`, d);
-      if (!d._diaCerrado) irA(origenFecha === "atajo" ? "atajoPlanillaSemana" : "selectorFechaPlanilla");
+      if (!d._diaCerrado) irA(origenFecha === "atajo" ? "atajoPlanillaSemana" : origenFecha === "menu" ? "menu" : "selectorFechaPlanilla");
       // Si es cierre de d\xc3\xada, no navega: setMostrarCierre(false) vuelve a la planilla normal
     },
     onAutoGuardar: d => savePlanilla(`${diaActual}_${fechaActual}`, d),
-    onVolver: () => irA(origenFecha === "atajo" ? "atajoPlanillaSemana" : "selectorFechaPlanilla"),
+    onVolver: () => irA(origenFecha === "atajo" ? "atajoPlanillaSemana" : origenFecha === "menu" ? "menu" : "selectorFechaPlanilla"),
     noVisitas: noVisitas
   }), pantalla === "selectorFechaClientes" && /*#__PURE__*/React.createElement(SelectorFecha, {
     dia: diaActual,
