@@ -322,9 +322,47 @@ function App() {
       return next;
     });
   };
+  // Migración única de la lista vieja de Prospectos (separada) al modelo
+  // nuevo: prospectos pendientes (no convertidos todavía) pasan a ser
+  // clientes normales con esProspecto:true, para que aparezcan integrados
+  // en la lista de clientes (al final, con su recuadro distinto) en vez de
+  // en una pantalla aparte. Se guarda una bandera en localStorage para que
+  // esto corra una sola vez por dispositivo.
+  React.useEffect(() => {
+    if (localStorage.getItem("lc_prospectos_migrados_v1")) return;
+    const pendientes = (prospectos || []).filter(p => p.estado !== "convertido" && !p._migradoACliente);
+    if (pendientes.length > 0) {
+      saveClientes(prev => [...prev, ...pendientes.map(p => ({
+        id: nuevoIdCat(),
+        nombre: p.nombre || "(sin nombre)",
+        telefono: p.telefono || "",
+        calle: p.calle || "",
+        barrio: p.barrio || "",
+        notas: p.notas || "",
+        dia: "Martes",
+        esProspecto: true,
+        saldo: 0,
+        sifon: 0,
+        bidon10: 0,
+        bidon20: 0,
+        dispenser: 0,
+        creadoFecha: new Date().toLocaleDateString("en-CA")
+      }))]);
+      saveProspectos(prev => (prev || []).map(p => pendientes.some(x => x.id === p.id) ? {
+        ...p,
+        _migradoACliente: true
+      } : p));
+      setTimeout(() => alert(`Se migraron ${pendientes.length} prospecto${pendientes.length !== 1 ? "s" : ""} pendiente${pendientes.length !== 1 ? "s" : ""} a la lista de clientes (marcados "Prospecto"). Quedaron con día "Martes" por defecto — revisá y corregí el día real de reparto de cada uno.`), 600);
+    }
+    localStorage.setItem("lc_prospectos_migrados_v1", "1");
+  }, []);
   // Cuando se toca "Convertir en cliente" en un prospecto, se guarda acá
   // para precargar el formulario de Nuevo Cliente con nombre/teléfono/dirección.
   const [prospectoAConvertir, setProspectoAConvertir] = useState(null);
+  // "Promociones" ahora carga el prospecto directo como cliente (con el
+  // checkbox "Es prospecto" tildado) en vez de una lista aparte — bandera
+  // para precargar ese checkbox al entrar a Nuevo cliente desde ese botón.
+  const [nuevoEsProspecto, setNuevoEsProspecto] = useState(false);
   const [clientes, setClientes] = useLS("cat_clientes_v3", CLIENTES_INICIALES);
   const [ventasRaw, setVentasRaw] = useLS("cat_ventas_v3", []);
   const normalizarFechaKey = v => {
@@ -1925,9 +1963,17 @@ function App() {
       }
       return base;
     });
+    // Prospecto → cliente fijo automático: a la 5ta compra real en su día
+    // (esta cuenta si no es un cobro de deuda ni un cambio de envase) se
+    // confirma solo, sin botón — pedido explícito del usuario.
+    const esVentaReal = opcionSaldo !== "cobro_deuda" && opcionSaldo !== "cambio_envase";
+    const comprasPrevias = ventas.filter(v => v.clienteId === c.id && !v._esCobro && !v._esAjuste && !v._esAjusteEnvases && !v._esCambio && !v._esMixtoTrans).length;
+    const totalComprasConEsta = comprasPrevias + (esVentaReal ? 1 : 0);
+    const confirmarProspecto = c.esProspecto && totalComprasConEsta >= 5;
     saveClientes(prev => aplicarMovimientoEnvases(prev, ventas, c.id, nuevaVenta.envPrest, nuevaVenta.envDev).map(c2 => c2.id === c.id ? {
       ...c2,
-      saldo: (Number(c2.saldo) || 0) + saldoExtra
+      saldo: (Number(c2.saldo) || 0) + saldoExtra,
+      ...(confirmarProspecto ? { esProspecto: false } : {})
     } : c2));
   };
   const renumerarTrasEliminar = (lista, clienteEliminado) => {
@@ -2164,6 +2210,57 @@ function App() {
       saveClientes(prev => aplicarMovimientoEnvases(prev, ventas, clienteIdObj, _ep, _ed));
     }
     return nv;
+  };
+  // Retirar cliente por inactividad (4+ visitas seguidas sin comprar,
+  // marcado desde el perfil del cliente): devuelve al depósito TODOS los
+  // envases que tenga asignados (fijos + prestados) y lo da de baja del
+  // reparto — son "envases parados que no producen" según lo pedido.
+  // No se borra el historial de ventas, solo se limpia su asignación de
+  // envases y se marca _retirado para que salga de las listas del día.
+  const retirarCliente = clienteId => {
+    const cli = clientes.find(c => c.id === clienteId);
+    if (!cli) return;
+    const totalEnvases = {
+      sifon: (Number(cli.sifon) || 0) + (Number(cli.prestado?.sifon) || 0),
+      bidon10: (Number(cli.bidon10) || 0) + (Number(cli.prestado?.bidon10) || 0),
+      bidon20: (Number(cli.bidon20) || 0) + (Number(cli.prestado?.bidon20) || 0),
+      dispenser: (Number(cli.dispenser) || 0) + (Number(cli.prestado?.dispenser) || 0)
+    };
+    const detalleTexto = [totalEnvases.sifon > 0 && `${totalEnvases.sifon} sifón`, totalEnvases.bidon10 > 0 && `${totalEnvases.bidon10} bidón 10L`, totalEnvases.bidon20 > 0 && `${totalEnvases.bidon20} bidón 20L`, totalEnvases.dispenser > 0 && `${totalEnvases.dispenser} dispenser`].filter(Boolean).join(", ") || "ningún envase asignado";
+    const ok = window.confirm(`Vas a retirar a ${cli.nombre} (${detalleTexto}) y darlo de baja del reparto. Los envases vuelven al depósito. ¿Confirmás?`);
+    if (!ok) return;
+    setStock(prev => {
+      const s = JSON.parse(JSON.stringify(prev || {}));
+      if (!s.casa) s.casa = {
+        sifon: 0,
+        bidon10: 0,
+        bidon20: 0,
+        dispenser: 0
+      };
+      ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
+        s.casa[k] = (s.casa[k] || 0) + (totalEnvases[k] || 0);
+      });
+      syncData({
+        stock: s
+      });
+      return s;
+    });
+    saveClientes(prev => (prev || []).map(c => c.id === clienteId ? {
+      ...c,
+      sifon: 0,
+      bidon10: 0,
+      bidon20: 0,
+      dispenser: 0,
+      prestado: {
+        sifon: 0,
+        bidon10: 0,
+        bidon20: 0,
+        dispenser: 0
+      },
+      _retirado: true,
+      _upd: Date.now()
+    } : c));
+    irA("clientes");
   };
   const eliminarVenta = ventaId => {
     // Guard anti doble-tap: ignora un segundo borrado del MISMO id dentro de 2s
@@ -2439,7 +2536,10 @@ function App() {
     onStock: () => irA("stock"),
     onAgenda: () => irA("agenda"),
     onNuevoCliente: () => irA("nuevoCliente"),
-    onPromociones: () => irA("prospectos"),
+    onPromociones: () => {
+      setNuevoEsProspecto(true);
+      irA("nuevoCliente");
+    },
     onVolver: () => irA("portada"),
     darkMode: darkMode,
     onToggleDark: () => setDarkMode(!darkMode),
@@ -2655,7 +2755,9 @@ function App() {
     },
     onVolver: () => irA(origenFecha === "planilla" ? "selectorFechaPlanilla" : "selectorFechaClientes")
   }), pantalla === "clientes" && /*#__PURE__*/React.createElement(ListaClientes, {
-    clientes: clientes.filter(c => c.dia === diaActual),
+    // _retirado: cliente dado de baja por inactividad (4+ visitas seguidas
+    // sin comprar) — ya no se le reparte, sale de la lista del día.
+    clientes: clientes.filter(c => c.dia === diaActual && !c._retirado),
     dia: diaActual,
     fecha: fechaActual,
     ventas: ventas.filter(v => v.fechaKey === fechaActual && v.dia === diaActual),
@@ -2721,6 +2823,7 @@ function App() {
     noVisitas: (noVisitas || []).filter(v => v.clienteId === cliente.id),
     dia: diaActual,
     fecha: fechaActual,
+    onRetirarCliente: () => retirarCliente(cliente.id),
     // BUG REPORTADO: "Editar" en una venta desde el perfil del cliente
     // rompía la app ("Cannot read properties of undefined (reading
     // 'forEach')"). Causa: acá nunca se pasaba la prop `productos`, así que
@@ -2937,9 +3040,25 @@ function App() {
       nombre: prospectoAConvertir.nombre,
       telefono: prospectoAConvertir.telefono,
       calle: prospectoAConvertir.calle,
-      barrio: prospectoAConvertir.barrio
+      barrio: prospectoAConvertir.barrio,
+      esProspecto: true
+    } : nuevoEsProspecto ? {
+      esProspecto: true
     } : null,
     onGuardar: datos => {
+      // Aviso de posible duplicado (causa real de los clientes duplicados
+      // reportados: al "Convertir en cliente" un prospecto que en realidad
+      // ya era cliente, se creaba un registro nuevo sin verificar contra los
+      // existentes). Compara por nombre — si hay coincidencia, confirma
+      // antes de crear otro registro con los mismos datos.
+      const nombreNorm = (datos.nombre || "").trim().toLowerCase();
+      if (nombreNorm) {
+        const posibleDup = clientes.find(c => (c.nombre || "").trim().toLowerCase() === nombreNorm);
+        if (posibleDup) {
+          const seguir = window.confirm(`Ya existe un cliente llamado "${posibleDup.nombre}"${posibleDup.calle ? ` (${posibleDup.calle})` : ""}. ¿Seguro que querés crear otro cliente nuevo con el mismo nombre?`);
+          if (!seguir) return;
+        }
+      }
       const orden = datos.orden;
       saveClientes(prevC => {
         let base = prevC;
@@ -2970,12 +3089,14 @@ function App() {
         } : p));
         irA("prospectos");
       } else {
+        setNuevoEsProspecto(false);
         irA("clientes");
       }
     },
     onVolver: () => {
       const veniaDeProspecto = !!prospectoAConvertir;
       setProspectoAConvertir(null);
+      setNuevoEsProspecto(false);
       irA(veniaDeProspecto ? "prospectos" : "clientes");
     }
   }), pantalla === "prospectos" && /*#__PURE__*/React.createElement(Prospectos, {
@@ -3059,6 +3180,7 @@ function App() {
     noVisitas: (noVisitas || []).filter(v => v.clienteId === cliente.id),
     dia: diaActual || cliente.dia,
     fecha: fechaActual,
+    onRetirarCliente: () => retirarCliente(cliente.id),
     productos: productos,
     onVenta: () => {
       setDiaActual(cliente.dia);

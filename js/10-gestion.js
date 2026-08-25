@@ -196,6 +196,10 @@ function GestionClientes({
     key: c.id,
     style: {
       ...s.card,
+      // Prospecto: mismo recuadro punteado distinto que en la lista del
+      // día, para reconocerlo también acá.
+      border: c.esProspecto && editandoId !== c.id ? "1.5px dashed #b794f6" : undefined,
+      background: c.esProspecto && editandoId !== c.id ? "rgba(183,148,246,0.06)" : undefined,
       borderLeft: editandoId === c.id ? "3px solid #5daaff" : "0.5px solid var(--color-border-tertiary)"
     }
   }, editandoId === c.id ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
@@ -284,7 +288,17 @@ function GestionClientes({
       color: "var(--color-text-success)",
       flexShrink: 0
     }
-  }, c.dia)), /*#__PURE__*/React.createElement("div", {
+  }, c.dia), c.esProspecto && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      fontWeight: 600,
+      padding: "2px 8px",
+      borderRadius: 20,
+      color: "#b794f6",
+      border: "0.5px solid #b794f6",
+      flexShrink: 0
+    }
+  }, "🔸 Prospecto")), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 13,
       color: "var(--color-text-primary)",

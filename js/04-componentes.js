@@ -679,7 +679,27 @@ function FormCliente({
     placeholder: "Nombre completo",
     value: datos.nombre || "",
     onChange: e => set("nombre", e.target.value)
-  })), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "8px 10px",
+      borderRadius: 8,
+      border: "1px dashed #b794f6",
+      background: "rgba(183,148,246,0.06)",
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: !!datos.esProspecto,
+    onChange: e => set("esProspecto", e.target.checked)
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-secondary)"
+    }
+  }, "🔸 Es prospecto (todavía no es cliente fijo — se confirma solo tras 5 compras en su día)")), /*#__PURE__*/React.createElement("div", {
     style: s.grid2
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: s.label

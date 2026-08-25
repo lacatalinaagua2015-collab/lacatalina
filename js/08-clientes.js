@@ -51,7 +51,9 @@ function ListaClientes({
     if (motivo === "noesta" && prev === "noesta") onRegistrarNoVisita(id, "noesta2");else if (prev === motivo) onQuitarNoVisita(id);else onRegistrarNoVisita(id, motivo);
   };
   const clientesReales = clientes;
-  const clientesOrdenados = [...clientesReales].sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
+  // Prospectos siempre al final, sin importar si tienen orden cargado —
+  // son "un reparto dentro del reparto" hasta que se confirmen como fijos.
+  const clientesOrdenados = [...clientesReales].sort((a, b) => (a.esProspecto ? 1 : 0) - (b.esProspecto ? 1 : 0) || (a.orden || 9999) - (b.orden || 9999));
   const filtrados = clientesOrdenados.filter(c => buscarCliente(c, busqueda) > 0);
   const pendientesNormales = filtrados.filter(c => !visitados.has(c.id) && noVMap[c.id] !== "noesta");
   const volverAlFinal = filtrados.filter(c => noVMap[c.id] === "noesta" && !atendidos.has(c.id));
@@ -161,6 +163,11 @@ function ListaClientes({
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: {
         ...s.card,
+        // Prospecto: recuadro punteado distinto hasta que se confirme como
+        // cliente fijo (5 compras en su día) — para distinguirlos de un
+        // vistazo en la lista.
+        border: c.esProspecto ? "1.5px dashed #b794f6" : undefined,
+        background: c.esProspecto ? "rgba(183,148,246,0.06)" : undefined,
         borderLeft: `3px solid ${bc}`,
         opacity: visitados.has(c.id) ? 0.65 : est === "noesta" ? 0.85 : 1
       }
@@ -306,7 +313,9 @@ function ListaClientes({
           color: "#5daaff"
         }
       }, "Disp×", c.dispenser));
-    })(), atendido && /*#__PURE__*/React.createElement("span", {
+    })(), c.esProspecto && /*#__PURE__*/React.createElement("span", {
+      style: { ...s.tag, color: "#b794f6", border: "0.5px solid #b794f6" }
+    }, "🔸 Prospecto"), atendido && /*#__PURE__*/React.createElement("span", {
       style: s.badge("success")
     }, "✓ Listo"), est === "noesta" && !atendido && /*#__PURE__*/React.createElement("span", {
       style: s.badge("warning")
@@ -615,7 +624,8 @@ function DetalleCliente({
   onCobrarSaldo,
   onGuardarAjuste,
   onGuardarCambio,
-  onPerdida
+  onPerdida,
+  onRetirarCliente
 }) {
   const [editandoCliente, setEditandoCliente] = useState(false);
   const [editandoVentaId, setEditandoVentaId] = useState(null);
@@ -643,14 +653,64 @@ function DetalleCliente({
     const hoy = new Date();
     return (hoy - d) / 86400000 <= 30;
   }).length;
+  // "Para retirar": 4 visitas SEGUIDAS sin comprar (no está confirmado 2da
+  // vez, o no quiere) — se calcula en vivo mirando el historial combinado
+  // de compras + no-visitas de este cliente, más reciente primero. Si las
+  // primeras N son todas "sin comprar", esas son las consecutivas actuales.
+  const comprasReales = ventasSinMixtoTr.filter(v => !v._esCobro && !v._esAjuste && !v._esAjusteEnvases && !v._esCambio);
+  const eventosVisita = [...comprasReales.map(v => ({
+    fecha: v.fechaKey,
+    compra: true
+  })), ...(noVisitas || []).filter(n => n.motivo === "noesta2" || n.motivo === "noquiso").map(n => ({
+    fecha: n.fecha,
+    compra: false
+  }))].filter(e => e.fecha).sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
+  let consecutivasSinComprar = 0;
+  for (const e of eventosVisita) {
+    if (e.compra) break;
+    consecutivasSinComprar++;
+  }
+  const paraRetirar = consecutivasSinComprar >= 4;
   return /*#__PURE__*/React.createElement("div", {
     style: s.screen
   }, /*#__PURE__*/React.createElement(HeaderApp, {
     titulo: `Clientes · ${cliente.dia || ""}`,
     onVolver: onVolver
-  }), /*#__PURE__*/React.createElement("div", {
+  }), paraRetirar && /*#__PURE__*/React.createElement("div", {
     style: {
-      background: "var(--color-background-secondary)",
+      margin: "8px 14px 0",
+      padding: "10px 14px",
+      borderRadius: 10,
+      background: "rgba(226,75,74,0.14)",
+      border: "1px solid #E24B4A",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#E24B4A",
+      fontWeight: 500
+    }
+  }, "⚠ ", consecutivasSinComprar, " visitas seguidas sin comprar"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      padding: "7px 12px",
+      borderRadius: 8,
+      border: "1px solid #E24B4A",
+      background: "transparent",
+      color: "#E24B4A",
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: "pointer",
+      flexShrink: 0
+    },
+    onClick: () => onRetirarCliente && onRetirarCliente()
+  }, "Retirar envases y dar de baja")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: paraRetirar ? "rgba(226,75,74,0.08)" : "var(--color-background-secondary)",
+      border: paraRetirar ? "1px solid #E24B4A" : undefined,
       borderRadius: 10,
       margin: "8px 14px 0",
       padding: "10px 14px",
