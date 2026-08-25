@@ -939,7 +939,22 @@ function FormCliente({
       fontSize: 11,
       color: gpsEstado.startsWith("⚠") ? "var(--color-text-warning)" : "var(--color-text-success)"
     }
-  }, gpsEstado || "✓ Ya tiene ubicación guardada"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+  }, gpsEstado || "✓ Ya tiene ubicación guardada"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: s.label
+  }, "Ubicación en el mapa (buscá, tocá o arrastrá el pin)"), /*#__PURE__*/React.createElement(MapaUbicacion, {
+    lat: datos.lat,
+    lng: datos.lng,
+    onCambiar: (la, ln) => setDatos(d => ({
+      ...d,
+      lat: la,
+      lng: ln,
+      maps: `https://www.google.com/maps?q=${la},${ln}`
+    }))
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: s.label
   }, "Link foto del domicilio (Google Drive, etc)"), /*#__PURE__*/React.createElement("input", {
     style: s.input,

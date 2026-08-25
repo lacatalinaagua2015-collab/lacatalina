@@ -242,6 +242,13 @@ function App() {
   // el paso de "Inicio del reparto" (cuando el dia aun no se cargo) sepa a
   // donde volver despues: directo a la planilla, o a la lista de clientes.
   const [origenFecha, setOrigenFecha] = useState("clientes");
+  // Si se entró a "clientes" con el atajo directo desde el menú (tocando el
+  // día, cuando el camión ya estaba cargado hoy — salta diaPrincipal y
+  // selectorFechaClientes), "Volver" tiene que volver directo al menú
+  // también. Si no, "Volver" quedaba yendo por el camino largo de siempre
+  // (selectorFechaClientes → diaPrincipal → menu = 3 pasos) aunque entrar
+  // había sido 1 solo paso.
+  const [origenClientes, setOrigenClientes] = useState(null);
   const [clienteId, setClienteId] = useState(null);
   const [pinOk, setPinOk] = React.useState(false);
   const [noVisitas, setNoVisitas] = useLS("cat_novisitas_v1", []);
@@ -2589,6 +2596,7 @@ function App() {
       // Si el camión ya se cargó hoy, no repetir la pantalla de "cargar envases"
       // cada vez que se vuelve a este día — ir directo a la lista de clientes.
       const yaIniciado = planillas[`${dia}_${fechaKey}`]?.iniciado;
+      setOrigenClientes(yaIniciado ? "menu" : null);
       irA(yaIniciado ? "clientes" : "inicioReparto");
     },
     onDiaResumen: (dia, fechaKey) => {
@@ -2613,6 +2621,7 @@ function App() {
     onIrClientesDia: d => {
       setDiaActual(d);
       const yaIniciado = fechaActual && planillas[`${d}_${fechaActual}`]?.iniciado;
+      setOrigenClientes(yaIniciado ? "menu" : null);
       irA(yaIniciado ? "clientes" : "selectorFechaClientes");
     }
   }), pantalla === "confirmacionesDia" && /*#__PURE__*/React.createElement(ConfirmacionesDia, {
@@ -2694,6 +2703,9 @@ function App() {
       setFechaActual(fk);
       setFechaObj(fo);
       setOrigenFecha("clientes");
+      // Se pasó por selectorFechaClientes (camino normal, no el atajo desde
+      // el menú) — "Volver" desde clientes debe volver ahí, como siempre.
+      setOrigenClientes(null);
       // Si el camión ya se cargó ese día, no repetir "Inicio del reparto" —
       // ir directo a la lista de clientes (mismo criterio que selectorFechaPlanilla).
       const yaIniciado = planillas[`${diaActual}_${fk}`]?.iniciado;
@@ -2791,7 +2803,11 @@ function App() {
       irA("venta");
     },
     onNuevoCliente: () => irA("nuevoCliente"),
-    onVolver: () => irA("selectorFechaClientes"),
+    // Si se entró con el atajo directo desde el menú (1 solo toque), volver
+    // también directo al menú — si no, "Volver" hacía el camino largo de
+    // siempre (selectorFechaClientes → diaPrincipal → menú, 3 toques) aunque
+    // entrar hubiera sido inmediato. Ver comentario junto a origenClientes.
+    onVolver: () => irA(origenClientes === "menu" ? "menu" : "selectorFechaClientes"),
     onReordenar: lista => {
       saveClientes(prev => [...prev.filter(c => c.dia !== diaActual), ...lista]);
     },
