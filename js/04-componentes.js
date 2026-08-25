@@ -769,6 +769,7 @@ function FormCliente({
     ...(inicial || {})
   });
   const [gpsEstado, setGpsEstado] = React.useState("");
+  const [mostrarFotoComodato, setMostrarFotoComodato] = React.useState(false);
   const set = (k, v) => setDatos(d => ({
     ...d,
     [k]: v
@@ -961,6 +962,40 @@ function FormCliente({
     placeholder: "https://...",
     value: datos.foto || "",
     onChange: e => set("foto", e.target.value)
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: s.label
+  }, "Foto del comodato (la ficha en papel que firma el cliente)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, datos.fotoComodato && /*#__PURE__*/React.createElement("img", {
+    src: datos.fotoComodato,
+    alt: "Comodato",
+    onClick: () => setMostrarFotoComodato(true),
+    style: {
+      width: 44,
+      height: 44,
+      objectFit: "cover",
+      borderRadius: 8,
+      border: "0.5px solid var(--color-border-secondary)",
+      cursor: "pointer"
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: {
+      ...s.btn,
+      fontSize: 12,
+      padding: "6px 10px"
+    },
+    onClick: () => setMostrarFotoComodato(true)
+  }, datos.fotoComodato ? "📄 Cambiar foto" : "📷 Cargar foto del comodato")), mostrarFotoComodato && /*#__PURE__*/React.createElement(FotoClienteModal, {
+    cliente: datos,
+    campo: "fotoComodato",
+    titulo: "Comodato",
+    onCerrar: () => setMostrarFotoComodato(false),
+    onGuardarFoto: b64 => set("fotoComodato", b64)
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: s.label
   }, "Notas rápidas (timbre roto, perro, cobrar deuda, etc.)"), /*#__PURE__*/React.createElement("input", {

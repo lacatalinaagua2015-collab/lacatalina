@@ -330,7 +330,11 @@ function calcVenta(detalle, pago, montoPagado, saldoAplicado, productos) {
 }
 
 // Comprime imagen a max 800px y calidad 0.75 antes de guardar
-function comprimirFoto(file, maxW = 800, quality = 0.75) {
+// maxW/quality bajados (antes 800/0.75) — con muchas fotos por cliente
+// (domicilio + comodato) el espacio de localStorage se llena rápido. A
+// 640px y calidad 0.55 el texto/firma del comodato se sigue leyendo bien,
+// pero cada foto pesa bastante menos (aprox. la mitad o menos).
+function comprimirFoto(file, maxW = 640, quality = 0.55) {
   return new Promise(resolve => {
     const r = new FileReader();
     r.onload = ev => {
