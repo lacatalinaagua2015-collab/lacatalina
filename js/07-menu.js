@@ -55,9 +55,14 @@ function MenuDias({
   });
 
   // Calcular si el día de hoy está completo (todos los clientes visitados)
-  const clientesHoy = (clientes || []).filter(c => c.dia === hoyDiaNombre);
+  // Mismo criterio que ListaClientes (08-clientes.js): un cliente (prospecto
+  // o no) recién creado HOY no cuenta para el total — cargarlo YA fue la
+  // visita de hoy. Si no se excluye acá también, este badge del menú queda
+  // en rojo "Pendiente" mientras la pantalla de clientes ya muestra todo
+  // listo (verde) — misma inconsistencia que se vio con los prospectos.
+  const clientesHoy = (clientes || []).filter(c => c.dia === hoyDiaNombre && !c._retirado && c.creadoFecha !== hoyFechaKey);
   const ventasHoyIds = new Set((ventas || []).filter(v => v.fechaKey === hoyFechaKey).map(v => v.clienteId));
-  const noVisitasHoyIds = new Set((noVisitas || []).filter(v => v.fecha === hoyFechaKey).map(v => v.clienteId));
+  const noVisitasHoyIds = new Set((noVisitas || []).filter(v => v.fecha === hoyFechaKey && (v.motivo === "noesta2" || v.motivo === "noquiso")).map(v => v.clienteId));
   const visitadosHoy = clientesHoy.filter(c => ventasHoyIds.has(c.id) || noVisitasHoyIds.has(c.id));
   const diaCompleto = clientesHoy.length > 0 && visitadosHoy.length >= clientesHoy.length;
   // Estado del recuadro de HOY según la hora del reloj (si quedó sin terminar):
