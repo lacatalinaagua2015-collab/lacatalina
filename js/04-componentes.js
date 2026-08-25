@@ -120,9 +120,16 @@ function CambioEnvasePanel({
 function FotoClienteModal({
   cliente,
   onCerrar,
-  onGuardarFoto
+  onGuardarFoto,
+  campo,
+  titulo
 }) {
   if (!cliente) return null;
+  // campo/titulo: permiten reusar este mismo modal para más de un tipo de
+  // foto por cliente (domicilio, comodato firmado, etc.) sin duplicar UI.
+  const campoFoto = campo || "foto";
+  const tituloFoto = titulo || "Domicilio";
+  const fotoActual = cliente[campoFoto];
   const subir = async e => {
     const f = e.target.files[0];
     if (!f) return;
@@ -149,9 +156,9 @@ function FotoClienteModal({
       e.stopPropagation();
       onCerrar();
     }
-  }, cliente.foto ? /*#__PURE__*/React.createElement("img", {
-    src: cliente.foto,
-    alt: "Domicilio",
+  }, fotoActual ? /*#__PURE__*/React.createElement("img", {
+    src: fotoActual,
+    alt: tituloFoto,
     style: {
       maxWidth: "100%",
       maxHeight: "60vh",
@@ -165,7 +172,7 @@ function FotoClienteModal({
       fontSize: 14,
       marginBottom: 20
     }
-  }, "Sin foto · ", cliente.nombre), /*#__PURE__*/React.createElement("div", {
+  }, `Sin foto de ${tituloFoto.toLowerCase()} · `, cliente.nombre), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 12
@@ -208,7 +215,7 @@ function FotoClienteModal({
       display: "none"
     },
     onChange: subir
-  })), cliente.foto && /*#__PURE__*/React.createElement("button", {
+  })), fotoActual && /*#__PURE__*/React.createElement("button", {
     style: {
       background: "#3a2020",
       color: "#e05c5c",
@@ -633,6 +640,125 @@ function PieEnvases({
 //    Usado en: Nuevo cliente, Editar desde el perfil, Editar en Gestión.
 //    Los envases prestados NO van acá: se editan con ♻️ Envases (PieEnvases).
 // ════════════════════════════════════════════════════════════════════
+// ── MapaUbicacion — mapa chico (Leaflet + OpenStreetMap, sin API key) con
+//    pin arrastrable, para cargar/corregir la ubicación de un cliente A
+//    MANO — pensado para cuando el comodato se llena en papel en la casa y
+//    el cliente se carga en la app más tarde (no siempre se puede usar
+//    "mi ubicación actual" porque ya no se está ahí physicalmente).
+//    Uso: <MapaUbicacion lat={..} lng={..} onCambiar={(lat,lng)=>...} />
+// ════════════════════════════════════════════════════════════════════
+function MapaUbicacion({
+  lat,
+  lng,
+  onCambiar
+}) {
+  const contRef = React.useRef(null);
+  const mapRef = React.useRef(null);
+  const markerRef = React.useRef(null);
+  const [busq, setBusq] = React.useState("");
+  const [buscando, setBuscando] = React.useState(false);
+  const armarMarker = (map, la, ln) => {
+    const m = window.L.marker([la, ln], {
+      draggable: true
+    }).addTo(map);
+    m.on("dragend", () => {
+      const p = m.getLatLng();
+      onCambiar(p.lat, p.lng);
+    });
+    return m;
+  };
+  React.useEffect(() => {
+    if (!window.L || !contRef.current || mapRef.current) return;
+    // Sin ubicación previa: arranca centrado en San Miguel de Tucumán (zona
+    // de trabajo) — con ubicación previa, centrado ahí con el pin puesto.
+    const hay = lat != null && lng != null;
+    const centro = hay ? [lat, lng] : [-26.8083, -65.2176];
+    const map = window.L.map(contRef.current, {
+      attributionControl: false
+    }).setView(centro, hay ? 17 : 13);
+    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19
+    }).addTo(map);
+    if (hay) markerRef.current = armarMarker(map, lat, lng);
+    map.on("click", e => {
+      const {
+        lat: la,
+        lng: ln
+      } = e.latlng;
+      if (markerRef.current) markerRef.current.setLatLng([la, ln]);else markerRef.current = armarMarker(map, la, ln);
+      onCambiar(la, ln);
+    });
+    mapRef.current = map;
+    setTimeout(() => map.invalidateSize(), 200);
+  }, []);
+  // Si lat/lng cambian desde afuera (ej: botón "Usar mi ubicación actual"),
+  // mover/crear el pin y recentrar sin reinicializar todo el mapa.
+  React.useEffect(() => {
+    if (!mapRef.current || !window.L || lat == null || lng == null) return;
+    if (markerRef.current) markerRef.current.setLatLng([lat, lng]);else markerRef.current = armarMarker(mapRef.current, lat, lng);
+    mapRef.current.setView([lat, lng], Math.max(mapRef.current.getZoom(), 16));
+  }, [lat, lng]);
+  const buscar = async () => {
+    if (!busq.trim() || !mapRef.current) return;
+    setBuscando(true);
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(busq + ", Tucumán, Argentina")}`);
+      const data = await res.json();
+      if (data && data[0]) {
+        mapRef.current.setView([Number(data[0].lat), Number(data[0].lon)], 17);
+      } else {
+        alert("No encontré esa dirección — probá con el barrio, o movete en el mapa a mano hasta la zona y tocá para poner el pin.");
+      }
+    } catch (e) {
+      alert("No se pudo buscar (revisá la conexión) — movete en el mapa a mano hasta encontrar la zona.");
+    }
+    setBuscando(false);
+  };
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    style: {
+      ...s.input,
+      flex: 1
+    },
+    placeholder: "Buscar calle/barrio para ubicar el mapa...",
+    value: busq,
+    onChange: e => setBusq(e.target.value),
+    onKeyDown: e => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        buscar();
+      }
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: {
+      ...s.btn,
+      fontSize: 12,
+      padding: "6px 10px"
+    },
+    onClick: buscar,
+    disabled: buscando
+  }, buscando ? "..." : "🔍")), /*#__PURE__*/React.createElement("div", {
+    ref: contRef,
+    style: {
+      height: 180,
+      borderRadius: 10,
+      overflow: "hidden",
+      border: "0.5px solid var(--color-border-secondary)"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--color-text-tertiary)",
+      marginTop: 4
+    }
+  }, "Tocá el mapa o arrastrá el pin para marcar la ubicación exacta."));
+}
 function FormCliente({
   inicial,
   onGuardar,
@@ -642,6 +768,7 @@ function FormCliente({
   const [datos, setDatos] = React.useState({
     ...(inicial || {})
   });
+  const [gpsEstado, setGpsEstado] = React.useState("");
   const set = (k, v) => setDatos(d => ({
     ...d,
     [k]: v
@@ -768,7 +895,51 @@ function FormCliente({
     placeholder: "https://maps.app.goo.gl/...",
     value: datos.maps || "",
     onChange: e => set("maps", e.target.value)
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginTop: 6
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: {
+      ...s.btn,
+      fontSize: 12,
+      padding: "6px 10px"
+    },
+    onClick: () => {
+      if (!navigator.geolocation) {
+        setGpsEstado("⚠ Este teléfono/navegador no permite ubicación GPS.");
+        return;
+      }
+      setGpsEstado("📡 Buscando ubicación...");
+      navigator.geolocation.getCurrentPosition(pos => {
+        const {
+          latitude,
+          longitude
+        } = pos.coords;
+        setDatos(d => ({
+          ...d,
+          lat: latitude,
+          lng: longitude,
+          maps: `https://www.google.com/maps?q=${latitude},${longitude}`
+        }));
+        setGpsEstado("✓ Ubicación guardada");
+      }, () => {
+        setGpsEstado("⚠ No se pudo obtener la ubicación (revisá que el GPS esté prendido y dale permiso al navegador).");
+      }, {
+        enableHighAccuracy: true,
+        timeout: 10000
+      });
+    }
+  }, "📍 Usar mi ubicación actual"), (gpsEstado || datos.lat && datos.lng) && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: gpsEstado.startsWith("⚠") ? "var(--color-text-warning)" : "var(--color-text-success)"
+    }
+  }, gpsEstado || "✓ Ya tiene ubicación guardada"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: s.label
   }, "Link foto del domicilio (Google Drive, etc)"), /*#__PURE__*/React.createElement("input", {
     style: s.input,

@@ -1281,7 +1281,7 @@ function Config({
     const kb = Math.round(total / 1024);
     const pct = Math.min(100, Math.round(kb / 5120 * 100));
     const color = pct > 80 ? "#e05c5c" : pct > 50 ? "#f5b942" : "#4dd9a0";
-    const fotos = clientes.filter(c => c.foto && c.foto.startsWith('data:')).length;
+    const fotos = clientes.filter(c => c.foto && c.foto.startsWith('data:') || c.fotoComodato && c.fotoComodato.startsWith('data:')).length;
     return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",

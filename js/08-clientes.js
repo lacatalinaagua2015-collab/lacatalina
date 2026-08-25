@@ -55,12 +55,19 @@ function ListaClientes({
   // son "un reparto dentro del reparto" hasta que se confirmen como fijos.
   const clientesOrdenados = [...clientesReales].sort((a, b) => (a.esProspecto ? 1 : 0) - (b.esProspecto ? 1 : 0) || (a.orden || 9999) - (b.orden || 9999));
   const filtrados = clientesOrdenados.filter(c => buscarCliente(c, busqueda) > 0);
-  const pendientesNormales = filtrados.filter(c => !visitados.has(c.id) && noVMap[c.id] !== "noesta");
+  // Un cliente (prospecto o no) cargado HOY mismo no debe aparecer como
+  // "pendiente de atender" en la ronda de hoy — cargarlo YA fue la visita de
+  // hoy. Recién debería volver a aparecer en su próxima visita (la semana
+  // que viene, cuando "fecha" cambie y ya no coincida con creadoFecha).
+  const pendientesNormales = filtrados.filter(c => !visitados.has(c.id) && noVMap[c.id] !== "noesta" && c.creadoFecha !== fecha);
   const volverAlFinal = filtrados.filter(c => noVMap[c.id] === "noesta" && !atendidos.has(c.id));
   const pendientes = [...pendientesNormales, ...volverAlFinal];
   const sinEntrega = filtrados.filter(c => visitadosSinVenta.has(c.id));
   const listos = filtrados.filter(c => atendidos.has(c.id));
-  const todosListos = clientesReales.length > 0 && clientesReales.filter(c => visitados.has(c.id)).length >= clientesReales.length;
+  // Mismo criterio: los recién cargados hoy no cuentan para el total de
+  // "todos listos" — si no, la ronda nunca se marcaría como terminada.
+  const clientesParaHoy = clientesReales.filter(c => c.creadoFecha !== fecha);
+  const todosListos = clientesParaHoy.length > 0 && clientesParaHoy.filter(c => visitados.has(c.id)).length >= clientesParaHoy.length;
   React.useEffect(() => {
     if (todosListos && btnPlanillaRef.current) {
       btnPlanillaRef.current.scrollIntoView({
@@ -635,6 +642,7 @@ function DetalleCliente({
   const [mostrarRecordatorio, setMostrarRecordatorio] = useState(false);
   const [mostrarPagoSaldo, setMostrarPagoSaldo] = useState(false);
   const [mostrarFotoGrande, setMostrarFotoGrande] = useState(false);
+  const [mostrarFotoComodato, setMostrarFotoComodato] = useState(false);
   const [razonAjuste, setRazonAjuste] = useState("");
   const [mostrarCambio, setMostrarCambio] = useState(false);
   const recActivos = (recordatorios || []).filter(r => r.clienteId === cliente.id && !r.confirmado);
@@ -809,6 +817,16 @@ function DetalleCliente({
         foto: b64
       });
     }
+  }), mostrarFotoComodato && /*#__PURE__*/React.createElement(FotoClienteModal, {
+    cliente: cliente,
+    campo: "fotoComodato",
+    titulo: "Comodato",
+    onCerrar: () => setMostrarFotoComodato(false),
+    onGuardarFoto: b64 => {
+      onEditar({
+        fotoComodato: b64
+      });
+    }
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: 16
@@ -940,7 +958,31 @@ function DetalleCliente({
       fontSize: 26,
       textDecoration: "none"
     }
-  }, "💬"))), cliente.foto && !editandoCliente && /*#__PURE__*/React.createElement("div", {
+  }, "💬"), /*#__PURE__*/React.createElement("div", {
+    onClick: () => setMostrarFotoComodato(true),
+    title: cliente.fotoComodato ? "Ver foto del comodato" : "Cargar foto del comodato",
+    style: {
+      width: 26,
+      height: 26,
+      borderRadius: 6,
+      overflow: "hidden",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: "pointer",
+      fontSize: 20,
+      flexShrink: 0,
+      border: cliente.fotoComodato ? "1.5px solid #b794f6" : "1.5px dashed var(--color-border-secondary)"
+    }
+  }, cliente.fotoComodato ? /*#__PURE__*/React.createElement("img", {
+    src: cliente.fotoComodato,
+    alt: "Comodato",
+    style: {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover"
+    }
+  }) : "📄"))), cliente.foto && !editandoCliente && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 10,
       cursor: "zoom-in",
