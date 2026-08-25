@@ -1078,7 +1078,11 @@ function Prospectos({ prospectos, onGuardar, onEliminar, onConvertir, onVolver }
 
   const lista = (prospectos || [])
     .filter(p => verConvertidos || p.estado !== "convertido")
-    .sort((a, b) => (b.id || "").localeCompare(a.id || ""));
+    // String(...) defensivo: prospectos viejos podían tener id numérico
+    // (antes de usar crypto.randomUUID / _lcGenId), y localeCompare no
+    // existe en números — eso era lo que rompía la pantalla en el celular
+    // con "(b.id || "").localeCompare is not a function".
+    .sort((a, b) => String(b.id || "").localeCompare(String(a.id || "")));
 
   const renderForm = () => {
     if (!mostrarForm) return null;

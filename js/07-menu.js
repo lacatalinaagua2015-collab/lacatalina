@@ -1584,7 +1584,7 @@ function PlanillaDelDia({
         margin: "0 0 8px",
         padding: "10px 12px"
       }
-    }, [["Soda", llenosCargados.soda > 0 ? `${Math.floor(llenosCargados.soda / CAJON)} cajones (${llenosCargados.soda} un)` : "—"], ["Bidón 10L", llenosCargados.b10 > 0 ? `${llenosCargados.b10} unidades` : "—"], ["Bidón 20L", llenosCargados.b20 > 0 ? `${llenosCargados.b20} unidades` : "—"]].map(([l, v]) => /*#__PURE__*/React.createElement("div", {
+    }, [["Sifón", llenosCargados.soda > 0 ? `${Math.floor(llenosCargados.soda / CAJON)} cajones (${llenosCargados.soda} un)` : "—"], ["Bidón 10L", llenosCargados.b10 > 0 ? `${llenosCargados.b10} unidades` : "—"], ["Bidón 20L", llenosCargados.b20 > 0 ? `${llenosCargados.b20} unidades` : "—"]].map(([l, v]) => /*#__PURE__*/React.createElement("div", {
       key: l,
       style: {
         display: "flex",
@@ -1623,7 +1623,7 @@ function PlanillaDelDia({
         textAlign: h ? "center" : "left",
         fontWeight: 500
       }
-    }, h))), [["Soda", "soda"], ["10L", "b10"], ["20L", "b20"]].map(([label, pk]) => /*#__PURE__*/React.createElement("div", {
+    }, h))), [["Sifón", "soda"], ["10L", "b10"], ["20L", "b20"]].map(([label, pk]) => /*#__PURE__*/React.createElement("div", {
       key: pk,
       style: {
         display: "grid",
@@ -1684,7 +1684,7 @@ function PlanillaDelDia({
       }
     }, "Salió, vuelve y lo que queda. Si algo no coincide con lo cargado, corregilo vos."), (() => {
       const filasResumen = [];
-      const productCards = [["Soda", "soda"], ["Bidón 10L", "b10"], ["Bidón 20L", "b20"]].map(([label, pk]) => {
+      const productCards = [["Sifón", "soda"], ["Bidón 10L", "b10"], ["Bidón 20L", "b20"]].map(([label, pk]) => {
       const cajon = pk === "soda" ? CAJON : 1;
       const unidad = pk === "soda" ? "cajones" : "unidades";
       const div = n => pk === "soda" ? Math.floor(n / cajon) : n;
