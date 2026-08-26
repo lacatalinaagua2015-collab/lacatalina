@@ -825,9 +825,19 @@ function DetalleVentasDia({
   ventas,
   clientes,
   noVisitas,
-  fecha
+  fecha,
+  productos,
+  todasLasVentas,
+  onEditarVenta,
+  onEliminarVenta,
+  onEditarCliente,
+  onPerdidaCliente
 }) {
   const [abierto, setAbierto] = React.useState(false);
+  // Qué venta se está editando in-place (solo aplica a compras reales —
+  // cobros/ajustes/cambios de envase solo se pueden eliminar, no editar,
+  // mismo criterio que el historial del perfil del cliente).
+  const [editandoVentaId, setEditandoVentaId] = React.useState(null);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       margin: "0 0 8px",
@@ -916,13 +926,61 @@ function DetalleVentasDia({
     const fmtEnv = arr => (arr || []).filter(e => e.prod && Number(e.cant) > 0).map(e => `${e.cant} ${e.prod}`).join(", ");
     const prestStr = fmtEnv(v.envPrest);
     const devStr = fmtEnv(v.envDev);
+    // Mismo criterio que el historial del perfil del cliente (08-clientes.js):
+    // cobros/ajustes/cambios de envase solo se pueden eliminar, no editar —
+    // editarlos como si fueran una compra normal rompería el saldo/stock.
+    const esCobro = v.pagadoNum > 0 && v.neto === 0 && !v._esAjuste;
+    const esAjuste = v._esAjuste || false;
+    const esCambio = v._esCambio || false;
+    const esCompraReal = !esCobro && !esAjuste && !esCambio;
+    const cardStyle = {
+      padding: "10px 16px",
+      borderBottom: idx < ventas.length - 1 ? "0.5px solid var(--color-border-tertiary)" : "none",
+      ...(esNuevo ? { background: "rgba(93,170,255,0.10)", borderLeft: "3px solid #5daaff" } : {})
+    };
+    if (editandoVentaId === v.id && esCompraReal) {
+      return /*#__PURE__*/React.createElement("div", {
+        key: v.id,
+        style: cardStyle
+      }, /*#__PURE__*/React.createElement(EditVenta, {
+        venta: v,
+        productos: productos,
+        onGuardar: (d, p, m, sa, obs, tr2) => {
+          onEditarVenta(v.id, d, p, m, sa, obs, tr2);
+          setEditandoVentaId(null);
+        },
+        onCancelar: () => setEditandoVentaId(null)
+      }));
+    }
+    // Fila de acciones al pie de cada tarjeta: registrar envases prestados/
+    // devueltos del cliente (mismo panel "♻️ Envases" que en Gestión/perfil),
+    // editar (solo compras reales) y eliminar.
+    const accionesRow = cli ? /*#__PURE__*/React.createElement(PieEnvases, {
+      c: cli,
+      ventas: todasLasVentas || [],
+      onEditar: onEditarCliente,
+      onPerdidaCliente: onPerdidaCliente
+    }, esCompraReal && /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        fontSize: 11,
+        padding: "3px 8px"
+      },
+      onClick: () => setEditandoVentaId(v.id)
+    }, "✏️ Editar"), /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btnDanger,
+        fontSize: 11,
+        padding: "3px 8px"
+      },
+      onClick: () => {
+        const tipo = esCobro ? "este cobro" : esAjuste ? "este ajuste" : esCambio ? "este cambio" : "esta venta";
+        if (window.confirm(`¿Eliminar ${tipo}?`)) onEliminarVenta(v.id);
+      }
+    }, "🗑 Eliminar")) : null;
     return /*#__PURE__*/React.createElement("div", {
       key: v.id,
-      style: {
-        padding: "10px 16px",
-        borderBottom: idx < ventas.length - 1 ? "0.5px solid var(--color-border-tertiary)" : "none",
-        ...(esNuevo ? { background: "rgba(93,170,255,0.10)", borderLeft: "3px solid #5daaff" } : {})
-      }
+      style: cardStyle
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
@@ -1025,7 +1083,7 @@ function DetalleVentasDia({
         fontSize: 11,
         color: "var(--color-text-info)"
       }
-    }, "↩️ Devolvió: ", devStr)));
+    }, "↩️ Devolvió: ", devStr)), accionesRow);
   }), (() => {
     const ventaIds = new Set(ventas.map(v => v.clienteId));
     const noComp = (noVisitas || []).filter(n => n.fecha === fecha && !ventaIds.has(n.clienteId) && n.motivo !== "salteado");
@@ -1059,11 +1117,14 @@ function DetalleVentasDia({
       return /*#__PURE__*/React.createElement("div", {
         key: "nv" + i,
         style: {
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
           padding: "7px 16px",
           borderTop: i > 0 ? "0.5px solid var(--color-border-tertiary)" : "none"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center"
         }
       }, /*#__PURE__*/React.createElement("div", {
         style: {
@@ -1086,7 +1147,12 @@ function DetalleVentasDia({
           color: info.c,
           flexShrink: 0
         }
-      }, info.ic, " ", info.t));
+      }, info.ic, " ", info.t)), p.id && /*#__PURE__*/React.createElement(PieEnvases, {
+        c: p,
+        ventas: todasLasVentas || [],
+        onEditar: onEditarCliente,
+        onPerdidaCliente: onPerdidaCliente
+      }));
     }));
   })()));
 }
@@ -1107,7 +1173,11 @@ function PlanillaDelDia({
   onAutoGuardar,
   noVisitas,
   cargasDia,
-  setCargasDia
+  setCargasDia,
+  onEditarVenta,
+  onEliminarVenta,
+  onEditarCliente,
+  onPerdidaCliente
 }) {
   // Separar ventas del día propio vs ventas de clientes de otro día
   const clientesDia = new Set((clientes || []).filter(c => c.dia === dia).map(c => c.id));
@@ -2424,7 +2494,13 @@ function PlanillaDelDia({
     ventas: todasVentasDia,
     clientes: clientes,
     noVisitas: noVisitas,
-    fecha: fecha
+    fecha: fecha,
+    productos: productos,
+    todasLasVentas: todasLasVentas,
+    onEditarVenta: onEditarVenta,
+    onEliminarVenta: onEliminarVenta,
+    onEditarCliente: onEditarCliente,
+    onPerdidaCliente: onPerdidaCliente
   }) : /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,

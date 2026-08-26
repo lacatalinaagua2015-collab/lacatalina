@@ -2697,7 +2697,21 @@ function App() {
     },
     onAutoGuardar: d => savePlanilla(`${diaActual}_${fechaActual}`, d),
     onVolver: () => irA(origenFecha === "atajo" ? "atajoPlanillaSemana" : origenFecha === "menu" ? "menu" : "selectorFechaPlanilla"),
-    noVisitas: noVisitas
+    noVisitas: noVisitas,
+    // Editar/eliminar venta y registrar envases prestados/devueltos directo
+    // desde la Planilla del día (antes solo se podía desde el perfil del
+    // cliente) — mismas funciones ya usadas en el resto de la app.
+    onEditarVenta: editarVenta,
+    onEliminarVenta: eliminarVenta,
+    onEditarCliente: (id, cambios) => {
+      const antes = clientes.find(c => c.id === id);
+      saveClientes(prev => prev.map(c => c.id === id ? {
+        ...c,
+        ...cambios
+      } : c));
+      if (antes) ajustarStockFijoCliente(antes, { ...antes, ...cambios });
+    },
+    onPerdidaCliente: registrarPerdidaCliente
   }), pantalla === "selectorFechaClientes" && /*#__PURE__*/React.createElement(SelectorFecha, {
     dia: diaActual,
     planillas: planillas,
