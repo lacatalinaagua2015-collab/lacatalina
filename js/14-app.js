@@ -363,6 +363,32 @@ function App() {
     }
     localStorage.setItem("lc_prospectos_migrados_v1", "1");
   }, []);
+  // Migración única: corrige cobros de deuda cuyo campo "dia" quedó mal por
+  // el bug reportado (onCobrarSaldo guardaba diaActual en vez del día real
+  // del cliente — un pago de un cliente de los martes podía archivarse bajo
+  // "viernes" si esa era la última ruta activa cuando se cargó el pago).
+  // Solo toca el campo "dia" de ventas _esCobro; no toca saldo, fecha ni el
+  // enganche con ventas fiadas que haya saldado — así no hay riesgo de
+  // romper esos datos. Es idempotente: si ya está bien, no cambia nada.
+  React.useEffect(() => {
+    if (localStorage.getItem("lc_cobros_dia_migrados_v1")) return;
+    if (!ventas.length || !clientes.length) return;
+    const clientesPorId = {};
+    clientes.forEach(c => {
+      clientesPorId[c.id] = c;
+    });
+    const aCorregir = ventas.filter(v => v._esCobro && v.dia && clientesPorId[v.clienteId] && clientesPorId[v.clienteId].dia && v.dia !== clientesPorId[v.clienteId].dia);
+    if (aCorregir.length > 0) {
+      const idsCorregir = new Set(aCorregir.map(v => v.id));
+      saveVentas(prev => prev.map(v => idsCorregir.has(v.id) ? {
+        ...v,
+        dia: clientesPorId[v.clienteId].dia,
+        _upd: Date.now()
+      } : v));
+      console.log(`✓ Corregidos ${aCorregir.length} cobro(s) de deuda con el día equivocado.`);
+    }
+    localStorage.setItem("lc_cobros_dia_migrados_v1", "1");
+  }, [ventas, clientes]);
   // Cuando se toca "Convertir en cliente" en un prospecto, se guarda acá
   // para precargar el formulario de Nuevo Cliente con nombre/teléfono/dirección.
   const [prospectoAConvertir, setProspectoAConvertir] = useState(null);
@@ -2932,11 +2958,16 @@ function App() {
       const fk = new Date().toLocaleDateString("en-CA");
       // saldoAntes/saldoDespues son solo para mostrar en el historial (referencia visual);
       // el cálculo real del saldo usa saldoDelta con forma funcional más abajo.
+      // BUG REPORTADO: un cobro de deuda quedaba archivado bajo el día que la
+      // app tenía activo en ese momento (diaActual, ej. "Viernes" de la
+      // última ruta) en vez del día real del cliente — por eso un pago de un
+      // cliente de los martes aparecía en la lista de confirmaciones del
+      // viernes. El día del cobro siempre tiene que ser el del cliente.
       const vt = {
         id: Date.now(),
         clienteId: cl.id,
         cliente: cl.nombre,
-        dia: diaActual || cl.dia,
+        dia: cl.dia,
         fechaKey: fk,
         fecha: new Date().toLocaleString("es-AR"),
       hora: new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
@@ -3250,12 +3281,17 @@ function App() {
           precio: 0,
           total: 0
         }];
-        const fk = fechaActual || new Date().toLocaleDateString("en-CA");
+        // BUG REPORTADO: mismo problema que en el perfil normal — Gestión
+        // permite ver cualquier cliente sin importar el día activo, así que
+        // ni diaActual ni fechaActual (que pueden venir de una sesión vieja)
+        // sirven acá. El cobro siempre va con el día del cliente y la fecha
+        // real de hoy.
+        const fk = new Date().toLocaleDateString("en-CA");
         const vt = {
           id: Date.now(),
           clienteId: cliente.id,
           cliente: cliente.nombre,
-          dia: diaActual || cliente.dia,
+          dia: cliente.dia,
           fechaKey: fk,
           fecha: new Date().toLocaleString("es-AR"),
       hora: new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
