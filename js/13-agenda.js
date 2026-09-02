@@ -230,7 +230,7 @@ function AgendaScreen({
         color: "var(--color-text-secondary)",
         marginBottom: 4
       }
-    }, c.dia, " · ", c.barrio || ""), /*#__PURE__*/React.createElement("div", {
+    }, c.dia, direccionCliente(c) && " · ", direccionCliente(c)), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 13,
         color: "var(--color-text-primary)",
@@ -435,7 +435,7 @@ function NuevoRecordatorioForm({
       fontSize: 11,
       color: "var(--color-text-secondary)"
     }
-  }, c.dia, " · ", c.barrio || ""))))), /*#__PURE__*/React.createElement("div", {
+  }, c.dia, direccionCliente(c) && " · ", direccionCliente(c)))))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 14
     }

@@ -64,6 +64,12 @@ function ListaClientes({
   const pendientes = [...pendientesNormales, ...volverAlFinal];
   const sinEntrega = filtrados.filter(c => visitadosSinVenta.has(c.id));
   const listos = filtrados.filter(c => atendidos.has(c.id));
+  // BUG REPORTADO: un cliente cargado hoy mismo (creadoFecha === fecha), sin
+  // venta ni "no está"/"no quiere" todavía, quedaba afuera de las 4
+  // secciones de arriba — no aparecía en NINGÚN lado de la lista, ni
+  // buscándolo, aunque el dato estuviera bien guardado. Necesita su propia
+  // sección para seguir visible/buscable sin contar como "pendiente".
+  const agregadosHoy = filtrados.filter(c => c.creadoFecha === fecha && !visitados.has(c.id) && noVMap[c.id] !== "noesta");
   // Mismo criterio: los recién cargados hoy no cuentan para el total de
   // "todos listos" — si no, la ronda nunca se marcaría como terminada.
   const clientesParaHoy = clientesReales.filter(c => c.creadoFecha !== fecha);
@@ -596,6 +602,14 @@ function ListaClientes({
   }, "No hay clientes para ", dia, "."), pendientesNormales.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
     style: s.sectionTitle
   }, "Pendientes (", pendientesNormales.length, ")"), pendientesNormales.map(c => /*#__PURE__*/React.createElement(Card, {
+    key: c.id,
+    c: c
+  }))), agregadosHoy.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      ...s.sectionTitle,
+      color: "#5daaff"
+    }
+  }, "🆕 Agregados hoy (", agregadosHoy.length, ")"), agregadosHoy.map(c => /*#__PURE__*/React.createElement(Card, {
     key: c.id,
     c: c
   }))), volverAlFinal.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {

@@ -43,6 +43,8 @@ function MenuDias({
   // del día") antes de recién ahí elegir la fecha. Se saca esa pantalla de
   // en medio: tocar el día expande estos 2 botones ACÁ MISMO, en la fila.
   const [diaExpandido, setDiaExpandido] = React.useState(null);
+  const [mostrarRecordatorios, setMostrarRecordatorios] = React.useState(true);
+  const [mostrarTransferencias, setMostrarTransferencias] = React.useState(true);
   const hoyDiaNombre = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"][new Date().getDay()];
   // Usar hora LOCAL para evitar bug de zona horaria (Argentina UTC-3)
   const hoyFechaKey = (() => {
@@ -85,9 +87,14 @@ function MenuDias({
       color: "#5daaff",
       marginBottom: 6,
       textTransform: "uppercase",
-      letterSpacing: "0.05em"
-    }
-  }, "🔔 Recordatorios pendientes"), recordatoriosActivos.slice(0, 5).map(r => /*#__PURE__*/React.createElement("div", {
+      letterSpacing: "0.05em",
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      gap: 4
+    },
+    onClick: () => setMostrarRecordatorios(v => !v)
+  }, mostrarRecordatorios ? "▼" : "▶", " 🔔 Recordatorios pendientes (", recordatoriosActivos.length, ")"), mostrarRecordatorios && recordatoriosActivos.slice(0, 5).map(r => /*#__PURE__*/React.createElement("div", {
     key: r.id,
     style: {
       ...s.card,
@@ -141,7 +148,7 @@ function MenuDias({
       marginTop: 2
     },
     onClick: () => onConfirmarRecordatorio && onConfirmarRecordatorio(r.id)
-  }, "✓"))), recordatoriosActivos.length > 5 && /*#__PURE__*/React.createElement("div", {
+  }, "✓"))), mostrarRecordatorios && recordatoriosActivos.length > 5 && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: "var(--color-text-tertiary)",
@@ -158,9 +165,14 @@ function MenuDias({
       color: "#f5b942",
       marginBottom: 6,
       textTransform: "uppercase",
-      letterSpacing: "0.05em"
-    }
-  }, "🔴 Transferencias sin confirmar"), transferenciasPendientes.map(({
+      letterSpacing: "0.05em",
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      gap: 4
+    },
+    onClick: () => setMostrarTransferencias(v => !v)
+  }, mostrarTransferencias ? "▼" : "▶", " 🔴 Transferencias sin confirmar (", transferenciasPendientes.length, ")"), mostrarTransferencias && transferenciasPendientes.map(({
     dia,
     fecha,
     count,
