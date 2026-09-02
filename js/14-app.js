@@ -277,6 +277,29 @@ function App() {
       return next;
     });
   };
+  // Registro de movimientos de dispenser (comodato) — préstamo/retiro directo
+  // al cliente, por día. Antes esto solo tocaba cliente.dispenser sin dejar
+  // rastro; para poder informar cuánto se prestó/retiró en el Cierre del día
+  // (pedido del usuario, junto con sifón/bidones) se guarda acá un historial
+  // liviano, sin tocar el modelo de c.prestado/c.dispenser existente.
+  const [dispMovs, setDispMovs] = useLS("cat_dispmovs_v1", []);
+  const registrarDispMov = (clienteId, clienteNombre, delta) => {
+    if (!delta) return;
+    setDispMovs(prev => {
+      const next = [...prev, {
+        id: Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+        fechaKey: new Date().toLocaleDateString("en-CA"),
+        clienteId,
+        clienteNombre: clienteNombre || null,
+        delta,
+        _upd: Date.now()
+      }];
+      syncData({
+        dispMovs: next
+      });
+      return next;
+    });
+  };
   const [recordatorios, setRecordatorios] = useLS("cat_recordatorios_v1", []);
   // recordatorio: {id, clienteId, clienteNombre, fecha, hora, motivo, dia, confirmado}
   // BUG REPORTADO: clientes (y productos/recordatorios) borrados volvían a
@@ -2734,6 +2757,7 @@ function App() {
     fecha: fechaActual,
     ventas: ventas.filter(v => v.fechaKey === fechaActual),
     todasLasVentas: ventas,
+    dispMovs: dispMovs.filter(m => m.fechaKey === fechaActual),
     clientes: clientes,
     planilla: planillas[`${diaActual}_${fechaActual}`] || planillaDiaVacia(),
     productos: productos,
@@ -2863,6 +2887,7 @@ function App() {
         dispenser: Math.max(0, (Number(c.dispenser) || 0) + delta)
       } : c));
       if (antes) ajustarStockFijoCliente(antes, { ...antes, dispenser: Math.max(0, (Number(antes.dispenser) || 0) + delta) });
+      registrarDispMov(id, antes?.nombre, delta);
     },
     onSeleccionar: c => {
       setClienteId(c.id);

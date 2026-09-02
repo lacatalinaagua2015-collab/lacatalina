@@ -1173,6 +1173,7 @@ function PlanillaDelDia({
   fecha,
   ventas,
   todasLasVentas,
+  dispMovs,
   clientes,
   planilla,
   productos,
@@ -1340,6 +1341,9 @@ function PlanillaDelDia({
     b10: "",
     b20: ""
   });
+  // Cartel de confirmación antes de mover algo del/al Depósito — pedido del
+  // usuario: la app tiene que avisar y preguntar, no mover en silencio.
+  const [mostrarConfirmDeposito, setMostrarConfirmDeposito] = useState(false);
 
   // ── Cálculo de stock para el cierre del día ──────────────────
   const CAJON = 6;
@@ -1356,17 +1360,20 @@ function PlanillaDelDia({
   const vendidosDia = {
     soda: 0,
     b10: 0,
-    b20: 0
+    b20: 0,
+    disp: 0
   };
   const prestadosDia = {
     soda: 0,
     b10: 0,
-    b20: 0
+    b20: 0,
+    disp: 0
   };
   const devueltosDia = {
     soda: 0,
     b10: 0,
-    b20: 0
+    b20: 0,
+    disp: 0
   };
   const prodKeyPl = {
     "Sifón 1.5L": "soda",
@@ -1386,6 +1393,12 @@ function PlanillaDelDia({
       const k = prodKeyPl[e.prod];
       if (k) devueltosDia[k] += Number(e.cant) || 0;
     });
+  });
+  // Dispenser: no se "vende", se presta/retira en comodato directo al
+  // cliente (ver registrarDispMov en 14-app.js) — se suma acá por separado
+  // para que aparezca en el mismo informe del día que sifón/bidones.
+  (dispMovs || []).forEach(m => {
+    if (m.delta > 0) prestadosDia.disp += m.delta;else devueltosDia.disp += -m.delta;
   });
   // FÓRMULA CORRECTA:
   // Sobrantes llenos = cargados − vendidos (prestados no reducen llenos, se compensan con devueltos)
@@ -1465,14 +1478,17 @@ function PlanillaDelDia({
     paraLlenarCalc[pk] = Math.min(falta, vaciosHoy); // no se puede llenar más de lo que vuelve vacío hoy
     vaciosRestoCalc[pk] = Math.max(0, vaciosHoy - paraLlenarCalc[pk]);
   });
-  const confirmarCierre = () => {
-    if (enviandoCierre) return;
-    // Bloquear el botón de inmediato: sin este freno, un doble-toque podía
-    // ejecutar confirmarCierre() dos veces seguidas y sumar los mismos
-    // envases a sodería dos veces (causa real de acumulación de envases,
-    // encontrada y corregida en Individual/Multiple — mismo arreglo acá).
-    setEnviandoCierre(true);
-    localStorage.setItem(cierreKey, "1"); // marcar como confirmado
+  const planKeyToSkL = {
+    "soda": "sifon",
+    "b10": "bidon10",
+    "b20": "bidon20"
+  };
+  // Calcula cuánto hay que sumar o sacar del Depósito para que sodería
+  // vuelva a su número fijo (ver notas abajo). Se separa de confirmarCierre
+  // para poder mostrar el mismo resultado en el cartel de confirmación
+  // ANTES de tocar el stock — pedido del usuario: que la app avise y
+  // pregunte antes de mover algo del/al depósito.
+  const calcularMovimientoDeposito = () => {
     // Usar valores reales si el usuario los modificó, si no usar los calculados
     const llenVuelta = {
       soda: 0,
@@ -1483,11 +1499,6 @@ function PlanillaDelDia({
       soda: 0,
       b10: 0,
       b20: 0
-    };
-    const planKeyToSkL = {
-      "soda": "sifon",
-      "b10": "bidon10",
-      "b20": "bidon20"
     };
     ["soda", "b10", "b20"].forEach(pk => {
       const calcL = sobrantes[pk];
@@ -1543,6 +1554,27 @@ function PlanillaDelDia({
       llenVueltaFijo[pk] = Math.max(0, Math.round(llenVuelta[pk] * factor));
       vacVueltaFijo[pk] = Math.max(0, Math.round(vacVuelta[pk] * factor));
     });
+    return {
+      diffs,
+      diffDeposito,
+      llenVueltaFijo,
+      vacVueltaFijo
+    };
+  };
+  const confirmarCierre = () => {
+    if (enviandoCierre) return;
+    // Bloquear el botón de inmediato: sin este freno, un doble-toque podía
+    // ejecutar confirmarCierre() dos veces seguidas y sumar los mismos
+    // envases a sodería dos veces (causa real de acumulación de envases,
+    // encontrada y corregida en Individual/Multiple — mismo arreglo acá).
+    setEnviandoCierre(true);
+    localStorage.setItem(cierreKey, "1"); // marcar como confirmado
+    const {
+      diffs,
+      diffDeposito,
+      llenVueltaFijo,
+      vacVueltaFijo
+    } = calcularMovimientoDeposito();
     setStock(prev => {
       const s = JSON.parse(JSON.stringify(prev || {}));
       if (!s.soderia) s.soderia = {
@@ -1583,6 +1615,16 @@ function PlanillaDelDia({
       _cierreDiffs: Object.keys(diffs).length > 0 ? diffs : null
     });
     setMostrarCierre(false);
+    setMostrarConfirmDeposito(false);
+  };
+  // Antes de cerrar, si hace falta agregar o sacar algo del Depósito (porque
+  // sobra o falta en sodería), se pregunta primero — si no hace falta mover
+  // nada, se cierra directo sin molestar con un cartel de más.
+  const intentarCerrar = () => {
+    if (enviandoCierre) return;
+    const { diffDeposito } = calcularMovimientoDeposito();
+    const hayMovimiento = ["soda", "b10", "b20"].some(pk => diffDeposito[pk] !== 0);
+    if (hayMovimiento) setMostrarConfirmDeposito(true);else confirmarCierre();
   };
   const setProd = (pid, campo, v) => setDatos(d => ({
     ...d,
@@ -1635,14 +1677,12 @@ function PlanillaDelDia({
       style: {
         padding: 16
       }
-    }, /*#__PURE__*/React.createElement("details", {
+    }, /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: 12
       }
-    }, /*#__PURE__*/React.createElement("summary", {
+    }, /*#__PURE__*/React.createElement("div", {
       style: {
-        cursor: "pointer",
-        listStyle: "none",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -1656,12 +1696,7 @@ function PlanillaDelDia({
         fontWeight: 500,
         color: "var(--color-text-primary)"
       }
-    }, "Ver detalle del día (lo cargado y los movimientos)"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 11,
-        color: "var(--color-text-tertiary)"
-      }
-    }, "▾")), /*#__PURE__*/React.createElement("div", {
+    }, "📋 Detalle del día (lo cargado y los movimientos)")), /*#__PURE__*/React.createElement("div", {
       style: {
         marginTop: 8
       }
@@ -1710,7 +1745,7 @@ function PlanillaDelDia({
         textAlign: h ? "center" : "left",
         fontWeight: 500
       }
-    }, h))), [["Sifón", "soda"], ["10L", "b10"], ["20L", "b20"]].map(([label, pk]) => /*#__PURE__*/React.createElement("div", {
+    }, h))), [["Sifón", "soda"], ["10L", "b10"], ["20L", "b20"], ["Dispenser", "disp"]].map(([label, pk]) => /*#__PURE__*/React.createElement("div", {
       key: pk,
       style: {
         display: "grid",
@@ -2005,8 +2040,94 @@ function PlanillaDelDia({
         opacity: enviandoCierre ? 0.7 : 1
       },
       disabled: enviandoCierre,
-      onClick: confirmarCierre
-    }, enviandoCierre ? "⏳ Cerrando día..." : "✓ Cerrar día y actualizar stock")));
+      onClick: intentarCerrar
+    }, enviandoCierre ? "⏳ Cerrando día..." : "✓ Cerrar día y actualizar stock"), mostrarConfirmDeposito && (() => {
+      const { diffDeposito } = calcularMovimientoDeposito();
+      const LBL = { soda: "Sifón", b10: "Bidón 10L", b20: "Bidón 20L" };
+      const filas = ["soda", "b10", "b20"].filter(pk => diffDeposito[pk] !== 0);
+      return /*#__PURE__*/React.createElement("div", {
+        style: {
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0,0,0,0.75)",
+          zIndex: 2000,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 20
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          ...s.card,
+          maxWidth: 360,
+          width: "100%",
+          margin: 0
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 15,
+          fontWeight: 600,
+          color: "var(--color-text-primary)",
+          marginBottom: 6
+        }
+      }, "📦 Movimiento en el Depósito"), /*#__PURE__*/React.createElement("p", {
+        style: {
+          fontSize: 12,
+          color: "var(--color-text-tertiary)",
+          margin: "0 0 12px"
+        }
+      }, "Sodería tiene que volver a su número fijo — esto es lo que se va a mover en el Depósito para compensar."), filas.map(pk => {
+        const diff = diffDeposito[pk];
+        const cajon = pk === "soda" ? CAJON : 1;
+        const cant = pk === "soda" ? Math.round(Math.abs(diff) / cajon) : Math.abs(diff);
+        const unidad = pk === "soda" ? (cant === 1 ? "cajón" : "cajones") : cant === 1 ? "unidad" : "unidades";
+        return /*#__PURE__*/React.createElement("div", {
+          key: pk,
+          style: {
+            display: "flex",
+            justifyContent: "space-between",
+            padding: "7px 0",
+            borderTop: "0.5px solid var(--color-border-tertiary)",
+            fontSize: 13
+          }
+        }, /*#__PURE__*/React.createElement("span", {
+          style: { color: "var(--color-text-secondary)" }
+        }, LBL[pk]), /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontWeight: 600,
+            color: diff > 0 ? "var(--color-text-success)" : "var(--color-text-warning)"
+          }
+        }, diff > 0 ? `+ guardar ${cant} ${unidad}` : `− sacar ${cant} ${unidad}`));
+      }), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          gap: 8,
+          marginTop: 14
+        }
+      }, /*#__PURE__*/React.createElement("button", {
+        style: {
+          ...s.btn,
+          flex: 1
+        },
+        onClick: () => setMostrarConfirmDeposito(false)
+      }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
+        style: {
+          flex: 1,
+          background: "#1d9e75",
+          color: "#fff",
+          border: "none",
+          borderRadius: 8,
+          padding: "10px",
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer"
+        },
+        onClick: confirmarCierre
+      }, "✓ Confirmar"))));
+    })()));
   }
   return /*#__PURE__*/React.createElement("div", {
     style: s.screen
