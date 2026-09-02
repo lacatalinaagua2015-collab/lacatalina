@@ -363,32 +363,6 @@ function App() {
     }
     localStorage.setItem("lc_prospectos_migrados_v1", "1");
   }, []);
-  // Migración única: corrige cobros de deuda cuyo campo "dia" quedó mal por
-  // el bug reportado (onCobrarSaldo guardaba diaActual en vez del día real
-  // del cliente — un pago de un cliente de los martes podía archivarse bajo
-  // "viernes" si esa era la última ruta activa cuando se cargó el pago).
-  // Solo toca el campo "dia" de ventas _esCobro; no toca saldo, fecha ni el
-  // enganche con ventas fiadas que haya saldado — así no hay riesgo de
-  // romper esos datos. Es idempotente: si ya está bien, no cambia nada.
-  React.useEffect(() => {
-    if (localStorage.getItem("lc_cobros_dia_migrados_v1")) return;
-    if (!ventas.length || !clientes.length) return;
-    const clientesPorId = {};
-    clientes.forEach(c => {
-      clientesPorId[c.id] = c;
-    });
-    const aCorregir = ventas.filter(v => v._esCobro && v.dia && clientesPorId[v.clienteId] && clientesPorId[v.clienteId].dia && v.dia !== clientesPorId[v.clienteId].dia);
-    if (aCorregir.length > 0) {
-      const idsCorregir = new Set(aCorregir.map(v => v.id));
-      saveVentas(prev => prev.map(v => idsCorregir.has(v.id) ? {
-        ...v,
-        dia: clientesPorId[v.clienteId].dia,
-        _upd: Date.now()
-      } : v));
-      console.log(`✓ Corregidos ${aCorregir.length} cobro(s) de deuda con el día equivocado.`);
-    }
-    localStorage.setItem("lc_cobros_dia_migrados_v1", "1");
-  }, [ventas, clientes]);
   // Cuando se toca "Convertir en cliente" en un prospecto, se guarda acá
   // para precargar el formulario de Nuevo Cliente con nombre/teléfono/dirección.
   const [prospectoAConvertir, setProspectoAConvertir] = useState(null);
@@ -417,6 +391,32 @@ function App() {
   };
   const ventas = React.useMemo(() => (ventasRaw || []).map(normalizarFechaKey), [ventasRaw]);
   const setVentas = arg => setVentasRaw(typeof arg === 'function' ? prev => arg(prev) : arg);
+  // Migración única: corrige cobros de deuda cuyo campo "dia" quedó mal por
+  // el bug reportado (onCobrarSaldo guardaba diaActual en vez del día real
+  // del cliente — un pago de un cliente de los martes podía archivarse bajo
+  // "viernes" si esa era la última ruta activa cuando se cargó el pago).
+  // Solo toca el campo "dia" de ventas _esCobro; no toca saldo, fecha ni el
+  // enganche con ventas fiadas que haya saldado — así no hay riesgo de
+  // romper esos datos. Es idempotente: si ya está bien, no cambia nada.
+  React.useEffect(() => {
+    if (localStorage.getItem("lc_cobros_dia_migrados_v1")) return;
+    if (!ventas.length || !clientes.length) return;
+    const clientesPorId = {};
+    clientes.forEach(c => {
+      clientesPorId[c.id] = c;
+    });
+    const aCorregir = ventas.filter(v => v._esCobro && v.dia && clientesPorId[v.clienteId] && clientesPorId[v.clienteId].dia && v.dia !== clientesPorId[v.clienteId].dia);
+    if (aCorregir.length > 0) {
+      const idsCorregir = new Set(aCorregir.map(v => v.id));
+      saveVentas(prev => prev.map(v => idsCorregir.has(v.id) ? {
+        ...v,
+        dia: clientesPorId[v.clienteId].dia,
+        _upd: Date.now()
+      } : v));
+      console.log(`✓ Corregidos ${aCorregir.length} cobro(s) de deuda con el día equivocado.`);
+    }
+    localStorage.setItem("lc_cobros_dia_migrados_v1", "1");
+  }, [ventas, clientes]);
   const [productos, setProductos] = useLS("cat_productos_v3", PRODUCTOS_INICIALES);
   const BASE_DEFAULT_FIJA = {
     sifon: 150,
