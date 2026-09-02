@@ -515,6 +515,32 @@ function App() {
     const normalized = normStock(stockRaw);
     if (JSON.stringify(normalized) !== JSON.stringify(stockRaw)) setStockRaw(normalized);
   }, []);
+  // Relleno automático de sodería los lunes: llega la producción de la
+  // semana y la sodería queda a full (según la "Base"/capacidadFija
+  // configurada en Stock). De ahí en más el número baja solo con los
+  // movimientos normales del día a día (InicioReparto descuenta al cargar
+  // el camión, cerrarCamion devuelve el sobrante al cerrar el día). Se
+  // corre UNA sola vez por semana — se guarda la fecha del lunes ya
+  // aplicado en localStorage para no volver a pisar el número si se
+  // recarga la app el mismo lunes después de haber cargado/vendido algo.
+  React.useEffect(() => {
+    const hoy = new Date();
+    if (hoy.getDay() !== 1) return; // 1 = lunes
+    const hoyKey = hoy.toLocaleDateString("en-CA");
+    if (localStorage.getItem("lc_stock_relleno_lunes") === hoyKey) return;
+    setStock(prev => {
+      const s = JSON.parse(JSON.stringify(normStock(prev)));
+      ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
+        s.soderia[k] = s.capacidadFija?.[k] || 0;
+        s.soderia_vacios[k] = 0;
+      });
+      syncData({
+        stock: s
+      });
+      return s;
+    });
+    localStorage.setItem("lc_stock_relleno_lunes", hoyKey);
+  }, []);
   // Helper: transferir del camión a sodería al cerrar el día
   const cerrarCamion = (sobrLlenos, vacios) => {
     setStock(prev => {
