@@ -43,8 +43,8 @@ function MenuDias({
   // del día") antes de recién ahí elegir la fecha. Se saca esa pantalla de
   // en medio: tocar el día expande estos 2 botones ACÁ MISMO, en la fila.
   const [diaExpandido, setDiaExpandido] = React.useState(null);
-  const [mostrarRecordatorios, setMostrarRecordatorios] = React.useState(true);
-  const [mostrarTransferencias, setMostrarTransferencias] = React.useState(true);
+  const [mostrarRecordatorios, setMostrarRecordatorios] = React.useState(false);
+  const [mostrarTransferencias, setMostrarTransferencias] = React.useState(false);
   const hoyDiaNombre = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"][new Date().getDay()];
   // Usar hora LOCAL para evitar bug de zona horaria (Argentina UTC-3)
   const hoyFechaKey = (() => {
