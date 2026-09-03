@@ -3389,6 +3389,7 @@ function App() {
   }), pantalla === "agenda" && /*#__PURE__*/React.createElement(AgendaScreen, {
     recordatorios: recordatorios || [],
     clientes: clientes,
+    onReordenar: nuevaLista => saveRecordatorios(nuevaLista),
     onConfirmar: id => saveRecordatorios(prev => (prev || []).map(r => r.id === id ? {
       ...r,
       confirmado: true,
