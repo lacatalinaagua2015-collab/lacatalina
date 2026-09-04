@@ -161,7 +161,7 @@ function ClientesTabs({
       cursor: "pointer",
       border: "none",
       background: activo === id ? "var(--color-background-tertiary)" : "transparent",
-      borderBottom: activo === id ? "2px solid var(--color-accent)" : "2px solid transparent"
+      borderBottom: activo === id ? "2px solid var(--color-accent-solid)" : "2px solid transparent"
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
