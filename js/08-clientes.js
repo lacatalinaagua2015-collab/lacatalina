@@ -1706,11 +1706,23 @@ function DetalleCliente({
         style: {
           marginBottom: 6
         }
-      }, editandoVentaId === v.id ? /*#__PURE__*/React.createElement(EditVenta, {
-        venta: v,
+      }, editandoVentaId === v.id ? /*#__PURE__*/React.createElement(NuevaVenta, {
+        compacto: true,
+        ventaEditar: v,
+        cliente: cliente,
         productos: productos,
-        onGuardar: (d, p, m, sa, obs, tr2) => {
-          onEditarVenta(v.id, d, p, m, sa, obs, tr2);
+        ventasCliente: [],
+        // Traduce la firma "create" de NuevaVenta (con envases/opcionSaldo) a
+        // la firma más chica que espera editarVenta — misma lógica que usaba
+        // EditVenta antes de unificarse en este componente.
+        onGuardar: (detalle, pagoArg, montoArg, saldoApl, envPrest, envDev, obs, opcionSaldo, otroLeg) => {
+          if (opcionSaldo === "mixto_ef") {
+            onEditarVenta(v.id, detalle, "mixto", montoArg, saldoApl, obs, otroLeg);
+          } else if (opcionSaldo === "mixto_tr") {
+            onEditarVenta(v.id, detalle, "mixto", otroLeg, saldoApl, obs, montoArg);
+          } else {
+            onEditarVenta(v.id, detalle, pagoArg, montoArg, saldoApl, obs);
+          }
           setEditandoVentaId(null);
         },
         onCancelar: () => setEditandoVentaId(null)

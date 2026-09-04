@@ -951,15 +951,24 @@ function DetalleVentasDia({
       borderBottom: idx < ventas.length - 1 ? "0.5px solid var(--color-border-tertiary)" : "none",
       ...(esNuevo ? { background: "rgba(93,170,255,0.10)", borderLeft: "3px solid #5daaff" } : {})
     };
-    if (editandoVentaId === v.id && esCompraReal) {
+    if (editandoVentaId === v.id && esCompraReal && cli) {
       return /*#__PURE__*/React.createElement("div", {
         key: v.id,
         style: cardStyle
-      }, /*#__PURE__*/React.createElement(EditVenta, {
-        venta: v,
+      }, /*#__PURE__*/React.createElement(NuevaVenta, {
+        compacto: true,
+        ventaEditar: v,
+        cliente: cli,
         productos: productos,
-        onGuardar: (d, p, m, sa, obs, tr2) => {
-          onEditarVenta(v.id, d, p, m, sa, obs, tr2);
+        ventasCliente: [],
+        onGuardar: (detalle, pagoArg, montoArg, saldoApl, envPrest, envDev, obs, opcionSaldo, otroLeg) => {
+          if (opcionSaldo === "mixto_ef") {
+            onEditarVenta(v.id, detalle, "mixto", montoArg, saldoApl, obs, otroLeg);
+          } else if (opcionSaldo === "mixto_tr") {
+            onEditarVenta(v.id, detalle, "mixto", otroLeg, saldoApl, obs, montoArg);
+          } else {
+            onEditarVenta(v.id, detalle, pagoArg, montoArg, saldoApl, obs);
+          }
           setEditandoVentaId(null);
         },
         onCancelar: () => setEditandoVentaId(null)

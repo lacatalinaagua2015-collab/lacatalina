@@ -1,281 +1,8 @@
 // ════════════════════════════════════════════════════════════════════
-// ◆  08-ventas.js — EditVenta, Modals, NuevaVenta, NuevoCliente
+// ◆  09-ventas.js — Modals, NuevaVenta, NuevoCliente
+// (EditVenta se eliminó: NuevaVenta con compacto+ventaEditar la reemplaza)
 // ════════════════════════════════════════════════════════════════════
 
-function EditVenta({
-  venta,
-  productos,
-  onGuardar,
-  onCancelar
-}) {
-  // onGuardar(detalle,pago,monto,saldoApl,obs,montoTrans2)
-  const esMixtaOrig = (Number(venta.montoTrans) || 0) > 0; // venta mixta guardada: pago "contado" + desglose
-  const [cantidades, setCantidades] = useState(() => {
-    const m = {};
-    productos.forEach(p => {
-      m[p.nombre] = 0;
-    });
-    venta.detalle.forEach(d => {
-      m[d.nombre] = d.cantidad;
-    });
-    return m;
-  });
-  const [pago, setPago] = useState(esMixtaOrig ? "mixto" : venta.pago || "contado");
-  const [monto, setMonto] = useState(() => String(venta.pagadoNum || venta.neto || ""));
-  const [montoEfec, setMontoEfec] = useState(esMixtaOrig ? String(venta.montoEfec || "") : "");
-  const [montoTrans, setMontoTrans] = useState(esMixtaOrig ? String(venta.montoTrans || "") : "");
-  const [obs, setObs] = useState((venta.obs || "").replace(/\s*\[Mixto:[^\]]*\]/g, ""));
-  const detalle = productos.map(p => ({
-    nombre: p.nombre,
-    cantidad: cantidades[p.nombre] || 0,
-    precio: p.precio,
-    total: (cantidades[p.nombre] || 0) * p.precio
-  })).filter(d => d.cantidad > 0);
-  const bruto = detalle.reduce((a, d) => a + d.total, 0);
-  const neto = bruto;
-  const sonarTrans = () => {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      [523, 659, 784].forEach((f, i) => {
-        const o = ctx.createOscillator(),
-          g = ctx.createGain();
-        o.connect(g);
-        g.connect(ctx.destination);
-        o.frequency.value = f;
-        g.gain.value = 0.3;
-        o.start(ctx.currentTime + i * 0.15);
-        o.stop(ctx.currentTime + i * 0.15 + 0.15);
-      });
-    } catch (e) {}
-  };
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      ...s.card,
-      margin: 0,
-      background: "var(--color-background-secondary)"
-    }
-  }, /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 13,
-      fontWeight: 500,
-      color: "var(--color-text-primary)",
-      marginBottom: 10
-    }
-  }, "Editando venta"), productos.map(p => /*#__PURE__*/React.createElement("div", {
-    key: p.id,
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 13,
-      color: "var(--color-text-primary)"
-    }
-  }, p.nombre), /*#__PURE__*/React.createElement("div", {
-    style: s.row
-  }, /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...s.btn,
-      padding: "3px 12px",
-      fontSize: 17
-    },
-    onClick: () => setCantidades(q => ({
-      ...q,
-      [p.nombre]: Math.max(0, (q[p.nombre] || 0) - 1)
-    }))
-  }, "−"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      minWidth: 24,
-      textAlign: "center",
-      fontWeight: 500,
-      fontSize: 15,
-      color: "var(--color-text-primary)"
-    }
-  }, cantidades[p.nombre] || 0), /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...s.btn,
-      padding: "3px 12px",
-      fontSize: 17
-    },
-    onClick: () => setCantidades(q => ({
-      ...q,
-      [p.nombre]: (q[p.nombre] || 0) + 1
-    }))
-  }, "+")))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 6,
-      margin: "10px 0"
-    }
-  }, [["contado", "Contado"], ["transferencia", "Transfer."], ["fiado", "Fiado"], ["mixto", "Mixto"]].map(([v, l]) => /*#__PURE__*/React.createElement("button", {
-    key: v,
-    style: {
-      ...s.btn,
-      flex: 1,
-      fontSize: 12,
-      padding: "8px 2px",
-      background: pago === v ? "#185FA5" : undefined,
-      color: pago === v ? "#fff" : undefined,
-      border: pago === v ? "none" : undefined
-    },
-    onClick: () => setPago(v)
-  }, l))), pago === "mixto" && /*#__PURE__*/React.createElement("div", {
-    style: {
-      ...s.card,
-      margin: "0 0 8px",
-      background: "var(--color-background-tertiary)"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "var(--color-text-secondary)",
-      marginBottom: 6
-    }
-  }, "Total: ", fmt(neto)), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "Efectivo $"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    type: "number",
-    placeholder: "0",
-    value: montoEfec,
-    onChange: e => {
-      const ef = e.target.value;
-      setMontoEfec(ef);
-      const r = neto - (Number(ef) || 0);
-      setMontoTrans(r > 0 ? String(Math.round(r)) : "");
-    }
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "Transferencia $"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    type: "number",
-    placeholder: "0",
-    value: montoTrans,
-    onChange: e => setMontoTrans(e.target.value)
-  }))), Number(montoEfec || 0) + Number(montoTrans || 0) > 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "var(--color-text-secondary)",
-      marginTop: 4
-    }
-  }, "Pagado: ", fmt(Number(montoEfec || 0) + Number(montoTrans || 0)), Number(montoEfec || 0) + Number(montoTrans || 0) < neto && /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: "var(--color-text-warning)"
-    }
-  }, " · Saldo: ", fmt(neto - Number(montoEfec || 0) - Number(montoTrans || 0))))), pago !== "fiado" && pago !== "mixto" && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "Monto cobrado (vacío = ", fmt(neto), " exacto)"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    type: "number",
-    value: monto,
-    onChange: e => setMonto(e.target.value),
-    placeholder: String(Math.round(neto))
-  })), pago === "transferencia" && /*#__PURE__*/React.createElement("div", {
-    style: {
-      ...s.card,
-      margin: "0 0 8px",
-      background: "#1e3a5f",
-      border: "0.5px solid #5daaff"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center"
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: "#5daaff"
-    }
-  }, "Transferencia — se aplica al guardar"), /*#__PURE__*/React.createElement("button", {
-    style: {
-      background: "#185FA5",
-      color: "#fff",
-      border: "none",
-      borderRadius: 6,
-      padding: "6px 12px",
-      fontSize: 12,
-      cursor: "pointer",
-      fontWeight: 600
-    },
-    onClick: () => {
-      sonarTrans();
-      onGuardar(detalle, pago, monto, venta.saldoAplicado || 0, obs);
-    }
-  }, "✓ Confirmar y guardar"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: s.label
-  }, "Observaciones"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    value: obs,
-    onChange: e => setObs(e.target.value)
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      padding: "8px 0",
-      fontSize: 14,
-      fontWeight: 500,
-      color: "var(--color-text-primary)",
-      borderTop: "0.5px solid var(--color-border-tertiary)"
-    }
-  }, /*#__PURE__*/React.createElement("span", null, "Total"), /*#__PURE__*/React.createElement("span", null, fmt(neto))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      marginTop: 8
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...s.btn,
-      flex: 1
-    },
-    onClick: onCancelar
-  }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...s.btnPrimary,
-      flex: 2,
-      padding: "10px"
-    },
-    onClick: () => {
-      if (pago === "mixto") {
-        const ef = Number(montoEfec || 0),
-          tr = Number(montoTrans || 0);
-        if (ef + tr === 0) {
-          alert("⚠️ Completá el desglose: cuánto en efectivo y cuánto por transferencia.");
-          return;
-        }
-        onGuardar(detalle, "mixto", String(ef), venta.saldoAplicado || 0, obs, tr);
-      } else {
-        onGuardar(detalle, pago, pago === "fiado" ? "" : monto, venta.saldoAplicado || 0, obs);
-      }
-    }
-  }, "Guardar")));
-}
 function VehiculoMantModal({
   onGuardar,
   onCerrar
@@ -917,9 +644,16 @@ function NuevaVenta({
   ventasCliente,
   progressData,
   compacto,
-  onCambiarDispenser
+  onCambiarDispenser,
+  ventaEditar,
+  onCancelar
 }) {
-  const [transConfirmada, setTransConfirmada] = React.useState(false);
+  // Modo edición: la tarjeta compacta se reutiliza para editar una venta ya
+  // guardada (antes era el componente aparte EditVenta). esMixtaOrigEdit
+  // detecta si esa venta se guardó como pago mixto (mismo criterio que usaba
+  // EditVenta: montoTrans > 0).
+  const esMixtaOrigEdit = ventaEditar && (Number(ventaEditar.montoTrans) || 0) > 0;
+  const [transConfirmada, setTransConfirmada] = React.useState(() => ventaEditar && ventaEditar.pago === "transferencia" ? !!ventaEditar.transConfirmada : false);
   // Préstamo/retiro de dispenser inline: +1 = le presté uno, -1 = le retiré
   // uno. No es un producto que se cobra — solo mueve cliente.dispenser.
   const [dispDelta, setDispDelta] = React.useState(0);
@@ -956,6 +690,13 @@ function NuevaVenta({
     (productos || []).forEach(p => {
       m[p.nombre] = 0;
     });
+    if (ventaEditar) {
+      const det = Array.isArray(ventaEditar.detalle) ? ventaEditar.detalle : Object.values(ventaEditar.detalle || {});
+      det.forEach(d => {
+        if (!d._esDispRoto && nombresEntrega.includes(d.nombre)) m[d.nombre] = d.cantidad || 0;
+      });
+      return m;
+    }
     if (ultimaConProd) {
       const det = Array.isArray(ultimaConProd.detalle) ? ultimaConProd.detalle : Object.values(ultimaConProd.detalle || {});
       det.forEach(d => {
@@ -964,7 +705,7 @@ function NuevaVenta({
     }
     return m;
   });
-  const [repetido, setRepetido] = useState(() => !!ultimaConProd);
+  const [repetido, setRepetido] = useState(() => ventaEditar ? true : !!ultimaConProd);
   // BUG REPORTADO: "se borraba la carga" al entrar cantidades en una venta.
   // Causa: ventasCliente se recalcula (ventas.filter(...)) en CADA render de
   // 14-app.js -> nueva referencia de array en cada sync/pulso de Firestore,
@@ -978,6 +719,7 @@ function NuevaVenta({
   // Si Firebase tarda en cargar, actualizar cuando lleguen los datos
   const ventasClienteRef = React.useRef(ventasCliente);
   React.useEffect(() => {
+    if (ventaEditar) return;
     if (ventasClienteRef.current === ventasCliente || repetido || cantidadesTocadas.current) return;
     ventasClienteRef.current = ventasCliente;
     const nombres = (productos || []).filter(p => !p.esDispenser).map(p => p.nombre);
@@ -998,11 +740,11 @@ function NuevaVenta({
     setCantidades(m);
     setRepetido(true);
   }, [ventasCliente]);
-  const [pago, setPago] = useState("contado");
-  const [monto, setMonto] = useState("");
-  const [montoEfec, setMontoEfec] = useState(""); // pago mixto: parte efectivo
-  const [montoTrans, setMontoTrans] = useState(""); // pago mixto: parte transferencia
-  const [transConfMixto, setTransConfMixto] = useState(false);
+  const [pago, setPago] = useState(() => ventaEditar ? (esMixtaOrigEdit ? "mixto" : ventaEditar.pago || "contado") : "contado");
+  const [monto, setMonto] = useState(() => ventaEditar ? String(ventaEditar.pagadoNum || ventaEditar.neto || "") : "");
+  const [montoEfec, setMontoEfec] = useState(() => ventaEditar && esMixtaOrigEdit ? String(ventaEditar.montoEfec || "") : ""); // pago mixto: parte efectivo
+  const [montoTrans, setMontoTrans] = useState(() => ventaEditar && esMixtaOrigEdit ? String(ventaEditar.montoTrans || "") : ""); // pago mixto: parte transferencia
+  const [transConfMixto, setTransConfMixto] = useState(() => ventaEditar && esMixtaOrigEdit ? !!ventaEditar.transConfirmada : false);
   const [usarSaldo, setUsarSaldo] = useState(false);
   const [opcionSaldo, setOpcionSaldo] = useState("compra"); // compra | todo | parcial
   const [envPrest, setEnvPrest] = useState([{
@@ -1041,7 +783,7 @@ function NuevaVenta({
     return n;
   });
   const getEnvCnt = (list, prod) => list.filter(e => e.prod === prod).reduce((a, e) => a + (Number(e.cant) || 0), 0);
-  const [obs, setObs] = useState("");
+  const [obs, setObs] = useState(() => ventaEditar ? (ventaEditar.obs || "").replace(/\s*\[Mixto:[^\]]*\]/g, "") : "");
   const [dispRotoPrecio, setDispRotoPrecio] = React.useState("");
   const [masOpciones, setMasOpciones] = React.useState(false);
   const dispenser = productos.find(p => p.esDispenser);
@@ -1063,7 +805,10 @@ function NuevaVenta({
   const desc = 0; // retención informativa solo en planilla
   const neto = bruto - desc;
   const saldoDisp = cliente.saldo > 0 ? cliente.saldo : 0;
-  const saldoApl = usarSaldo && pago !== "fiado" ? Math.min(saldoDisp, neto) : 0;
+  // En edición mantenemos el saldoAplicado original de la venta (igual que
+  // hacía EditVenta) — no lo recalculamos por el toggle "usar saldo" para no
+  // duplicar/perder aplicaciones de saldo ya hechas al registrar la venta.
+  const saldoApl = ventaEditar ? Number(ventaEditar.saldoAplicado) || 0 : usarSaldo && pago !== "fiado" ? Math.min(saldoDisp, neto) : 0;
   const aPagar = neto - saldoApl;
   // Deuda anterior del cliente (si el saldo es negativo) y total combinado a cobrar
   const deudaPrevia = cliente.saldo < 0 ? Math.abs(cliente.saldo) : 0;
@@ -1245,7 +990,8 @@ function NuevaVenta({
           cursor: "pointer",
           padding: 0
         },
-        onClick: decrementarEnv,
+        onClick: ventaEditar ? undefined : decrementarEnv,
+        disabled: !!ventaEditar,
         title: "Devolvió uno"
       }, "−"), /*#__PURE__*/React.createElement("span", {
         style: {
@@ -1268,10 +1014,11 @@ function NuevaVenta({
           cursor: "pointer",
           padding: 0
         },
-        onClick: incrementarEnv,
+        onClick: ventaEditar ? undefined : incrementarEnv,
+        disabled: !!ventaEditar,
         title: "Prestó uno"
       }, "+")));
-    }), dispenser && /*#__PURE__*/React.createElement("div", {
+    }), dispenser && !ventaEditar && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "grid",
         gridTemplateColumns: "1fr auto 70px",
@@ -1334,7 +1081,7 @@ function NuevaVenta({
         textAlign: "center",
         color: dispDelta > 0 ? "var(--color-text-info)" : dispDelta < 0 ? "var(--color-text-success)" : "var(--color-text-tertiary)"
       }
-    }, dispDelta > 0 ? `presté ${dispDelta}` : dispDelta < 0 ? `retiré ${-dispDelta}` : "sin cambio")), /*#__PURE__*/React.createElement("div", {
+    }, dispDelta > 0 ? `presté ${dispDelta}` : dispDelta < 0 ? `retiré ${-dispDelta}` : "sin cambio")), !ventaEditar && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 6,
@@ -1362,7 +1109,7 @@ function NuevaVenta({
         border: mostrarCambio ? "none" : undefined
       },
       onClick: () => setMostrarCambio(m => !m)
-    }, "🔄 Cambio de envase")), mostrarRotoCompacto && dispenser && /*#__PURE__*/React.createElement("div", {
+    }, "🔄 Cambio de envase")), !ventaEditar && mostrarRotoCompacto && dispenser && /*#__PURE__*/React.createElement("div", {
       style: {
         ...s.card,
         margin: "0 0 8px",
@@ -1389,7 +1136,7 @@ function NuevaVenta({
         setDispRotoPrecio("");
         setMostrarRotoCompacto(false);
       }
-    }, "Cancelar")), mostrarCambio && /*#__PURE__*/React.createElement(CambioEnvasePanel, {
+    }, "Cancelar")), !ventaEditar && mostrarCambio && /*#__PURE__*/React.createElement(CambioEnvasePanel, {
       productos: productos,
       onConfirmar: (productoViejo, productoNuevo, motivo) => {
         const obsTxt = `Cambio: ${productoViejo} → ${productoNuevo}${motivo.trim() ? ` · ${motivo.trim()}` : ""}`;
@@ -1530,7 +1277,7 @@ function NuevaVenta({
       placeholder: `Monto cobrado (vacío = ${fmt(aPagar)})`,
       value: monto,
       onChange: e => setMonto(e.target.value)
-    }), (saldoDisp > 0 || cliente.saldo < 0) && /*#__PURE__*/React.createElement("div", {
+    }), (ventaEditar || saldoDisp > 0 || cliente.saldo < 0) && /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: 8
       }
@@ -1541,11 +1288,11 @@ function NuevaVenta({
         cursor: "pointer"
       },
       onClick: () => setMasOpciones(m => !m)
-    }, masOpciones ? "▲ Menos opciones" : "▼ Más opciones (saldo, deuda, notas)"), masOpciones && /*#__PURE__*/React.createElement("div", {
+    }, ventaEditar ? masOpciones ? "▲ Ocultar notas" : "▼ Notas" : masOpciones ? "▲ Menos opciones" : "▼ Más opciones (saldo, deuda, notas)"), masOpciones && /*#__PURE__*/React.createElement("div", {
       style: {
         marginTop: 8
       }
-    }, saldoDisp > 0 && pago !== "fiado" && /*#__PURE__*/React.createElement("div", {
+    }, !ventaEditar && saldoDisp > 0 && pago !== "fiado" && /*#__PURE__*/React.createElement("div", {
       style: {
         ...s.card,
         margin: "0 0 8px",
@@ -1578,7 +1325,7 @@ function NuevaVenta({
         cursor: "pointer",
         fontWeight: 500
       }
-    }, "Usar saldo a favor — ", fmt(saldoDisp)))), cliente.saldo < 0 && pago !== "fiado" && /*#__PURE__*/React.createElement("div", {
+    }, "Usar saldo a favor — ", fmt(saldoDisp)))), !ventaEditar && cliente.saldo < 0 && pago !== "fiado" && /*#__PURE__*/React.createElement("div", {
       style: {
         ...s.card,
         margin: "0 0 8px",
@@ -1613,7 +1360,7 @@ function NuevaVenta({
         fontWeight: opcionSaldo === op ? 500 : 400
       },
       onClick: () => setOpcionSaldo(op)
-    }, opcionSaldo === op ? "✓ " : "", label, total ? ` — ${fmt(total)}` : "")))), cliente.saldo < 0 && /*#__PURE__*/React.createElement(CobroDeudaPanel, {
+    }, opcionSaldo === op ? "✓ " : "", label, total ? ` — ${fmt(total)}` : "")))), !ventaEditar && cliente.saldo < 0 && /*#__PURE__*/React.createElement(CobroDeudaPanel, {
       saldo: cliente.saldo,
       onCobrar: (mCobro, pCobro) => {
         onGuardar([{
@@ -1651,17 +1398,31 @@ function NuevaVenta({
         fontWeight: 500,
         color: "var(--color-text-primary)"
       }
-    }, fmt(totalACobrar))), /*#__PURE__*/React.createElement("button", {
+    }, fmt(totalACobrar))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        marginBottom: 6
+      }
+    }, ventaEditar && onCancelar && /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        flex: 1,
+        padding: "9px",
+        fontSize: 13
+      },
+      onClick: onCancelar
+    }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
       style: {
         ...s.btnPrimary,
-        marginBottom: 6,
+        flex: ventaEditar ? 2 : 1,
         padding: "9px",
         fontSize: 13,
         opacity: detalle.length === 0 ? 0.45 : 1
       },
       disabled: detalle.length === 0,
       onClick: confirmarRegistro
-    }, "✓ Registrar entrega"));
+    }, ventaEditar ? "💾 Guardar cambios" : "✓ Registrar entrega")));
   }
 
   return /*#__PURE__*/React.createElement("div", {
