@@ -843,7 +843,8 @@ function DetalleVentasDia({
   onEditarVenta,
   onEliminarVenta,
   onEditarCliente,
-  onPerdidaCliente
+  onPerdidaCliente,
+  onConfirmarTransfer
 }) {
   const [abierto, setAbierto] = React.useState(false);
   // Qué venta se está editando in-place (solo aplica a compras reales —
@@ -1011,7 +1012,24 @@ function DetalleVentasDia({
         fontWeight: 500,
         color: "var(--color-text-primary)"
       }
-    }, v.cliente), /*#__PURE__*/React.createElement("span", {
+    }, v.cliente), (v.pago === "transferencia" || esMixto) ? /*#__PURE__*/React.createElement("button", {
+      style: {
+        marginLeft: 6,
+        fontSize: 10,
+        padding: "1px 6px",
+        borderRadius: 4,
+        background: pagoBadge.bg,
+        color: pagoBadge.color,
+        fontWeight: 600,
+        border: "none",
+        cursor: "pointer"
+      },
+      title: v.transConfirmada ? "Transfer. confirmada — tocá para desmarcar" : "Tocá para confirmar transferencia",
+      onClick: e => {
+        e.stopPropagation();
+        onConfirmarTransfer && onConfirmarTransfer(v.clienteId, v.id);
+      }
+    }, pagoBadge.txt) : /*#__PURE__*/React.createElement("span", {
       style: {
         marginLeft: 6,
         fontSize: 10,
@@ -1190,7 +1208,8 @@ function PlanillaDelDia({
   onEditarVenta,
   onEliminarVenta,
   onEditarCliente,
-  onPerdidaCliente
+  onPerdidaCliente,
+  onConfirmarTransfer
 }) {
   // Separar ventas del día propio vs ventas de clientes de otro día
   const clientesDia = new Set((clientes || []).filter(c => c.dia === dia).map(c => c.id));
@@ -2633,7 +2652,8 @@ function PlanillaDelDia({
     onEditarVenta: onEditarVenta,
     onEliminarVenta: onEliminarVenta,
     onEditarCliente: onEditarCliente,
-    onPerdidaCliente: onPerdidaCliente
+    onPerdidaCliente: onPerdidaCliente,
+    onConfirmarTransfer: onConfirmarTransfer
   }) : /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,

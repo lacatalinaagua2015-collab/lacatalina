@@ -249,6 +249,19 @@ function App() {
   // (selectorFechaClientes → diaPrincipal → menu = 3 pasos) aunque entrar
   // había sido 1 solo paso.
   const [origenClientes, setOrigenClientes] = useState(null);
+  // Antes había 2 pantallas de perfil de cliente casi idénticas: una para
+  // cuando entrabas desde Clientes del día ("detalleCliente") y otra para
+  // Gestión/Agenda/Mapa/Dormidos ("detalleDesdeGestion") — se unificaron en
+  // una sola ("detalleCliente"); origenDetalle guarda de dónde viniste para
+  // que "Volver" y "Eliminar cliente" te devuelvan ahí.
+  const [origenDetalle, setOrigenDetalle] = useState("clientes");
+  // A dónde vuelve "Volver" desde la pantalla de venta (NuevaVenta) — cada
+  // punto de entrada la setea antes de irA("venta"). rutaDiariaVenta indica
+  // si esta carga es parte del recorrido diario real (auto-avanza al
+  // siguiente cliente pendiente al guardar/saltar) o una visita puntual
+  // (Gestión/Agenda/Mapa/Dormidos: guarda y vuelve, sin recorrer la ruta).
+  const [volverVentaA, setVolverVentaA] = useState("detalleCliente");
+  const [rutaDiariaVenta, setRutaDiariaVenta] = useState(true);
   const [clienteId, setClienteId] = useState(null);
   const [pinOk, setPinOk] = React.useState(false);
   const [noVisitas, setNoVisitas] = useLS("cat_novisitas_v1", []);
@@ -1746,6 +1759,16 @@ function App() {
     });
   };
   const cliente = clientes.find(c => c.id === clienteId) || null;
+  // A qué pantalla vuelve el perfil del cliente ("Volver", "Eliminar
+  // cliente") según por dónde se entró — ver comentario junto a
+  // origenDetalle más arriba.
+  const pantallaOrigenDetalle = () => ({
+    clientes: "clientes",
+    gestion: "gestionClientes",
+    agenda: "agenda",
+    dormidos: "clientesDormidos",
+    mapa: "mapaClientes"
+  })[origenDetalle] || "clientes";
   const irA = p => {
     const needsDia = ["diaPrincipal", "selectorFechaClientes", "selectorFechaPlanilla", "inicioReparto", "clientes", "detalleCliente", "venta", "planilla"]; // historial does NOT need dia
     if (needsDia.includes(p) && !diaActual) {
@@ -2057,6 +2080,13 @@ function App() {
       saldo: (Number(c2.saldo) || 0) + saldoExtra,
       ...(confirmarProspecto ? { esProspecto: false } : {})
     } : c2));
+    // Si el cliente tenía recordatorios pendientes en Agenda, se resuelven
+    // solos al registrarle una venta — no hace falta ir a Agenda a tocar "✓".
+    saveRecordatorios(prev => (prev || []).map(r => r.clienteId === c.id && !r.confirmado ? {
+      ...r,
+      confirmado: true,
+      _upd: Date.now()
+    } : r));
   };
   const renumerarTrasEliminar = (lista, clienteEliminado) => {
     const {
@@ -2787,7 +2817,14 @@ function App() {
       } : c));
       if (antes) ajustarStockFijoCliente(antes, { ...antes, ...cambios });
     },
-    onPerdidaCliente: registrarPerdidaCliente
+    onPerdidaCliente: registrarPerdidaCliente,
+    onConfirmarTransfer: (clienteId, ventaId) => {
+      saveVentas(prev => prev.map(v => v.id === ventaId ? {
+        ...v,
+        transConfirmada: !v.transConfirmada,
+        _upd: Date.now()
+      } : v));
+    }
   }), pantalla === "selectorFechaClientes" && /*#__PURE__*/React.createElement(SelectorFecha, {
     dia: diaActual,
     planillas: planillas,
@@ -2891,10 +2928,13 @@ function App() {
     },
     onSeleccionar: c => {
       setClienteId(c.id);
+      setOrigenDetalle("clientes");
       irA("detalleCliente");
     },
     onEntregar: c => {
       setClienteId(c.id);
+      setVolverVentaA("clientes");
+      setRutaDiariaVenta(true);
       irA("venta");
     },
     onNuevoCliente: () => irA("nuevoCliente"),
@@ -2929,64 +2969,88 @@ function App() {
     onAbrirMapa: () => irA("mapaClientes"),
     onPlanilla: () => irA("planilla")
   }), pantalla === "detalleCliente" && cliente && /*#__PURE__*/React.createElement(DetalleCliente, {
+    // Antes esta pantalla estaba duplicada (una copia para cuando entrabas
+    // desde Clientes del día, otra —"detalleDesdeGestion"— para Gestión,
+    // Agenda, Mapa y Dormidos) con ~90 líneas casi idénticas. Se unificó acá;
+    // origenDetalle (seteado por cada punto de entrada antes de navegar)
+    // decide a dónde vuelve "Volver"/"Eliminar cliente" y si corresponde el
+    // recorrido diario (auto-avance al siguiente cliente pendiente).
     cliente: cliente,
     ventas: ventas.filter(v => v.clienteId === cliente.id),
     noVisitas: (noVisitas || []).filter(v => v.clienteId === cliente.id),
-    dia: diaActual,
+    dia: diaActual || cliente.dia,
     fecha: fechaActual,
     onRetirarCliente: () => retirarCliente(cliente.id),
-    // BUG REPORTADO: "Editar" en una venta desde el perfil del cliente
-    // rompía la app ("Cannot read properties of undefined (reading
-    // 'forEach')"). Causa: acá nunca se pasaba la prop `productos`, así que
-    // EditVenta (08-ventas.js) recibía productos=undefined y explotaba en
-    // su primer useState (productos.forEach(...)). El otro punto donde se
-    // usa DetalleCliente (pantalla "detalleDesdeGestion", más abajo) sí la
-    // pasaba — por eso desde Gestión funcionaba pero desde la lista normal
-    // de clientes no.
     productos: productos,
     onVenta: () => {
+      setVolverVentaA("detalleCliente");
+      const esRutaDiaria = origenDetalle === "clientes";
+      setRutaDiariaVenta(esRutaDiaria);
       const hoyKey = new Date().toLocaleDateString("en-CA");
-      if (fechaActual !== hoyKey) setFechaActual(hoyKey);
+      if (esRutaDiaria) {
+        // Recorrido diario real: forzar fecha de hoy (evita cargar una venta
+        // "de ayer" si quedó una fecha vieja seleccionada en Planilla).
+        if (fechaActual !== hoyKey) setFechaActual(hoyKey);
+      } else {
+        // Visita puntual (Gestión/Agenda/Mapa/Dormidos): el cliente puede no
+        // pertenecer al día activo — usar el día real del cliente.
+        setDiaActual(cliente.dia);
+        if (!fechaActual) setFechaActual(hoyKey);
+      }
       irA("venta");
     },
-    onVolver: () => irA("clientes"),
+    onVolver: () => irA(pantallaOrigenDetalle()),
     onEditar: cambios => updateCliente(cliente.id, cambios),
     onEliminarVenta: eliminarVenta,
     onEditarVenta: editarVenta,
-    onEliminarCliente: () => eliminarCliente(cliente.id),
+    onEliminarCliente: () => {
+      eliminarCliente(cliente.id);
+      irA(pantallaOrigenDetalle());
+    },
     onEliminarNoVisita: (nvDia, nvFecha) => {
       registrarTombstoneNoVisita(cliente.id, nvDia, nvFecha);
       saveNoVisitas(prev => (prev || []).filter(v => !(v.clienteId === cliente.id && v.dia === nvDia && v.fecha === nvFecha)));
     },
     onNoEstaCliente: () => {
-      const nv = [...(noVisitas || []).filter(v => !(v.clienteId === cliente.id && v.dia === diaActual && v.fecha === fechaActual)), {
+      const diaN = diaActual || cliente.dia;
+      const fechaN = fechaActual || new Date().toLocaleDateString("en-CA");
+      const nv = [...(noVisitas || []).filter(v => !(v.clienteId === cliente.id && v.dia === diaN && v.fecha === fechaN)), {
         clienteId: cliente.id,
-        dia: diaActual,
-        fecha: fechaActual,
+        dia: diaN,
+        fecha: fechaN,
         motivo: "noesta",
         _upd: Date.now()
       }];
       saveNoVisitas(nv);
-      const sigId = siguientePendienteId(clientes, ventas, nv, diaActual, fechaActual, cliente.id);
-      if (sigId) {
-        setClienteId(sigId);
-        irA("detalleCliente");
-      } else irA("clientes");
+      // El auto-avance al siguiente cliente pendiente solo tiene sentido
+      // dentro del recorrido diario real (origenDetalle === "clientes") —
+      // para una visita puntual, guardamos y volvemos a donde estábamos.
+      if (origenDetalle === "clientes") {
+        const sigId = siguientePendienteId(clientes, ventas, nv, diaN, fechaN, cliente.id);
+        if (sigId) {
+          setClienteId(sigId);
+          irA("detalleCliente");
+        } else irA("clientes");
+      } else irA(pantallaOrigenDetalle());
     },
     onNoQuiereCliente: () => {
-      const nv = [...(noVisitas || []).filter(v => !(v.clienteId === cliente.id && v.dia === diaActual && v.fecha === fechaActual)), {
+      const diaN = diaActual || cliente.dia;
+      const fechaN = fechaActual || new Date().toLocaleDateString("en-CA");
+      const nv = [...(noVisitas || []).filter(v => !(v.clienteId === cliente.id && v.dia === diaN && v.fecha === fechaN)), {
         clienteId: cliente.id,
-        dia: diaActual,
-        fecha: fechaActual,
+        dia: diaN,
+        fecha: fechaN,
         motivo: "noquiso",
         _upd: Date.now()
       }];
       saveNoVisitas(nv);
-      const sigId = siguientePendienteId(clientes, ventas, nv, diaActual, fechaActual, cliente.id);
-      if (sigId) {
-        setClienteId(sigId);
-        irA("detalleCliente");
-      } else irA("clientes");
+      if (origenDetalle === "clientes") {
+        const sigId = siguientePendienteId(clientes, ventas, nv, diaN, fechaN, cliente.id);
+        if (sigId) {
+          setClienteId(sigId);
+          irA("detalleCliente");
+        } else irA("clientes");
+      } else irA(pantallaOrigenDetalle());
     },
     recordatorios: recordatorios,
     onGuardarRecordatorio: r => saveRecordatorios(prev => [...(prev || []), {
@@ -3009,11 +3073,8 @@ function App() {
       const fk = new Date().toLocaleDateString("en-CA");
       // saldoAntes/saldoDespues son solo para mostrar en el historial (referencia visual);
       // el cálculo real del saldo usa saldoDelta con forma funcional más abajo.
-      // BUG REPORTADO: un cobro de deuda quedaba archivado bajo el día que la
-      // app tenía activo en ese momento (diaActual, ej. "Viernes" de la
-      // última ruta) en vez del día real del cliente — por eso un pago de un
-      // cliente de los martes aparecía en la lista de confirmaciones del
-      // viernes. El día del cobro siempre tiene que ser el del cliente.
+      // El día del cobro siempre es el del cliente (no diaActual, que puede
+      // ser de otra ruta o estar vacío si se entró por Gestión/Agenda/Mapa).
       const vt = {
         id: Date.now(),
         clienteId: cl.id,
@@ -3048,6 +3109,12 @@ function App() {
         ...x,
         saldo: (Number(x.saldo) || 0) + monto
       } : x));
+      // Un cobro también resuelve recordatorios pendientes de este cliente.
+      saveRecordatorios(prev => (prev || []).map(r => r.clienteId === cl.id && !r.confirmado ? {
+        ...r,
+        confirmado: true,
+        _upd: Date.now()
+      } : r));
     },
     onGuardarAjuste: vt => {
       saveVentas(prev => [...prev, vt]);
@@ -3104,6 +3171,13 @@ function App() {
         _upd: Date.now()
       }];
       saveNoVisitas(nv);
+      // El auto-avance al siguiente cliente pendiente solo aplica al
+      // recorrido diario real — una visita puntual (Gestión/Agenda/Mapa/
+      // Dormidos) guarda y vuelve a donde estaba.
+      if (!rutaDiariaVenta) {
+        irA(volverVentaA || "detalleCliente");
+        return;
+      }
       const sigId = siguientePendienteId(clientes, ventas, nv, diaActual, fechaActual, clienteId);
       if (sigId) {
         setClienteId(sigId);
@@ -3112,6 +3186,10 @@ function App() {
     },
     onNoQuiere: (envPrest, envDev) => {
       const nv = registrarNoQuiereConEnvases(clienteId, envPrest, envDev);
+      if (!rutaDiariaVenta) {
+        irA(volverVentaA || "detalleCliente");
+        return;
+      }
       const sigId = siguientePendienteId(clientes, ventas, nv, diaActual, fechaActual, clienteId);
       if (sigId) {
         setClienteId(sigId);
@@ -3121,7 +3199,14 @@ function App() {
     onGuardar: (...args) => {
       // Pasa TODOS los argumentos (incluye el desglose del pago mixto: montoTrans2 y saldoDelta)
       registrarVenta(clienteId, ...args);
-      // Auto-advance to next pending client (noesta = volver al final, no saltar a ellos)
+      // El auto-avance al siguiente cliente pendiente del recorrido solo
+      // aplica cuando esto ES el recorrido diario real — una visita puntual
+      // (entrada desde Gestión/Agenda/Mapa/Dormidos) simplemente guarda y
+      // vuelve a donde estaba, sin "hacer todo el camino" del reparto.
+      if (!rutaDiariaVenta) {
+        irA(volverVentaA || "detalleCliente");
+        return;
+      }
       const clientesDia = clientes.filter(c => c.dia === diaActual).sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
       const visitadosIds = new Set([...ventas.filter(v => v.fechaKey === fechaActual && v.dia === diaActual && !v._esCobro && !v._esAjuste && !v._esMixtoTrans).map(v => v.clienteId), ...(noVisitas || []).filter(v => v.dia === diaActual && v.fecha === fechaActual && (v.motivo === "noquiso" || v.motivo === "noesta2" || v.motivo === "noesta" || v.motivo === "salteado")).map(v => v.clienteId)]);
       visitadosIds.add(clienteId);
@@ -3140,6 +3225,10 @@ function App() {
         _upd: Date.now()
       }];
       saveNoVisitas(nv);
+      if (!rutaDiariaVenta) {
+        irA(volverVentaA || "detalleCliente");
+        return;
+      }
       // Auto-avanzar al siguiente cliente pendiente, respetando el orden de reparto
       const visitadosIds = new Set([...ventas.filter(v => v.fechaKey === fechaActual && v.dia === diaActual).map(v => v.clienteId), ...nv.filter(v => v.fecha === fechaActual && v.dia === diaActual).map(v => v.clienteId)]);
       const clientesDia = clientes.filter(c => c.dia === diaActual).sort((a, b) => (a.orden || 9999) - (b.orden || 9999));
@@ -3149,7 +3238,7 @@ function App() {
         irA("venta");
       } else irA("clientes");
     },
-    onVolver: () => irA("detalleCliente")
+    onVolver: () => irA(volverVentaA || "detalleCliente")
   }), pantalla === "nuevoCliente" && /*#__PURE__*/React.createElement(NuevoCliente, {
     diaActual: diaActual,
     prefill: prospectoAConvertir ? {
@@ -3279,110 +3368,19 @@ function App() {
       if (!fechaActual) setFechaActual(hoyKey);
       // Si no hay diaActual, usar el día del cliente como fallback
       if (!diaActual) setDiaActual(c.dia);
+      // Visita puntual desde Gestión (no forma parte del recorrido diario):
+      // al guardar, vuelve directo acá — no auto-avanza por la ruta.
+      setVolverVentaA("gestionClientes");
+      setRutaDiariaVenta(false);
       irA("venta");
     },
     onVerDetalle: c => {
       setClienteId(c.id);
-      irA("detalleDesdeGestion");
+      setOrigenDetalle("gestion");
+      irA("detalleCliente");
     },
     ventas: ventas,
     productos: productos,
-    onGuardarCambio: vt => {
-      saveVentas(prev => [...prev, vt]);
-    }
-  }), pantalla === "detalleDesdeGestion" && cliente && /*#__PURE__*/React.createElement(DetalleCliente, {
-    cliente: cliente,
-    ventas: ventas.filter(v => v.clienteId === cliente.id),
-    noVisitas: (noVisitas || []).filter(v => v.clienteId === cliente.id),
-    dia: diaActual || cliente.dia,
-    fecha: fechaActual,
-    onRetirarCliente: () => retirarCliente(cliente.id),
-    productos: productos,
-    onVenta: () => {
-      setDiaActual(cliente.dia);
-      const hoy = new Date().toLocaleDateString("en-CA");
-      if (!fechaActual) setFechaActual(hoy);
-      irA("venta");
-    },
-    onVolver: () => irA("gestionClientes"),
-    onEditar: cambios => updateCliente(cliente.id, cambios),
-    onEliminarVenta: eliminarVenta,
-    onEditarVenta: editarVenta,
-    onEliminarCliente: () => {
-      eliminarCliente(cliente.id);
-      irA("gestionClientes");
-    },
-    onNoEstaCliente: () => {},
-    onNoQuiereCliente: () => {},
-    recordatorios: recordatorios,
-    onGuardarRecordatorio: r => saveRecordatorios(prev => [...(prev || []), {
-      ...r,
-      _upd: Date.now()
-    }]),
-    onConfirmarRecordatorio: id => saveRecordatorios(prev => (prev || []).map(r => r.id === id ? {
-      ...r,
-      confirmado: true,
-      _upd: Date.now()
-    } : r)),
-    onCobrarSaldo: (monto, pago) => {
-      if (cliente) {
-        const det = [{
-          nombre: "Cobro de deuda",
-          cantidad: 1,
-          precio: 0,
-          total: 0
-        }];
-        // BUG REPORTADO: mismo problema que en el perfil normal — Gestión
-        // permite ver cualquier cliente sin importar el día activo, así que
-        // ni diaActual ni fechaActual (que pueden venir de una sesión vieja)
-        // sirven acá. El cobro siempre va con el día del cliente y la fecha
-        // real de hoy.
-        const fk = new Date().toLocaleDateString("en-CA");
-        const vt = {
-          id: Date.now(),
-          clienteId: cliente.id,
-          cliente: cliente.nombre,
-          dia: cliente.dia,
-          fechaKey: fk,
-          fecha: new Date().toLocaleString("es-AR"),
-      hora: new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
-          detalle: det,
-          pago,
-          obs: `Cobro de deuda $${monto.toLocaleString("es-AR")} (${pago})`,
-          saldoAplicado: 0,
-          neto: 0,
-          bruto: 0,
-          desc: 0,
-          costo: 0,
-          ganancia: 0,
-          pagadoNum: monto,
-          saldoDelta: monto,
-          envPrest: [],
-          envDev: [],
-          saldoAntes: cliente.saldo || 0,
-          saldoDespues: (cliente.saldo || 0) + monto,
-          _esCobro: true,
-          _upd: Date.now()
-        };
-        saveVentas(prev => {
-          const { ventasActualizadas, idsAfectados } = aplicarCobroAVentasFiado(prev, cliente.id, monto);
-          return [...ventasActualizadas, { ...vt, _ventasSaldadas: idsAfectados }];
-        });
-        saveClientes(prev => prev.map(x => x.id === cliente.id ? {
-          ...x,
-          saldo: (Number(x.saldo) || 0) + monto
-        } : x));
-      }
-    },
-    // BUG REPORTADO: el ajuste de saldo de un cliente se perdía en silencio
-    // al entrar por Gestión de clientes / Mapa / Agenda (esta pantalla), a
-    // diferencia de entrar por la lista diaria normal (pantalla
-    // "detalleCliente", más arriba) — porque acá nunca se pasaba
-    // onGuardarAjuste, y DetalleCliente lo llama con "&&" de guarda (no
-    // explota, pero tampoco guarda nada). Mismo criterio que la otra pantalla.
-    onGuardarAjuste: vt => {
-      saveVentas(prev => [...prev, vt]);
-    },
     onGuardarCambio: vt => {
       saveVentas(prev => [...prev, vt]);
     }
@@ -3416,7 +3414,8 @@ function App() {
     },
     onIrCliente: clienteId => {
       setClienteId(clienteId);
-      irA("detalleDesdeGestion");
+      setOrigenDetalle("agenda");
+      irA("detalleCliente");
     },
     onVolver: () => irA("menu")
   }), pantalla === "stock" && /*#__PURE__*/React.createElement(StockGeneral, {
@@ -3520,6 +3519,7 @@ function App() {
     onSeleccionar: c => {
       setClienteId(c.id);
       setDiaActual(c.dia);
+      setOrigenDetalle("dormidos");
       irA("detalleCliente");
     },
     onEditarCliente: (id, cambios) => {
@@ -3667,7 +3667,8 @@ function App() {
     onActualizar: saveClientes,
     onSeleccionar: c => {
       setClienteId(c.id);
-      irA("detalleDesdeGestion");
+      setOrigenDetalle("mapa");
+      irA("detalleCliente");
     },
     onVolver: () => irA("menu")
   })), pantalla === "config" && /*#__PURE__*/React.createElement(Config, {
