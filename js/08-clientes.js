@@ -2,154 +2,17 @@
 // ◆  07-clientes.js — ListaClientes, DetalleCliente (formulario: FormCliente unificado en 03-utils)
 // ════════════════════════════════════════════════════════════════════
 
-function ListaClientes({
-  clientes,
-  dia,
-  fecha,
-  ventas,
-  todasVentas,
-  noVisitas,
-  recordatorios,
-  productos,
-  onSeleccionar,
-  onEntregar,
-  onGuardarVenta,
-  onNoQuiereConEnvases,
-  onCambiarDispenserCliente,
-  onNuevoCliente,
-  onVolver,
-  onReordenar,
-  onEditarCliente,
-  onRegistrarNoVisita,
-  onQuitarNoVisita,
-  onConfirmarTransfer,
-  onAbrirMapa,
-  onPlanilla,
-  onPerdida
+// ClienteCard: antes vivía como "const Card = (...) => {...}" DEFINIDA ADENTRO
+// de ListaClientes. Eso hacía que React viera un componente nuevo en cada
+// render de la lista (nueva identidad de función = nuevo tipo) y desmontara/
+// remontara TODAS las tarjetas de golpe en cada tecla del buscador o cada vez
+// que se expandía un cliente — la causa real de la traba durante el día.
+// Ahora es una función de módulo estable; todo lo que antes tomaba "gratis"
+// del cierre de ListaClientes ahora llega explícito por props (mismos
+// nombres, así el cuerpo de abajo no tuvo que tocarse).
+const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
+  c, atendidos, noVMap, visitados, clienteExpandidoId, setClienteExpandidoId, pendientes, clienteMoviendo, setClienteMoviendo, moverCliente, onSeleccionar, recordatorios, ventas, fecha, onConfirmarTransfer, todasVentas, marcarNoVisita, onGuardarVenta, productos, onNoQuiereConEnvases, onCambiarDispenserCliente, onQuitarNoVisita, clientes, onReordenar
 }) {
-  const [busqueda, setBusqueda] = useState("");
-  const [clienteMoviendo, setClienteMoviendo] = useState(null); // id del cliente "levantado", esperando destino
-  // Tarjeta de venta compacta expandida in-place (una sola a la vez). Antes
-  // "Entregar" navegaba a otra pantalla (NuevaVenta); ahora expande la
-  // planilla ahí mismo y la lista sigue debajo, sin cambiar de pantalla.
-  const [clienteExpandidoId, setClienteExpandidoId] = useState(null);
-  // Auto-scroll al botón "Ir a la planilla del día" apenas se termina de
-  // registrar el último cliente pendiente — antes había que darse cuenta y
-  // bajar manualmente.
-  const btnPlanillaRef = React.useRef(null);
-  // ventas y noVisitas ya filtradas por fecha+dia desde App
-  const atendidos = new Set(ventas.filter(v => !v._esCobro && !v._esAjuste).map(v => v.clienteId));
-  const noVMap = {};
-  (noVisitas || []).filter(v => v.fecha === fecha).forEach(v => {
-    noVMap[v.clienteId] = v.motivo;
-  });
-  // visitados = ventas + noesta2 + noquiso (noesta 1ra vez NO cuenta)
-  const visitadosSinVenta = new Set(Object.entries(noVMap).filter(([, m]) => m === "noesta2" || m === "noquiso").map(([id]) => Number(id)));
-  const visitados = new Set([...atendidos, ...visitadosSinVenta]);
-  const marcarNoVisita = (id, motivo) => {
-    const prev = noVMap[id];
-    if (motivo === "noesta" && prev === "noesta") onRegistrarNoVisita(id, "noesta2");else if (prev === motivo) onQuitarNoVisita(id);else onRegistrarNoVisita(id, motivo);
-  };
-  const clientesReales = clientes;
-  // Prospectos siempre al final, sin importar si tienen orden cargado —
-  // son "un reparto dentro del reparto" hasta que se confirmen como fijos.
-  const clientesOrdenados = [...clientesReales].sort((a, b) => (a.esProspecto ? 1 : 0) - (b.esProspecto ? 1 : 0) || (a.orden || 9999) - (b.orden || 9999));
-  const filtrados = clientesOrdenados.filter(c => buscarCliente(c, busqueda) > 0);
-  // Un cliente (prospecto o no) cargado HOY mismo no debe aparecer como
-  // "pendiente de atender" en la ronda de hoy — cargarlo YA fue la visita de
-  // hoy. Recién debería volver a aparecer en su próxima visita (la semana
-  // que viene, cuando "fecha" cambie y ya no coincida con creadoFecha).
-  const pendientesNormales = filtrados.filter(c => !visitados.has(c.id) && noVMap[c.id] !== "noesta" && c.creadoFecha !== fecha);
-  const volverAlFinal = filtrados.filter(c => noVMap[c.id] === "noesta" && !atendidos.has(c.id));
-  const pendientes = [...pendientesNormales, ...volverAlFinal];
-  const sinEntrega = filtrados.filter(c => visitadosSinVenta.has(c.id));
-  const listos = filtrados.filter(c => atendidos.has(c.id));
-  // BUG REPORTADO: un cliente cargado hoy mismo (creadoFecha === fecha), sin
-  // venta ni "no está"/"no quiere" todavía, quedaba afuera de las 4
-  // secciones de arriba — no aparecía en NINGÚN lado de la lista, ni
-  // buscándolo, aunque el dato estuviera bien guardado. Necesita su propia
-  // sección para seguir visible/buscable sin contar como "pendiente".
-  const agregadosHoy = filtrados.filter(c => c.creadoFecha === fecha && !visitados.has(c.id) && noVMap[c.id] !== "noesta");
-  // Mismo criterio: los recién cargados hoy no cuentan para el total de
-  // "todos listos" — si no, la ronda nunca se marcaría como terminada.
-  const clientesParaHoy = clientesReales.filter(c => c.creadoFecha !== fecha);
-  const todosListos = clientesParaHoy.length > 0 && clientesParaHoy.filter(c => visitados.has(c.id)).length >= clientesParaHoy.length;
-  React.useEffect(() => {
-    if (todosListos && btnPlanillaRef.current) {
-      btnPlanillaRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "center"
-      });
-    }
-  }, [todosListos]);
-  const abrirRuta = () => {
-    const cp = pendientes.filter(c => c.maps).slice(0, 9);
-    if (!cp.length) {
-      alert("Ningún pendiente tiene Maps cargado.");
-      return;
-    }
-    const dest = encodeURIComponent(cp[cp.length - 1].maps);
-    const wps = cp.slice(0, -1).map(c => encodeURIComponent(c.maps)).join("|");
-    window.open(`https://www.google.com/maps/dir/?api=1${wps ? `&waypoints=${wps}` : ""}&destination=${dest}&travelmode=driving`, "_blank");
-  };
-
-  // Ruta óptima: ordena los pendientes por cercanía (vecino más cercano) y abre Google Maps
-  const abrirRutaOptima = () => {
-    const conMaps = pendientes.filter(c => c.maps);
-    const conCoords = conMaps.map(c => ({
-      c,
-      co: extraerCoordsDeURL(c.maps)
-    })).filter(x => x.co);
-    if (conCoords.length < 2) {
-      alert("Para la ruta óptima necesito al menos 2 clientes pendientes cuyo link de Maps tenga las coordenadas adentro. Si tus links no las tienen, usá la ruta normal (🗺).");
-      return;
-    }
-    const rest = [...conCoords];
-    const orden = [rest.shift()];
-    while (rest.length) {
-      const last = orden[orden.length - 1].co;
-      let bi = 0,
-        bd = Infinity;
-      rest.forEach((x, i) => {
-        const d = (x.co.lat - last.lat) ** 2 + (x.co.lng - last.lng) ** 2;
-        if (d < bd) {
-          bd = d;
-          bi = i;
-        }
-      });
-      orden.push(rest.splice(bi, 1)[0]);
-    }
-    const pts = orden.slice(0, 10).map(x => `${x.co.lat},${x.co.lng}`);
-    const origin = pts[0],
-      dest = pts[pts.length - 1];
-    const wps = pts.slice(1, -1).join("|");
-    window.open(`https://www.google.com/maps/dir/?api=1&origin=${origin}${wps ? `&waypoints=${encodeURIComponent(wps)}` : ""}&destination=${dest}&travelmode=driving`, "_blank");
-    const afuera = conMaps.length - conCoords.length;
-    if (afuera > 0) setTimeout(() => alert(`Nota: ${afuera} cliente(s) quedaron afuera de la ruta óptima porque su link de Maps no trae coordenadas.`), 400);
-  };
-  const moverCliente = (idOrigen, idDestino) => {
-    if (idOrigen === idDestino) return;
-    const ordenActual = clientesOrdenados.map(c => c.id); // todos los reales del día, en su orden actual
-    const idxOrigen = ordenActual.indexOf(idOrigen);
-    const idxDestino = ordenActual.indexOf(idDestino);
-    if (idxOrigen === -1 || idxDestino === -1) return;
-    const nuevoOrden = [...ordenActual];
-    const [item] = nuevoOrden.splice(idxOrigen, 1);
-    nuevoOrden.splice(idxDestino, 0, item);
-    // Renumerar TODO en secuencia (1,2,3...) según la posición nueva —
-    // así nunca queda un número peleado con otro cliente.
-    const posMap = {};
-    nuevoOrden.forEach((id, i) => {
-      posMap[id] = i + 1;
-    });
-    onReordenar(clientes.map(c => posMap[c.id] !== undefined ? {
-      ...c,
-      orden: posMap[c.id]
-    } : c));
-  };
-  const Card = ({
-    c
-  }) => {
     const [fotoOpen, setFotoOpen] = React.useState(false);
     const atendido = atendidos.has(c.id),
       est = noVMap[c.id];
@@ -531,7 +394,200 @@ function ListaClientes({
       foto: b64
     } : x))
   }));
+});
+
+function ListaClientes({
+  clientes,
+  dia,
+  fecha,
+  ventas,
+  todasVentas,
+  noVisitas,
+  recordatorios,
+  productos,
+  onSeleccionar,
+  onEntregar,
+  onGuardarVenta,
+  onNoQuiereConEnvases,
+  onCambiarDispenserCliente,
+  onNuevoCliente,
+  onVolver,
+  onReordenar,
+  onEditarCliente,
+  onRegistrarNoVisita,
+  onQuitarNoVisita,
+  onConfirmarTransfer,
+  onAbrirMapa,
+  onPlanilla,
+  onPerdida
+}) {
+  const [busqueda, setBusqueda] = useState("");
+  const [clienteMoviendo, setClienteMoviendo] = useState(null); // id del cliente "levantado", esperando destino
+  // Tarjeta de venta compacta expandida in-place (una sola a la vez). Antes
+  // "Entregar" navegaba a otra pantalla (NuevaVenta); ahora expande la
+  // planilla ahí mismo y la lista sigue debajo, sin cambiar de pantalla.
+  const [clienteExpandidoId, setClienteExpandidoId] = useState(null);
+  // Auto-scroll al botón "Ir a la planilla del día" apenas se termina de
+  // registrar el último cliente pendiente — antes había que darse cuenta y
+  // bajar manualmente.
+  const btnPlanillaRef = React.useRef(null);
+  // ventas y noVisitas ya filtradas por fecha+dia desde App
+  const clientesReales = clientes;
+  // Todo este bloque (orden, filtro de búsqueda, y las 4 secciones de la
+  // lista) antes se recalculaba en CADA render de ListaClientes — incluido
+  // cada vez que se tocaba un botón que no cambia la composición de la
+  // lista (expandir "Entregar" en una tarjeta, levantar un cliente para
+  // reordenar, etc.). Con 100-300 clientes no es pesado en sí, pero sí
+  // genera un array/Set nuevo en cada toque, lo que hace que TODAS las
+  // tarjetas reciban props con identidad distinta y vuelvan a renderizar
+  // igual. Memoizado acá, solo se recalcula si cambian los datos reales
+  // (clientes, ventas, noVisitas, fecha) o el texto buscado.
+  const {
+    atendidos,
+    noVMap,
+    visitadosSinVenta,
+    visitados,
+    clientesOrdenados,
+    filtrados,
+    pendientesNormales,
+    volverAlFinal,
+    pendientes,
+    sinEntrega,
+    listos,
+    agregadosHoy,
+    clientesParaHoy,
+    todosListos
+  } = React.useMemo(() => {
+    const atendidos = new Set(ventas.filter(v => !v._esCobro && !v._esAjuste).map(v => v.clienteId));
+    const noVMap = {};
+    (noVisitas || []).filter(v => v.fecha === fecha).forEach(v => {
+      noVMap[v.clienteId] = v.motivo;
+    });
+    // visitados = ventas + noesta2 + noquiso (noesta 1ra vez NO cuenta)
+    const visitadosSinVenta = new Set(Object.entries(noVMap).filter(([, m]) => m === "noesta2" || m === "noquiso").map(([id]) => Number(id)));
+    const visitados = new Set([...atendidos, ...visitadosSinVenta]);
+    // Prospectos siempre al final, sin importar si tienen orden cargado —
+    // son "un reparto dentro del reparto" hasta que se confirmen como fijos.
+    const clientesOrdenados = [...clientes].sort((a, b) => (a.esProspecto ? 1 : 0) - (b.esProspecto ? 1 : 0) || (a.orden || 9999) - (b.orden || 9999));
+    const filtrados = clientesOrdenados.filter(c => buscarCliente(c, busqueda) > 0);
+    // Un cliente (prospecto o no) cargado HOY mismo no debe aparecer como
+    // "pendiente de atender" en la ronda de hoy — cargarlo YA fue la visita de
+    // hoy. Recién debería volver a aparecer en su próxima visita (la semana
+    // que viene, cuando "fecha" cambie y ya no coincida con creadoFecha).
+    const pendientesNormales = filtrados.filter(c => !visitados.has(c.id) && noVMap[c.id] !== "noesta" && c.creadoFecha !== fecha);
+    const volverAlFinal = filtrados.filter(c => noVMap[c.id] === "noesta" && !atendidos.has(c.id));
+    const pendientes = [...pendientesNormales, ...volverAlFinal];
+    const sinEntrega = filtrados.filter(c => visitadosSinVenta.has(c.id));
+    const listos = filtrados.filter(c => atendidos.has(c.id));
+    // BUG REPORTADO: un cliente cargado hoy mismo (creadoFecha === fecha), sin
+    // venta ni "no está"/"no quiere" todavía, quedaba afuera de las 4
+    // secciones de arriba — no aparecía en NINGÚN lado de la lista, ni
+    // buscándolo, aunque el dato estuviera bien guardado. Necesita su propia
+    // sección para seguir visible/buscable sin contar como "pendiente".
+    const agregadosHoy = filtrados.filter(c => c.creadoFecha === fecha && !visitados.has(c.id) && noVMap[c.id] !== "noesta");
+    // Mismo criterio: los recién cargados hoy no cuentan para el total de
+    // "todos listos" — si no, la ronda nunca se marcaría como terminada.
+    const clientesParaHoy = clientes.filter(c => c.creadoFecha !== fecha);
+    const todosListos = clientesParaHoy.length > 0 && clientesParaHoy.filter(c => visitados.has(c.id)).length >= clientesParaHoy.length;
+    return {
+      atendidos,
+      noVMap,
+      visitadosSinVenta,
+      visitados,
+      clientesOrdenados,
+      filtrados,
+      pendientesNormales,
+      volverAlFinal,
+      pendientes,
+      sinEntrega,
+      listos,
+      agregadosHoy,
+      clientesParaHoy,
+      todosListos
+    };
+  }, [clientes, ventas, noVisitas, fecha, busqueda]);
+  const marcarNoVisita = (id, motivo) => {
+    const prev = noVMap[id];
+    if (motivo === "noesta" && prev === "noesta") onRegistrarNoVisita(id, "noesta2");else if (prev === motivo) onQuitarNoVisita(id);else onRegistrarNoVisita(id, motivo);
   };
+  React.useEffect(() => {
+    if (todosListos && btnPlanillaRef.current) {
+      btnPlanillaRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
+    }
+  }, [todosListos]);
+  const abrirRuta = () => {
+    const cp = pendientes.filter(c => c.maps).slice(0, 9);
+    if (!cp.length) {
+      alert("Ningún pendiente tiene Maps cargado.");
+      return;
+    }
+    const dest = encodeURIComponent(cp[cp.length - 1].maps);
+    const wps = cp.slice(0, -1).map(c => encodeURIComponent(c.maps)).join("|");
+    window.open(`https://www.google.com/maps/dir/?api=1${wps ? `&waypoints=${wps}` : ""}&destination=${dest}&travelmode=driving`, "_blank");
+  };
+
+  // Ruta óptima: ordena los pendientes por cercanía (vecino más cercano) y abre Google Maps
+  const abrirRutaOptima = () => {
+    const conMaps = pendientes.filter(c => c.maps);
+    const conCoords = conMaps.map(c => ({
+      c,
+      co: extraerCoordsDeURL(c.maps)
+    })).filter(x => x.co);
+    if (conCoords.length < 2) {
+      alert("Para la ruta óptima necesito al menos 2 clientes pendientes cuyo link de Maps tenga las coordenadas adentro. Si tus links no las tienen, usá la ruta normal (🗺).");
+      return;
+    }
+    const rest = [...conCoords];
+    const orden = [rest.shift()];
+    while (rest.length) {
+      const last = orden[orden.length - 1].co;
+      let bi = 0,
+        bd = Infinity;
+      rest.forEach((x, i) => {
+        const d = (x.co.lat - last.lat) ** 2 + (x.co.lng - last.lng) ** 2;
+        if (d < bd) {
+          bd = d;
+          bi = i;
+        }
+      });
+      orden.push(rest.splice(bi, 1)[0]);
+    }
+    const pts = orden.slice(0, 10).map(x => `${x.co.lat},${x.co.lng}`);
+    const origin = pts[0],
+      dest = pts[pts.length - 1];
+    const wps = pts.slice(1, -1).join("|");
+    window.open(`https://www.google.com/maps/dir/?api=1&origin=${origin}${wps ? `&waypoints=${encodeURIComponent(wps)}` : ""}&destination=${dest}&travelmode=driving`, "_blank");
+    const afuera = conMaps.length - conCoords.length;
+    if (afuera > 0) setTimeout(() => alert(`Nota: ${afuera} cliente(s) quedaron afuera de la ruta óptima porque su link de Maps no trae coordenadas.`), 400);
+  };
+  const moverCliente = (idOrigen, idDestino) => {
+    if (idOrigen === idDestino) return;
+    const ordenActual = clientesOrdenados.map(c => c.id); // todos los reales del día, en su orden actual
+    const idxOrigen = ordenActual.indexOf(idOrigen);
+    const idxDestino = ordenActual.indexOf(idDestino);
+    if (idxOrigen === -1 || idxDestino === -1) return;
+    const nuevoOrden = [...ordenActual];
+    const [item] = nuevoOrden.splice(idxOrigen, 1);
+    nuevoOrden.splice(idxDestino, 0, item);
+    // Renumerar TODO en secuencia (1,2,3...) según la posición nueva —
+    // así nunca queda un número peleado con otro cliente.
+    const posMap = {};
+    nuevoOrden.forEach((id, i) => {
+      posMap[id] = i + 1;
+    });
+    onReordenar(clientes.map(c => posMap[c.id] !== undefined ? {
+      ...c,
+      orden: posMap[c.id]
+    } : c));
+  };
+  // Props estables para ClienteCard (ver comentario arriba de su definición) —
+  // spreadeadas en cada React.createElement(ClienteCard, {key, ...cardProps(c)}).
+  const cardProps = c => ({
+    c, atendidos, noVMap, visitados, clienteExpandidoId, setClienteExpandidoId, pendientes, clienteMoviendo, setClienteMoviendo, moverCliente, onSeleccionar, recordatorios, ventas, fecha, onConfirmarTransfer, todasVentas, marcarNoVisita, onGuardarVenta, productos, onNoQuiereConEnvases, onCambiarDispenserCliente, onQuitarNoVisita, clientes, onReordenar
+  });
   return /*#__PURE__*/React.createElement("div", {
     style: s.screen
   }, /*#__PURE__*/React.createElement(HeaderApp, {
@@ -601,35 +657,35 @@ function ListaClientes({
     }
   }, "No hay clientes para ", dia, "."), pendientesNormales.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
     style: s.sectionTitle
-  }, "Pendientes (", pendientesNormales.length, ")"), pendientesNormales.map(c => /*#__PURE__*/React.createElement(Card, {
+  }, "Pendientes (", pendientesNormales.length, ")"), pendientesNormales.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
     key: c.id,
-    c: c
+    ...cardProps(c)
   }))), agregadosHoy.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
     style: {
       ...s.sectionTitle,
       color: "#5daaff"
     }
-  }, "🆕 Agregados hoy (", agregadosHoy.length, ")"), agregadosHoy.map(c => /*#__PURE__*/React.createElement(Card, {
+  }, "🆕 Agregados hoy (", agregadosHoy.length, ")"), agregadosHoy.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
     key: c.id,
-    c: c
+    ...cardProps(c)
   }))), volverAlFinal.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
     style: {
       ...s.sectionTitle,
       color: "#f5b942"
     }
-  }, "🔄 Volver a visitar (", volverAlFinal.length, ")"), volverAlFinal.map(c => /*#__PURE__*/React.createElement(Card, {
+  }, "🔄 Volver a visitar (", volverAlFinal.length, ")"), volverAlFinal.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
     key: c.id,
-    c: c
+    ...cardProps(c)
   }))), listos.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
     style: s.sectionTitle
-  }, "Entregado (", listos.length, ")"), listos.map(c => /*#__PURE__*/React.createElement(Card, {
+  }, "Entregado (", listos.length, ")"), listos.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
     key: c.id,
-    c: c
+    ...cardProps(c)
   }))), sinEntrega.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
     style: s.sectionTitle
-  }, "Sin entrega (", sinEntrega.length, ")"), sinEntrega.map(c => /*#__PURE__*/React.createElement(Card, {
+  }, "Sin entrega (", sinEntrega.length, ")"), sinEntrega.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
     key: c.id,
-    c: c
+    ...cardProps(c)
   }))), onPlanilla && todosListos && /*#__PURE__*/React.createElement("div", {
     ref: btnPlanillaRef,
     style: {

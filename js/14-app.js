@@ -1767,7 +1767,8 @@ function App() {
     gestion: "gestionClientes",
     agenda: "agenda",
     dormidos: "clientesDormidos",
-    mapa: "mapaClientes"
+    mapa: "mapaClientes",
+    resumen: "resumen"
   })[origenDetalle] || "clientes";
   const irA = p => {
     const needsDia = ["diaPrincipal", "selectorFechaClientes", "selectorFechaPlanilla", "inicioReparto", "clientes", "detalleCliente", "venta", "planilla"]; // historial does NOT need dia
@@ -3445,7 +3446,17 @@ function App() {
     productos: productos,
     planillas: planillas,
     noVisitas: noVisitas || [],
-    onVolver: () => irA("menu")
+    onVolver: () => irA("menu"),
+    onSeleccionarCliente: c => {
+      // Resumen no exige haber elegido un día de reparto (a diferencia de
+      // Clientes/Planilla), pero detalleCliente sí lo necesita para
+      // navegar — si no hay uno activo, tomamos el día del cliente elegido
+      // (mismo patrón que se usa desde Gestión/Agenda, ver línea ~3371).
+      if (!diaActual) setDiaActual(c.dia);
+      setClienteId(c.id);
+      setOrigenDetalle("resumen");
+      irA("detalleCliente");
+    }
   }), pantalla === "fiadosPendientes" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(ClientesTabs, {
     activo: "fiados",
     onIr: irA

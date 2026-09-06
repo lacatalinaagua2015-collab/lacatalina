@@ -1534,9 +1534,18 @@ function PlanillaDelDia({
       const calcV = vaciosRestoCalc[pk];
       const cajon = pk === "soda" ? CAJON : 1;
       const sueltosLL = pk === "soda" ? sobrantes[pk] % CAJON : 0;
+      // BUG REAL (causa de "falta un cajón" en el cierre): vaciosRestoCalc
+      // sale de un Math.floor(vaciosRec/CAJON) — los sifones vacíos que
+      // sobran sin completar un cajón entero (0 a 5) se perdían acá y no
+      // volvían a aparecer en ningún lado. Los llenos SÍ se salvaban con
+      // "sueltosLL" (ver arriba); a vacíos le faltaba el mismo tratamiento.
+      // Un cajón físico que tiene, por ejemplo, 3 sifones vacíos (no lleno
+      // el cajón entero de vacíos) igual tiene esos 3 vacíos reales — hay
+      // que sumarlos, no descartarlos.
+      const sueltosVV = pk === "soda" ? vaciosRec[pk] % CAJON : 0;
       const llenosReal = realesLlenos[pk] !== "" ? Number(realesLlenos[pk]) * cajon + sueltosLL : calcL;
       const paraLlenarReal = realesParaLlenar[pk] !== "" ? Number(realesParaLlenar[pk]) * cajon : calcPL * cajon;
-      const vaciosReal = realesVacios[pk] !== "" ? Number(realesVacios[pk]) * cajon : calcV * cajon;
+      const vaciosReal = (realesVacios[pk] !== "" ? Number(realesVacios[pk]) * cajon : calcV * cajon) + sueltosVV;
       // "Para llenar" se llena antes de salir mañana — para el stock ya
       // cuenta como LLENO, no como vacío (aunque hoy físicamente esté vacío).
       llenVuelta[pk] = llenosReal + paraLlenarReal;
@@ -1842,9 +1851,14 @@ function PlanillaDelDia({
         AMBAR = "#f5b942",
         VIOLETA = "#b794f6";
       const sueltosLL = pk === "soda" ? sobrantes[pk] % cajon : 0;
+      // Mismo fix que en calcularMovimientoDeposito: los sifones vacíos
+      // sueltos (que no completan un cajón) se sumaban a "sobrantes" pero se
+      // perdían acá al no tener su propio "sueltosVV" — por eso el cierre
+      // marcaba "falta un cajón" con bastante frecuencia.
+      const sueltosVV = pk === "soda" ? vaciosRec[pk] % cajon : 0;
       const llenReal = realesLlenos[pk] !== "" ? Number(realesLlenos[pk]) * cajon + sueltosLL : sobrantes[pk];
       const paraLlenarReal = realesParaLlenar[pk] !== "" ? Number(realesParaLlenar[pk]) * cajon : paraLlenarCalc[pk] * cajon;
-      const vacReal = realesVacios[pk] !== "" ? Number(realesVacios[pk]) * cajon : vaciosRestoCalc[pk] * cajon;
+      const vacReal = (realesVacios[pk] !== "" ? Number(realesVacios[pk]) * cajon : vaciosRestoCalc[pk] * cajon) + sueltosVV;
       const salio = llenosCargados[pk];
       const vuelveTotal = llenReal + paraLlenarReal + vacReal;
       // Sodería solo controla que vuelva todo lo que salió cargado — los
@@ -1982,7 +1996,7 @@ function PlanillaDelDia({
           color: "var(--color-text-tertiary)",
           marginBottom: 4
         }
-      }, "↳ ¿Cuántos llenás hoy?", pk === "soda" && sueltosLL > 0 ? ` (+${sueltosLL} suelto lleno, ya contado)` : ""), /*#__PURE__*/React.createElement("div", {
+      }, "↳ ¿Cuántos llenás hoy?", pk === "soda" && sueltosLL > 0 ? ` (+${sueltosLL} suelto lleno, ya contado)` : "", pk === "soda" && sueltosVV > 0 ? ` (+${sueltosVV} suelto vacío, ya contado)` : ""), /*#__PURE__*/React.createElement("div", {
         style: {
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
