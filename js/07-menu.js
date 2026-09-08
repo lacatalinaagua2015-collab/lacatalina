@@ -169,7 +169,11 @@ function MenuDias({
       cursor: "pointer",
       display: "flex",
       alignItems: "center",
-      gap: 4
+      gap: 4,
+      background: "#1e3a5f",
+      border: "1px solid #f5b942",
+      borderRadius: 8,
+      padding: "8px 10px"
     },
     onClick: () => setMostrarTransferencias(v => !v)
   }, mostrarTransferencias ? "▼" : "▶", " 🔴 Transferencias sin confirmar (", transferenciasPendientes.length, ")"), mostrarTransferencias && transferenciasPendientes.map(({
