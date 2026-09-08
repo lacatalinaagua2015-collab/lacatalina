@@ -72,6 +72,13 @@ function MenuDias({
   const horaActual = new Date().getHours();
   const hayPendHoy = clientesHoy.length > 0 && !diaCompleto;
   const estadoHoy = diaCompleto ? "listo" : hayPendHoy && horaActual >= 17 ? "rojo" : hayPendHoy && horaActual >= 12 ? "naranja" : "normal";
+  // Notificaciones (Recordatorios pendientes / Transferencias sin confirmar):
+  // en vez de un solo número, mostrar días y clientes distintos por
+  // separado ("2d, 5c") para saber de un vistazo el alcance real.
+  const recDiasCount = new Set((recordatoriosActivos || []).map(r => r.dia)).size;
+  const recClientesCount = new Set((recordatoriosActivos || []).map(r => r.clienteId)).size;
+  const transDiasCount = (transferenciasPendientes || []).length;
+  const transClientesCount = new Set((transferenciasPendientes || []).flatMap(t => (t.ventas || []).map(v => v.clienteId))).size;
   return /*#__PURE__*/React.createElement("div", {
     style: s.screen
   }, /*#__PURE__*/React.createElement(HeaderApp, {
@@ -94,7 +101,7 @@ function MenuDias({
       gap: 4
     },
     onClick: () => setMostrarRecordatorios(v => !v)
-  }, mostrarRecordatorios ? "▼" : "▶", " 🔔 Recordatorios pendientes (", recordatoriosActivos.length, ")"), mostrarRecordatorios && recordatoriosActivos.slice(0, 5).map(r => /*#__PURE__*/React.createElement("div", {
+  }, mostrarRecordatorios ? "▼" : "▶", " 🔔 Recordatorios pendientes (D:", recDiasCount, ") ; (C:", recClientesCount, ")"), mostrarRecordatorios && recordatoriosActivos.slice(0, 5).map(r => /*#__PURE__*/React.createElement("div", {
     key: r.id,
     style: {
       ...s.card,
@@ -176,7 +183,7 @@ function MenuDias({
       padding: "8px 10px"
     },
     onClick: () => setMostrarTransferencias(v => !v)
-  }, mostrarTransferencias ? "▼" : "▶", " 🔴 Transferencias sin confirmar (", transferenciasPendientes.length, ")"), mostrarTransferencias && transferenciasPendientes.map(({
+  }, mostrarTransferencias ? "▼" : "▶", " 🔴 Transferencias sin confirmar (D:", transDiasCount, ") ; (C:", transClientesCount, ")"), mostrarTransferencias && transferenciasPendientes.map(({
     dia,
     fecha,
     count,
