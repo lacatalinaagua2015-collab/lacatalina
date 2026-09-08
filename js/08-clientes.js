@@ -279,7 +279,10 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         fontWeight: 500,
         flex: 1
       },
-      onClick: () => marcarNoVisita(c.id, est === "noesta" ? "noesta2" : "noesta")
+      onClick: () => {
+        marcarNoVisita(c.id, est === "noesta" ? "noesta2" : "noesta");
+        irAlSiguientePendiente();
+      }
     }, est === "noesta" ? "2ª vez" : "🔄 No está"), /*#__PURE__*/React.createElement("button", {
       style: {
         background: "var(--color-background-danger)",
@@ -292,7 +295,10 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         fontWeight: 500,
         flex: 1
       },
-      onClick: () => marcarNoVisita(c.id, "noquiso")
+      onClick: () => {
+        marcarNoVisita(c.id, "noquiso");
+        irAlSiguientePendiente();
+      }
     }, "No quiere"), /*#__PURE__*/React.createElement("button", {
       style: {
         background: "#185FA5",
@@ -330,7 +336,10 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         cursor: "pointer",
         fontWeight: 500
       },
-      onClick: () => marcarNoVisita(c.id, est === "noesta" ? "noesta2" : "noesta")
+      onClick: () => {
+        marcarNoVisita(c.id, est === "noesta" ? "noesta2" : "noesta");
+        irAlSiguientePendiente();
+      }
     }, est === "noesta" ? "2ª vez" : "🔄 No está"), /*#__PURE__*/React.createElement("button", {
       style: {
         flex: 1,
@@ -343,7 +352,10 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         cursor: "pointer",
         fontWeight: 500
       },
-      onClick: () => marcarNoVisita(c.id, "noquiso")
+      onClick: () => {
+        marcarNoVisita(c.id, "noquiso");
+        irAlSiguientePendiente();
+      }
     }, "No quiere"), /*#__PURE__*/React.createElement("button", {
       style: {
         ...s.btn,
