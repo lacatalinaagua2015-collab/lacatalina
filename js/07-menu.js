@@ -1218,7 +1218,8 @@ function PlanillaDelDia({
   onEliminarVenta,
   onEditarCliente,
   onPerdidaCliente,
-  onConfirmarTransfer
+  onConfirmarTransfer,
+  onEditarCarga
 }) {
   // Separar ventas del día propio vs ventas de clientes de otro día
   const clientesDia = new Set((clientes || []).filter(c => c.dia === dia).map(c => c.id));
@@ -2210,7 +2211,16 @@ function PlanillaDelDia({
       color: "var(--color-text-info)",
       fontWeight: 500
     }
-  }, "📦 Stock actualizado"))), /*#__PURE__*/React.createElement("div", {
+  }, "📦 Stock actualizado"), onEditarCarga && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--color-text-info)",
+      fontWeight: 500,
+      cursor: "pointer",
+      textDecoration: "underline"
+    },
+    onClick: onEditarCarga
+  }, "✏️ Editar envases con los que salió"))), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: 16
     }

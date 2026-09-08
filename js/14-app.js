@@ -2825,7 +2825,11 @@ function App() {
         transConfirmada: !v.transConfirmada,
         _upd: Date.now()
       } : v));
-    }
+    },
+    // Volver a "Inicio del reparto" para corregir la cantidad de envases con
+    // la que se salió, incluso si el día ya estaba iniciado (antes, una vez
+    // iniciado, no había forma de volver a esa pantalla).
+    onEditarCarga: () => irA("inicioReparto")
   }), pantalla === "selectorFechaClientes" && /*#__PURE__*/React.createElement(SelectorFecha, {
     dia: diaActual,
     planillas: planillas,
