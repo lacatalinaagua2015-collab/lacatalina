@@ -3512,12 +3512,18 @@ function AtajoPlanillaSemana({
     const iniciada = !!(pl && pl.iniciado);
     const clientesDia = (clientes || []).filter(c => c.dia === dia);
     const totalClientes = clientesDia.length;
-    const entregas = (ventas || []).filter(v => v.fechaKey === fechaKey).length;
     const esPasado = fecha.getTime() < hoy0.getTime();
-    // Clientes que ni tienen venta ni quedaron marcados (no quiso/no estaba/salteado)
-    // ese día — son los que faltó atender o marcar antes de poder cerrar la planilla.
     const ventaIdsDia = new Set((ventas || []).filter(v => v.fechaKey === fechaKey).map(v => v.clienteId));
     const noVisitaIdsDia = new Set((noVisitas || []).filter(n => n.fecha === fechaKey).map(n => n.clienteId));
+    // VISITADOS: clientes ÚNICOS del día con alguna venta registrada. Se cuenta
+    // por cliente y no por registro de venta a propósito: un cliente que no
+    // compró pero pagó deuda vieja SÍ fue visitado (queda como venta _esCobro),
+    // y un mismo cliente puede tener varios registros el mismo día (venta +
+    // cobro, o la parte-transferencia de un pago mixto) sin ser dos visitas.
+    const visitados = clientesDia.filter(c => ventaIdsDia.has(c.id)).length;
+    // Marcados: no compraron pero quedaron registrados (no estaba / no quiso / salteado).
+    const marcados = clientesDia.filter(c => !ventaIdsDia.has(c.id) && noVisitaIdsDia.has(c.id)).length;
+    // Pendientes: ni venta ni marca — son los que faltó atender o marcar antes de cerrar.
     const pendientes = clientesDia.filter(c => !ventaIdsDia.has(c.id) && !noVisitaIdsDia.has(c.id));
     const sinCerrarPorPendientes = esPasado && iniciada && !cerrada;
     const label = fecha.toLocaleDateString("es-AR", {
@@ -3551,13 +3557,13 @@ function AtajoPlanillaSemana({
         marginTop: 2,
         textTransform: "capitalize"
       }
-    }, label, totalClientes ? ` · ${entregas}/${totalClientes} entregas` : ""), sinCerrarPorPendientes && /*#__PURE__*/React.createElement("div", {
+    }, label, totalClientes ? ` · ${visitados}/${totalClientes} visitados` : ""), sinCerrarPorPendientes && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 11,
         color: "var(--color-text-danger)",
         marginTop: 2
       }
-    }, pendientes.length > 0 ? `⚠️ Faltan ${pendientes.length} cliente${pendientes.length === 1 ? "" : "s"} por atender o marcar` : "⚠️ Todos atendidos — falta confirmar el cierre")), /*#__PURE__*/React.createElement("div", {
+    }, pendientes.length > 0 ? `⚠️ Faltan ${pendientes.length} cliente${pendientes.length === 1 ? "" : "s"} por atender o marcar` : `⚠️ ${visitados} visitados + ${marcados} marcados — falta confirmar el cierre`)), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         alignItems: "center",
