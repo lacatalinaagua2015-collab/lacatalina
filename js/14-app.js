@@ -2526,6 +2526,18 @@ function App() {
     const obsLimpia = (obs || "").replace(/\s*\[Mixto:[^\]]*\]/g, "");
     const obsFinal = esMixto && tr > 0 ? obsLimpia + ` [Mixto: ef $${ef} + tr $${tr}]` : obsLimpia;
     const eraMixta = (Number(vV.montoTrans) || 0) > 0;
+    // BUG REAL ("el saldo del cliente queda mal al editar la forma de
+    // pago"): si esta venta era fiado y YA se había cobrado (total o
+    // parcialmente) con "Cobrar deuda" (aplicarCobroAVentasFiado marca
+    // _pagada/_montoPagadoAcum en la venta), ese monto YA fue sumado una
+    // vez al saldo del cliente cuando se registró el cobro (como una venta
+    // _esCobro aparte). Si ahora se le cambia la forma de pago a algo
+    // distinto de "fiado" (p.ej. "contado"), el cálculo de más abajo
+    // acreditaría ese mismo monto una SEGUNDA vez si no se resta acá. Al
+    // pasarla a no-fiado, además se limpian _pagada/_montoPagadoAcum: ya no
+    // tiene sentido seguir rastreándola como deuda fiada pendiente/cobrada.
+    const eraFiadoYaCobrado = vV.pago === "fiado" && (vV._pagada || (Number(vV._montoPagadoAcum) || 0) > 0);
+    const montoYaCobrado = eraFiadoYaCobrado && pagoReal !== "fiado" ? Number(vV._montoPagadoAcum) || 0 : 0;
     // Buscar de forma sincrónica las partes-transferencia ligadas a esta venta
     // — no depende de cuándo React corra el actualizador de saveVentas.
     let ajusteLigadas = 0;
@@ -2542,7 +2554,7 @@ function App() {
     // netDeltaCambio: cuánto CAMBIA el saldo por esta edición — es un delta puro,
     // no depende del saldo actual del cliente (por eso es seguro aplicarlo después
     // sobre el saldo más reciente, en vez de sobre el que había al abrir la pantalla).
-    const netDeltaCambio = calc.saldoDelta - vV.saldoDelta - ajusteLigadas;
+    const netDeltaCambio = calc.saldoDelta - vV.saldoDelta - ajusteLigadas - montoYaCobrado;
     saveVentas(prev => {
       let nev = prev.filter(v => !idsLigados.has(v.id));
       nev = nev.map(v => v.id === ventaId ? {
@@ -2554,6 +2566,7 @@ function App() {
         ...calc,
         montoEfec: esMixto ? ef : 0,
         montoTrans: tr,
+        ...(montoYaCobrado > 0 ? { _pagada: false, _montoPagadoAcum: 0 } : {}),
         _upd: Date.now()
       } : v);
       if (esMixto && tr > 0) {
@@ -2750,6 +2763,7 @@ function App() {
     planillas: planillas,
     ventas: ventas,
     clientes: clientes,
+    noVisitas: noVisitas,
     onSeleccionar: (fk, dia) => {
       setDiaActual(dia);
       setFechaActual(fk);

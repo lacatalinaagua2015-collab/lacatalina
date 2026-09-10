@@ -3453,11 +3453,14 @@ function AtajoPlanillaSemana({
   planillas,
   ventas,
   clientes,
+  noVisitas,
   onSeleccionar,
   onVolver
 }) {
   const DIAS_NOMBRE = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
   const dias5 = [];
+  const hoy0 = new Date();
+  hoy0.setHours(0, 0, 0, 0);
   const cur = new Date();
   cur.setHours(0, 0, 0, 0);
   while (dias5.length < 5) {
@@ -3507,8 +3510,16 @@ function AtajoPlanillaSemana({
     const pl = (planillas || {})[`${dia}_${fechaKey}`];
     const cerrada = !!(pl && pl._diaCerrado);
     const iniciada = !!(pl && pl.iniciado);
-    const totalClientes = (clientes || []).filter(c => c.dia === dia).length;
+    const clientesDia = (clientes || []).filter(c => c.dia === dia);
+    const totalClientes = clientesDia.length;
     const entregas = (ventas || []).filter(v => v.fechaKey === fechaKey).length;
+    const esPasado = fecha.getTime() < hoy0.getTime();
+    // Clientes que ni tienen venta ni quedaron marcados (no quiso/no estaba/salteado)
+    // ese día — son los que faltó atender o marcar antes de poder cerrar la planilla.
+    const ventaIdsDia = new Set((ventas || []).filter(v => v.fechaKey === fechaKey).map(v => v.clienteId));
+    const noVisitaIdsDia = new Set((noVisitas || []).filter(n => n.fecha === fechaKey).map(n => n.clienteId));
+    const pendientes = clientesDia.filter(c => !ventaIdsDia.has(c.id) && !noVisitaIdsDia.has(c.id));
+    const sinCerrarPorPendientes = esPasado && iniciada && !cerrada;
     const label = fecha.toLocaleDateString("es-AR", {
       weekday: "short",
       day: "numeric",
@@ -3540,7 +3551,13 @@ function AtajoPlanillaSemana({
         marginTop: 2,
         textTransform: "capitalize"
       }
-    }, label, totalClientes ? ` · ${entregas}/${totalClientes} entregas` : "")), /*#__PURE__*/React.createElement("div", {
+    }, label, totalClientes ? ` · ${entregas}/${totalClientes} entregas` : ""), sinCerrarPorPendientes && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--color-text-danger)",
+        marginTop: 2
+      }
+    }, pendientes.length > 0 ? `⚠️ Faltan ${pendientes.length} cliente${pendientes.length === 1 ? "" : "s"} por atender o marcar` : "⚠️ Todos atendidos — falta confirmar el cierre")), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         alignItems: "center",
@@ -3554,7 +3571,15 @@ function AtajoPlanillaSemana({
         background: "var(--color-background-success)",
         color: "var(--color-text-success)"
       }
-    }, "Cerrada ✓") : iniciada ? /*#__PURE__*/React.createElement("span", {
+    }, "Cerrada ✓") : sinCerrarPorPendientes ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        padding: "3px 8px",
+        borderRadius: 20,
+        background: "var(--color-background-danger)",
+        color: "var(--color-text-danger)"
+      }
+    }, "Sin cerrar ⚠️") : iniciada ? /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,
         padding: "3px 8px",
