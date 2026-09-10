@@ -3508,7 +3508,24 @@ function AtajoPlanillaSemana({
     dia
   }) => {
     const pl = (planillas || {})[`${dia}_${fechaKey}`];
-    const cerrada = !!(pl && pl._diaCerrado);
+    // El cierre deja DOS marcas: `_diaCerrado` en la planilla (sincroniza a la
+    // nube) y una en localStorage, que confirmarCierre escribe de inmediato.
+    // La pantalla de la planilla mira las dos (su `yaCerrado`); esta tarjeta
+    // miraba sólo `_diaCerrado`, así que un día ya cerrado acá seguía
+    // apareciendo abierto si el guardado de la planilla no llegó a persistir
+    // (falló, o un merge de la nube lo pisó). Ahora mira las mismas dos.
+    const cerradaEnPlanilla = !!(pl && pl._diaCerrado);
+    const cerradaLocal = (() => {
+      try {
+        return !!localStorage.getItem(`cierre_${dia}_${fechaKey}`);
+      } catch {
+        return false;
+      }
+    })();
+    const cerrada = cerradaEnPlanilla || cerradaLocal;
+    // Se cerró en este dispositivo pero la planilla no guardó la marca: el día
+    // está cerrado de hecho, pero en otro dispositivo se va a seguir viendo abierto.
+    const cierreNoRegistrado = cerradaLocal && !cerradaEnPlanilla;
     const iniciada = !!(pl && pl.iniciado);
     const clientesDia = (clientes || []).filter(c => c.dia === dia);
     const totalClientes = clientesDia.length;
@@ -3525,14 +3542,17 @@ function AtajoPlanillaSemana({
     const marcados = clientesDia.filter(c => !ventaIdsDia.has(c.id) && noVisitaIdsDia.has(c.id)).length;
     // Pendientes: ni venta ni marca — son los que faltó atender o marcar antes de cerrar.
     const pendientes = clientesDia.filter(c => !ventaIdsDia.has(c.id) && !noVisitaIdsDia.has(c.id));
-    const sinCerrarPorPendientes = esPasado && iniciada && !cerrada;
+    const sinCerrar = esPasado && iniciada && !cerrada;
+    // Causa concreta por la que el día quedó sin cerrar.
+    const causaSinCierre = pendientes.length > 0 ? `⚠️ No se cerró porque faltan ${pendientes.length} cliente${pendientes.length === 1 ? "" : "s"} por atender o marcar` : `⚠️ No se cerró: ${visitados} visitados + ${marcados} marcados, pero nunca se confirmó el cierre`;
     const label = fecha.toLocaleDateString("es-AR", {
       weekday: "short",
       day: "numeric",
       month: "short"
     });
-    return /*#__PURE__*/React.createElement("button", {
+    return /*#__PURE__*/React.createElement("div", {
       key: fechaKey + "_" + dia,
+      role: "button",
       onClick: () => onSeleccionar(fechaKey, dia),
       style: {
         ...s.card,
@@ -3557,13 +3577,35 @@ function AtajoPlanillaSemana({
         marginTop: 2,
         textTransform: "capitalize"
       }
-    }, label, totalClientes ? ` · ${visitados}/${totalClientes} visitados` : ""), sinCerrarPorPendientes && /*#__PURE__*/React.createElement("div", {
+    }, label, totalClientes ? ` · ${visitados}/${totalClientes} visitados` : ""), cierreNoRegistrado && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--color-text-tertiary)",
+        marginTop: 2
+      }
+    }, "Cerrada en este dispositivo (no quedó guardada en la planilla)"), sinCerrar && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 11,
         color: "var(--color-text-danger)",
         marginTop: 2
       }
-    }, pendientes.length > 0 ? `⚠️ Faltan ${pendientes.length} cliente${pendientes.length === 1 ? "" : "s"} por atender o marcar` : `⚠️ ${visitados} visitados + ${marcados} marcados — falta confirmar el cierre`)), /*#__PURE__*/React.createElement("div", {
+    }, causaSinCierre), sinCerrar && /*#__PURE__*/React.createElement("button", {
+      onClick: e => {
+        e.stopPropagation();
+        onSeleccionar(fechaKey, dia);
+      },
+      style: {
+        marginTop: 6,
+        fontSize: 12,
+        fontWeight: 600,
+        padding: "5px 12px",
+        borderRadius: 8,
+        border: "none",
+        cursor: "pointer",
+        background: "var(--color-accent)",
+        color: "#fff"
+      }
+    }, "Cerrar día")), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         alignItems: "center",
@@ -3577,7 +3619,7 @@ function AtajoPlanillaSemana({
         background: "var(--color-background-success)",
         color: "var(--color-text-success)"
       }
-    }, "Cerrada ✓") : sinCerrarPorPendientes ? /*#__PURE__*/React.createElement("span", {
+    }, "Cerrada ✓") : sinCerrar ? /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,
         padding: "3px 8px",
