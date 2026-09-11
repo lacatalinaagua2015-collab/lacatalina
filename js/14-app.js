@@ -1822,6 +1822,50 @@ function App() {
   };
   const getPlanilla = dia => planillas[dia] || planillaDiaVacia();
 
+  // ── Reparación: cierres que quedaron marcados sólo en este dispositivo ──
+  // Cerrar un día deja DOS marcas: una en localStorage (`cierre_<dia>_<fecha>`,
+  // que confirmarCierre escribe de inmediato) y `_diaCerrado` en la planilla,
+  // que es la que sincroniza a la nube. Si está la primera y falta la segunda,
+  // el cierre se hizo pero no llegó a guardarse (falló, o un merge de la nube
+  // lo pisó justo después): el día se ve cerrado acá y abierto en el celular.
+  // Se repone SÓLO la bandera. El movimiento de stock del cierre (envases a
+  // sodería, depósito, vaciar camión) ya se hizo en su momento y NO se repite.
+  const cierresReparadosRef = React.useRef(false);
+  React.useEffect(() => {
+    if (cierresReparadosRef.current) return;
+    const claves = Object.keys(planillas || {});
+    if (claves.length === 0) return;
+    // La clave de planilla es `${dia}_${fechaKey}` y la del cierre es la misma
+    // con el prefijo `cierre_`, así que se corresponden directo.
+    const aReparar = claves.filter(k => {
+      const pl = planillas[k];
+      if (!pl || pl._diaCerrado) return false;
+      try {
+        return !!localStorage.getItem(`cierre_${k}`);
+      } catch {
+        return false;
+      }
+    });
+    if (aReparar.length === 0) return;
+    cierresReparadosRef.current = true; // una sola vez por sesión
+    console.log(`✓ Reponiendo la marca de cierre en ${aReparar.length} planilla(s):`, aReparar);
+    savePlanillasCloud(prev => {
+      const next = {
+        ...prev
+      };
+      aReparar.forEach(k => {
+        if (next[k] && !next[k]._diaCerrado) {
+          next[k] = {
+            ...next[k],
+            _diaCerrado: true,
+            _upd: Date.now()
+          };
+        }
+      });
+      return next;
+    });
+  }, [planillas]);
+
   // Auto-guardado de planilla cuando todos los clientes del día tienen estado
   React.useEffect(() => {
     if (!diaActual || !fechaActual) return;

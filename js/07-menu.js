@@ -98,7 +98,13 @@ function MenuDias({
       cursor: "pointer",
       display: "flex",
       alignItems: "center",
-      gap: 4
+      gap: 4,
+      // Mismo recuadro que el encabezado de "Transferencias sin confirmar",
+      // con los colores azules propios de los recordatorios.
+      background: "#1e2e4a",
+      border: "1px solid #5daaff",
+      borderRadius: 8,
+      padding: "8px 10px"
     },
     onClick: () => setMostrarRecordatorios(v => !v)
   }, mostrarRecordatorios ? "▼" : "▶", " 🔔 Recordatorios pendientes (D:", recDiasCount, ") ; (C:", recClientesCount, ")"), mostrarRecordatorios && recordatoriosActivos.slice(0, 5).map(r => /*#__PURE__*/React.createElement("div", {
