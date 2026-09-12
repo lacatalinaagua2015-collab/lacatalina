@@ -1236,7 +1236,8 @@ function PlanillaDelDia({
   onEditarCliente,
   onPerdidaCliente,
   onConfirmarTransfer,
-  onEditarCarga
+  onEditarCarga,
+  ecToken
 }) {
   // Separar ventas del día propio vs ventas de clientes de otro día
   const clientesDia = new Set((clientes || []).filter(c => c.dia === dia).map(c => c.id));
@@ -3177,7 +3178,32 @@ function PlanillaDelDia({
     }
   }, fmt(ganancia)))), /*#__PURE__*/React.createElement("button", {
     style: s.btnPrimary,
-    onClick: () => onGuardar(datos)
+    onClick: () => {
+      // Enviar a Emma Control los valores NETOS que se ven en esta pantalla:
+      // efectivo en mano (ya descontado el llenado de envases — costo que
+      // Emma Control no ve de otra forma) y transferencia neta (ya
+      // descontada la retención 2.5%). Los gastos extras se mandan aparte
+      // como registros propios (igual que antes) — por eso NO se restan acá
+      // también del efectivo, para no descontarlos dos veces en Emma Control.
+      // Se reenvía cada vez que se guarda la planilla: como usa el mismo id
+      // de día (lc_ing_<fecha>), sobrescribe el registro anterior, no duplica.
+      if (ecToken && window.enviarAEmmaControl) {
+        const efectivoNeto = Math.round(cobEfectivo - totalVentaLlenar);
+        const transferenciaNeta = Math.round(cobTransNeto);
+        const gastosData = (datos.gastos || []).filter(g => g.confirmado && Number(g.monto) > 0).map(g => ({
+          desc: g.desc || 'Gasto reparto',
+          monto: Number(g.monto),
+          cat: g.cat || 'Otros',
+          metodo: g.metodo || 'efectivo'
+        }));
+        window.enviarAEmmaControl(ecToken, fecha, {
+          total: efectivoNeto + transferenciaNeta,
+          efectivo: efectivoNeto,
+          transferencia: transferenciaNeta
+        }, gastosData);
+      }
+      onGuardar(datos);
+    }
   }, "Guardar planilla"), !yaCerrado ? /*#__PURE__*/React.createElement("button", {
     style: {
       width: "100%",

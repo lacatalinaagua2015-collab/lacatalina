@@ -1926,7 +1926,6 @@ function App() {
     if (JSON.stringify(nueva) !== JSON.stringify(planillaActual)) {
       savePlanilla(planillaKey, nueva);
     }
-    // AVISO A EMMA CONTROL — se ejecuta una sola vez por día.
     // OJO: acá ANTES también se recalculaba y sumaba el traspaso de stock
     // camión→sodería (sobrantes + vacíos) en automático. Se sacó porque
     // duplicaba el cierre: el mismo traspaso se vuelve a hacer, con revisión
@@ -1935,6 +1934,11 @@ function App() {
     // sin enterarse uno del otro y el stock quedaba sumado dos veces cada
     // día. Ahora el ÚNICO lugar que mueve stock al cerrar el día es
     // confirmarCierre en 06-menu.js.
+    // El aviso a Emma Control YA NO se manda desde acá (mandaba los montos en
+    // bruto, sin descontar llenado de envases ni la retención de las
+    // transferencias) — ahora se manda desde el botón "Guardar planilla" en
+    // 07-menu.js, con los valores netos (efectivo en mano / neto a
+    // acreditar), cada vez que se guarda la planilla.
     const camionCerradoKey = `lc_cam_${planillaKey}`;
     if (planillaActual.iniciado && !planillaActual._stockCerrado && !localStorage.getItem(camionCerradoKey)) {
       localStorage.setItem(camionCerradoKey, "1");
@@ -1942,23 +1946,6 @@ function App() {
         ...nueva,
         _stockCerrado: true
       });
-      // ── Enviar datos del día a Emma Control ──
-      if (ecToken && window.enviarAEmmaControl) {
-        const cobEf = ventasDia.filter(v => v.pago === "contado").reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
-        const cobTr = ventasDia.filter(v => v.pago === "transferencia").reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
-        const totalCob = Math.round(cobEf + cobTr);
-        const gastosData = (planillaActual.gastos || []).filter(g => g.monto && Number(g.monto) > 0).map(g => ({
-          desc: g.desc || 'Gasto reparto',
-          monto: Number(g.monto),
-          cat: g.cat || 'Otros',
-          metodo: g.metodo || 'efectivo'
-        }));
-        window.enviarAEmmaControl(ecToken, fechaActual, {
-          total: totalCob,
-          efectivo: Math.round(cobEf),
-          transferencia: Math.round(cobTr)
-        }, gastosData);
-      }
     }
   }, [ventas, noVisitas, clientes, diaActual, fechaActual, planillas, ecToken]);
   // OJO: antes esta función tomaba el cliente del estado global `cliente`
@@ -2855,6 +2842,7 @@ function App() {
     syncData: syncData,
     autoCierre: !!planillas[`${diaActual}_${fechaActual}`]?.iniciado,
     cargasDia: cargasDia,
+    ecToken: ecToken,
     onGuardar: d => {
       savePlanilla(`${diaActual}_${fechaActual}`, d);
       if (!d._diaCerrado) irA(origenFecha === "atajo" ? "atajoPlanillaSemana" : origenFecha === "menu" ? "menu" : "selectorFechaPlanilla");
