@@ -115,10 +115,14 @@ var firebaseConfig = {
       catch(e) { console.warn("Cloud Messaging no disponible en este navegador:", e); }
 
       // Firebase secundario: Emma Control (para enviar datos de integración)
+      // OJO: tiene que ser el MISMO proyecto que usa la app Emma Control
+      // (ver su firebaseConfig) — antes apuntaba a un proyecto distinto
+      // ("emma-control") y los datos se escribían ahí, no donde Emma Control
+      // los lee ("emma-control-diariolc"), así que nunca llegaban.
       var ecConfig = {
-        apiKey: "AIzaSyBbLoljOPJgjNvVN7bfOuMl8NrUjFB-agU",
-        authDomain: "emma-control.firebaseapp.com",
-        projectId: "emma-control",
+        apiKey: "AIzaSyBrBkNvBygco-jzy9WDG0CAQPd7GKX48Cg",
+        authDomain: "emma-control-diariolc.firebaseapp.com",
+        projectId: "emma-control-diariolc",
       };
       try {
         var ecApp = firebase.apps.find(a=>a.name==='emma-control') || firebase.initializeApp(ecConfig,'emma-control');
