@@ -131,27 +131,37 @@ var firebaseConfig = {
 
       // Función para enviar datos del día a Emma Control
       window.enviarAEmmaControl = function(token, fecha, ingresos, gastos){
-        if(!token || !window.dbEC) return;
+        if(!token || !window.dbEC) return Promise.resolve(false);
         var ref = window.dbEC.collection('integraciones').doc(token).collection('movs');
         var batch = window.dbEC.batch();
-        // Ingreso del día
-        if(ingresos.total > 0){
-          var ingId = 'lc_ing_' + fecha.replace(/-/g,'');
-          batch.set(ref.doc(ingId), {
-            id: ingId,
-            tipo: 'ingreso',
-            ent: 'negocio',
-            desc: 'La Catalina — Reparto ' + fecha,
-            monto: ingresos.total,
-            efectivo: ingresos.efectivo,
-            transferencia: ingresos.transferencia,
-            cat: 'La Catalina',
-            fecha: fecha,
+        var fechaId = fecha.replace(/-/g,'');
+        // INGRESOS DEL DÍA — van SEPARADOS por forma de cobro, para que Emma
+        // Control los impute cada uno a su método: el efectivo en mano como
+        // efectivo, y el neto a acreditar como transferencia. Antes iba un solo
+        // registro con el total y `metodo:'efectivo'` siempre, así que del otro
+        // lado la transferencia entraba como si fuera efectivo.
+        var ingEfId = 'lc_ing_ef_' + fechaId;
+        var ingTrId = 'lc_ing_tr_' + fechaId;
+        var base = { tipo:'ingreso', ent:'negocio', cat:'La Catalina', fecha:fecha, _origen:'la_catalina', _ts:Date.now() };
+        if(ingresos.efectivo > 0){
+          batch.set(ref.doc(ingEfId), Object.assign({}, base, {
+            id: ingEfId,
+            desc: 'La Catalina — Reparto ' + fecha + ' (efectivo)',
+            monto: ingresos.efectivo,
             metodo: 'efectivo',
-            _origen: 'la_catalina',
-            _ts: Date.now(),
-          });
-        }
+          }));
+        } else { batch.delete(ref.doc(ingEfId)); } // quedó en cero: no dejar el registro viejo
+        if(ingresos.transferencia > 0){
+          batch.set(ref.doc(ingTrId), Object.assign({}, base, {
+            id: ingTrId,
+            desc: 'La Catalina — Reparto ' + fecha + ' (transferencia)',
+            monto: ingresos.transferencia,
+            metodo: 'transferencia',
+          }));
+        } else { batch.delete(ref.doc(ingTrId)); }
+        // Limpiar el registro del formato viejo (un solo ingreso por día); si no,
+        // el día quedaría contado dos veces en Emma Control.
+        batch.delete(ref.doc('lc_ing_' + fechaId));
         // Gastos del día
         (gastos||[]).forEach(function(g, i){
           if(!g.monto || g.monto <= 0) return;
@@ -169,8 +179,19 @@ var firebaseConfig = {
             _ts: Date.now(),
           });
         });
-        batch.commit().then(function(){ console.log('✅ Datos enviados a Emma Control'); })
-          .catch(function(e){ console.log('Error Emma Control:', e); });
+        // Devuelve true/false para que quien llama sepa si LLEGÓ. Antes no
+        // devolvía nada y el error moría en un console.log: si el envío fallaba
+        // (sin señal, permisos, cuota) nadie se enteraba y no se reintentaba
+        // nunca, porque el día ya quedaba marcado como enviado.
+        // Los ids son fijos por fecha (lc_ing_<fecha> / lc_gas_<fecha>_<i>), así
+        // que reenviar el mismo día SOBREESCRIBE, nunca duplica: es seguro reintentar.
+        return batch.commit().then(function(){
+          console.log('✅ Datos enviados a Emma Control:', fecha);
+          return true;
+        }).catch(function(e){
+          console.warn('✗ Error enviando a Emma Control:', e && e.code || '', e && e.message || e);
+          return false;
+        });
       };
       window.db.enablePersistence({synchronizeTabs:false}).catch(function(err){
         if(err.code==="failed-precondition"||err.code==="unimplemented"){
@@ -209,7 +230,11 @@ var firebaseConfig = {
     // Entidades tipo MAPA (objeto {clave:valor}) -> colección; docId = clave.
     var LC_MAPAS = ['planillas','cargasDia','zonasReparto'];
     // Config singleton (valores que no son listas) -> config/app
-    var LC_CONFIG_KEYS = ['stock','horaAvisoCierre','horasAvisoTrans','diasAvisoMant'];
+    // `ecToken` (código de vinculación con Emma Control) va acá para que
+    // SINCRONICE: antes vivía sólo en el localStorage del equipo donde lo
+    // cargabas, así que si lo ponías en la PC y cerrabas el reparto desde el
+    // celular, el celular no tenía token y no enviaba nada a Emma Control.
+    var LC_CONFIG_KEYS = ['stock','horaAvisoCierre','horasAvisoTrans','diasAvisoMant','ecToken'];
 
     function _lcUsuario(){ var u = firebase.auth().currentUser; return (u && !u.isAnonymous) ? u : null; }
     window._lcLastSaved = null;

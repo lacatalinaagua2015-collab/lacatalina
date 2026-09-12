@@ -3185,9 +3185,12 @@ function PlanillaDelDia({
       // descontada la retención 2.5%). Los gastos extras se mandan aparte
       // como registros propios (igual que antes) — por eso NO se restan acá
       // también del efectivo, para no descontarlos dos veces en Emma Control.
-      // Se reenvía cada vez que se guarda la planilla: como usa el mismo id
-      // de día (lc_ing_<fecha>), sobrescribe el registro anterior, no duplica.
-      if (ecToken && window.enviarAEmmaControl) {
+      // Se reenvía cada vez que se guarda la planilla: los ids son fijos por
+      // día (lc_ing_ef_<fecha> y lc_ing_tr_<fecha>), así que sobrescriben el
+      // registro anterior en vez de duplicar. El efectivo y la transferencia
+      // van como DOS registros separados, cada uno con su método, para que Emma
+      // Control impute bien cada forma de cobro.
+      if (ecToken && (window._lcEncolarEC || window.enviarAEmmaControl)) {
         const efectivoNeto = Math.round(cobEfectivo - totalVentaLlenar);
         const transferenciaNeta = Math.round(cobTransNeto);
         const gastosData = (datos.gastos || []).filter(g => g.confirmado && Number(g.monto) > 0).map(g => ({
@@ -3196,11 +3199,14 @@ function PlanillaDelDia({
           cat: g.cat || 'Otros',
           metodo: g.metodo || 'efectivo'
         }));
-        window.enviarAEmmaControl(ecToken, fecha, {
+        const ingresosEC = {
           total: efectivoNeto + transferenciaNeta,
           efectivo: efectivoNeto,
           transferencia: transferenciaNeta
-        }, gastosData);
+        };
+        // Vía la cola: si el envío falla (sin señal, permisos, cuota) el día
+        // queda pendiente y se reintenta solo, en vez de perderse en silencio.
+        if (window._lcEncolarEC) window._lcEncolarEC(fecha, ingresosEC, gastosData);else window.enviarAEmmaControl(ecToken, fecha, ingresosEC, gastosData);
       }
       onGuardar(datos);
     }

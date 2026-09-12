@@ -697,6 +697,86 @@ function App() {
     const idsRemotos = new Set(listaRemota.map(t => String(t.id)));
     return juntarTombstonesLocales().some(t => !idsRemotos.has(String(t.id)));
   };
+  // ── ENVÍO A EMMA CONTROL, CON REINTENTO ──────────────────────────────────
+  // El envío del día se disparaba una sola vez, al salir el camión, y si
+  // fallaba (sin señal en la calle, permisos, cuota) se perdía: el día ya
+  // quedaba marcado como cerrado, así que esa condición no se volvía a cumplir
+  // nunca. Ahora lo que se manda queda en una cola en este dispositivo y se
+  // reintenta hasta que entre. Reenviar es seguro: los documentos van con id
+  // fijo por fecha (lc_ing_<fecha>, lc_gas_<fecha>_<i>), así que sobreescriben
+  // en vez de duplicar.
+  const EC_COLA_KEY = "lc_ec_cola_v1";
+  const leerColaEC = () => {
+    try {
+      const c = JSON.parse(localStorage.getItem(EC_COLA_KEY) || "[]");
+      return Array.isArray(c) ? c : [];
+    } catch {
+      return [];
+    }
+  };
+  const guardarColaEC = c => {
+    try {
+      localStorage.setItem(EC_COLA_KEY, JSON.stringify(c));
+    } catch {}
+  };
+  // Procesa lo pendiente. Cada entrada sale de la cola SOLO si el envío confirmó.
+  const procesarColaEC = React.useCallback(async () => {
+    const token = localStorage.getItem("lc_ec_token") || "";
+    if (!token || !window.enviarAEmmaControl || !navigator.onLine) return;
+    const cola = leerColaEC();
+    if (cola.length === 0) return;
+    const quedan = [];
+    for (const item of cola) {
+      let ok = false;
+      try {
+        ok = await window.enviarAEmmaControl(token, item.fecha, item.ingresos, item.gastos);
+      } catch {
+        ok = false;
+      }
+      if (!ok) quedan.push({
+        ...item,
+        intentos: (Number(item.intentos) || 0) + 1
+      });
+    }
+    guardarColaEC(quedan);
+    const enviados = cola.length - quedan.length;
+    if (enviados > 0) console.log(`✅ Emma Control: ${enviados} día(s) enviado(s)`);
+    if (quedan.length > 0) {
+      console.warn(`⏳ Emma Control: ${quedan.length} día(s) sin enviar todavía —`, quedan.map(q => q.fecha).join(", "));
+      // Avisar sólo cuando ya falló varias veces: no molestar por un corte breve.
+      if (quedan.some(q => (Number(q.intentos) || 0) >= 3) && window.lcToast) {
+        window.lcToast(`No se pudieron enviar ${quedan.length} día(s) a Emma Control. Se sigue reintentando.`, "warn", 5000);
+      }
+    }
+  }, []);
+  // Encola el día y trata de mandarlo ahora mismo.
+  const encolarEnvioEC = (fecha, ingresos, gastos) => {
+    const cola = leerColaEC().filter(x => x.fecha !== fecha); // una sola entrada por fecha
+    cola.push({
+      fecha,
+      ingresos,
+      gastos,
+      intentos: 0,
+      _ts: Date.now()
+    });
+    guardarColaEC(cola);
+    procesarColaEC();
+  };
+  // Lo usa el botón "Guardar planilla" (07-menu.js) para mandar a Emma Control
+  // pasando por la cola, en vez de llamar a window.enviarAEmmaControl directo:
+  // así, si el envío falla, el día no se pierde y se reintenta solo.
+  window._lcEncolarEC = encolarEnvioEC;
+  // Reintento: al abrir la app, cuando vuelve la señal, y cada 5 minutos.
+  React.useEffect(() => {
+    procesarColaEC();
+    const alVolverSenal = () => procesarColaEC();
+    window.addEventListener("online", alVolverSenal);
+    const cada5 = setInterval(procesarColaEC, 5 * 60 * 1000);
+    return () => {
+      window.removeEventListener("online", alVolverSenal);
+      clearInterval(cada5);
+    };
+  }, [procesarColaEC]);
   const traerDeLaNube = React.useCallback(forzar => {
     if (!apiKey || !binId) return;
     const ahora = Date.now();
@@ -1180,6 +1260,14 @@ function App() {
           recordatorios: mergedRec
         }), 2000);
       }
+      // Código de vinculación con Emma Control: si este equipo no lo tiene y la
+      // nube sí, adoptarlo — así alcanza con vincular una sola vez, desde
+      // cualquier dispositivo. Si acá ya hay uno cargado, NO se pisa.
+      if (data.ecToken && !localStorage.getItem('lc_ec_token')) {
+        localStorage.setItem('lc_ec_token', data.ecToken);
+        setEcToken(data.ecToken);
+        console.log("✓ Código de Emma Control recibido de otro dispositivo");
+      }
       if (data.mantVeh?.length) localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(_lcDedupMantVeh(data.mantVeh)));
       if (data.horaAvisoCierre) localStorage.setItem("lc_hora_notif_cierre", data.horaAvisoCierre);
       if (data.horasAvisoTrans) localStorage.setItem("lc_horas_notif_trans", JSON.stringify(data.horasAvisoTrans));
@@ -1489,6 +1577,9 @@ function App() {
       // la nube las que sumó el otro dispositivo — y sin esas marcas volveríamos
       // a revivir registros borrados, que es justo lo que se está arreglando.
       tombstones: overrides.tombstones || juntarTombstonesLocales(),
+      // Código de vinculación con Emma Control: viaja para que valga en todos
+      // los equipos, no sólo en el que lo cargó.
+      ecToken: overrides.ecToken !== undefined ? overrides.ecToken : localStorage.getItem('lc_ec_token') || '',
       mantVeh: overrides.mantVeh || mantVehActual,
       histPrecios: overrides.histPrecios || histPreciosActual,
       zonasReparto: overrides.zonasReparto || estadoRef.current.zonasReparto || {},
@@ -2042,23 +2133,13 @@ function App() {
         ...nueva,
         _stockCerrado: true
       });
-      // ── Enviar datos del día a Emma Control ──
-      if (ecToken && window.enviarAEmmaControl) {
-        const cobEf = ventasDia.filter(v => v.pago === "contado").reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
-        const cobTr = ventasDia.filter(v => v.pago === "transferencia").reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
-        const totalCob = Math.round(cobEf + cobTr);
-        const gastosData = (planillaActual.gastos || []).filter(g => g.monto && Number(g.monto) > 0).map(g => ({
-          desc: g.desc || 'Gasto reparto',
-          monto: Number(g.monto),
-          cat: g.cat || 'Otros',
-          metodo: g.metodo || 'efectivo'
-        }));
-        window.enviarAEmmaControl(ecToken, fechaActual, {
-          total: totalCob,
-          efectivo: Math.round(cobEf),
-          transferencia: Math.round(cobTr)
-        }, gastosData);
-      }
+      // ── Emma Control: ACÁ YA NO SE ENVÍA NADA ──
+      // El envío lo hace el botón "Guardar planilla" (07-menu.js), que manda los
+      // montos NETOS: el efectivo en mano (ya descontado el llenado de envases) y
+      // el neto a acreditar de transferencia (ya descontada la retención).
+      // Si además se enviara desde acá, los dos escribirían el MISMO documento
+      // del día con montos distintos (brutos contra netos) y se pisarían entre
+      // sí, dejando los números de Emma Control mal de forma impredecible.
     }
   }, [ventas, noVisitas, clientes, diaActual, fechaActual, planillas, ecToken]);
   // OJO: antes esta función tomaba el cliente del estado global `cliente`
@@ -3875,7 +3956,14 @@ function App() {
     syncData: syncData,
     onVolver: () => irA("menu"),
     ecToken: ecToken,
-    setEcToken: setEcToken,
+    // Al cargar o cambiar el código en Config, además de guardarlo acá se
+    // sincroniza, para que el otro dispositivo también quede vinculado.
+    setEcToken: v => {
+      setEcToken(v);
+      syncData({
+        ecToken: v
+      });
+    },
     tabInicial: tabConfig,
     noVisitas: noVisitas,
     onDiagnostico: () => irA("diagnostico")
