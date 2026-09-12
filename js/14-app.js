@@ -626,6 +626,77 @@ function App() {
   // termine de sincronizar no las pise (mismo problema que ya se resolvía
   // para clientes/ventas/planillas/noVisitas, pero stock quedaba afuera).
   const ultimoStockLocalRef = React.useRef(0);
+  // ── MARCAS DE BORRADO COMPARTIDAS ────────────────────────────────────────
+  // Entidades que llevan marca de borrado, y si la marca identifica por `id`
+  // o por `clave` compuesta (noVisitas usa "clienteId|dia|fecha").
+  const ENTIDADES_TOMBSTONE = [["ventas", false], ["clientes", false], ["productos", false], ["recordatorios", false], ["novisitas", true]];
+  // Junta TODAS las marcas locales en una sola lista, con el formato que viaja
+  // a Firestore. Es lo que se manda en syncData({tombstones: ...}).
+  const juntarTombstonesLocales = () => {
+    const out = [];
+    ENTIDADES_TOMBSTONE.forEach(([ent, esClave]) => {
+      try {
+        JSON.parse(localStorage.getItem(`cat_${ent}_tombstone_v1`) || "[]").forEach(t => {
+          const ref = esClave ? t.clave : t.id;
+          if (ref == null) return;
+          out.push({
+            id: `${ent}__${ref}`,
+            entidad: ent,
+            ref: String(ref),
+            esClave,
+            ts: Number(t.ts) || 0
+          });
+        });
+      } catch {}
+    });
+    return out;
+  };
+  // Aplica las marcas que vinieron de OTROS dispositivos: las suma a las claves
+  // locales `cat_<entidad>_tombstone_v1`. Como los merges de más arriba ya leen
+  // esas claves, con esto respetan solos los borrados hechos en otro equipo —
+  // no hace falta tocar ningún merge. Solo AGREGA marcas, nunca borra datos por
+  // su cuenta: lo que se elimina es lo que alguien borró a propósito.
+  // Devuelve true si alguna marca local no estaba en la nube (hay que subirlas).
+  const aplicarTombstonesRemotos = remotos => {
+    const CUARENTA_CINCO_DIAS = 45 * 24 * 60 * 60 * 1000;
+    const ahoraT = Date.now();
+    const vigente = t => ahoraT - (Number(t.ts) || 0) < CUARENTA_CINCO_DIAS;
+    const listaRemota = (Array.isArray(remotos) ? remotos : []).filter(t => t && t.entidad && vigente(t));
+    const porEntidad = {};
+    listaRemota.forEach(t => {
+      (porEntidad[t.entidad] = porEntidad[t.entidad] || []).push(t);
+    });
+    ENTIDADES_TOMBSTONE.forEach(([ent, esClave]) => {
+      const key = `cat_${ent}_tombstone_v1`;
+      try {
+        const locales = JSON.parse(localStorage.getItem(key) || "[]").filter(vigente);
+        const marcaDe = t => t.clave != null ? "c:" + t.clave : "i:" + t.id;
+        const vistos = new Set(locales.map(marcaDe));
+        let sumadas = 0;
+        (porEntidad[ent] || []).forEach(t => {
+          const nueva = esClave ? {
+            clave: t.ref,
+            ts: t.ts
+          } : {
+            id: t.ref,
+            ts: t.ts
+          };
+          const m = marcaDe(nueva);
+          if (vistos.has(m)) return;
+          vistos.add(m);
+          locales.push(nueva);
+          sumadas++;
+        });
+        if (sumadas > 0) {
+          localStorage.setItem(key, JSON.stringify(locales));
+          console.log(`✓ ${sumadas} marca(s) de borrado de otro dispositivo aplicadas en ${ent}`);
+        }
+      } catch {}
+    });
+    // ¿Hay marcas locales que la nube todavía no tiene? Entonces hay que subirlas.
+    const idsRemotos = new Set(listaRemota.map(t => String(t.id)));
+    return juntarTombstonesLocales().some(t => !idsRemotos.has(String(t.id)));
+  };
   const traerDeLaNube = React.useCallback(forzar => {
     if (!apiKey || !binId) return;
     const ahora = Date.now();
@@ -636,6 +707,25 @@ function App() {
       if (!data) {
         setSyncStatus("idle");
         return;
+      }
+      // ── Marcas de borrado de OTROS dispositivos ──────────────────────────
+      // Va PRIMERO, antes de cualquier merge: cada merge lee las claves
+      // `cat_<entidad>_tombstone_v1` de localStorage para no revivir lo que se
+      // borró, así que sumando acá las marcas ajenas, todos los merges de abajo
+      // respetan solos los borrados hechos en el celular (o en la PC).
+      // Sin esto, un registro borrado en un equipo "faltaba" en la nube para el
+      // otro, que lo tomaba por nuevo y lo volvía a subir — el caso de los
+      // recordatorios que reaparecían.
+      try {
+        if (aplicarTombstonesRemotos(data.tombstones)) {
+          // Este equipo tiene marcas que la nube todavía no conoce (p. ej. las
+          // de antes de esta versión): compartirlas para que el otro deje de revivir.
+          setTimeout(() => syncData({
+            tombstones: juntarTombstonesLocales()
+          }), 2500);
+        }
+      } catch (e) {
+        console.warn("Marcas de borrado:", e);
       }
       // ═══════════════════════════════════════════════════════════════════
       // LEER ESTO ANTES DE TOCAR CUALQUIER MERGE DE ACÁ ABAJO
@@ -1132,7 +1222,12 @@ function App() {
       const upd = snap.data()._upd;
       if (upd && upd !== ultimoUpdRemotoRef.current) {
         const esPrimera = ultimoUpdRemotoRef.current === null;
-        const esPropio = upd === window._lcUltimoPulsoPropio; // el server ya confirmó ESTE MISMO guardado nuestro
+        // ¿Es el eco de un guardado NUESTRO? Se consulta la lista de los últimos
+        // pulsos propios, no sólo el último: un merge puede disparar varios
+        // guardados seguidos, y con una sola variable los ecos de los anteriores
+        // se tomaban por "otro dispositivo" y provocaban un refetch que a su vez
+        // generaba más guardados (bucle que consumía la cuota de Firestore).
+        const esPropio = upd === window._lcUltimoPulsoPropio || Array.isArray(window._lcPulsosPropios) && window._lcPulsosPropios.indexOf(upd) !== -1;
         ultimoUpdRemotoRef.current = upd;
         if (!esPrimera && !esPropio) traerDeLaNube(true); // cambio real de OTRO dispositivo → recién ahí traer
       }
@@ -1389,6 +1484,11 @@ function App() {
       ...overrides,
       noVisitas: estadoRef.current.noVisitas || [],
       recordatorios: estadoRef.current.recordatorios || [],
+      // Siempre fresco desde localStorage, NUNCA de estadoRef: como el guardado
+      // a Firestore es diferencial, mandar una lista vieja de marcas borraría de
+      // la nube las que sumó el otro dispositivo — y sin esas marcas volveríamos
+      // a revivir registros borrados, que es justo lo que se está arreglando.
+      tombstones: overrides.tombstones || juntarTombstonesLocales(),
       mantVeh: overrides.mantVeh || mantVehActual,
       histPrecios: overrides.histPrecios || histPreciosActual,
       zonasReparto: overrides.zonasReparto || estadoRef.current.zonasReparto || {},
@@ -1926,6 +2026,7 @@ function App() {
     if (JSON.stringify(nueva) !== JSON.stringify(planillaActual)) {
       savePlanilla(planillaKey, nueva);
     }
+    // AVISO A EMMA CONTROL — se ejecuta una sola vez por día.
     // OJO: acá ANTES también se recalculaba y sumaba el traspaso de stock
     // camión→sodería (sobrantes + vacíos) en automático. Se sacó porque
     // duplicaba el cierre: el mismo traspaso se vuelve a hacer, con revisión
@@ -1934,11 +2035,6 @@ function App() {
     // sin enterarse uno del otro y el stock quedaba sumado dos veces cada
     // día. Ahora el ÚNICO lugar que mueve stock al cerrar el día es
     // confirmarCierre en 06-menu.js.
-    // El aviso a Emma Control YA NO se manda desde acá (mandaba los montos en
-    // bruto, sin descontar llenado de envases ni la retención de las
-    // transferencias) — ahora se manda desde el botón "Guardar planilla" en
-    // 07-menu.js, con los valores netos (efectivo en mano / neto a
-    // acreditar), cada vez que se guarda la planilla.
     const camionCerradoKey = `lc_cam_${planillaKey}`;
     if (planillaActual.iniciado && !planillaActual._stockCerrado && !localStorage.getItem(camionCerradoKey)) {
       localStorage.setItem(camionCerradoKey, "1");
@@ -1946,6 +2042,23 @@ function App() {
         ...nueva,
         _stockCerrado: true
       });
+      // ── Enviar datos del día a Emma Control ──
+      if (ecToken && window.enviarAEmmaControl) {
+        const cobEf = ventasDia.filter(v => v.pago === "contado").reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
+        const cobTr = ventasDia.filter(v => v.pago === "transferencia").reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
+        const totalCob = Math.round(cobEf + cobTr);
+        const gastosData = (planillaActual.gastos || []).filter(g => g.monto && Number(g.monto) > 0).map(g => ({
+          desc: g.desc || 'Gasto reparto',
+          monto: Number(g.monto),
+          cat: g.cat || 'Otros',
+          metodo: g.metodo || 'efectivo'
+        }));
+        window.enviarAEmmaControl(ecToken, fechaActual, {
+          total: totalCob,
+          efectivo: Math.round(cobEf),
+          transferencia: Math.round(cobTr)
+        }, gastosData);
+      }
     }
   }, [ventas, noVisitas, clientes, diaActual, fechaActual, planillas, ecToken]);
   // OJO: antes esta función tomaba el cliente del estado global `cliente`
@@ -2289,6 +2402,10 @@ function App() {
         ts: ahoraT
       });
       localStorage.setItem(key, JSON.stringify(vivoT));
+      // Compartir la marca: sin esto, los otros dispositivos resucitan el registro.
+      syncData({
+        tombstones: juntarTombstonesLocales()
+      });
     } catch {}
   };
   // Deja constancia de una marca de "no visita" borrada (Desmarcar / eliminar
@@ -2304,6 +2421,10 @@ function App() {
         ts: ahoraT
       });
       localStorage.setItem("cat_novisitas_tombstone_v1", JSON.stringify(vivoT));
+      // Compartir la marca: sin esto, los otros dispositivos resucitan la marca de visita.
+      syncData({
+        tombstones: juntarTombstonesLocales()
+      });
     } catch {}
   };
   // Extraído para poder usarse tanto desde la pantalla completa de venta
@@ -2842,7 +2963,6 @@ function App() {
     syncData: syncData,
     autoCierre: !!planillas[`${diaActual}_${fechaActual}`]?.iniciado,
     cargasDia: cargasDia,
-    ecToken: ecToken,
     onGuardar: d => {
       savePlanilla(`${diaActual}_${fechaActual}`, d);
       if (!d._diaCerrado) irA(origenFecha === "atajo" ? "atajoPlanillaSemana" : origenFecha === "menu" ? "menu" : "selectorFechaPlanilla");

@@ -197,7 +197,14 @@ var firebaseConfig = {
       noVisitas:     function(it){ return it.id!=null ? String(it.id) : (String(it.clienteId)+'_'+String(it.dia)+'_'+String(it.fecha)); },
       histPrecios:   function(it){ return it.id!=null ? String(it.id) : ('hp_'+String(it.fecha||'').replace(/[^0-9A-Za-z_-]/g,'')); },
       perdidas:      function(it){ return it.id!=null ? String(it.id) : null; },
-      prospectos:    function(it){ return it.id!=null ? String(it.id) : null; }
+      prospectos:    function(it){ return it.id!=null ? String(it.id) : null; },
+      // MARCAS DE BORRADO COMPARTIDAS. Antes vivían sólo en el localStorage del
+      // equipo donde borrabas, así que los demás no se enteraban: veían el
+      // registro "faltando" en la nube, lo tomaban por nuevo y lo RESUCITABAN,
+      // subiéndolo de vuelta. Sincronizándolas, un borrado pasa a ser una
+      // decisión explícita que todos los dispositivos conocen y respetan.
+      // Formato: {id:"<entidad>__<ref>", entidad, ref, esClave, ts}
+      tombstones:    function(it){ return it.id!=null ? String(it.id) : null; }
     };
     // Entidades tipo MAPA (objeto {clave:valor}) -> colección; docId = clave.
     var LC_MAPAS = ['planillas','cargasDia','zonasReparto'];
@@ -266,7 +273,17 @@ var firebaseConfig = {
       // pulso para los listeners en tiempo real (equivale al viejo _upd de config)
       if(ops.length){
         var _tsPulso = Date.now();
-        window._lcUltimoPulsoPropio = _tsPulso; // para que 14-app.js sepa que ESTE pulso es nuestro
+        window._lcUltimoPulsoPropio = _tsPulso; // compatibilidad
+        // Un solo "último pulso" no alcanza: el merge dispara varios guardados
+        // seguidos (ventas, marcas de visita, recordatorios...), cada uno con su
+        // pulso. Con una sola variable, el eco de los pulsos anteriores no se
+        // reconocía como propio, la app creía que era otro dispositivo y volvía
+        // a traer todo — y ese refetch disparaba más guardados. Bucle de
+        // lecturas/escrituras contra Firestore (la cuota se va en eso).
+        // Guardando los últimos pulsos propios, ningún eco se confunde.
+        if(!window._lcPulsosPropios) window._lcPulsosPropios = [];
+        window._lcPulsosPropios.push(_tsPulso);
+        if(window._lcPulsosPropios.length > 40) window._lcPulsosPropios = window._lcPulsosPropios.slice(-40);
         ops.push({tipo:'set', ref:window.db.collection('meta').doc('pulse'), data:{_upd:_tsPulso}});
       }
       return ops;
