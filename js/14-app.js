@@ -2874,10 +2874,13 @@ function App() {
     } : x));
   };
   // Acceso biométrico: solo se interpone si está activado en Config. Si no, la
-  // app abre directo. La pantalla siempre deja entrar sin huella, así que un
-  // problema del lector nunca te deja afuera en medio del reparto.
+  // app abre directo. Al confirmar la huella se saltea la portada y entra
+  // derecho al menú: la huella ya cumple la función del botón "Ingresar".
   if (!accesoOk && lcBio2Activo()) return /*#__PURE__*/React.createElement(PantallaAccesoLC, {
-    onOk: () => setAccesoOk(true)
+    onOk: () => {
+      setAccesoOk(true);
+      if (pantalla === "portada") irA("menu");
+    }
   });
   window._setScaleIdxLC = setScaleIdx;
   // Header clickeable: tocar el nombre de la empresa en CUALQUIER pantalla
