@@ -312,7 +312,16 @@ function MenuDias({
         color: "var(--color-text-primary)",
         overflow: "hidden",
         textOverflow: "ellipsis",
-        whiteSpace: "nowrap"
+        whiteSpace: "nowrap",
+        cursor: "pointer",
+        // Subrayado punteado tenue: la única señal de que se puede tocar para
+        // editar (reemplaza al cartelito "editar zona" que estaba abajo).
+        borderBottom: "1px dotted var(--color-text-tertiary)"
+      },
+      title: "Tocá para editar la zona",
+      onClick: e => {
+        e.stopPropagation();
+        setEditandoZona(d);
       }
     }, zona)), !zona && /*#__PURE__*/React.createElement("span", {
       style: {
@@ -468,24 +477,7 @@ function MenuDias({
         fontSize: 13
       },
       onClick: () => setEditandoZona(null)
-    }, "✕"))), zona && editandoZona !== d && /*#__PURE__*/React.createElement("div", {
-      style: {
-        textAlign: "right",
-        marginTop: 2,
-        marginBottom: 2
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 10,
-        color: "var(--color-text-tertiary)",
-        cursor: "pointer",
-        textDecoration: "underline"
-      },
-      onClick: e => {
-        e.stopPropagation();
-        setEditandoZona(d);
-      }
-    }, "editar zona")), diaExpandido === d && /*#__PURE__*/React.createElement("div", {
+    }, "✕"))), diaExpandido === d && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 6,

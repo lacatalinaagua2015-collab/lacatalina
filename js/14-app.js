@@ -2879,7 +2879,17 @@ function App() {
   if (!accesoOk && lcBio2Activo()) return /*#__PURE__*/React.createElement(PantallaAccesoLC, {
     onOk: () => {
       setAccesoOk(true);
-      if (pantalla === "portada") irA("menu");
+      // Se usa el setter funcional (no irA) para no depender del valor de
+      // `pantalla` capturado cuando se montó la pantalla de acceso: la huella
+      // puede confirmarse varios segundos después.
+      setPantalla(p => p === "portada" ? "menu" : p);
+      if ((window.location.hash.slice(1) || "portada") === "portada") {
+        try {
+          window.history.replaceState({
+            pantalla: "menu"
+          }, '', '#menu');
+        } catch (e) {}
+      }
     }
   });
   window._setScaleIdxLC = setScaleIdx;
