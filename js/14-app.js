@@ -1459,12 +1459,40 @@ function App() {
     }
   };
 
+  // ── Cuánto espacio del navegador está usado (0 a 1) ─────────────────────
+  // localStorage da ~5 MB y no avisa cuando se llena: los guardados empiezan a
+  // fallar en silencio (todos los setItem de la app están en try/catch vacíos).
+  const _usoLocalStorage = () => {
+    try {
+      let total = 0;
+      for (const k in localStorage) {
+        if (localStorage.hasOwnProperty(k)) total += (localStorage[k] || "").length * 2;
+      }
+      return total / (5 * 1024 * 1024);
+    } catch {
+      return 0;
+    }
+  };
+  // Meses de historial a conservar en el dispositivo, según lo apretado que esté
+  // el espacio. Antes era fijo en 3 meses, y tres meses de reparto real (~1300
+  // ventas) ya no entran en 5 MB: el archivado no tenía nada "viejo" que sacar y
+  // el espacio se llenaba igual. Lo archivado NO se pierde: va a Firebase
+  // (archivo_ventas / archivo_novisitas) y se descarga una copia en JSON.
+  const _mesesHistorialLocal = () => {
+    const uso = _usoLocalStorage();
+    if (uso > 0.85) return 1;
+    if (uso > 0.7) return 2;
+    return 3;
+  };
+
   // ── LIMPIEZA AUTOMÁTICA de ventas antiguas ──────────────────────────────
-  // Archiva a Firebase y elimina localmente ventas de más de 3 meses
+  // Archiva a Firebase y elimina localmente las ventas más viejas que la
+  // ventana calculada arriba.
   React.useEffect(() => {
     if (!ventas.length) return;
     const hoy = new Date();
-    const limite = new Date(hoy.getFullYear(), hoy.getMonth() - 3, hoy.getDate());
+    const meses = _mesesHistorialLocal();
+    const limite = new Date(hoy.getFullYear(), hoy.getMonth() - meses, hoy.getDate());
     const limiteKey = limite.toLocaleDateString("en-CA");
     // Si ya archivamos hasta esta fecha (o más allá) antes, no repetir — esto
     // es lo que evitaba que la descarga se disparara de nuevo en cada apertura
@@ -1486,7 +1514,7 @@ function App() {
         // Solo borrar localmente si se guardaron en Firebase
         const ventasRecientes = ventas.filter(v => !v.fechaKey || v.fechaKey >= limiteKey);
         if (ventasRecientes.length < ventas.length) {
-          console.log("Limpieza automática: archivadas " + viejas.length + " ventas antiguas en Firebase");
+          console.log("Limpieza automática: archivadas " + viejas.length + " ventas anteriores al " + limiteKey + " (se conservan " + meses + " mes(es) en el dispositivo). Copia en Firebase + descarga JSON.");
           setVentasRaw(ventasRecientes);
           syncData({
             ventas: ventasRecientes
@@ -1506,7 +1534,8 @@ function App() {
   React.useEffect(() => {
     if (!noVisitas || !noVisitas.length) return;
     const hoy = new Date();
-    const limite = new Date(hoy.getFullYear(), hoy.getMonth() - 3, hoy.getDate());
+    const meses = _mesesHistorialLocal(); // misma ventana adaptativa que las ventas
+    const limite = new Date(hoy.getFullYear(), hoy.getMonth() - meses, hoy.getDate());
     const limiteKey = limite.toLocaleDateString("en-CA");
     const yaHasta = localStorage.getItem("lc_archivado_novisitas_hasta") || "";
     if (yaHasta >= limiteKey) return;
@@ -1523,7 +1552,7 @@ function App() {
       }).then(() => {
         const recientes = noVisitas.filter(v => !v.fecha || v.fecha >= limiteKey);
         if (recientes.length < noVisitas.length) {
-          console.log("Limpieza automática: archivadas " + viejas.length + " marcas de visita antiguas en Firebase");
+          console.log("Limpieza automática: archivadas " + viejas.length + " marcas de visita anteriores al " + limiteKey + " (se conservan " + meses + " mes(es) en el dispositivo).");
           setNoVisitas(recientes);
           syncData({
             noVisitas: recientes

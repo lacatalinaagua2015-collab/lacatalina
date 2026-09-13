@@ -333,6 +333,32 @@ const LC_PIN_KEY = "lc_pin";
 function lcBioSoportado() {
   return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create);
 }
+// Lo de arriba sólo dice que EXISTE la API — da true en cualquier Chrome, aunque
+// el equipo no tenga lector de huella disponible para el navegador. Esta es la
+// pregunta de verdad: ¿hay un autenticador del propio dispositivo (huella/rostro)
+// que el navegador pueda usar? Es asincrónica, por eso va aparte.
+async function lcBioDisponible() {
+  try {
+    if (!lcBioSoportado()) return false;
+    if (!window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) return false;
+    return await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+  } catch {
+    return false;
+  }
+}
+// Traduce el error técnico de WebAuthn a algo que se entienda y diga qué hacer.
+// Antes todos los fallos mostraban "No se pudo activar", que no dice nada:
+// no es lo mismo cancelar el cartel del sistema que estar en un contexto no seguro.
+function lcBioMotivo(e) {
+  const n = e && e.name || "";
+  if (n === "NotAllowedError") return "Se canceló o se agotó el tiempo del cartel de huella. Probá de nuevo y apoyá el dedo cuando aparezca.";
+  if (n === "InvalidStateError") return "Esta huella ya estaba registrada en este dispositivo. Desactivá y volvé a activar.";
+  if (n === "NotSupportedError") return "El navegador no soporta huella en este dispositivo.";
+  if (n === "SecurityError") return "El navegador bloqueó la huella por el origen del sitio (tiene que ser HTTPS).";
+  if (n === "AbortError") return "La operación se interrumpió. Probá de nuevo.";
+  if (n === "ConstraintError") return "El dispositivo no pudo cumplir el requisito de verificación (huella o rostro).";
+  return (n ? n + ": " : "") + (e && e.message || "Error desconocido");
+}
 function lcBioEnrolado() {
   try {
     return !!localStorage.getItem(LC_BIO_KEY);
@@ -365,7 +391,10 @@ async function lcBioRegistrar() {
     publicKey: {
       challenge: crypto.getRandomValues(new Uint8Array(32)),
       rp: {
-        name: "La Catalina"
+        name: "La Catalina",
+        // Explícito: el dominio del sitio. Sin esto el navegador lo deduce solo,
+        // y en algunos Android eso falla al registrar.
+        id: location.hostname
       },
       user: {
         id: crypto.getRandomValues(new Uint8Array(16)),
@@ -402,7 +431,12 @@ async function lcBioVerificar() {
         id: _lcB64ToBuf(localStorage.getItem(LC_BIO_KEY))
       }],
       userVerification: "required",
-      timeout: 60000
+      // 25s en vez de 60: si el cartel del sistema no llega a abrirse, un minuto
+      // entero mirando "Verificando huella…" se siente como que la app se colgó.
+      timeout: 25000,
+      // Explícito, igual que al registrar: el id tiene que coincidir con el que
+      // se usó en el alta, si no el autenticador no encuentra la credencial.
+      rpId: location.hostname
     }
   });
   return !!r;
@@ -426,18 +460,25 @@ function PantallaBloqueoLC({
   const [bioMsg, setBioMsg] = React.useState("");
   const [mostrarPin, setMostrarPin] = React.useState(modoSetup); // setup siempre muestra PIN
   const [fallosBio, setFallosBio] = React.useState(0);
+  const [verificando, setVerificando] = React.useState(false);
   const puedeBio = lcBioSoportado();
   const bioOn = lcBioEnrolado();
 
   // Intento automático de huella al montar (solo si ya está enrolada)
   React.useEffect(() => {
     if (!modoSetup && puedeBio && bioOn) {
+      setVerificando(true);
       lcBioVerificar().then(ok => {
+        setVerificando(false);
         if (ok) onOk();
       }).catch(() => {
-        setFallosBio(1);
-        setMostrarPin(true);
-        setBioMsg("Usá tu PIN para entrar.");
+        // Ojo: NO mandar directo al PIN. En Android el intento automático suele
+        // fallar sin siquiera mostrar el cartel del sistema (falta un gesto del
+        // usuario), y mandar al PIN acá dejaba la huella inutilizable: nunca se
+        // llegaba a ver el botón. Ahora se queda en la pantalla de huella, con
+        // el botón para tocar, y el PIN sigue disponible abajo por si lo querés.
+        setVerificando(false);
+        setBioMsg("Tocá la huella para intentar de nuevo, o entrá con tu PIN.");
       });
     }
   }, []);
@@ -492,18 +533,25 @@ function PantallaBloqueoLC({
     setError("");
   };
   const intentarHuellaDeNuevo = async () => {
+    if (verificando) return; // evita disparar dos verificaciones superpuestas
     setBioMsg("");
     setError("");
+    setVerificando(true);
     try {
       if (await lcBioVerificar()) onOk();
+      setVerificando(false);
     } catch (e) {
+      setVerificando(false);
       const nf = fallosBio + 1;
       setFallosBio(nf);
       if (nf >= 3) {
         setBioMsg("Demasiados intentos. Ingresá tu PIN.");
         setMostrarPin(true);
       } else {
-        setBioMsg(`No se reconoció. Intentos restantes: ${3 - nf}`);
+        // Mostrar el motivo real ayuda a distinguir "no se reconoció el dedo"
+        // de "el navegador no llegó a abrir el cartel".
+        const motivo = typeof lcBioMotivo === "function" ? lcBioMotivo(e) : "";
+        setBioMsg(motivo || `No se reconoció. Intentos restantes: ${3 - nf}`);
       }
     }
   };
@@ -631,9 +679,28 @@ function PantallaBloqueoLC({
       alignItems: "center",
       gap: 16
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  },
+  // El 👆 ahora es un BOTÓN, no un adorno. Chrome en Android no muestra el
+  // cartel de huella del sistema si la verificación se dispara sola al abrir
+  // la app (pide un gesto del usuario), así que sin algo para tocar la pantalla
+  // quedaba en "Verificando huella…" hasta agotar el tiempo y caer al PIN.
+  /*#__PURE__*/React.createElement("button", {
+    onClick: intentarHuellaDeNuevo,
+    "aria-label": "Entrar con huella",
     style: {
-      fontSize: 56
+      fontSize: 56,
+      lineHeight: 1,
+      background: "var(--color-background-secondary,#1a2b3c)",
+      border: "2px solid #185FA5",
+      borderRadius: "50%",
+      width: 116,
+      height: 116,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: "pointer",
+      padding: 0,
+      boxShadow: "0 4px 16px rgba(0,0,0,0.35)"
     }
   }, "👆"), /*#__PURE__*/React.createElement("p", {
     style: {
@@ -641,7 +708,7 @@ function PantallaBloqueoLC({
       color: "var(--color-text-secondary,#7a9ab8)",
       textAlign: "center"
     }
-  }, "Verificando huella..."), bioMsg && /*#__PURE__*/React.createElement("p", {
+  }, verificando ? "Verificando huella..." : "Tocá la huella para entrar"), bioMsg && /*#__PURE__*/React.createElement("p", {
     style: {
       color: "#f5b942",
       fontSize: 13,

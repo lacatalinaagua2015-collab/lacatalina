@@ -325,6 +325,21 @@ function SeguridadHuella() {
   const [enrolado, setEnrolado] = React.useState(lcBioEnrolado());
   const [msg, setMsg] = React.useState("");
   const soportado = lcBioSoportado();
+  // `soportado` sólo dice que existe la API. Acá preguntamos si REALMENTE hay un
+  // lector de huella/rostro disponible para el navegador (es asincrónico).
+  // null = todavía consultando.
+  const [disponible, setDisponible] = React.useState(null);
+  React.useEffect(() => {
+    let vivo = true;
+    if (typeof lcBioDisponible === "function") {
+      lcBioDisponible().then(d => {
+        if (vivo) setDisponible(d);
+      });
+    } else setDisponible(soportado);
+    return () => {
+      vivo = false;
+    };
+  }, []);
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
@@ -382,11 +397,23 @@ function SeguridadHuella() {
       try {
         await lcBioRegistrar();
         setEnrolado(true);
+        setMsg("");
       } catch (e) {
-        setMsg("No se pudo activar. Probá de nuevo.");
+        // Mostrar el MOTIVO real: antes decía siempre "No se pudo activar",
+        // que no permitía saber si se canceló el cartel, si el navegador lo
+        // bloqueó, o si el equipo no tiene lector disponible.
+        setMsg(typeof lcBioMotivo === "function" ? lcBioMotivo(e) : e && e.name || "No se pudo activar.");
+        console.warn("Huella — fallo al registrar:", e && e.name, e && e.message);
       }
     }
-  }, "Activar")), msg && /*#__PURE__*/React.createElement("div", {
+  }, "Activar")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "var(--color-text-tertiary)",
+      marginTop: 8,
+      lineHeight: 1.5
+    }
+  }, "Lector del dispositivo: ", disponible === null ? "consultando…" : disponible ? "disponible ✓" : "NO disponible ✗", " · Conexión segura: ", window.isSecureContext ? "sí ✓" : "NO ✗", " · Sitio: ", location.hostname), msg && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: "var(--color-text-danger)",
@@ -1321,7 +1348,63 @@ function Config({
         color: "var(--color-text-tertiary)",
         marginTop: 6
       }
-    }, "📷 ", fotos, " fotos guardadas"), pct > 70 && /*#__PURE__*/React.createElement("div", {
+    }, "📷 ", fotos, " fotos guardadas"),
+    // Desglose: qué ocupa el espacio, de mayor a menor. Sin esto no se puede
+    // saber qué conviene aliviar — y el total solo no dice nada.
+    (() => {
+      const filas = [];
+      try {
+        for (let k in localStorage) {
+          if (!localStorage.hasOwnProperty(k)) continue;
+          const bytes = (localStorage[k] || "").length * 2;
+          if (bytes > 1024) filas.push({
+            k,
+            kb: Math.round(bytes / 1024)
+          });
+        }
+      } catch (e) {}
+      filas.sort((a, b) => b.kb - a.kb);
+      if (!filas.length) return null;
+      const nombres = {
+        cat_ventas_v3: "Ventas",
+        cat_clientes_v3: "Clientes (incluye fotos)",
+        cat_novisitas_v1: "Marcas de visita",
+        cat_planillas_v1: "Planillas",
+        cat_recordatorios_v1: "Recordatorios",
+        cat_productos_v3: "Productos",
+        lc_hist_precios: "Historial de precios",
+        cat_perdidas_v1: "Pérdidas",
+        cat_prospectos_v1: "Prospectos",
+        cat_dispmovs_v1: "Movimientos de dispenser"
+      };
+      return /*#__PURE__*/React.createElement("div", {
+        style: {
+          marginTop: 10,
+          borderTop: "0.5px solid var(--color-border-tertiary)",
+          paddingTop: 8
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          fontWeight: 600,
+          color: "var(--color-text-secondary)",
+          marginBottom: 6
+        }
+      }, "QUÉ OCUPA EL ESPACIO"), filas.slice(0, 8).map(f => /*#__PURE__*/React.createElement("div", {
+        key: f.k,
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          fontSize: 11,
+          color: "var(--color-text-tertiary)",
+          padding: "2px 0"
+        }
+      }, /*#__PURE__*/React.createElement("span", null, nombres[f.k] || f.k), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontWeight: 600
+        }
+      }, f.kb, " KB"))));
+    })(), pct > 70 && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 12,
         color: "#e05c5c",
