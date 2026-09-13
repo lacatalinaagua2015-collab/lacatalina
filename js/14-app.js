@@ -263,7 +263,9 @@ function App() {
   const [volverVentaA, setVolverVentaA] = useState("detalleCliente");
   const [rutaDiariaVenta, setRutaDiariaVenta] = useState(true);
   const [clienteId, setClienteId] = useState(null);
-  const [pinOk, setPinOk] = React.useState(false);
+  // Acceso biométrico ya superado en esta sesión. Vive en memoria a propósito:
+  // al cerrar la app del todo vuelve a pedir huella.
+  const [accesoOk, setAccesoOk] = React.useState(false);
   const [noVisitas, setNoVisitas] = useLS("cat_novisitas_v1", []);
   // Registro de envases perdidos — rotos durante el reparto, o no
   // recuperados al eliminar un cliente (se mudó y no avisó, etc). Se
@@ -2871,11 +2873,11 @@ function App() {
       saldo: (Number(x.saldo) || 0) + netDeltaCambio
     } : x));
   };
-  if (!pinOk) return /*#__PURE__*/React.createElement(PantallaBloqueoLC, {
-    onOk: () => {
-      setPinOk(true);
-      if (pantalla === "portada") irA("menu");
-    }
+  // Acceso biométrico: solo se interpone si está activado en Config. Si no, la
+  // app abre directo. La pantalla siempre deja entrar sin huella, así que un
+  // problema del lector nunca te deja afuera en medio del reparto.
+  if (!accesoOk && lcBio2Activo()) return /*#__PURE__*/React.createElement(PantallaAccesoLC, {
+    onOk: () => setAccesoOk(true)
   });
   window._setScaleIdxLC = setScaleIdx;
   // Header clickeable: tocar el nombre de la empresa en CUALQUIER pantalla

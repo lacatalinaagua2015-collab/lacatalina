@@ -320,91 +320,80 @@ function NotifConfig({
   }, "📅 Recordatorios de agenda → a la hora exacta")));
 }
 
-// Toggle de huella — usa las funciones ya definidas en 04-portada.js (lcBioRegistrar/LC_BIO_KEY)
-function SeguridadHuella() {
-  const [enrolado, setEnrolado] = React.useState(lcBioEnrolado());
+// ── Acceso biométrico (v2) ───────────────────────────────────────────────────
+// Usa las funciones de 05-portada.js. A diferencia del esquema viejo, no hay
+// nada que se pueda "perder": la credencial la guarda el teléfono. Acá sólo se
+// prende o apaga la marca de que el acceso está activo.
+function AccesoBiometrico() {
+  const [activo, setActivo] = React.useState(lcBio2Activo());
+  const [disponible, setDisponible] = React.useState(null); // null = consultando
   const [msg, setMsg] = React.useState("");
-  const soportado = lcBioSoportado();
-  // `soportado` sólo dice que existe la API. Acá preguntamos si REALMENTE hay un
-  // lector de huella/rostro disponible para el navegador (es asincrónico).
-  // null = todavía consultando.
-  const [disponible, setDisponible] = React.useState(null);
+  const enCursoRef = React.useRef(false);
   React.useEffect(() => {
     let vivo = true;
-    if (typeof lcBioDisponible === "function") {
-      lcBioDisponible().then(d => {
-        if (vivo) setDisponible(d);
-      });
-    } else setDisponible(soportado);
+    lcBio2Disponible().then(d => {
+      if (vivo) setDisponible(d);
+    });
     return () => {
       vivo = false;
     };
   }, []);
+  const activar = async () => {
+    if (enCursoRef.current) return;
+    enCursoRef.current = true;
+    setMsg("");
+    try {
+      await lcBio2Registrar();
+      setActivo(true);
+      setMsg("Listo. La próxima vez que abras la app te va a pedir la huella.");
+    } catch (e) {
+      setMsg(lcBio2Motivo(e));
+    } finally {
+      enCursoRef.current = false;
+    }
+  };
+  const desactivar = () => {
+    lcBio2Apagar();
+    setActivo(lcBio2Activo());
+    setMsg("Acceso por huella desactivado. La app va a abrir directo.");
+  };
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
       color: "var(--color-text-secondary)",
-      marginBottom: 10
+      marginBottom: 10,
+      lineHeight: 1.5
     }
-  }, "Entrá a la app con tu huella o Face ID en vez de escribir el PIN."), !soportado ? /*#__PURE__*/React.createElement("div", {
+  }, "Pedí tu huella o rostro al abrir la app. Siempre vas a poder entrar sin huella si el lector no responde."), disponible === false ? /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
       color: "var(--color-text-tertiary)"
     }
-  }, "⚠ Este dispositivo/navegador no soporta huella.") : /*#__PURE__*/React.createElement("div", {
+  }, "⚠ Este dispositivo no tiene lector disponible para el navegador.") : /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
-      alignItems: "center"
+      alignItems: "center",
+      gap: 10
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 13,
       fontWeight: 600,
-      color: enrolado ? "#4dd9a0" : "#f5b942"
+      color: activo ? "var(--color-text-success)" : "var(--color-text-warning)"
     }
-  }, enrolado ? "✅ Activada" : "⏳ Desactivada"), enrolado ? /*#__PURE__*/React.createElement("button", {
+  }, activo ? "✅ Activado" : "⏳ Desactivado"), activo ? /*#__PURE__*/React.createElement("button", {
     style: {
       background: "var(--color-background-danger)",
       color: "var(--color-text-danger)",
-      border: "0.5px solid var(--color-border-danger)",
+      border: "0.5px solid var(--color-text-danger)",
       borderRadius: 8,
       padding: "8px 16px",
       fontSize: 13,
       fontWeight: 500,
       cursor: "pointer"
     },
-    onClick: () => {
-      // Se borra por varias vías y se CONFIRMA leyendo de nuevo: antes el
-      // removeItem estaba en un try/catch mudo, así que si fallaba el botón
-      // parecía no hacer nada y no había manera de saber por qué.
-      let e1 = null;
-      try {
-        localStorage.removeItem(LC_BIO_KEY);
-        localStorage.removeItem("lc_bio_no");
-      } catch (err) {
-        e1 = err;
-      }
-      let sigue = false;
-      try {
-        sigue = !!localStorage.getItem(LC_BIO_KEY);
-      } catch (err) {}
-      if (sigue) {
-        // Segundo intento: dejarla vacía equivale a no tener credencial.
-        try {
-          localStorage.setItem(LC_BIO_KEY, "");
-        } catch (err) {}
-        try {
-          sigue = !!localStorage.getItem(LC_BIO_KEY);
-        } catch (err) {}
-      }
-      if (sigue) {
-        setMsg("No se pudo borrar la huella de este dispositivo" + (e1 ? " (" + (e1.name || e1) + ")" : "") + ". Probá desde la pantalla de ingreso, con \"Reconfigurar huella\".");
-      } else {
-        setMsg("Huella desactivada en este dispositivo.");
-        setEnrolado(false);
-      }
-    }
+    onClick: desactivar
   }, "Desactivar") : /*#__PURE__*/React.createElement("button", {
     style: {
       background: "#185FA5",
@@ -416,35 +405,23 @@ function SeguridadHuella() {
       fontWeight: 500,
       cursor: "pointer"
     },
-    onClick: async () => {
-      setMsg("");
-      try {
-        await lcBioRegistrar();
-        setEnrolado(true);
-        setMsg("");
-      } catch (e) {
-        // Mostrar el MOTIVO real: antes decía siempre "No se pudo activar",
-        // que no permitía saber si se canceló el cartel, si el navegador lo
-        // bloqueó, o si el equipo no tiene lector disponible.
-        setMsg(typeof lcBioMotivo === "function" ? lcBioMotivo(e) : e && e.name || "No se pudo activar.");
-        console.warn("Huella — fallo al registrar:", e && e.name, e && e.message);
-      }
+    onClick: activar
+  }, "Activar")), msg && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--color-text-secondary)",
+      marginTop: 10,
+      lineHeight: 1.5
     }
-  }, "Activar")), /*#__PURE__*/React.createElement("div", {
+  }, msg), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 10,
       color: "var(--color-text-tertiary)",
-      marginTop: 8,
-      lineHeight: 1.5
+      marginTop: 8
     }
-  }, "Lector del dispositivo: ", disponible === null ? "consultando…" : disponible ? "disponible ✓" : "NO disponible ✗", " · Conexión segura: ", window.isSecureContext ? "sí ✓" : "NO ✗", " · Sitio: ", location.hostname), msg && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "var(--color-text-danger)",
-      marginTop: 6
-    }
-  }, msg));
+  }, "Lector del dispositivo: ", disponible === null ? "consultando…" : disponible ? "disponible ✓" : "no disponible ✗"));
 }
+
 function Config({
   productos,
   setProductos,
@@ -469,7 +446,7 @@ function Config({
 }) {
   const [tab, setTab] = useState(["datos", "vehiculo", "apariencia"].includes(tabInicial) ? tabInicial : "datos");
   const [abiertoNotif, setAbiertoNotif] = useState(false);
-  const [abiertoHuella, setAbiertoHuella] = useState(false);
+  const [abiertoAcceso, setAbiertoAcceso] = useState(false);
   const [abiertoRespaldo, setAbiertoRespaldo] = useState(false);
   const [abiertoMant, setAbiertoMant] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
@@ -1088,7 +1065,7 @@ function Config({
       cursor: "pointer",
       textAlign: "left"
     },
-    onClick: () => setAbiertoHuella(!abiertoHuella)
+    onClick: () => setAbiertoAcceso(!abiertoAcceso)
   }, /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 18
@@ -1100,24 +1077,16 @@ function Config({
       color: "var(--color-text-primary)",
       flex: 1
     }
-  }, "Ingreso con huella"), /*#__PURE__*/React.createElement("span", {
+  }, "Acceso con huella"), /*#__PURE__*/React.createElement("span", {
     style: {
-      width: 26,
-      height: 26,
-      borderRadius: "50%",
-      background: "var(--color-background-primary)",
-      color: "var(--color-text-info)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: 13,
+      color: "var(--color-text-tertiary)",
       flexShrink: 0
     }
-  }, abiertoHuella ? "▲" : "▼")), abiertoHuella && /*#__PURE__*/React.createElement("div", {
+  }, abiertoAcceso ? "▲" : "▼")), abiertoAcceso && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 10
     }
-  }, /*#__PURE__*/React.createElement(SeguridadHuella, null))), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(AccesoBiometrico, null))), /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
       margin: 0

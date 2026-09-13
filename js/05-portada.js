@@ -327,81 +327,79 @@ function SyncBar({
   }, c.txt);
 }
 
-// ── Acceso con PIN + huella (WebAuthn) — La Catalina ───────────────────────────
-const LC_BIO_KEY = "lc_bio_cred";
-const LC_PIN_KEY = "lc_pin";
-function lcBioSoportado() {
+// ════════════════════════════════════════════════════════════════════════════
+// ◆  ACCESO BIOMÉTRICO (v2) — huella / rostro, con passkey DESCUBRIBLE
+// ════════════════════════════════════════════════════════════════════════════
+// Reemplaza al esquema anterior (PIN + huella), que se eliminó entero.
+//
+// POR QUÉ ES DISTINTO. El anterior guardaba el identificador de la credencial
+// en localStorage y se lo pasaba al teléfono para verificar. Eso falló: cuando
+// el almacenamiento del navegador se llenaba, el identificador no quedaba
+// guardado, y al reabrir la app no había con qué verificar — pedía PIN y volvía
+// a ofrecer activar la huella, en círculo.
+//
+// Acá NO se guarda ningún identificador. Se crea una passkey "descubrible"
+// (residentKey), que queda en el gestor de credenciales del propio teléfono, y
+// al verificar se pide sin lista: el teléfono ofrece lo que tenga para este
+// sitio. Así el acceso no depende del almacenamiento del navegador.
+//
+// Lo único que se guarda acá es una marca de "está activado", y si esa marca se
+// pierde la app simplemente abre sin pedir nada: nunca deja a nadie afuera.
+const LC_BIO2_ON = "lc_bio2_on";
+function lcBio2Soportado() {
   return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create);
 }
-// Lo de arriba sólo dice que EXISTE la API — da true en cualquier Chrome, aunque
-// el equipo no tenga lector de huella disponible para el navegador. Esta es la
-// pregunta de verdad: ¿hay un autenticador del propio dispositivo (huella/rostro)
-// que el navegador pueda usar? Es asincrónica, por eso va aparte.
-async function lcBioDisponible() {
+// ¿Hay de verdad un lector del dispositivo disponible para el navegador?
+// (que exista la API no alcanza: da true en cualquier Chrome).
+async function lcBio2Disponible() {
   try {
-    if (!lcBioSoportado()) return false;
+    if (!lcBio2Soportado()) return false;
     if (!window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) return false;
     return await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
   } catch {
     return false;
   }
 }
-// Traduce el error técnico de WebAuthn a algo que se entienda y diga qué hacer.
-// Antes todos los fallos mostraban "No se pudo activar", que no dice nada:
-// no es lo mismo cancelar el cartel del sistema que estar en un contexto no seguro.
-function lcBioMotivo(e) {
+function lcBio2Activo() {
+  try {
+    return localStorage.getItem(LC_BIO2_ON) === "1";
+  } catch {
+    return false;
+  }
+}
+function lcBio2Apagar() {
+  try {
+    localStorage.removeItem(LC_BIO2_ON);
+  } catch {}
+}
+// Traduce el error técnico a algo que se entienda y diga qué hacer.
+function lcBio2Motivo(e) {
   const n = e && e.name || "";
-  if (n === "NotAllowedError") return "Se canceló o se agotó el tiempo del cartel de huella. Probá de nuevo y apoyá el dedo cuando aparezca.";
-  if (n === "InvalidStateError") return "Esta huella ya estaba registrada en este dispositivo. Desactivá y volvé a activar.";
-  if (n === "NotSupportedError") return "El navegador no soporta huella en este dispositivo.";
-  if (n === "SecurityError") return "El navegador bloqueó la huella por el origen del sitio (tiene que ser HTTPS).";
-  if (n === "AbortError") return "La operación se interrumpió. Probá de nuevo.";
-  if (n === "ConstraintError") return "El dispositivo no pudo cumplir el requisito de verificación (huella o rostro).";
-  if (n === "OperationError") return "Ya había un pedido de huella abierto. Esperá un segundo y probá de nuevo.";
-  if (n === "AlmacenamientoLleno") return "La huella se validó pero no se pudo guardar: el almacenamiento del navegador está lleno. Liberá espacio desde Config y volvé a activarla.";
-  return (n ? n + ": " : "") + (e && e.message || "Error desconocido");
+  if (n === "NotAllowedError") return "Se canceló o se agotó el tiempo. Tocá de nuevo y apoyá el dedo cuando aparezca el cartel.";
+  if (n === "InvalidStateError") return "Este dispositivo ya tenía el acceso creado. Probá entrar con la huella.";
+  if (n === "NotSupportedError") return "Este teléfono o navegador no soporta el acceso por huella.";
+  if (n === "SecurityError") return "El navegador lo bloqueó por el origen del sitio.";
+  if (n === "OperationError") return "Ya había un pedido abierto. Esperá un segundo y tocá de nuevo.";
+  if (n === "AbortError") return "Se interrumpió. Probá de nuevo.";
+  return (n ? n + ": " : "") + (e && e.message || "No se pudo completar");
 }
-function lcBioEnrolado() {
-  try {
-    return !!localStorage.getItem(LC_BIO_KEY);
-  } catch {
-    return false;
-  }
-}
-function lcBioRechazado() {
-  try {
-    return localStorage.getItem("lc_bio_no") === "1";
-  } catch {
-    return false;
-  }
-}
-function _lcB64ToBuf(b64) {
-  const x = atob(b64);
-  const u = new Uint8Array(x.length);
-  for (let i = 0; i < x.length; i++) u[i] = x.charCodeAt(i);
-  return u.buffer;
-}
-function _lcBufToB64(buf) {
-  const u = new Uint8Array(buf);
-  let x = "";
-  for (let i = 0; i < u.length; i++) x += String.fromCharCode(u[i]);
-  return btoa(x);
-}
-async function lcBioRegistrar() {
-  if (!lcBioSoportado()) throw new Error("no_soportado");
+// Crea la passkey. `residentKey: required` es lo que la hace descubrible —
+// sin eso volveríamos a depender de guardar un identificador.
+async function lcBio2Registrar() {
+  if (!lcBio2Soportado()) throw new Error("no_soportado");
   const cred = await navigator.credentials.create({
     publicKey: {
       challenge: crypto.getRandomValues(new Uint8Array(32)),
       rp: {
         name: "La Catalina",
-        // Explícito: el dominio del sitio. Sin esto el navegador lo deduce solo,
-        // y en algunos Android eso falla al registrar.
         id: location.hostname
       },
+      // id fijo a propósito: si cambiara en cada alta, el teléfono acumularía
+      // una passkey nueva por cada activación.
       user: {
-        id: crypto.getRandomValues(new Uint8Array(16)),
-        name: "usuario",
-        displayName: "Usuario"
+        id: new TextEncoder().encode("lacatalina-app"),
+        name: "La Catalina",
+        displayName: "La Catalina"
       },
       pubKeyCredParams: [{
         type: "public-key",
@@ -412,6 +410,8 @@ async function lcBioRegistrar() {
       }],
       authenticatorSelection: {
         authenticatorAttachment: "platform",
+        residentKey: "required",
+        requireResidentKey: true,
         userVerification: "required"
       },
       timeout: 60000,
@@ -419,235 +419,57 @@ async function lcBioRegistrar() {
     }
   });
   if (!cred) throw new Error("cancelado");
-  // Guardar la credencial Y CONFIRMAR que quedó. Antes esto se escribía sin
-  // verificar: si el almacenamiento del navegador estaba lleno, el setItem
-  // fallaba y la huella parecía activarse, pero al reabrir la app no había
-  // credencial y volvía a pedir PIN y a ofrecer activarla — eternamente.
-  const idB64 = _lcBufToB64(cred.rawId);
   try {
-    localStorage.setItem(LC_BIO_KEY, idB64);
+    localStorage.setItem(LC_BIO2_ON, "1");
   } catch (e) {
-    const err = new Error("no_se_pudo_guardar");
+    // Si ni esta marca mínima entra, avisamos en vez de fingir que quedó activo.
+    const err = new Error("sin_espacio");
     err.name = "AlmacenamientoLleno";
     throw err;
   }
-  if (localStorage.getItem(LC_BIO_KEY) !== idB64) {
-    const err = new Error("no_se_pudo_guardar");
-    err.name = "AlmacenamientoLleno";
-    throw err;
-  }
-  try {
-    localStorage.removeItem("lc_bio_no");
-  } catch (e) {}
   return true;
 }
-async function lcBioVerificar() {
-  if (!lcBioSoportado() || !lcBioEnrolado()) throw new Error("no_disponible");
+// Verifica SIN lista de credenciales: el teléfono ofrece las que tenga para
+// este sitio. Por eso no hace falta haber guardado nada.
+async function lcBio2Verificar() {
   const r = await navigator.credentials.get({
     publicKey: {
       challenge: crypto.getRandomValues(new Uint8Array(32)),
-      allowCredentials: [{
-        type: "public-key",
-        id: _lcB64ToBuf(localStorage.getItem(LC_BIO_KEY))
-      }],
+      rpId: location.hostname,
       userVerification: "required",
-      // 25s en vez de 60: si el cartel del sistema no llega a abrirse, un minuto
-      // entero mirando "Verificando huella…" se siente como que la app se colgó.
-      timeout: 25000,
-      // Explícito, igual que al registrar: el id tiene que coincidir con el que
-      // se usó en el alta, si no el autenticador no encuentra la credencial.
-      rpId: location.hostname
+      timeout: 60000
     }
   });
   return !!r;
 }
-function PantallaBloqueoLC({
+
+// ── Pantalla de acceso ───────────────────────────────────────────────────────
+// Solo aparece si el acceso está activado. Siempre ofrece "Entrar sin huella":
+// la app es la herramienta de trabajo del día, no puede dejarte afuera en medio
+// del reparto porque el lector no quiso andar.
+function PantallaAccesoLC({
   onOk
 }) {
-  const pinGuardado = (() => {
-    try {
-      return localStorage.getItem(LC_PIN_KEY) || "";
-    } catch {
-      return "";
-    }
-  })();
-  const modoSetup = !pinGuardado;
-  const [pin, setPin] = React.useState("");
-  const [setupPaso, setSetupPaso] = React.useState(1);
-  const [pinTmp, setPinTmp] = React.useState("");
-  const [error, setError] = React.useState("");
-  const [faseEnrolar, setFaseEnrolar] = React.useState(false);
-  const [bioMsg, setBioMsg] = React.useState("");
-  const [mostrarPin, setMostrarPin] = React.useState(modoSetup); // setup siempre muestra PIN
-  const [fallosBio, setFallosBio] = React.useState(0);
+  const [msg, setMsg] = React.useState("");
   const [verificando, setVerificando] = React.useState(false);
-  // El guard REAL contra dobles disparos. Con el estado de React no alcanza:
-  // setVerificando(true) no se aplica en el acto, así que dos toques seguidos
-  // (habitual en una pantalla táctil) pasaban los dos y salían DOS pedidos de
-  // huella a la vez. El teléfono admite uno solo y el segundo falla con
-  // "OperationError: A request is already pending". Un ref cambia al instante.
+  // Guard sincrónico: con estado de React no alcanza (no se aplica en el acto)
+  // y dos toques seguidos disparaban dos pedidos, lo que el teléfono rechaza
+  // con "A request is already pending".
   const enCursoRef = React.useRef(false);
-  const puedeBio = lcBioSoportado();
-  const [bioOn, setBioOn] = React.useState(lcBioEnrolado());
-
-  // Intento automático de huella al montar (solo si ya está enrolada)
-  // NO se intenta la huella sola al abrir. Dos motivos, los dos comprobados en
-  // el Android de uso diario:
-  //   1) Chrome no abre el cartel del sistema si la verificación no viene de un
-  //      toque del usuario, así que el intento automático fallaba siempre.
-  //   2) Peor todavía: ese intento dejaba una verificación "en curso" hasta
-  //      25 segundos, y el guard anti-superposición de intentarHuellaDeNuevo
-  //      descartaba el toque del botón — tocabas el dedito y no pasaba nada.
-  // Ahora la huella la disparás vos tocando el botón, que es además el único
-  // camino que Android acepta.
-  const finalizar = () => {
-    if (puedeBio && !lcBioEnrolado() && !lcBioRechazado()) {
-      setPin("");
-      setFaseEnrolar(true);
-    } else onOk();
-  };
-  const completar = valor => {
-    if (valor.length < 4) return;
-    if (modoSetup) {
-      if (setupPaso === 1) {
-        setPinTmp(valor);
-        setPin("");
-        setSetupPaso(2);
-        setError("");
-      } else {
-        if (valor === pinTmp) {
-          try {
-            localStorage.setItem(LC_PIN_KEY, valor);
-          } catch (e) {}
-          setError("");
-          finalizar();
-        } else {
-          setError("No coincide, empezá de nuevo");
-          setPin("");
-          setPinTmp("");
-          setSetupPaso(1);
-        }
-      }
-    } else {
-      if (valor === pinGuardado) {
-        setError("");
-        finalizar();
-      } else {
-        setError("PIN incorrecto");
-        setPin("");
-        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-      }
-    }
-  };
-  const presionar = d => {
-    if (pin.length >= 4) return;
-    const nuevo = pin + d;
-    setPin(nuevo);
-    setError("");
-    if (nuevo.length === 4) completar(nuevo);
-  };
-  const borrar = () => {
-    setPin(p => p.slice(0, -1));
-    setError("");
-  };
-  const intentarHuellaDeNuevo = async () => {
-    if (enCursoRef.current) return; // ya hay un pedido de huella abierto
+  const entrarConHuella = async () => {
+    if (enCursoRef.current) return;
     enCursoRef.current = true;
-    setBioMsg("");
-    setError("");
+    setMsg("");
     setVerificando(true);
     try {
-      if (await lcBioVerificar()) onOk();
+      if (await lcBio2Verificar()) onOk();
     } catch (e) {
-      // "A request is already pending" NO es un fallo de tu huella: es que
-      // quedó otro pedido abierto. No cuenta como intento fallido, porque si
-      // no, tres toques apurados te mandaban al PIN sin haber fallado nunca.
-      if (e && e.name === "OperationError") {
-        setBioMsg("Esperá un segundo y tocá de nuevo.");
-      } else {
-        const nf = fallosBio + 1;
-        setFallosBio(nf);
-        if (nf >= 3) {
-          setBioMsg("Demasiados intentos. Ingresá tu PIN.");
-          setMostrarPin(true);
-        } else {
-          const motivo = typeof lcBioMotivo === "function" ? lcBioMotivo(e) : "";
-          setBioMsg(motivo || `No se reconoció. Intentos restantes: ${3 - nf}`);
-        }
-      }
+      setMsg(lcBio2Motivo(e));
     } finally {
       enCursoRef.current = false;
       setVerificando(false);
     }
   };
-  // Borra la credencial guardada y registra una nueva, en un solo toque.
-  // Hace falta porque una credencial vieja (registrada con otra configuración)
-  // ya no la encuentra el teléfono: falla ANTES de dibujar el cartel del dedo,
-  // así que no hay forma de entrar con huella ni de darse cuenta de por qué.
-  // Va acá, en la pantalla de bloqueo, porque es donde estás cuando pasa —
-  // depender del botón "Desactivar" de Config obliga a entrar primero.
-  // Registrar exige verificación biométrica, o sea que si sale bien ya te
-  // identificaste: se entra derecho.
-  const reconfigurarHuella = async () => {
-    if (enCursoRef.current) return;
-    enCursoRef.current = true;
-    setBioMsg("");
-    setError("");
-    try {
-      localStorage.removeItem(LC_BIO_KEY);
-      localStorage.removeItem("lc_bio_no");
-    } catch (e) {}
-    try {
-      await lcBioRegistrar();
-      setBioOn(true);
-      onOk();
-    } catch (e) {
-      setBioMsg(typeof lcBioMotivo === "function" ? lcBioMotivo(e) : "No se pudo reconfigurar.");
-      setMostrarPin(true);
-    } finally {
-      enCursoRef.current = false;
-    }
-  };
-  const activarHuella = async () => {
-    if (enCursoRef.current) return; // no abrir dos pedidos de huella a la vez
-    enCursoRef.current = true;
-    setBioMsg("");
-    try {
-      await lcBioRegistrar();
-      setBioOn(true);
-      onOk();
-    } catch (e) {
-      // Antes decía siempre "No se pudo activar" y te hacía entrar igual, así
-      // que no había forma de enterarse de POR QUÉ no quedaba activada —
-      // sobre todo si el fallo era que no se pudo guardar por falta de espacio.
-      setBioMsg(typeof lcBioMotivo === "function" ? lcBioMotivo(e) : "No se pudo activar. Entrás con tu PIN.");
-      setTimeout(onOk, 3500);
-    } finally {
-      enCursoRef.current = false;
-    }
-  };
-  const saltarHuella = () => {
-    try {
-      localStorage.setItem("lc_bio_no", "1");
-    } catch (e) {}
-    onOk();
-  };
-  const titulo = modoSetup ? setupPaso === 1 ? "Creá un PIN de 4 dígitos" : "Repetí el PIN" : "Ingresá tu PIN";
-  const btnStyle = color => ({
-    width: 72,
-    height: 72,
-    borderRadius: "50%",
-    border: "none",
-    cursor: "pointer",
-    fontSize: 24,
-    fontWeight: 600,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: color || "var(--color-background-secondary,#1a2b3c)",
-    color: "var(--color-text-primary,#e2eaf4)",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.3)"
-  });
   return /*#__PURE__*/React.createElement("div", {
     style: {
       minHeight: "100vh",
@@ -660,102 +482,27 @@ function PantallaBloqueoLC({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      textAlign: "center",
-      marginBottom: 32
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
       fontSize: 44,
       marginBottom: 8
     }
-  }, "💧"), /*#__PURE__*/React.createElement("h2", {
+  }, "💧"), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 20,
-      fontWeight: 700,
-      color: "var(--color-text-primary,#e2eaf4)",
-      margin: 0
-    }
-  }, "La Catalina"), mostrarPin && /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 13,
-      color: "var(--color-text-secondary,#7a9ab8)",
-      marginTop: 4
-    }
-  }, titulo)), faseEnrolar ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      gap: 14,
-      maxWidth: 280
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 46
-    }
-  }, "👆"), /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 16,
-      color: "var(--color-text-primary,#e2eaf4)",
-      textAlign: "center",
-      margin: 0,
-      fontWeight: 600
-    }
-  }, "¿Entrar con tu huella la próxima vez?"), /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 12,
-      color: "var(--color-text-secondary,#7a9ab8)",
-      textAlign: "center",
-      margin: 0,
-      lineHeight: 1.5
-    }
-  }, "Más rápido. Tu PIN sigue funcionando por si lo necesitás."), /*#__PURE__*/React.createElement("button", {
-    style: {
-      background: "#185FA5",
-      color: "#fff",
-      border: "none",
-      borderRadius: 10,
-      padding: "12px 20px",
-      fontSize: 15,
+      fontSize: 22,
       fontWeight: 600,
-      cursor: "pointer",
-      width: 210
-    },
-    onClick: activarHuella
-  }, "Activar huella"), /*#__PURE__*/React.createElement("button", {
-    style: {
-      background: "none",
-      border: "none",
-      color: "var(--color-text-secondary,#7a9ab8)",
-      fontSize: 13,
-      cursor: "pointer"
-    },
-    onClick: saltarHuella
-  }, "Ahora no"))
-
-  /* Esperando huella automática */ : !mostrarPin && bioOn ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      gap: 16
+      color: "var(--color-text-primary,#e2eaf4)",
+      marginBottom: 28
     }
-  },
-  // El 👆 ahora es un BOTÓN, no un adorno. Chrome en Android no muestra el
-  // cartel de huella del sistema si la verificación se dispara sola al abrir
-  // la app (pide un gesto del usuario), así que sin algo para tocar la pantalla
-  // quedaba en "Verificando huella…" hasta agotar el tiempo y caer al PIN.
-  /*#__PURE__*/React.createElement("button", {
-    onClick: intentarHuellaDeNuevo,
+  }, "La Catalina"), /*#__PURE__*/React.createElement("button", {
+    onClick: entrarConHuella,
     "aria-label": "Entrar con huella",
     style: {
-      fontSize: 56,
+      fontSize: 52,
       lineHeight: 1,
-      background: "var(--color-background-secondary,#1a2b3c)",
-      border: "2px solid #185FA5",
-      borderRadius: "50%",
       width: 116,
       height: 116,
+      borderRadius: "50%",
+      background: "var(--color-background-secondary,#1a2b3c)",
+      border: "2px solid #185FA5",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -767,103 +514,29 @@ function PantallaBloqueoLC({
     style: {
       fontSize: 15,
       color: "var(--color-text-secondary,#7a9ab8)",
+      marginTop: 16,
       textAlign: "center"
     }
-  }, verificando ? "Verificando huella..." : "Tocá la huella para entrar"), bioMsg && /*#__PURE__*/React.createElement("p", {
+  }, verificando ? "Esperando tu huella..." : "Tocá para entrar con tu huella"), msg && /*#__PURE__*/React.createElement("p", {
     style: {
+      fontSize: 13,
       color: "#f5b942",
-      fontSize: 13,
-      textAlign: "center"
+      marginTop: 10,
+      textAlign: "center",
+      maxWidth: 300,
+      lineHeight: 1.5
     }
-  }, bioMsg), fallosBio > 0 && fallosBio < 3 && /*#__PURE__*/React.createElement("button", {
+  }, msg), /*#__PURE__*/React.createElement("button", {
+    onClick: onOk,
     style: {
-      background: "#185FA5",
-      color: "#fff",
-      border: "none",
-      borderRadius: 10,
-      padding: "10px 20px",
-      fontSize: 14,
-      cursor: "pointer"
-    },
-    onClick: intentarHuellaDeNuevo
-  }, "Reintentar huella"), /*#__PURE__*/React.createElement("button", {
-    style: {
-      background: "none",
-      border: "none",
-      color: "var(--color-text-tertiary,#4a6a85)",
-      fontSize: 13,
-      cursor: "pointer",
-      marginTop: 8
-    },
-    onClick: () => setMostrarPin(true)
-  }, "Usar PIN"), /*#__PURE__*/React.createElement("button", {
-    style: {
+      marginTop: 22,
       background: "none",
       border: "0.5px solid var(--color-border-secondary,#2e4055)",
-      color: "var(--color-text-tertiary,#4a6a85)",
-      fontSize: 12,
+      color: "var(--color-text-tertiary,#7797b5)",
+      fontSize: 13,
       borderRadius: 8,
-      padding: "6px 14px",
-      cursor: "pointer",
-      marginTop: 4
-    },
-    onClick: reconfigurarHuella
-  }, "Reconfigurar huella"))
-
-  /* Teclado PIN */ : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 16,
-      marginBottom: 28
+      padding: "8px 18px",
+      cursor: "pointer"
     }
-  }, [0, 1, 2, 3].map(i => /*#__PURE__*/React.createElement("div", {
-    key: i,
-    style: {
-      width: 16,
-      height: 16,
-      borderRadius: "50%",
-      background: i < pin.length ? "#185FA5" : "rgba(255,255,255,0.15)",
-      boxShadow: i < pin.length ? "0 0 8px rgba(24,95,165,0.6)" : "none"
-    }
-  }))), error && /*#__PURE__*/React.createElement("p", {
-    style: {
-      color: "#f07070",
-      fontSize: 13,
-      marginBottom: 18,
-      textAlign: "center"
-    }
-  }, error), bioMsg && /*#__PURE__*/React.createElement("p", {
-    style: {
-      color: "#f5b942",
-      fontSize: 13,
-      marginBottom: 16,
-      textAlign: "center"
-    }
-  }, bioMsg), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "grid",
-      gridTemplateColumns: "repeat(3,72px)",
-      gap: 12
-    }
-  }, [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => /*#__PURE__*/React.createElement("button", {
-    key: n,
-    style: btnStyle(),
-    onClick: () => presionar(String(n))
-  }, n)), /*#__PURE__*/React.createElement("div", null), /*#__PURE__*/React.createElement("button", {
-    style: btnStyle(),
-    onClick: () => presionar("0")
-  }, "0"), /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...btnStyle("rgba(240,112,112,0.15)"),
-      color: "#f07070"
-    },
-    onClick: borrar
-  }, "⌫"))), /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 11,
-      color: "var(--color-text-tertiary,#4a6a85)",
-      marginTop: 24,
-      textAlign: "center"
-    }
-  }, "La Catalina"));
+  }, "Entrar sin huella"));
 }
