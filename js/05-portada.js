@@ -465,23 +465,15 @@ function PantallaBloqueoLC({
   const bioOn = lcBioEnrolado();
 
   // Intento automático de huella al montar (solo si ya está enrolada)
-  React.useEffect(() => {
-    if (!modoSetup && puedeBio && bioOn) {
-      setVerificando(true);
-      lcBioVerificar().then(ok => {
-        setVerificando(false);
-        if (ok) onOk();
-      }).catch(() => {
-        // Ojo: NO mandar directo al PIN. En Android el intento automático suele
-        // fallar sin siquiera mostrar el cartel del sistema (falta un gesto del
-        // usuario), y mandar al PIN acá dejaba la huella inutilizable: nunca se
-        // llegaba a ver el botón. Ahora se queda en la pantalla de huella, con
-        // el botón para tocar, y el PIN sigue disponible abajo por si lo querés.
-        setVerificando(false);
-        setBioMsg("Tocá la huella para intentar de nuevo, o entrá con tu PIN.");
-      });
-    }
-  }, []);
+  // NO se intenta la huella sola al abrir. Dos motivos, los dos comprobados en
+  // el Android de uso diario:
+  //   1) Chrome no abre el cartel del sistema si la verificación no viene de un
+  //      toque del usuario, así que el intento automático fallaba siempre.
+  //   2) Peor todavía: ese intento dejaba una verificación "en curso" hasta
+  //      25 segundos, y el guard anti-superposición de intentarHuellaDeNuevo
+  //      descartaba el toque del botón — tocabas el dedito y no pasaba nada.
+  // Ahora la huella la disparás vos tocando el botón, que es además el único
+  // camino que Android acepta.
   const finalizar = () => {
     if (puedeBio && !lcBioEnrolado() && !lcBioRechazado()) {
       setPin("");
@@ -553,6 +545,29 @@ function PantallaBloqueoLC({
         const motivo = typeof lcBioMotivo === "function" ? lcBioMotivo(e) : "";
         setBioMsg(motivo || `No se reconoció. Intentos restantes: ${3 - nf}`);
       }
+    }
+  };
+  // Borra la credencial guardada y registra una nueva, en un solo toque.
+  // Hace falta porque una credencial vieja (registrada con otra configuración)
+  // ya no la encuentra el teléfono: falla ANTES de dibujar el cartel del dedo,
+  // así que no hay forma de entrar con huella ni de darse cuenta de por qué.
+  // Va acá, en la pantalla de bloqueo, porque es donde estás cuando pasa —
+  // depender del botón "Desactivar" de Config obliga a entrar primero.
+  // Registrar exige verificación biométrica, o sea que si sale bien ya te
+  // identificaste: se entra derecho.
+  const reconfigurarHuella = async () => {
+    setBioMsg("");
+    setError("");
+    try {
+      localStorage.removeItem(LC_BIO_KEY);
+      localStorage.removeItem("lc_bio_no");
+    } catch (e) {}
+    try {
+      await lcBioRegistrar();
+      onOk();
+    } catch (e) {
+      setBioMsg(typeof lcBioMotivo === "function" ? lcBioMotivo(e) : "No se pudo reconfigurar.");
+      setMostrarPin(true);
     }
   };
   const activarHuella = async () => {
@@ -735,7 +750,19 @@ function PantallaBloqueoLC({
       marginTop: 8
     },
     onClick: () => setMostrarPin(true)
-  }, "Usar PIN"))
+  }, "Usar PIN"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      background: "none",
+      border: "0.5px solid var(--color-border-secondary,#2e4055)",
+      color: "var(--color-text-tertiary,#4a6a85)",
+      fontSize: 12,
+      borderRadius: 8,
+      padding: "6px 14px",
+      cursor: "pointer",
+      marginTop: 4
+    },
+    onClick: reconfigurarHuella
+  }, "Reconfigurar huella"))
 
   /* Teclado PIN */ : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {

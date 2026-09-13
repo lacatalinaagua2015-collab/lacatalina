@@ -375,11 +375,35 @@ function SeguridadHuella() {
       cursor: "pointer"
     },
     onClick: () => {
+      // Se borra por varias vías y se CONFIRMA leyendo de nuevo: antes el
+      // removeItem estaba en un try/catch mudo, así que si fallaba el botón
+      // parecía no hacer nada y no había manera de saber por qué.
+      let e1 = null;
       try {
         localStorage.removeItem(LC_BIO_KEY);
-      } catch (e) {}
-      ;
-      setEnrolado(false);
+        localStorage.removeItem("lc_bio_no");
+      } catch (err) {
+        e1 = err;
+      }
+      let sigue = false;
+      try {
+        sigue = !!localStorage.getItem(LC_BIO_KEY);
+      } catch (err) {}
+      if (sigue) {
+        // Segundo intento: dejarla vacía equivale a no tener credencial.
+        try {
+          localStorage.setItem(LC_BIO_KEY, "");
+        } catch (err) {}
+        try {
+          sigue = !!localStorage.getItem(LC_BIO_KEY);
+        } catch (err) {}
+      }
+      if (sigue) {
+        setMsg("No se pudo borrar la huella de este dispositivo" + (e1 ? " (" + (e1.name || e1) + ")" : "") + ". Probá desde la pantalla de ingreso, con \"Reconfigurar huella\".");
+      } else {
+        setMsg("Huella desactivada en este dispositivo.");
+        setEnrolado(false);
+      }
     }
   }, "Desactivar") : /*#__PURE__*/React.createElement("button", {
     style: {
