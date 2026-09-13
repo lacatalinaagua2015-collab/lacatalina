@@ -357,6 +357,8 @@ function lcBioMotivo(e) {
   if (n === "SecurityError") return "El navegador bloqueó la huella por el origen del sitio (tiene que ser HTTPS).";
   if (n === "AbortError") return "La operación se interrumpió. Probá de nuevo.";
   if (n === "ConstraintError") return "El dispositivo no pudo cumplir el requisito de verificación (huella o rostro).";
+  if (n === "OperationError") return "Ya había un pedido de huella abierto. Esperá un segundo y probá de nuevo.";
+  if (n === "AlmacenamientoLleno") return "La huella se validó pero no se pudo guardar: el almacenamiento del navegador está lleno. Liberá espacio desde Config y volvé a activarla.";
   return (n ? n + ": " : "") + (e && e.message || "Error desconocido");
 }
 function lcBioEnrolado() {
@@ -417,8 +419,26 @@ async function lcBioRegistrar() {
     }
   });
   if (!cred) throw new Error("cancelado");
-  localStorage.setItem(LC_BIO_KEY, _lcBufToB64(cred.rawId));
-  localStorage.removeItem("lc_bio_no");
+  // Guardar la credencial Y CONFIRMAR que quedó. Antes esto se escribía sin
+  // verificar: si el almacenamiento del navegador estaba lleno, el setItem
+  // fallaba y la huella parecía activarse, pero al reabrir la app no había
+  // credencial y volvía a pedir PIN y a ofrecer activarla — eternamente.
+  const idB64 = _lcBufToB64(cred.rawId);
+  try {
+    localStorage.setItem(LC_BIO_KEY, idB64);
+  } catch (e) {
+    const err = new Error("no_se_pudo_guardar");
+    err.name = "AlmacenamientoLleno";
+    throw err;
+  }
+  if (localStorage.getItem(LC_BIO_KEY) !== idB64) {
+    const err = new Error("no_se_pudo_guardar");
+    err.name = "AlmacenamientoLleno";
+    throw err;
+  }
+  try {
+    localStorage.removeItem("lc_bio_no");
+  } catch (e) {}
   return true;
 }
 async function lcBioVerificar() {
@@ -461,8 +481,14 @@ function PantallaBloqueoLC({
   const [mostrarPin, setMostrarPin] = React.useState(modoSetup); // setup siempre muestra PIN
   const [fallosBio, setFallosBio] = React.useState(0);
   const [verificando, setVerificando] = React.useState(false);
+  // El guard REAL contra dobles disparos. Con el estado de React no alcanza:
+  // setVerificando(true) no se aplica en el acto, así que dos toques seguidos
+  // (habitual en una pantalla táctil) pasaban los dos y salían DOS pedidos de
+  // huella a la vez. El teléfono admite uno solo y el segundo falla con
+  // "OperationError: A request is already pending". Un ref cambia al instante.
+  const enCursoRef = React.useRef(false);
   const puedeBio = lcBioSoportado();
-  const bioOn = lcBioEnrolado();
+  const [bioOn, setBioOn] = React.useState(lcBioEnrolado());
 
   // Intento automático de huella al montar (solo si ya está enrolada)
   // NO se intenta la huella sola al abrir. Dos motivos, los dos comprobados en
@@ -525,26 +551,33 @@ function PantallaBloqueoLC({
     setError("");
   };
   const intentarHuellaDeNuevo = async () => {
-    if (verificando) return; // evita disparar dos verificaciones superpuestas
+    if (enCursoRef.current) return; // ya hay un pedido de huella abierto
+    enCursoRef.current = true;
     setBioMsg("");
     setError("");
     setVerificando(true);
     try {
       if (await lcBioVerificar()) onOk();
-      setVerificando(false);
     } catch (e) {
-      setVerificando(false);
-      const nf = fallosBio + 1;
-      setFallosBio(nf);
-      if (nf >= 3) {
-        setBioMsg("Demasiados intentos. Ingresá tu PIN.");
-        setMostrarPin(true);
+      // "A request is already pending" NO es un fallo de tu huella: es que
+      // quedó otro pedido abierto. No cuenta como intento fallido, porque si
+      // no, tres toques apurados te mandaban al PIN sin haber fallado nunca.
+      if (e && e.name === "OperationError") {
+        setBioMsg("Esperá un segundo y tocá de nuevo.");
       } else {
-        // Mostrar el motivo real ayuda a distinguir "no se reconoció el dedo"
-        // de "el navegador no llegó a abrir el cartel".
-        const motivo = typeof lcBioMotivo === "function" ? lcBioMotivo(e) : "";
-        setBioMsg(motivo || `No se reconoció. Intentos restantes: ${3 - nf}`);
+        const nf = fallosBio + 1;
+        setFallosBio(nf);
+        if (nf >= 3) {
+          setBioMsg("Demasiados intentos. Ingresá tu PIN.");
+          setMostrarPin(true);
+        } else {
+          const motivo = typeof lcBioMotivo === "function" ? lcBioMotivo(e) : "";
+          setBioMsg(motivo || `No se reconoció. Intentos restantes: ${3 - nf}`);
+        }
       }
+    } finally {
+      enCursoRef.current = false;
+      setVerificando(false);
     }
   };
   // Borra la credencial guardada y registra una nueva, en un solo toque.
@@ -556,6 +589,8 @@ function PantallaBloqueoLC({
   // Registrar exige verificación biométrica, o sea que si sale bien ya te
   // identificaste: se entra derecho.
   const reconfigurarHuella = async () => {
+    if (enCursoRef.current) return;
+    enCursoRef.current = true;
     setBioMsg("");
     setError("");
     try {
@@ -564,20 +599,31 @@ function PantallaBloqueoLC({
     } catch (e) {}
     try {
       await lcBioRegistrar();
+      setBioOn(true);
       onOk();
     } catch (e) {
       setBioMsg(typeof lcBioMotivo === "function" ? lcBioMotivo(e) : "No se pudo reconfigurar.");
       setMostrarPin(true);
+    } finally {
+      enCursoRef.current = false;
     }
   };
   const activarHuella = async () => {
+    if (enCursoRef.current) return; // no abrir dos pedidos de huella a la vez
+    enCursoRef.current = true;
     setBioMsg("");
     try {
       await lcBioRegistrar();
+      setBioOn(true);
       onOk();
     } catch (e) {
-      setBioMsg("No se pudo activar. Entrás con tu PIN.");
-      setTimeout(onOk, 1200);
+      // Antes decía siempre "No se pudo activar" y te hacía entrar igual, así
+      // que no había forma de enterarse de POR QUÉ no quedaba activada —
+      // sobre todo si el fallo era que no se pudo guardar por falta de espacio.
+      setBioMsg(typeof lcBioMotivo === "function" ? lcBioMotivo(e) : "No se pudo activar. Entrás con tu PIN.");
+      setTimeout(onOk, 3500);
+    } finally {
+      enCursoRef.current = false;
     }
   };
   const saltarHuella = () => {
