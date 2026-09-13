@@ -452,23 +452,56 @@ function PantallaAccesoLC({
 }) {
   const [msg, setMsg] = React.useState("");
   const [verificando, setVerificando] = React.useState(false);
+  // Arranca en true: al abrir se intenta la huella sola, así que hasta que ese
+  // intento termine no se muestra el botón (si el cartel del sistema sale solo,
+  // no hace falta tocar nada).
+  const [mostrarBoton, setMostrarBoton] = React.useState(false);
+  const [fallos, setFallos] = React.useState(0);
+  const [rescate, setRescate] = React.useState(false);
   // Guard sincrónico: con estado de React no alcanza (no se aplica en el acto)
   // y dos toques seguidos disparaban dos pedidos, lo que el teléfono rechaza
   // con "A request is already pending".
   const enCursoRef = React.useRef(false);
-  const entrarConHuella = async () => {
+  const entrarConHuella = async manual => {
     if (enCursoRef.current) return;
     enCursoRef.current = true;
     setMsg("");
     setVerificando(true);
     try {
-      if (await lcBio2Verificar()) onOk();
+      if (await lcBio2Verificar()) onOk();else {
+        setMostrarBoton(true);
+      }
     } catch (e) {
-      setMsg(lcBio2Motivo(e));
+      // Si el intento AUTOMÁTICO falla, casi siempre es porque el navegador
+      // exige un gesto del usuario para abrir el cartel del sistema. En ese
+      // caso no es un error que valga la pena mostrar: simplemente aparece el
+      // botón para que lo toques. El mensaje sólo se muestra si falló algo que
+      // vos disparaste a mano.
+      setMostrarBoton(true);
+      if (manual) {
+        setMsg(lcBio2Motivo(e));
+        setFallos(f => f + 1);
+      }
     } finally {
       enCursoRef.current = false;
       setVerificando(false);
     }
+  };
+  // Intento automático al abrir: si el teléfono lo permite, el cartel de la
+  // huella sale solo y entrás sin tocar nada.
+  React.useEffect(() => {
+    entrarConHuella(false);
+  }, []);
+  // Salida de emergencia, a propósito escondida: mantener apretado el logo 5
+  // segundos. No es un botón "entrar sin huella" —eso volvería decorativo el
+  // candado— pero evita quedarte afuera de tu propia app si el lector se rompe.
+  const presionRef = React.useRef(null);
+  const iniciarPresion = () => {
+    presionRef.current = setTimeout(() => setRescate(true), 5000);
+  };
+  const soltarPresion = () => {
+    if (presionRef.current) clearTimeout(presionRef.current);
+    presionRef.current = null;
   };
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -483,8 +516,17 @@ function PantallaAccesoLC({
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 44,
-      marginBottom: 8
-    }
+      marginBottom: 8,
+      cursor: "default",
+      userSelect: "none"
+    },
+    // Salida de emergencia: 5 segundos apretado.
+    onMouseDown: iniciarPresion,
+    onMouseUp: soltarPresion,
+    onMouseLeave: soltarPresion,
+    onTouchStart: iniciarPresion,
+    onTouchEnd: soltarPresion,
+    onTouchCancel: soltarPresion
   }, "💧"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 22,
@@ -493,7 +535,7 @@ function PantallaAccesoLC({
       marginBottom: 28
     }
   }, "La Catalina"), /*#__PURE__*/React.createElement("button", {
-    onClick: entrarConHuella,
+    onClick: () => entrarConHuella(true),
     "aria-label": "Entrar con huella",
     style: {
       fontSize: 52,
@@ -517,7 +559,7 @@ function PantallaAccesoLC({
       marginTop: 16,
       textAlign: "center"
     }
-  }, verificando ? "Esperando tu huella..." : "Tocá para entrar con tu huella"), msg && /*#__PURE__*/React.createElement("p", {
+  }, verificando ? "Verificando tu huella..." : mostrarBoton ? "Tocá para entrar con tu huella" : "Apoyá el dedo en el sensor"), msg && /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 13,
       color: "#f5b942",
@@ -526,17 +568,21 @@ function PantallaAccesoLC({
       maxWidth: 300,
       lineHeight: 1.5
     }
-  }, msg), /*#__PURE__*/React.createElement("button", {
+  }, msg),
+  // La salida de emergencia sólo aparece si mantuviste apretado el logo, o
+  // tras varios fallos seguidos — nunca como una opción a la vista, porque eso
+  // dejaría entrar sin huella a cualquiera.
+  (rescate || fallos >= 3) && /*#__PURE__*/React.createElement("button", {
     onClick: onOk,
     style: {
       marginTop: 22,
       background: "none",
       border: "0.5px solid var(--color-border-secondary,#2e4055)",
       color: "var(--color-text-tertiary,#7797b5)",
-      fontSize: 13,
+      fontSize: 12,
       borderRadius: 8,
       padding: "8px 18px",
       cursor: "pointer"
     }
-  }, "Entrar sin huella"));
+  }, "Entrar sin huella (emergencia)"));
 }
