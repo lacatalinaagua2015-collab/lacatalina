@@ -1,6 +1,6 @@
 // ── La Catalina · Service Worker ─────────────────────────────────────────────
 // Cache offline + notificaciones push.
-const CACHE = 'lc-v64';
+const CACHE = 'lc-v66';
 const ASSETS = [
   'https://unpkg.com/react@18/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -48,6 +48,25 @@ self.addEventListener('fetch', e => {
         // Clonar ACÁ, antes de devolver la respuesta — si se clona adentro
         // de un .then() posterior, el body ya puede estar consumido y
         // revienta con "Response body is already used".
+        if (res.ok) { const copia = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copia)); }
+        return res;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // El código propio del repo (index.html ya lo cubre arriba; acá van los
+  // js/*.js) cambia seguido — si se sirve cache-primero como el resto, un
+  // cambio recién subido a GitHub tarda DOS recargas en aparecer (la 1ra
+  // refresca el caché en segundo plano, recién la 2da lo muestra). Para
+  // los archivos propios del sitio (mismo origen) va SIEMPRE primero a la
+  // red, igual que la navegación — así un cambio se ve en la primera
+  // recarga. Los assets de CDN (React, Babel, etc., en ASSETS arriba) SÍ
+  // siguen cache-primero: no cambian nunca y así ahorran datos/son rápidos.
+  const esPropio = url.startsWith(self.location.origin);
+  if (esPropio) {
+    e.respondWith(
+      fetch(e.request).then(res => {
         if (res.ok) { const copia = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copia)); }
         return res;
       }).catch(() => caches.match(e.request))

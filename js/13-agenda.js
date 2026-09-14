@@ -10,9 +10,16 @@ function AgendaScreen({
   onNuevo,
   onIrCliente,
   onVolver,
-  onReordenar
+  onReordenar,
+  inicial,
+  onInicialConsumido
 }) {
   const [mostrarNuevo, setMostrarNuevo] = React.useState(false);
+  // Jarvis LC (voz) puede mandar un recordatorio ya armado: abrimos el
+  // formulario solo con eso, la persona sigue revisando y guardando a mano.
+  React.useEffect(() => {
+    if (inicial) setMostrarNuevo(true);
+  }, [inicial]);
   const [clienteBusq, setClienteBusq] = React.useState("");
   const [clienteSel, setClienteSel] = React.useState(null);
   const [filtro, setFiltro] = React.useState("pendiente"); // pendiente | todos
@@ -389,28 +396,34 @@ function AgendaScreen({
     }
   }, "🔔 Nuevo recordatorio"), /*#__PURE__*/React.createElement(NuevoRecordatorioForm, {
     clientes: clientes,
+    inicial: inicial,
     onGuardar: datos => {
       onNuevo(datos);
       setMostrarNuevo(false);
+      onInicialConsumido && onInicialConsumido();
     },
-    onCerrar: () => setMostrarNuevo(false)
+    onCerrar: () => {
+      setMostrarNuevo(false);
+      onInicialConsumido && onInicialConsumido();
+    }
   }))));
 }
 function NuevoRecordatorioForm({
   clientes,
   onGuardar,
-  onCerrar
+  onCerrar,
+  inicial
 }) {
   const hoy = (() => {
     const d = new Date(Date.now() - 3 * 60 * 60 * 1000);
     return d.toISOString().slice(0, 10);
   })();
-  const [tipo, setTipo] = React.useState("visita");
-  const [fecha, setFecha] = React.useState(hoy);
-  const [hora, setHora] = React.useState("10:00");
+  const [tipo, setTipo] = React.useState(() => inicial && inicial.tipo || "visita");
+  const [fecha, setFecha] = React.useState(() => inicial && inicial.fecha || hoy);
+  const [hora, setHora] = React.useState(() => inicial && inicial.hora || "10:00");
   const [busq, setBusq] = React.useState("");
-  const [clienteId, setClienteId] = React.useState(null);
-  const [motivo, setMotivo] = React.useState("");
+  const [clienteId, setClienteId] = React.useState(() => inicial && inicial.clienteId || null);
+  const [motivo, setMotivo] = React.useState(() => inicial && inicial.motivo || "");
   const clientesFilt = busq.length > 1 ? clientes.filter(c => buscarCliente(c, busq) > 0).slice(0, 6) : [];
   const clienteSel = clientes.find(c => c.id === clienteId);
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(TipoRecordatorioSelector, {

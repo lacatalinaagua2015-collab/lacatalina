@@ -263,6 +263,9 @@ function App() {
   const [volverVentaA, setVolverVentaA] = useState("detalleCliente");
   const [rutaDiariaVenta, setRutaDiariaVenta] = useState(true);
   const [clienteId, setClienteId] = useState(null);
+  // Recordatorio armado por voz (Jarvis LC) a la espera de que lo revisen
+  // y guarden a mano en la pantalla de Agenda.
+  const [jarvisAgendaInicial, setJarvisAgendaInicial] = useState(null);
   // Acceso biométrico ya superado en esta sesión. Vive en memoria a propósito:
   // al cerrar la app del todo vuelve a pedir huella.
   const [accesoOk, setAccesoOk] = React.useState(false);
@@ -2010,6 +2013,25 @@ function App() {
   };
   window._lcIrA = irA;
 
+  // ── Jarvis LC (botón de voz) ──────────────────────────────────────
+  // Nunca toca plata/envases/stock: solo navega, o deja cosas armadas
+  // para que la persona las confirme a mano.
+  const jarvisAbrirVenta = c => {
+    setClienteId(c.id);
+    const hoyKey = new Date().toLocaleDateString("en-CA");
+    if (!fechaActual) setFechaActual(hoyKey);
+    if (!diaActual) setDiaActual(c.dia);
+    // Venta disparada por voz: visita puntual, no forma parte del
+    // recorrido diario — al guardar, vuelve al menú.
+    setVolverVentaA("menu");
+    setRutaDiariaVenta(false);
+    irA("venta");
+  };
+  const jarvisProponerRecordatorio = datos => {
+    setJarvisAgendaInicial(datos);
+    irA("agenda");
+  };
+
   // Handle back button
   React.useEffect(() => {
     const handler = e => {
@@ -3683,6 +3705,8 @@ function App() {
   }), pantalla === "agenda" && /*#__PURE__*/React.createElement(AgendaScreen, {
     recordatorios: recordatorios || [],
     clientes: clientes,
+    inicial: jarvisAgendaInicial,
+    onInicialConsumido: () => setJarvisAgendaInicial(null),
     onReordenar: nuevaLista => saveRecordatorios(nuevaLista),
     onConfirmar: id => saveRecordatorios(prev => (prev || []).map(r => r.id === id ? {
       ...r,
@@ -4047,7 +4071,15 @@ function App() {
       cursor: "pointer"
     },
     onClick: deshacerUltimaVenta
-  }, "↩️ Deshacer")))));
+  }, "↩️ Deshacer")), pantalla !== "portada" && /*#__PURE__*/React.createElement(JarvisLCBoton, {
+    clientes: clientes,
+    recordatorios: recordatorios || [],
+    ventas: ventas,
+    diaActual: diaActual,
+    onNavegar: p => irA(p),
+    onAbrirVenta: jarvisAbrirVenta,
+    onProponerRecordatorio: jarvisProponerRecordatorio
+  }))));
 }
 class ErrorBoundary extends React.Component {
   constructor(props) {
