@@ -302,13 +302,18 @@
       }
     }
 
-    return h(React.Fragment, null, mensaje && h("div", {
+    // Portal directo a <body>: así el botón no depende de qué pantalla
+    // esté montada por encima (algunas tienen su propio contenedor con
+    // scroll/transform, y eso rompía "position: fixed" si el botón vivía
+    // adentro). Con esto queda siempre pegado a la ventana, en cualquier
+    // pantalla.
+    return ReactDOM.createPortal(h(React.Fragment, null, mensaje && h("div", {
       style: {
         position: "fixed",
         bottom: 84,
         left: 16,
         right: 16,
-        zIndex: 850,
+        zIndex: 1200,
         background: mensaje.tipo === "error" ? "var(--color-background-danger)" : "var(--color-background-info)",
         color: "var(--color-text-primary)",
         border: mensaje.tipo === "error" ? "1px solid var(--color-border-danger)" : "1px solid var(--color-border-info)",
@@ -328,7 +333,7 @@
         position: "fixed",
         bottom: 16,
         right: 16,
-        zIndex: 850,
+        zIndex: 1200,
         width: 56,
         height: 56,
         borderRadius: "50%",
@@ -342,7 +347,7 @@
         alignItems: "center",
         justifyContent: "center"
       }
-    }, escuchando ? "🔴" : "🎙️"));
+    }, escuchando ? "🔴" : "🎙️")), document.body);
   }
 
   window.JarvisLCBoton = JarvisLCBoton;
