@@ -422,6 +422,263 @@ function AccesoBiometrico() {
   }, "Lector del dispositivo: ", disponible === null ? "consultando…" : disponible ? "disponible ✓" : "no disponible ✗"));
 }
 
+// ── Cuenta ───────────────────────────────────────────────────────────────────
+// Muestra con qué cuenta está andando la app. El MAIL sí se puede mostrar: lo
+// sabe Firebase Auth (y queda copia en el equipo al entrar). La CONTRASEÑA no
+// existe en ningún lado en texto: Firebase guarda sólo un "hash" (una huella
+// del que no se puede volver atrás), así que ni el servidor ni la app la
+// tienen. Por eso, en vez de mostrarla, acá se puede cambiar (sabiendo la
+// actual) o pedir un mail para restablecerla si no te acordás.
+function CuentaConfig() {
+  const [email, setEmail] = React.useState(() => {
+    try {
+      const u = typeof firebase !== "undefined" && firebase.auth ? firebase.auth().currentUser : null;
+      return u && u.email || localStorage.getItem("lc_ultimo_email") || "";
+    } catch (e) {
+      return "";
+    }
+  });
+  const [verCambio, setVerCambio] = React.useState(false);
+  const [actual, setActual] = React.useState("");
+  const [nueva, setNueva] = React.useState("");
+  const [nueva2, setNueva2] = React.useState("");
+  const [verNueva, setVerNueva] = React.useState(false);
+  const [msg, setMsg] = React.useState("");
+  const [err, setErr] = React.useState("");
+  const [cargando, setCargando] = React.useState(false);
+  // La sesión puede tardar un instante en estar lista al abrir Config.
+  React.useEffect(() => {
+    if (typeof firebase === "undefined" || !firebase.auth) return;
+    const unsub = firebase.auth().onAuthStateChanged(function (u) {
+      if (u && u.email) setEmail(u.email);
+    });
+    return () => unsub();
+  }, []);
+  const copiarMail = async () => {
+    setErr("");
+    try {
+      await navigator.clipboard.writeText(email);
+      setMsg("Mail copiado.");
+    } catch (e) {
+      setErr("No se pudo copiar. Anotalo a mano.");
+    }
+  };
+  const cambiarPass = async () => {
+    setErr("");
+    setMsg("");
+    if (!actual || !nueva) {
+      setErr("Completá la contraseña actual y la nueva.");
+      return;
+    }
+    if (nueva.length < 6) {
+      setErr("La nueva tiene que tener al menos 6 caracteres.");
+      return;
+    }
+    if (nueva !== nueva2) {
+      setErr("Las dos contraseñas nuevas no coinciden.");
+      return;
+    }
+    setCargando(true);
+    try {
+      const u = firebase.auth().currentUser;
+      // Firebase exige haber entrado hace poco para cambiar la contraseña; por
+      // eso primero se vuelve a validar con la actual.
+      const cred = firebase.auth.EmailAuthProvider.credential(u.email, actual);
+      await u.reauthenticateWithCredential(cred);
+      await u.updatePassword(nueva);
+      setActual("");
+      setNueva("");
+      setNueva2("");
+      setVerCambio(false);
+      setMsg("Contraseña cambiada. Usá la nueva en los otros dispositivos.");
+    } catch (e) {
+      const c = e && e.code || "";
+      if (c === "auth/invalid-credential" || c === "auth/wrong-password") setErr("La contraseña actual no es correcta.");else if (c === "auth/weak-password") setErr("La nueva es muy débil (mínimo 6 caracteres).");else if (c === "auth/network-request-failed") setErr("Sin conexión. Probá de nuevo con internet.");else if (c === "auth/too-many-requests") setErr("Demasiados intentos. Esperá un rato.");else setErr(e && e.message || "No se pudo cambiar.");
+    }
+    setCargando(false);
+  };
+  const mandarReset = async () => {
+    setErr("");
+    setMsg("");
+    if (!email) {
+      setErr("No hay mail de cuenta para enviarlo.");
+      return;
+    }
+    setCargando(true);
+    try {
+      await firebase.auth().sendPasswordResetEmail(email);
+      setMsg(`Te mandamos un mail a ${email} con el link para poner una contraseña nueva. Si no lo ves, fijate en correo no deseado.`);
+    } catch (e) {
+      setErr(e && e.message || "No se pudo enviar el mail.");
+    }
+    setCargando(false);
+  };
+  const inp = {
+    width: "100%",
+    padding: "10px 12px",
+    borderRadius: 8,
+    border: "0.5px solid var(--color-border-secondary)",
+    background: "var(--color-background-primary)",
+    color: "var(--color-text-primary)",
+    fontSize: 14,
+    marginBottom: 8,
+    boxSizing: "border-box"
+  };
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-secondary)",
+      marginBottom: 4
+    }
+  }, "Mail de la cuenta"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      alignItems: "center",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0,
+      background: "var(--color-background-primary)",
+      border: "0.5px solid var(--color-border-secondary)",
+      borderRadius: 8,
+      padding: "10px 12px",
+      fontSize: 14,
+      color: "var(--color-text-primary)",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, email || "— sin sesión —"), email && /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      padding: "8px 12px",
+      fontSize: 13,
+      flexShrink: 0
+    },
+    onClick: copiarMail
+  }, "Copiar")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-secondary)",
+      marginBottom: 4
+    }
+  }, "Contraseña"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--color-background-primary)",
+      border: "0.5px solid var(--color-border-secondary)",
+      borderRadius: 8,
+      padding: "10px 12px",
+      fontSize: 13,
+      color: "var(--color-text-secondary)",
+      lineHeight: 1.5,
+      marginBottom: 10
+    }
+  }, "•••••••• — No se puede mostrar: Firebase la guarda encriptada y nadie, ni la app, puede volver a leerla. Si no te acordás, cambiala o pedí el mail para restablecerla."), !verCambio && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btnPrimary,
+      padding: "9px 14px",
+      fontSize: 13
+    },
+    onClick: () => {
+      setVerCambio(true);
+      setMsg("");
+      setErr("");
+    }
+  }, "Cambiar contraseña"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      padding: "9px 14px",
+      fontSize: 13
+    },
+    disabled: cargando,
+    onClick: mandarReset
+  }, "Enviarme el mail para restablecerla")), verCambio && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("input", {
+    style: inp,
+    type: "password",
+    placeholder: "Contraseña actual",
+    value: actual,
+    onChange: e => setActual(e.target.value),
+    autoComplete: "current-password"
+  }), /*#__PURE__*/React.createElement("input", {
+    style: inp,
+    type: verNueva ? "text" : "password",
+    placeholder: "Contraseña nueva (mínimo 6)",
+    value: nueva,
+    onChange: e => setNueva(e.target.value),
+    autoComplete: "new-password"
+  }), /*#__PURE__*/React.createElement("input", {
+    style: inp,
+    type: verNueva ? "text" : "password",
+    placeholder: "Repetí la nueva",
+    value: nueva2,
+    onChange: e => setNueva2(e.target.value),
+    autoComplete: "new-password"
+  }), /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      fontSize: 12,
+      color: "var(--color-text-secondary)",
+      marginBottom: 10,
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: verNueva,
+    onChange: e => setVerNueva(e.target.checked)
+  }), "Ver la contraseña nueva mientras la escribo"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btnPrimary,
+      padding: "9px 14px",
+      fontSize: 13
+    },
+    disabled: cargando,
+    onClick: cambiarPass
+  }, cargando ? "Guardando…" : "Guardar"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      padding: "9px 14px",
+      fontSize: 13
+    },
+    onClick: () => {
+      setVerCambio(false);
+      setActual("");
+      setNueva("");
+      setNueva2("");
+      setErr("");
+    }
+  }, "Cancelar"))), msg && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10,
+      fontSize: 13,
+      color: "var(--color-text-success)",
+      lineHeight: 1.5
+    }
+  }, msg), err && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10,
+      fontSize: 13,
+      color: "var(--color-text-danger)",
+      lineHeight: 1.5
+    }
+  }, err));
+}
+
 function Config({
   productos,
   setProductos,
@@ -447,6 +704,7 @@ function Config({
   const [tab, setTab] = useState(["datos", "vehiculo", "apariencia"].includes(tabInicial) ? tabInicial : "datos");
   const [abiertoNotif, setAbiertoNotif] = useState(false);
   const [abiertoAcceso, setAbiertoAcceso] = useState(false);
+  const [abiertoCuenta, setAbiertoCuenta] = useState(false);
   const [abiertoRespaldo, setAbiertoRespaldo] = useState(false);
   const [abiertoMant, setAbiertoMant] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
@@ -1087,6 +1345,45 @@ function Config({
       marginTop: 10
     }
   }, /*#__PURE__*/React.createElement(AccesoBiometrico, null))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      margin: 0
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      width: "100%",
+      background: "var(--color-background-tertiary)",
+      border: "none",
+      borderRadius: 10,
+      padding: "14px 16px",
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      cursor: "pointer",
+      textAlign: "left"
+    },
+    onClick: () => setAbiertoCuenta(!abiertoCuenta)
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 18
+    }
+  }, "🔑"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 16,
+      fontWeight: 600,
+      color: "var(--color-text-primary)",
+      flex: 1
+    }
+  }, "Cuenta"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "var(--color-text-tertiary)",
+      flexShrink: 0
+    }
+  }, abiertoCuenta ? "▲" : "▼")), abiertoCuenta && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement(CuentaConfig, null))), /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
       margin: 0

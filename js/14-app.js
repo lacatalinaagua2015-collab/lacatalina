@@ -4131,7 +4131,30 @@ function AuthGate({
   const [pass, setPass] = React.useState("");
   const [pass2, setPass2] = React.useState("");
   const [err, setErr] = React.useState("");
+  const [aviso, setAviso] = React.useState("");
   const [cargando, setCargando] = React.useState(false);
+  // "Olvidé mi contraseña": Firebase manda un mail con un link para poner una
+  // nueva. Es la única forma de recuperarla — la contraseña no está guardada en
+  // ningún lado en texto, ni acá ni en el servidor (sólo un hash, del que no se
+  // puede volver atrás).
+  const olvide = async () => {
+    setErr("");
+    setAviso("");
+    const em = (email || "").trim();
+    if (!em) {
+      setErr("Escribí primero tu email y volvé a tocar acá.");
+      return;
+    }
+    setCargando(true);
+    try {
+      await firebase.auth().sendPasswordResetEmail(em);
+      setAviso(`Te mandamos un mail a ${em} con el link para poner una contraseña nueva. Si no lo ves, fijate en correo no deseado.`);
+    } catch (e) {
+      const c = e && e.code || "";
+      if (c === "auth/user-not-found") setErr("No hay ninguna cuenta con ese email.");else if (c === "auth/invalid-email") setErr("El email no es válido.");else if (c === "auth/network-request-failed") setErr("Sin conexión. Revisá tu internet.");else setErr(e && e.message || "No se pudo enviar el mail.");
+    }
+    setCargando(false);
+  };
   React.useEffect(() => {
     if (typeof firebase === "undefined" || !firebase.auth) {
       setEstado("ok");
@@ -4324,7 +4347,28 @@ function AuthGate({
       fontSize: 13,
       cursor: "pointer"
     }
-  }, modoCrear ? "Ya tengo cuenta — Ingresar" : "Es la primera vez — Crear cuenta")));
+  }, modoCrear ? "Ya tengo cuenta — Ingresar" : "Es la primera vez — Crear cuenta"), !modoCrear && /*#__PURE__*/React.createElement("button", {
+    onClick: olvide,
+    disabled: cargando,
+    style: {
+      width: "100%",
+      marginTop: 4,
+      background: "none",
+      border: "none",
+      color: "#7a9ab8",
+      fontSize: 13,
+      textDecoration: "underline",
+      cursor: "pointer"
+    }
+  }, "Olvidé mi contraseña"), aviso && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12,
+      color: "#4dd9a0",
+      fontSize: 13,
+      lineHeight: 1.5,
+      textAlign: "center"
+    }
+  }, aviso)));
 }
 
 // ── Pantalla de Diagnóstico: muestra los últimos errores registrados ──────────
