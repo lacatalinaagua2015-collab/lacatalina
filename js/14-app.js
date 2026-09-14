@@ -2031,6 +2031,21 @@ function App() {
     setJarvisAgendaInicial(datos);
     irA("agenda");
   };
+  // Mismo destino que tocar el día en el Menú, o su atajo "Ver planilla".
+  const jarvisIrDia = d => {
+    setDiaActual(d);
+    irA("diaPrincipal");
+  };
+  const jarvisIrPlanillaDia = d => {
+    setDiaActual(d);
+    irA("selectorFechaPlanilla");
+  };
+  const jarvisIrClientesDia = d => {
+    setDiaActual(d);
+    const yaIniciado = fechaActual && planillas[`${d}_${fechaActual}`]?.iniciado;
+    setOrigenClientes(yaIniciado ? "menu" : null);
+    irA(yaIniciado ? "clientes" : "selectorFechaClientes");
+  };
 
   // Handle back button
   React.useEffect(() => {
@@ -4078,7 +4093,10 @@ function App() {
     diaActual: diaActual,
     onNavegar: p => irA(p),
     onAbrirVenta: jarvisAbrirVenta,
-    onProponerRecordatorio: jarvisProponerRecordatorio
+    onProponerRecordatorio: jarvisProponerRecordatorio,
+    onIrDia: jarvisIrDia,
+    onIrPlanillaDia: jarvisIrPlanillaDia,
+    onIrClientesDia: jarvisIrClientesDia
   }))));
 }
 class ErrorBoundary extends React.Component {

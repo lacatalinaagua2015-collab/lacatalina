@@ -42,14 +42,26 @@
     return new Date(base.getTime() + delta * 86400000).toISOString().slice(0, 10);
   }
 
+  // Devuelve fecha/hora y además, en `spans`, las posiciones (relativas a
+  // `t`, que al normalizar conserva la misma longitud que el texto
+  // original) que ya quedaron "usadas" — para poder borrarlas después y
+  // que el detalle no repita "mañana", "el viernes", "a las 10", etc.
   function extraerFechaHora(t) {
     let fecha = fechaISO(0);
     let hora = "10:00";
-    if (/pasado\s*manana/.test(t)) fecha = fechaISO(2);else if (/\bmanana\b/.test(t)) fecha = fechaISO(1);else {
-      const mDia = t.match(/\b(lunes|martes|miercoles|jueves|viernes|sabado|domingo)\b/);
-      if (mDia) {
-        const f = proximaFechaDia(mDia[1]);
-        if (f) fecha = f;
+    const spans = [];
+    let m = t.match(/pasado\s*manana/);
+    if (m) {
+      fecha = fechaISO(2);
+      spans.push([m.index, m.index + m[0].length]);
+    } else if (m = t.match(/\bmanana\b/)) {
+      fecha = fechaISO(1);
+      spans.push([m.index, m.index + m[0].length]);
+    } else if (m = t.match(/\b(lunes|martes|miercoles|jueves|viernes|sabado|domingo)\b/)) {
+      const f = proximaFechaDia(m[1]);
+      if (f) {
+        fecha = f;
+        spans.push([m.index, m.index + m[0].length]);
       }
     }
     const mHora = t.match(/\ba\s*las?\s*(\d{1,2})(?:[:.](\d{2}))?\s*(y\s*media)?/);
@@ -57,8 +69,23 @@
       const hh = String(Math.min(23, parseInt(mHora[1], 10))).padStart(2, "0");
       const mm = mHora[3] ? "30" : mHora[2] || "00";
       hora = `${hh}:${mm}`;
+      spans.push([mHora.index, mHora.index + mHora[0].length]);
     }
-    return { fecha, hora };
+    return { fecha, hora, spans };
+  }
+
+  // Tacha (con espacios) los tramos ya interpretados como disparador,
+  // cliente o fecha/hora, y limpia conectores sueltos ("para", "el",
+  // "de"...) para que quede solo el detalle real ("llevar 2 bidones",
+  // "cobrar la deuda"...).
+  function armarMotivo(textoCrudo, spans) {
+    const chars = textoCrudo.split("");
+    spans.forEach(([ini, fin]) => {
+      for (let i = ini; i < fin && i < chars.length; i++) chars[i] = " ";
+    });
+    let out = chars.join("").replace(/\b(para|el|la|los|las|de|del|que|a|le)\b/gi, " ").replace(/\s+/g, " ").trim();
+    if (out) out = out.charAt(0).toUpperCase() + out.slice(1);
+    return out;
   }
 
   // Busca, dentro del texto dicho, a qué cliente de la lista se refiere.
@@ -88,13 +115,37 @@
   }
 
   // ---------- intérprete de comandos ----------
+  // Nombres de los días de reparto, tal cual los usa el resto de la app
+  // (const DIAS en 02-constantes.js) — acá solo los leemos, no los repetimos.
+  const DIA_RE = /\b(lunes|martes|miercoles|jueves|viernes)\b/;
+
   function interpretar(textoCrudo, clientes) {
     const t = normalizar(textoCrudo);
-    const NAV = [[/\bagenda\b/, "agenda"], [/\bstock\b/, "stock"], [/\bclientes?\b/, "clientes"], [/\bresumen\b/, "resumen"], [/\bconfig(uracion)?\b|\bajustes\b/, "config"], [/\bmenu\b|\binicio\b/, "menu"]];
-    if (/\b(abri|abrime|anda|andate|ir a|mostrame|llevame)\b/.test(t)) {
+    // "clientes" a secas → la lista completa (todos los días juntos, la de
+    // Gestión). Si además nombra un día, esa lista de "clientes" sí es la
+    // que filtra por día — se resuelve más abajo, antes que esta.
+    const NAV = [[/\bagenda\b/, "agenda"], [/\bstock\b/, "stock"], [/\bclientes?\b/, "gestionClientes"], [/\bresumen\b/, "resumen"], [/\bconfig(uracion)?\b|\bajustes\b/, "config"], [/\bmenu\b|\binicio\b/, "menu"]];
+    const conVerboNav = /\b(abri|abrime|anda|andate|ir a|mostrame|llevame|volve|volver|regresa)\b/.test(t);
+
+    // "abrí el martes" / "andá al jueves" / "planilla de jueves" / "clientes
+    // del lunes" — mismo destino al que llegás tocando el día en el menú (o
+    // sus atajos "Ver planilla" / "Clientes" si nombrás esa palabra).
+    const mDia = t.match(DIA_RE);
+    if (mDia && (conVerboNav || /planilla|client/.test(t))) {
+      const diaCanon = (typeof DIAS !== "undefined" ? DIAS : []).find(d => normalizar(d) === mDia[1]);
+      if (diaCanon) {
+        if (/planilla/.test(t)) return { tipo: "planilla_dia", dia: diaCanon };
+        if (/client/.test(t)) return { tipo: "clientes_dia", dia: diaCanon };
+        return { tipo: "dia", dia: diaCanon };
+      }
+    }
+
+    if (conVerboNav) {
       for (const [re, pantalla] of NAV) {
         if (re.test(t)) return { tipo: "navegacion", pantalla };
       }
+      // "volvé" / "volver" sin destino reconocido → a la pantalla principal.
+      if (/\bvolv/.test(t)) return { tipo: "navegacion", pantalla: "menu" };
     }
     if (/cuanto(s)?\s*(me\s*)?debe/.test(t)) {
       const c = encontrarCliente(t, clientes);
@@ -110,11 +161,18 @@
       const c = encontrarCliente(t, clientes);
       return c ? { tipo: "venta", cliente: c } : { tipo: "venta_sin_cliente" };
     }
-    if (/\b(recordame|recorda|agendame|agenda(le)?)\b/.test(t)) {
+    const mAgendaTrig = t.match(/\b(recordame|recorda|agendame|agendale|agenda)\b/);
+    if (mAgendaTrig) {
       const c = encontrarCliente(t, clientes);
-      const { fecha, hora } = extraerFechaHora(t);
+      const { fecha, hora, spans } = extraerFechaHora(t);
       const tipoRec = /cobr|deuda|saldo/.test(t) ? "cobro" : "visita";
-      let motivo = textoCrudo.replace(/^\s*\S+\s*/, "").trim(); // saca la primera palabra (el disparador)
+      spans.push([mAgendaTrig.index, mAgendaTrig.index + mAgendaTrig[0].length]);
+      if (c) {
+        const nombreNorm = normalizar(c.nombre || "");
+        const idxNombre = t.indexOf(nombreNorm);
+        if (idxNombre >= 0) spans.push([idxNombre, idxNombre + nombreNorm.length]);
+      }
+      let motivo = armarMotivo(textoCrudo, spans);
       if (!motivo) motivo = tipoRec === "cobro" ? "Cobrar" : "Visitar";
       return {
         tipo: "agenda",
@@ -134,7 +192,7 @@
   window.JarvisLCInterpretar = interpretar; // útil para probar desde la consola
 
   // ---------- botón flotante ----------
-  function JarvisLCBoton({ clientes, recordatorios, ventas, diaActual, onNavegar, onAbrirVenta, onProponerRecordatorio }) {
+  function JarvisLCBoton({ clientes, recordatorios, ventas, diaActual, onNavegar, onAbrirVenta, onProponerRecordatorio, onIrDia, onIrPlanillaDia, onIrClientesDia }) {
     const [escuchando, setEscuchando] = React.useState(false);
     const [mensaje, setMensaje] = React.useState(null); // { texto, tipo: 'ok'|'error'|'info' }
     const soportado = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -165,6 +223,18 @@
         case "navegacion":
           onNavegar(r.pantalla);
           responder(`Abriendo ${r.pantalla}.`);
+          break;
+        case "dia":
+          onIrDia(r.dia);
+          responder(`Abriendo ${r.dia}.`);
+          break;
+        case "planilla_dia":
+          onIrPlanillaDia(r.dia);
+          responder(`Abriendo la planilla del ${r.dia}.`);
+          break;
+        case "clientes_dia":
+          onIrClientesDia(r.dia);
+          responder(`Abriendo clientes del ${r.dia}.`);
           break;
         case "consulta_saldo":
           {
