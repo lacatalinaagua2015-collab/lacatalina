@@ -1244,6 +1244,66 @@ function HeaderBotones() {
     title: "Tamaño de texto"
   }, SCALE_LABELS_LC[scaleIdx]));
 }
+// ── Reloj del encabezado ─────────────────────────────────────────────────────
+// Hora grande + fecha corta abajo, en un recuadro al lado del título.
+// Se actualiza al empezar cada minuto (no cada 60s desde que cargó, así el
+// cambio de minuto coincide con el reloj del teléfono), y también al volver a
+// la app: si el celular estuvo dormido, el intervalo puede haber quedado
+// parado y la hora vieja en pantalla.
+const _LC_DIAS_CORTO = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+const _LC_MESES_CORTO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+function RelojHeaderLC() {
+  const [ahora, setAhora] = React.useState(() => new Date());
+  React.useEffect(() => {
+    let tid = null;
+    const programar = () => {
+      const d = new Date();
+      setAhora(d);
+      // Milisegundos que faltan para el próximo minuto en punto.
+      const falta = 60000 - (d.getSeconds() * 1000 + d.getMilliseconds());
+      tid = setTimeout(programar, falta + 50);
+    };
+    programar();
+    const alVolver = () => {
+      if (document.visibilityState === "visible") {
+        if (tid) clearTimeout(tid);
+        programar();
+      }
+    };
+    document.addEventListener("visibilitychange", alVolver);
+    return () => {
+      if (tid) clearTimeout(tid);
+      document.removeEventListener("visibilitychange", alVolver);
+    };
+  }, []);
+  const hh = String(ahora.getHours()).padStart(2, "0");
+  const mm = String(ahora.getMinutes()).padStart(2, "0");
+  const fecha = `${_LC_DIAS_CORTO[ahora.getDay()]} ${ahora.getDate()} ${_LC_MESES_CORTO[ahora.getMonth()]}`;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--color-background-tertiary)",
+      borderRadius: 8,
+      padding: "4px 8px",
+      lineHeight: 1.25,
+      textAlign: "right",
+      flexShrink: 0,
+      fontVariantNumeric: "tabular-nums"
+    },
+    title: "Fecha y hora del dispositivo"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: "var(--color-text-primary)"
+    }
+  }, hh, ":", mm), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--color-text-secondary)",
+      whiteSpace: "nowrap"
+    }
+  }, fecha));
+}
 function HeaderApp({
   titulo,
   onVolver
@@ -1270,5 +1330,5 @@ function HeaderApp({
     },
     onClick: () => window._lcIrInicio && window._lcIrInicio(),
     title: "Ir al inicio"
-  }, titulo ? `${negocio} · ${titulo}` : negocio), /*#__PURE__*/React.createElement(HeaderBotones, null));
+  }, titulo ? `${negocio} · ${titulo}` : negocio), /*#__PURE__*/React.createElement(RelojHeaderLC, null), /*#__PURE__*/React.createElement(HeaderBotones, null));
 }
