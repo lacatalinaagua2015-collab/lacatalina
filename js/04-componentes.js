@@ -1245,13 +1245,15 @@ function HeaderBotones() {
   }, SCALE_LABELS_LC[scaleIdx]));
 }
 // ── Reloj del encabezado ─────────────────────────────────────────────────────
-// Hora grande + fecha corta abajo, en un recuadro al lado del título.
+// Franja fina debajo del título: fecha completa a la izquierda, hora a la
+// derecha. Va SIN línea divisoria y con el mismo fondo que el encabezado, así
+// se lee como una sola pieza y no como dos barras apiladas.
 // Se actualiza al empezar cada minuto (no cada 60s desde que cargó, así el
 // cambio de minuto coincide con el reloj del teléfono), y también al volver a
 // la app: si el celular estuvo dormido, el intervalo puede haber quedado
 // parado y la hora vieja en pantalla.
-const _LC_DIAS_CORTO = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-const _LC_MESES_CORTO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+const _LC_DIAS_LARGO = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+const _LC_MESES_LARGO = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 function RelojHeaderLC() {
   const [ahora, setAhora] = React.useState(() => new Date());
   React.useEffect(() => {
@@ -1278,31 +1280,32 @@ function RelojHeaderLC() {
   }, []);
   const hh = String(ahora.getHours()).padStart(2, "0");
   const mm = String(ahora.getMinutes()).padStart(2, "0");
-  const fecha = `${_LC_DIAS_CORTO[ahora.getDay()]} ${ahora.getDate()} ${_LC_MESES_CORTO[ahora.getMonth()]}`;
+  const fecha = `${_LC_DIAS_LARGO[ahora.getDay()]} ${ahora.getDate()} de ${_LC_MESES_LARGO[ahora.getMonth()]}`;
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      background: "var(--color-background-tertiary)",
-      borderRadius: 8,
-      padding: "4px 8px",
-      lineHeight: 1.25,
-      textAlign: "right",
-      flexShrink: 0,
-      fontVariantNumeric: "tabular-nums"
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "baseline",
+      gap: 10,
+      padding: "0 14px 7px",
+      fontSize: 11.5,
+      color: "var(--color-text-tertiary)"
     },
     title: "Fecha y hora del dispositivo"
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: 12,
-      fontWeight: 600,
-      color: "var(--color-text-primary)"
-    }
-  }, hh, ":", mm), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "var(--color-text-secondary)",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
       whiteSpace: "nowrap"
     }
-  }, fecha));
+  }, fecha), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "var(--color-text-secondary)",
+      fontWeight: 500,
+      flexShrink: 0,
+      fontVariantNumeric: "tabular-nums"
+    }
+  }, hh, ":", mm));
 }
 function HeaderApp({
   titulo,
@@ -1315,8 +1318,26 @@ function HeaderApp({
       return "La Catalina";
     }
   })();
+  // El encabezado y la franja de fecha/hora van adentro de un mismo bloque
+  // pegajoso: el bloque lleva el fondo y la única línea (la de abajo), y la
+  // fila de arriba las pierde. Si la fila conservara su propio borde, entre el
+  // título y la fecha quedaría una línea de más.
   return /*#__PURE__*/React.createElement("div", {
-    style: s.header
+    style: {
+      position: "sticky",
+      top: 0,
+      zIndex: 10,
+      background: "var(--color-background-secondary)",
+      borderBottom: "0.5px solid var(--color-border-tertiary)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.header,
+      position: "static",
+      background: "none",
+      borderBottom: "none",
+      paddingBottom: 4
+    }
   }, /*#__PURE__*/React.createElement("button", {
     style: s.backBtn,
     onClick: onVolver
@@ -1330,5 +1351,5 @@ function HeaderApp({
     },
     onClick: () => window._lcIrInicio && window._lcIrInicio(),
     title: "Ir al inicio"
-  }, titulo ? `${negocio} · ${titulo}` : negocio), /*#__PURE__*/React.createElement(RelojHeaderLC, null), /*#__PURE__*/React.createElement(HeaderBotones, null));
+  }, titulo ? `${negocio} · ${titulo}` : negocio), /*#__PURE__*/React.createElement(HeaderBotones, null)), /*#__PURE__*/React.createElement(RelojHeaderLC, null));
 }
