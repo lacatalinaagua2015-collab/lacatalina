@@ -679,6 +679,55 @@ function CuentaConfig() {
   }, err));
 }
 
+// ── Vaciar backups locales viejos ────────────────────────────────────────────
+// El auto-backup ahora guarda una sola copia (la del día), pero equipos que ya
+// venían usando la app pueden tener 2 o 3 copias de antes ocupando lugar. Este
+// botón las saca a mano: no toca ventas/clientes/planillas (los datos de
+// verdad), sólo esas copias de más — el respaldo real es la nube y el .json
+// que se descarga desde "Respaldo".
+function LimpiarBackupsLocales() {
+  const [msg, setMsg] = React.useState("");
+  const contar = () => {
+    try {
+      const hoy = new Date().toLocaleDateString("en-CA");
+      return Object.keys(localStorage).filter(k => k.startsWith("lc_backup_") && k !== "lc_backup_" + hoy).length;
+    } catch (e) {
+      return 0;
+    }
+  };
+  const [cant, setCant] = React.useState(contar);
+  if (!cant) return null;
+  const limpiar = () => {
+    try {
+      const hoy = new Date().toLocaleDateString("en-CA");
+      const viejos = Object.keys(localStorage).filter(k => k.startsWith("lc_backup_") && k !== "lc_backup_" + hoy);
+      viejos.forEach(k => localStorage.removeItem(k));
+      setMsg(`Se liberaron ${viejos.length} copia(s) vieja(s).`);
+      setCant(0);
+    } catch (e) {
+      setMsg("No se pudo liberar espacio.");
+    }
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      padding: "8px 12px",
+      fontSize: 12
+    },
+    onClick: limpiar
+  }, "🧹 Liberar ", cant, " copia(s) de respaldo vieja(s)"), msg && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--color-text-secondary)",
+      marginTop: 6
+    }
+  }, msg));
+}
+
 function Config({
   productos,
   setProductos,
@@ -1700,7 +1749,7 @@ function Config({
         color: "#e05c5c",
         marginTop: 8
       }
-    }, "⚠️ Espacio alto. Eliminá fotos si la app deja de funcionar."));
+    }, "⚠️ Espacio alto. Eliminá fotos si la app deja de funcionar."), /*#__PURE__*/React.createElement(LimpiarBackupsLocales, null));
   })()), /*#__PURE__*/React.createElement("details", {
     style: {
       ...s.card,

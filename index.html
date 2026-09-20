@@ -219,6 +219,11 @@ var firebaseConfig = {
       histPrecios:   function(it){ return it.id!=null ? String(it.id) : ('hp_'+String(it.fecha||'').replace(/[^0-9A-Za-z_-]/g,'')); },
       perdidas:      function(it){ return it.id!=null ? String(it.id) : null; },
       prospectos:    function(it){ return it.id!=null ? String(it.id) : null; },
+      // Movimientos de dispenser (comodato). Faltaban acá: se "sincronizaban"
+      // contra una colección que no existía, así que todo el historial de
+      // préstamo/retiro vivía en un solo teléfono y no entraba ni en el
+      // respaldo. Si se borraban los datos del sitio, se perdía entero.
+      dispMovs:      function(it){ return it.id!=null ? String(it.id) : null; },
       // MARCAS DE BORRADO COMPARTIDAS. Antes vivían sólo en el localStorage del
       // equipo donde borrabas, así que los demás no se enteraban: veían el
       // registro "faltando" en la nube, lo tomaban por nuevo y lo RESUCITABAN,
@@ -258,8 +263,12 @@ var firebaseConfig = {
       return chain;
     }
 
-    function _lcArmarOps(data, prev){
+    // opts.sinBorrar = true -> NO se emite ningún borrado, sólo altas y
+    // cambios. Lo usa la restauración de respaldos: restaurar una copia vieja
+    // NO puede significar borrar de la nube todo lo que se cargó después.
+    function _lcArmarOps(data, prev, opts){
       var ops=[];
+      var sinBorrar = !!(opts && opts.sinBorrar);
       // LISTAS (diff por docId)
       Object.keys(LC_LISTAS).forEach(function(ent){
         var idOf=LC_LISTAS[ent];
@@ -274,7 +283,7 @@ var firebaseConfig = {
           var antes=prevMap[id];
           if(!antes || JSON.stringify(antes)!==JSON.stringify(it)) ops.push({tipo:'set', ref:col.doc(id), data:it});
         });
-        Object.keys(prevMap).forEach(function(id){ if(!vistos[id]) ops.push({tipo:'del', ref:col.doc(id)}); });
+        if(!sinBorrar) Object.keys(prevMap).forEach(function(id){ if(!vistos[id]) ops.push({tipo:'del', ref:col.doc(id)}); });
       });
       // MAPAS (diff por clave)
       LC_MAPAS.forEach(function(ent){
@@ -284,7 +293,7 @@ var firebaseConfig = {
         Object.keys(data[ent]).forEach(function(k){
           if(JSON.stringify(prevObj[k])!==JSON.stringify(data[ent][k])) ops.push({tipo:'set', ref:col.doc(k), data:_lcVal(data[ent][k])});
         });
-        Object.keys(prevObj).forEach(function(k){ if(!(k in data[ent])) ops.push({tipo:'del', ref:col.doc(k)}); });
+        if(!sinBorrar) Object.keys(prevObj).forEach(function(k){ if(!(k in data[ent])) ops.push({tipo:'del', ref:col.doc(k)}); });
       });
       // CONFIG singleton
       var cfg={}, hayCfg=false;
@@ -314,15 +323,22 @@ var firebaseConfig = {
       return ops;
     }
 
-    function cloudSave(data){
+    function cloudSave(data, opts){
       if(!window.db) return Promise.resolve(false);
       if(!_lcUsuario()) return Promise.resolve(false);
       var ops;
-      try { ops=_lcArmarOps(data, window._lcLastSaved||{}); }
+      try { ops=_lcArmarOps(data, window._lcLastSaved||{}, opts); }
       catch(e){ console.error('cloudSave prep err', e); return Promise.resolve(false); }
       if(!ops.length){ return Promise.resolve(true); } // nada cambió
       return _lcCommitOps(ops).then(function(){
-        window._lcLastSaved = JSON.parse(JSON.stringify(data));
+        // Con sinBorrar, lo que quedó en la nube NO es igual a `data` (quedaron
+        // registros que `data` no tiene). Guardar esa foto como referencia
+        // haría que el PRÓXIMO guardado normal los tomara por borrados y los
+        // eliminara: el borrón que acabamos de evitar, una vuelta más tarde.
+        // Por eso se deja la referencia en blanco y el próximo arranque la
+        // vuelve a armar leyendo la nube.
+        if(opts && opts.sinBorrar) window._lcLastSaved = null;
+        else window._lcLastSaved = JSON.parse(JSON.stringify(data));
         return true;
       }).catch(function(e){ console.error('cloudSave err', e); return false; });
     }

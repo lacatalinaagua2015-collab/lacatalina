@@ -96,9 +96,25 @@ function useLS(key, fallback) {
   const save = v => {
     setVal(prev => {
       const next = typeof v === "function" ? v(prev) : v;
+      // ACÁ PASABA ALGO FEO: si el equipo estaba lleno, el guardado fallaba,
+      // el catch vacío se comía el error y la venta quedaba en pantalla como
+      // si se hubiera guardado. Con señal se salvaba igual (sube a la nube),
+      // pero sin señal quedaba sólo en memoria: cerrabas la app y no existía
+      // más. Ahora, si no entra, se hace lugar tirando los respaldos locales
+      // (que son copias, no datos originales) y se reintenta; si sigue sin
+      // entrar, se avisa en pantalla en vez de fingir que se guardó.
+      let guardado = false;
       try {
         localStorage.setItem(key, JSON.stringify(next));
-      } catch {}
+        guardado = true;
+      } catch (e) {
+        try {
+          Object.keys(localStorage).filter(k => k.startsWith("lc_backup_")).forEach(k => localStorage.removeItem(k));
+          localStorage.setItem(key, JSON.stringify(next));
+          guardado = true;
+        } catch (e2) {}
+      }
+      if (window._lcAvisarEspacio) window._lcAvisarEspacio(guardado ? null : key);
       return next;
     });
   };

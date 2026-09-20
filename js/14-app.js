@@ -269,6 +269,19 @@ function App() {
   // Acceso biométrico ya superado en esta sesión. Vive en memoria a propósito:
   // al cerrar la app del todo vuelve a pedir huella.
   const [accesoOk, setAccesoOk] = React.useState(false);
+  // Aviso de "no hay lugar en el equipo". Lo prende useLS (03-utils.js) cuando
+  // un guardado local no entra, y lo apaga solo en cuanto uno vuelve a entrar.
+  const [sinEspacio, setSinEspacio] = React.useState(false);
+  React.useEffect(() => {
+    // El aviso llega desde adentro de un updater de React, así que se difiere
+    // un tick: cambiar estado en pleno render tira warning y puede perderse.
+    window._lcAvisarEspacio = clave => {
+      setTimeout(() => setSinEspacio(prev => clave ? true : prev ? false : prev), 0);
+    };
+    return () => {
+      window._lcAvisarEspacio = null;
+    };
+  }, []);
   const [noVisitas, setNoVisitas] = useLS("cat_novisitas_v1", []);
   // Registro de envases perdidos — rotos durante el reparto, o no
   // recuperados al eliminar un cliente (se mudó y no avisó, etc). Se
@@ -1155,6 +1168,47 @@ function App() {
           }), 2000);
         }
       }
+      // ── dispMovs y prospectos: MERGEAR por id + _upd ─────────────────────
+      // Los dos se SUBÍAN pero nunca se BAJABAN, así que cada equipo veía sólo
+      // lo suyo. Peor con dispMovs, que encima ni siquiera subía. Mismo
+      // criterio append-only que pérdidas: unir por id, gana el _upd más nuevo.
+      const _mergeSimple = (deLaNube, claveLS, setter, campoSync, etiqueta) => {
+        if (!deLaNube || !deLaNube.length) return;
+        let locales = [];
+        try {
+          locales = JSON.parse(localStorage.getItem(claveLS) || "[]");
+        } catch (e) {
+          locales = [];
+        }
+        const porId = {};
+        deLaNube.forEach(it => {
+          if (it && it.id != null) porId[it.id] = it;
+        });
+        let nuevosLocales = 0;
+        locales.forEach(it => {
+          if (!it || it.id == null) return;
+          const enNube = porId[it.id];
+          if (!enNube) {
+            porId[it.id] = it;
+            nuevosLocales++;
+            return;
+          }
+          if ((Number(it._upd) || 0) > (Number(enNube._upd) || 0)) {
+            porId[it.id] = it;
+            nuevosLocales++;
+          }
+        });
+        const merged = Object.values(porId);
+        setter(merged);
+        if (nuevosLocales > 0) {
+          console.log("Merge: " + nuevosLocales + " " + etiqueta + " locales más nuevos, sincronizando...");
+          setTimeout(() => syncData({
+            [campoSync]: merged
+          }), 2000);
+        }
+      };
+      _mergeSimple(data.dispMovs, "cat_dispmovs_v1", setDispMovs, "dispMovs", "movimientos de dispenser");
+      _mergeSimple(data.prospectos, "cat_prospectos_v1", setProspectos, "prospectos", "prospectos");
       // ── noVisitas: MERGEAR en vez de sobreescribir (mismo problema que clientes/planillas) ──
       // Acá vive "No está" / "No quiere" / "Saltar". Sin esto, una marca recién
       // hecha podía desaparecer si llegaba un refetch antes de terminar de sincronizar
@@ -1392,7 +1446,9 @@ function App() {
     productos,
     noVisitas,
     recordatorios,
-    cargasDia
+    cargasDia,
+    dispMovs,
+    prospectos
   });
   React.useEffect(() => {
     estadoRef.current = {
@@ -1405,7 +1461,11 @@ function App() {
       recordatorios,
       zonasReparto,
       cargasDia,
-      perdidas
+      perdidas,
+      // Faltaban acá: por eso no entraban ni al respaldo manual descargable
+      // ni a lo que "Restaurar" vuelve a subir a la nube.
+      dispMovs,
+      prospectos
     };
   });
 
@@ -1428,11 +1488,28 @@ function App() {
           ventas: ve,
           planillas: pl
         });
-        localStorage.setItem("lc_backup_" + hoy, payload);
+        // PRIMERO limpiar, DESPUÉS escribir. Antes era al revés, y ahí estaba
+        // el problema: cuando el equipo se llenaba, el setItem tiraba error,
+        // el catch se lo comía y la limpieza —que era justo lo que liberaba
+        // lugar— nunca llegaba a correr. El espacio no se recuperaba más.
+        //
+        // Además se guarda UNA sola copia (la del día), no tres. Eran tres
+        // copias enteras de clientes+ventas+planillas compitiendo con los
+        // datos de verdad por los mismos 5 MB del navegador; el respaldo real
+        // es la nube y el JSON que te descargás, no esto.
+        const viejos = Object.keys(localStorage).filter(k => k.startsWith("lc_backup_") && k !== "lc_backup_" + hoy);
+        viejos.forEach(k => localStorage.removeItem(k));
+        try {
+          localStorage.setItem("lc_backup_" + hoy, payload);
+        } catch (e) {
+          // No entró ni sacando los viejos: el backup del día se borra para
+          // no dejar una copia a medias ocupando lugar, y los datos de verdad
+          // siguen teniendo todo el espacio para ellos.
+          localStorage.removeItem("lc_backup_" + hoy);
+          console.warn("Auto-backup: no hay lugar, se omite esta vuelta.", e);
+          return;
+        }
         localStorage.setItem("lc_ultimo_backup", hoy);
-        // Mantener solo los últimos 3 días de backup
-        const keys = Object.keys(localStorage).filter(k => k.startsWith("lc_backup_")).sort().reverse();
-        keys.slice(3).forEach(k => localStorage.removeItem(k));
         console.log("Auto-backup guardado:", hoy, new Date().toLocaleTimeString());
       } catch (e) {
         console.warn("Auto-backup falló:", e);
@@ -1516,9 +1593,29 @@ function App() {
         d: viejas,
         archivadasEl: hoy.toISOString()
       }).then(() => {
-        // Solo borrar localmente si se guardaron en Firebase
-        const ventasRecientes = ventas.filter(v => !v.fechaKey || v.fechaKey >= limiteKey);
-        if (ventasRecientes.length < ventas.length) {
+        // Solo borrar localmente si se guardaron en Firebase.
+        //
+        // OJO — ACÁ SE PERDÍAN VENTAS. Este efecto corre una sola vez al
+        // arrancar, así que `ventas` es la foto de ese momento. Entre que
+        // arranca y que Firebase confirma el archivo pasan segundos, y en
+        // ese rato `traerDeLaNube` ya metió las ventas que trajo de la nube.
+        // Si filtrábamos la foto vieja, esas ventas nuevas desaparecían —
+        // y como el guardado en la nube es diferencial (lo que no está en
+        // la lista se borra allá), el borrón se replicaba a Firebase.
+        //
+        // Ahora se parte de la lista FRESCA (la que está guardada en el
+        // equipo en este instante) y se sacan ÚNICAMENTE las ventas que
+        // realmente se archivaron, por id. Una venta que haya llegado en el
+        // medio no se toca, tenga la fecha que tenga.
+        let ventasAhora;
+        try {
+          ventasAhora = JSON.parse(localStorage.getItem("cat_ventas_v3") || "null") || ventas;
+        } catch (e) {
+          ventasAhora = ventas;
+        }
+        const idsArchivadas = new Set(viejas.map(v => String(v.id)));
+        const ventasRecientes = ventasAhora.filter(v => !idsArchivadas.has(String(v.id)));
+        if (ventasRecientes.length < ventasAhora.length) {
           console.log("Limpieza automática: archivadas " + viejas.length + " ventas anteriores al " + limiteKey + " (se conservan " + meses + " mes(es) en el dispositivo). Copia en Firebase + descarga JSON.");
           setVentasRaw(ventasRecientes);
           syncData({
@@ -1555,8 +1652,19 @@ function App() {
         d: viejas,
         archivadasEl: hoy.toISOString()
       }).then(() => {
-        const recientes = noVisitas.filter(v => !v.fecha || v.fecha >= limiteKey);
-        if (recientes.length < noVisitas.length) {
+        // Mismo cuidado que con las ventas: partir de la lista fresca del
+        // equipo y sacar sólo las marcas efectivamente archivadas, nunca
+        // filtrar la foto vieja del arranque (ver comentario de arriba).
+        let nvAhora;
+        try {
+          nvAhora = JSON.parse(localStorage.getItem("cat_novisitas_v1") || "null") || noVisitas;
+        } catch (e) {
+          nvAhora = noVisitas;
+        }
+        const claveNV = v => v && v.id != null ? String(v.id) : `${v && v.clienteId}_${v && v.dia}_${v && v.fecha}`;
+        const archivadas = new Set(viejas.map(claveNV));
+        const recientes = nvAhora.filter(v => !archivadas.has(claveNV(v)));
+        if (recientes.length < nvAhora.length) {
           console.log("Limpieza automática: archivadas " + viejas.length + " marcas de visita anteriores al " + limiteKey + " (se conservan " + meses + " mes(es) en el dispositivo).");
           setNoVisitas(recientes);
           syncData({
@@ -1903,13 +2011,35 @@ function App() {
         if (data.histPrecios !== undefined) localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios || []));
         if (data.zonasReparto !== undefined) setZonasReparto(data.zonasReparto || {});
         if (data.cargasDia && Object.keys(data.cargasDia).length) setCargasDia(data.cargasDia);
-        // Subir lo restaurado a la nube
+        if (data.dispMovs !== undefined) setDispMovs(data.dispMovs || []);
+        if (data.prospectos !== undefined) setProspectos(data.prospectos || []);
+        // Subir lo restaurado a la nube, SIN BORRAR.
+        //
+        // Antes esto era un cloudSave común, y el guardado es diferencial:
+        // todo lo que estaba en la nube y no venía en el respaldo se borraba
+        // allá. O sea que restaurar una copia de hace tres días eliminaba de
+        // Firebase todo lo cargado después — y encima en el peor momento,
+        // porque uno usa "Restaurar" justo cuando cree que perdió algo.
+        // Con sinBorrar sólo se agregan y actualizan registros; lo más nuevo
+        // que haya en la nube sigue estando, y vuelve al equipo en la próxima
+        // sincronización.
         try {
           cloudSave({
             ...estadoRef.current,
             ...data
+          }, {
+            sinBorrar: true
           });
         } catch {}
+        // Volver a traer de la nube para reconciliar: así lo restaurado y lo
+        // que ya estaba allá quedan juntos en el equipo, y la app recupera su
+        // referencia de "qué hay en la nube" (que el guardado sin borrar dejó
+        // en blanco a propósito).
+        setTimeout(() => {
+          try {
+            traerDeLaNube(true);
+          } catch (e) {}
+        }, 1500);
         return true;
       } catch (e) {
         lcAlert("Error al restaurar: " + e.message);
@@ -1947,18 +2077,27 @@ function App() {
       // que podía resucitar un producto ya borrado (mismo bug que clientes).
       const _t = Date.now();
       const next = _soloUpdCambiados(prev, base, _t);
-      // Registrar cambio de precio en historial
-      const hoy = new Date().toISOString().slice(0, 16);
-      const histPrecios = JSON.parse(localStorage.getItem("lc_hist_precios") || "[]");
-      histPrecios.push({
-        fecha: hoy,
-        productos: next.map(p => ({
-          nombre: p.nombre,
-          precio: p.precio,
-          costo: p.costo
-        }))
-      });
-      localStorage.setItem("lc_hist_precios", JSON.stringify(histPrecios.slice(-50)));
+      // Registrar cambio de precio en historial. Estos dos accesos eran los
+      // únicos de toda la app sin try/catch, y estaban ADENTRO de un updater
+      // de estado: si el equipo estaba lleno, el setItem tiraba una excepción
+      // acá y el syncData de abajo nunca llegaba a ejecutarse — el cambio de
+      // precio no se guardaba ni local ni en la nube, sin ningún aviso, y las
+      // ventas del día se seguían calculando con el precio viejo.
+      try {
+        const hoy = new Date().toISOString().slice(0, 16);
+        const histPrecios = JSON.parse(localStorage.getItem("lc_hist_precios") || "[]");
+        histPrecios.push({
+          fecha: hoy,
+          productos: next.map(p => ({
+            nombre: p.nombre,
+            precio: p.precio,
+            costo: p.costo
+          }))
+        });
+        localStorage.setItem("lc_hist_precios", JSON.stringify(histPrecios.slice(-50)));
+      } catch (e) {
+        console.warn("No se pudo guardar el historial de precios (sin espacio):", e);
+      }
       syncData({
         productos: next
       });
@@ -2958,7 +3097,17 @@ function App() {
   }, /*#__PURE__*/React.createElement(SyncBar, {
     status: syncStatus,
     isOnline: isOnline
-  }), pantalla === "portada" && /*#__PURE__*/React.createElement(Portada, {
+  }), sinEspacio && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#b91c1c",
+      color: "#ffe4e4",
+      padding: "8px 12px",
+      fontSize: 12.5,
+      lineHeight: 1.45,
+      fontWeight: 500,
+      textAlign: "center"
+    }
+  }, "⚠ No entra más en la memoria del equipo. Lo último puede no haber quedado guardado acá. ", isOnline ? "Está subiendo a la nube igual." : "SIN CONEXIÓN: no cierres la app hasta tener señal.", " Entrá a Ajustes › Mantenimiento para hacer lugar."), pantalla === "portada" && /*#__PURE__*/React.createElement(Portada, {
     onIngresar: () => irA("menu")
   }), pantalla === "menu" && /*#__PURE__*/React.createElement(MenuDias, {
     dias: DIAS,
