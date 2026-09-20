@@ -2132,7 +2132,10 @@ function App() {
     agenda: "agenda",
     dormidos: "clientesDormidos",
     mapa: "mapaClientes",
-    resumen: "resumen"
+    resumen: "resumen",
+    // Entrada desde el cartel de deuda en el Menú (onVerDeudor) — "Volver"
+    // tiene que volver al Menú, no a la lista de Clientes del día.
+    menu: "menu"
   })[origenDetalle] || "clientes";
   const irA = p => {
     const needsDia = ["diaPrincipal", "selectorFechaClientes", "selectorFechaPlanilla", "inicioReparto", "clientes", "detalleCliente", "venta", "planilla"]; // historial does NOT need dia
@@ -3209,6 +3212,15 @@ function App() {
       const yaIniciado = fechaActual && planillas[`${d}_${fechaActual}`]?.iniciado;
       setOrigenClientes(yaIniciado ? "menu" : null);
       irA(yaIniciado ? "clientes" : "selectorFechaClientes");
+    },
+    // Abrir la ficha de un cliente en deuda directo desde el cartel "⚠ N
+    // clientes deben" del Menú. origenDetalle:"menu" hace que "Volver"
+    // regrese acá en vez de a la lista de Clientes del día.
+    onVerDeudor: (c, d) => {
+      setDiaActual(d);
+      setClienteId(c.id);
+      setOrigenDetalle("menu");
+      irA("detalleCliente");
     }
   }), pantalla === "confirmacionesDia" && /*#__PURE__*/React.createElement(ConfirmacionesDia, {
     dia: diaActual || "todos los días",

@@ -35,9 +35,13 @@ function MenuDias({
   onDormidos,
   onPlanillaAtajo,
   onIrPlanillaDia,
-  onIrClientesDia
+  onIrClientesDia,
+  onVerDeudor
 }) {
   const [editandoZona, setEditandoZona] = React.useState(null);
+  // Qué día tiene desplegada la lista de clientes en deuda (uno solo a la
+  // vez, igual que editandoZona/diaExpandido).
+  const [deudaExpandida, setDeudaExpandida] = React.useState(null);
   // Antes, tocar un día llevaba a una pantalla intermedia ("Día Principal")
   // que solo mostraba 2 botones sin datos ("Planilla del día" / "Clientes
   // del día") antes de recién ahí elegir la fecha. Se saca esa pantalla de
@@ -343,9 +347,17 @@ function MenuDias({
     }, totalDeuda > 0 ? /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 12,
-        color: "var(--color-text-danger)"
+        color: "var(--color-text-danger)",
+        cursor: "pointer",
+        textDecoration: "underline",
+        textDecorationStyle: "dotted"
+      },
+      title: "Tocá para ver quién debe",
+      onClick: e => {
+        e.stopPropagation();
+        setDeudaExpandida(deudaExpandida === d ? null : d);
       }
-    }, "⚠ ", deudas.length, " cliente", deudas.length > 1 ? "s" : "", " ", deudas.length > 1 ? "deben" : "debe", " ", fmt(totalDeuda)) : /*#__PURE__*/React.createElement("span", {
+    }, "⚠ ", deudas.length, " cliente", deudas.length > 1 ? "s" : "", " ", deudas.length > 1 ? "deben" : "debe", " ", fmt(totalDeuda), " ", deudaExpandida === d ? "▲" : "▼") : /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 12,
         color: "var(--color-text-success)"
@@ -477,7 +489,52 @@ function MenuDias({
         fontSize: 13
       },
       onClick: () => setEditandoZona(null)
-    }, "✕"))), diaExpandido === d && /*#__PURE__*/React.createElement("div", {
+    }, "✕"))), deudaExpandida === d && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "var(--color-background-secondary)",
+        border: "0.5px solid var(--color-border-secondary)",
+        borderRadius: 10,
+        padding: "8px 10px",
+        marginTop: 2,
+        display: "flex",
+        flexDirection: "column",
+        gap: 4
+      },
+      onClick: e => e.stopPropagation()
+    }, [...deudas].sort((a, b) => a.saldo - b.saldo).map(c => /*#__PURE__*/React.createElement("button", {
+      key: c.id,
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 8,
+        background: "none",
+        border: "none",
+        borderBottom: "0.5px solid var(--color-border-tertiary)",
+        padding: "8px 4px",
+        cursor: "pointer",
+        textAlign: "left"
+      },
+      onClick: () => {
+        setDeudaExpandida(null);
+        onVerDeudor && onVerDeudor(c, d);
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        color: "var(--color-text-primary)",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, c.nombre), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        fontWeight: 600,
+        color: "var(--color-text-danger)",
+        flexShrink: 0
+      }
+    }, fmt(Math.abs(c.saldo)))))), diaExpandido === d && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 6,
