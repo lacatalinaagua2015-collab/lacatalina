@@ -803,10 +803,19 @@ function DiaPrincipal({
 }
 function DetalleTransferencias({
   ventas,
-  ventasPendTrans
+  ventasPendTrans,
+  clientes,
+  onConfirmarTransfer
 }) {
   const [abierto, setAbierto] = React.useState(false);
   const pendientes = (ventasPendTrans || []).length;
+  const clientePorId = React.useMemo(() => {
+    const m = {};
+    (clientes || []).forEach(c => {
+      m[c.id] = c;
+    });
+    return m;
+  }, [clientes]);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 8,
@@ -861,6 +870,10 @@ function DetalleTransferencias({
     }
   }, ventas.map(v => {
     const confirmada = !!v.transConfirmada;
+    const monto = v.pagadoNum || v.neto || 0;
+    const cli = clientePorId[v.clienteId];
+    const tel = cli && cli.telefono;
+    const msjWA = encodeURIComponent(`Hola ${v.cliente}! Te escribo de La Catalina para confirmar tu transferencia de ${fmt(monto)}. ¿Me confirmás que ya salió de tu cuenta? Gracias!`);
     return /*#__PURE__*/React.createElement("div", {
       key: v.id,
       style: {
@@ -872,7 +885,8 @@ function DetalleTransferencias({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        flex: 1
+        flex: 1,
+        minWidth: 0
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
@@ -880,7 +894,7 @@ function DetalleTransferencias({
         color: "var(--color-text-primary)",
         fontWeight: 500
       }
-    }, v.cliente), /*#__PURE__*/React.createElement("span", {
+    }, v.cliente), /*#__PURE__*/React.createElement("button", {
       style: {
         marginLeft: 6,
         fontSize: 10,
@@ -888,15 +902,35 @@ function DetalleTransferencias({
         borderRadius: 4,
         background: confirmada ? "var(--color-background-success)" : "var(--color-background-warning)",
         color: confirmada ? "var(--color-text-success)" : "#f5b942",
-        fontWeight: 600
+        fontWeight: 600,
+        border: "none",
+        cursor: "pointer"
+      },
+      title: confirmada ? "Transferencia confirmada — tocá para desmarcar" : "Tocá para confirmar la transferencia",
+      onClick: e => {
+        e.stopPropagation();
+        onConfirmarTransfer && onConfirmarTransfer(v.clienteId, v.id);
       }
-    }, confirmada ? "✅ Confirmada" : "🔴 Pendiente")), /*#__PURE__*/React.createElement("span", {
+    }, confirmada ? "✅ Confirmada" : "🔴 Pendiente"), !confirmada && tel && /*#__PURE__*/React.createElement("a", {
+      href: `https://wa.me/54${tel}?text=${msjWA}`,
+      target: "_blank",
+      rel: "noreferrer",
+      title: "Mandar WhatsApp para pedir que confirme la transferencia",
+      style: {
+        marginLeft: 6,
+        fontSize: 13,
+        textDecoration: "none"
+      },
+      onClick: e => e.stopPropagation()
+    }, "💬")), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 13,
         fontWeight: 500,
-        color: confirmada ? "var(--color-text-success)" : "#f5b942"
+        color: confirmada ? "var(--color-text-success)" : "#f5b942",
+        flexShrink: 0,
+        marginLeft: 8
       }
-    }, fmt(v.pagadoNum || v.neto || 0)));
+    }, fmt(monto)));
   })));
 }
 function DetalleVentasDia({
@@ -3125,7 +3159,9 @@ function PlanillaDelDia({
     if (!transDelDia.length) return null;
     return /*#__PURE__*/React.createElement(DetalleTransferencias, {
       ventas: transDelDia,
-      ventasPendTrans: ventasPendTrans
+      ventasPendTrans: ventasPendTrans,
+      clientes: clientes,
+      onConfirmarTransfer: onConfirmarTransfer
     });
   })()), /*#__PURE__*/React.createElement("div", {
     style: {
