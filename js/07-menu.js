@@ -873,14 +873,9 @@ function DetalleTransferencias({
     const monto = v.pagadoNum || v.neto || 0;
     const cli = clientePorId[v.clienteId];
     const tel = cli && cli.telefono;
-    // "6 Sifón 1.5L y 1 Bidón 10L" — se arma desde el detalle real de la
-    // venta (los productos configurados en Stock/Config), no un texto fijo.
-    // La parte transferencia de un pago MIXTO no lleva detalle propio (es un
-    // registro aparte solo para el seguimiento del cobro): en ese caso se
-    // manda el mensaje sin el listado de productos.
-    const items = (v.detalle || []).filter(d => d && d.cantidad > 0 && !/^Pago mixto/.test(d.nombre || ""));
-    const itemsTxt = items.length ? items.map(d => `${d.cantidad} ${d.nombre}`).reduce((acc, txt, i) => i === 0 ? txt : i === items.length - 1 ? `${acc} y ${txt}` : `${acc}, ${txt}`, "") : "";
-    const msjWA = encodeURIComponent(itemsTxt ? `Buen día, estimado cliente! Hoy le dejé ${itemsTxt}, lo que da un total de ${fmt(monto)}. Muchas gracias!` : `Buen día, estimado cliente! Le escribo de La Catalina por la transferencia de hoy, de ${fmt(monto)}. Muchas gracias!`);
+    // Mensaje pre-armado (mismo texto en toda la app) — ver armarMsjTransferWA
+    // en 03-utils.js.
+    const msjWA = armarMsjTransferWA([v]);
     return /*#__PURE__*/React.createElement("div", {
       key: v.id,
       style: {
@@ -1155,7 +1150,18 @@ function DetalleVentasDia({
         color: pagoBadge.color,
         fontWeight: 600
       }
-    }, pagoBadge.txt), esNuevo && /*#__PURE__*/React.createElement("span", {
+    }, pagoBadge.txt), !v.transConfirmada && (v.pago === "transferencia" || esMixto) && cli && cli.telefono && /*#__PURE__*/React.createElement("a", {
+      href: `https://wa.me/54${cli.telefono}?text=${armarMsjTransferWA([v])}`,
+      target: "_blank",
+      rel: "noreferrer",
+      title: "Mandar WhatsApp para pedir que confirme la transferencia",
+      onClick: e => e.stopPropagation(),
+      style: {
+        marginLeft: 6,
+        fontSize: 13,
+        textDecoration: "none"
+      }
+    }, "💬"), esNuevo && /*#__PURE__*/React.createElement("span", {
       style: {
         marginLeft: 6,
         fontSize: 10,

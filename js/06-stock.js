@@ -1525,7 +1525,7 @@ function ConfirmacionesDia({
       marginTop: 2
     }
   }, direccionCliente(c))), c?.telefono && /*#__PURE__*/React.createElement("a", {
-    href: `https://wa.me/54${c.telefono}`,
+    href: `https://wa.me/54${c.telefono}?text=${armarMsjTransferWA(vts)}`,
     target: "_blank",
     rel: "noreferrer",
     style: {

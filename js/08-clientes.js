@@ -121,7 +121,7 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
     }, "🔔"), (() => {
       const vt = ventas.find(v => v.clienteId === c.id && v.fechaKey === fecha && v.pago === "transferencia");
       if (!vt) return null;
-      return /*#__PURE__*/React.createElement("button", {
+      return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
         style: {
           background: "none",
           border: "none",
@@ -150,7 +150,18 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
           fontWeight: 500,
           color: "#f5b942"
         }
-      }, fmt(vt.pagadoNum || vt.neto || 0)));
+      }, fmt(vt.pagadoNum || vt.neto || 0))), !vt.transConfirmada && c.telefono && /*#__PURE__*/React.createElement("a", {
+        href: `https://wa.me/54${c.telefono}?text=${armarMsjTransferWA([vt])}`,
+        target: "_blank",
+        rel: "noreferrer",
+        onClick: e => e.stopPropagation(),
+        title: "Mandar WhatsApp para pedir que confirme la transferencia",
+        style: {
+          fontSize: 15,
+          textDecoration: "none",
+          flexShrink: 0
+        }
+      }, "💬"));
     })()), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 17,
