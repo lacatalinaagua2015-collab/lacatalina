@@ -3195,18 +3195,11 @@ function App() {
     onFiados: () => irA("fiadosPendientes"),
     onMapaClientes: () => irA("mapaClientes"),
     onDormidos: () => irA("clientesDormidos"),
-    // La elección Planilla-o-Clientes se hace tocando el día en el propio
-    // menú (fila expandida) — mismo criterio de "saltar Inicio del reparto
-    // si el camión ya salió hoy" que ya usaba onIrClientes.
+    // Tocar el día en el Menú va directo a la lista de fechas — ahí, tocando
+    // una fecha, se elige Planilla o Clientes (ver SelectorFecha).
     onIrPlanillaDia: d => {
       setDiaActual(d);
       irA("selectorFechaPlanilla");
-    },
-    onIrClientesDia: d => {
-      setDiaActual(d);
-      const yaIniciado = fechaActual && planillas[`${d}_${fechaActual}`]?.iniciado;
-      setOrigenClientes(yaIniciado ? "menu" : null);
-      irA(yaIniciado ? "clientes" : "selectorFechaPlanilla");
     },
     // Abrir la ficha de un cliente en deuda directo desde el cartel "⚠ N
     // clientes deben" del Menú. origenDetalle:"menu" hace que "Volver"

@@ -34,18 +34,12 @@ function MenuDias({
   onDormidos,
   onPlanillaAtajo,
   onIrPlanillaDia,
-  onIrClientesDia,
   onVerDeudor
 }) {
   const [editandoZona, setEditandoZona] = React.useState(null);
   // Qué día tiene desplegada la lista de clientes en deuda (uno solo a la
-  // vez, igual que editandoZona/diaExpandido).
+  // vez, igual que editandoZona).
   const [deudaExpandida, setDeudaExpandida] = React.useState(null);
-  // Antes, tocar un día llevaba a una pantalla intermedia ("Día Principal")
-  // que solo mostraba 2 botones sin datos ("Planilla del día" / "Clientes
-  // del día") antes de recién ahí elegir la fecha. Se saca esa pantalla de
-  // en medio: tocar el día expande estos 2 botones ACÁ MISMO, en la fila.
-  const [diaExpandido, setDiaExpandido] = React.useState(null);
   const [mostrarRecordatorios, setMostrarRecordatorios] = React.useState(false);
   const [mostrarTransferencias, setMostrarTransferencias] = React.useState(false);
   const hoyDiaNombre = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"][new Date().getDay()];
@@ -283,7 +277,7 @@ function MenuDias({
         alignItems: "center",
         padding: "14px 16px"
       },
-      onClick: () => setDiaExpandido(diaExpandido === d ? null : d)
+      onClick: () => onIrPlanillaDia(d)
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
@@ -533,48 +527,7 @@ function MenuDias({
         color: "var(--color-text-danger)",
         flexShrink: 0
       }
-    }, fmt(Math.abs(c.saldo)))))), diaExpandido === d && /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 6,
-        marginTop: 2
-      },
-      onClick: e => e.stopPropagation()
-    }, /*#__PURE__*/React.createElement("button", {
-      style: {
-        ...s.card,
-        margin: 0,
-        flex: 1,
-        cursor: "pointer",
-        textAlign: "center",
-        padding: "12px 8px",
-        background: "var(--color-background-tertiary)"
-      },
-      onClick: () => onIrPlanillaDia(d)
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 13,
-        fontWeight: 500,
-        color: "var(--color-text-primary)"
-      }
-    }, "📋 Planilla")), /*#__PURE__*/React.createElement("button", {
-      style: {
-        ...s.card,
-        margin: 0,
-        flex: 1,
-        cursor: "pointer",
-        textAlign: "center",
-        padding: "12px 8px",
-        background: "var(--color-background-tertiary)"
-      },
-      onClick: () => onIrClientesDia(d)
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 13,
-        fontWeight: 500,
-        color: "var(--color-text-primary)"
-      }
-    }, "👥 Clientes"))));
+    }, fmt(Math.abs(c.saldo)))))));
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
