@@ -104,12 +104,18 @@ function SelectorFecha({
   planillas,
   ventas,
   noVisitas,
-  onSeleccionar,
+  onIrPlanilla,
+  onIrClientes,
   onVolver
 }) {
   const fechas = getFechasDelAnio(dia);
   const hoy = hoyKey();
   const [mostrarTodas, setMostrarTodas] = useState(false);
+  // Antes esta pantalla tenía 2 versiones (una para ir a Planilla, otra
+  // para ir a Clientes), casi idénticas salvo el destino. Ahora es una
+  // sola: tocar la fecha la expande acá mismo con los 2 botones, igual que
+  // tocar un día en el Menú.
+  const [fechaExpandida, setFechaExpandida] = useState(null);
 
   // Agrupar por mes
   const porMes = {};
@@ -197,21 +203,22 @@ function SelectorFecha({
       const nVentas = ventasPorFecha[fk] || 0;
       const nVisitas = visitasPorFecha[fk] || 0;
       const esHoy = fk === hoy;
-      return /*#__PURE__*/React.createElement("button", {
-        key: fk,
+      return /*#__PURE__*/React.createElement(React.Fragment, {
+        key: fk
+      }, /*#__PURE__*/React.createElement("button", {
         style: {
           width: "100%",
           textAlign: "left",
           padding: "12px 16px",
           cursor: "pointer",
           border: "none",
-          borderBottom: "0.5px solid var(--color-border-tertiary)",
+          borderBottom: fechaExpandida === fk ? "none" : "0.5px solid var(--color-border-tertiary)",
           background: esHoy ? "var(--color-background-success)" : "var(--color-background-primary)",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center"
         },
-        onClick: () => onSeleccionar(fk, f)
+        onClick: () => setFechaExpandida(fechaExpandida === fk ? null : fk)
       }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 14,
@@ -233,9 +240,51 @@ function SelectorFecha({
         style: s.badge("info")
       }, "planilla ✓"))), /*#__PURE__*/React.createElement("span", {
         style: {
-          color: "var(--color-text-tertiary)"
+          color: "var(--color-text-tertiary)",
+          transform: fechaExpandida === fk ? "rotate(90deg)" : "none"
         }
-      }, "→"));
+      }, "→")), fechaExpandida === fk && /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          gap: 6,
+          padding: "8px 16px",
+          borderBottom: "0.5px solid var(--color-border-tertiary)"
+        }
+      }, /*#__PURE__*/React.createElement("button", {
+        style: {
+          ...s.card,
+          margin: 0,
+          flex: 1,
+          cursor: "pointer",
+          textAlign: "center",
+          padding: "10px 8px",
+          background: "var(--color-background-tertiary)"
+        },
+        onClick: () => onIrPlanilla(fk, f)
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 13,
+          fontWeight: 500,
+          color: "var(--color-text-primary)"
+        }
+      }, "📋 Planilla")), /*#__PURE__*/React.createElement("button", {
+        style: {
+          ...s.card,
+          margin: 0,
+          flex: 1,
+          cursor: "pointer",
+          textAlign: "center",
+          padding: "10px 8px",
+          background: "var(--color-background-tertiary)"
+        },
+        onClick: () => onIrClientes(fk, f)
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 13,
+          fontWeight: 500,
+          color: "var(--color-text-primary)"
+        }
+      }, "👥 Clientes"))));
     })));
   }), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -253,12 +302,49 @@ function SelectorFecha({
       marginTop: 4
     },
     onChange: e => {
-      if (e.target.value) {
-        const d = new Date(e.target.value + 'T12:00:00');
-        onSeleccionar(e.target.value, d);
-      }
+      if (e.target.value) setFechaExpandida(e.target.value);
     }
-  }))));
+  }), fechaExpandida && !planillas[`${dia}_${fechaExpandida}`] && !porMes[mesAbierto]?.some(f => fechaKey(f) === fechaExpandida) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.card,
+      margin: 0,
+      flex: 1,
+      cursor: "pointer",
+      textAlign: "center",
+      padding: "10px 8px",
+      background: "var(--color-background-tertiary)"
+    },
+    onClick: () => onIrPlanilla(fechaExpandida, new Date(fechaExpandida + "T12:00:00"))
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 500,
+      color: "var(--color-text-primary)"
+    }
+  }, "📋 Planilla")), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.card,
+      margin: 0,
+      flex: 1,
+      cursor: "pointer",
+      textAlign: "center",
+      padding: "10px 8px",
+      background: "var(--color-background-tertiary)"
+    },
+    onClick: () => onIrClientes(fechaExpandida, new Date(fechaExpandida + "T12:00:00"))
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 500,
+      color: "var(--color-text-primary)"
+    }
+  }, "👥 Clientes"))))));
 }
 function SyncBar({
   status,

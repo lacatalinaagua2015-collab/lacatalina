@@ -1,10 +1,9 @@
 // ════════════════════════════════════════════════════════════════════
-// ◆  07-menu.js — MenuDias, DiaPrincipal, PlanillaDelDia, InicioReparto
+// ◆  07-menu.js — MenuDias, PlanillaDelDia, InicioReparto
 // ════════════════════════════════════════════════════════════════════
 
 function MenuDias({
   dias,
-  onDia,
   onResumen,
   onConfig,
   onGestionClientes,
@@ -682,124 +681,6 @@ function MenuDias({
       textAlign: "center"
     }
   }, lbl))))));
-}
-function DiaPrincipal({
-  dia,
-  onIrClientes,
-  onIrPlanilla,
-  onVolver,
-  onVerConfirmaciones,
-  ventasPendientesTransfer
-}) {
-  return /*#__PURE__*/React.createElement("div", {
-    style: s.screen
-  }, /*#__PURE__*/React.createElement(HeaderApp, {
-    titulo: dia,
-    onVolver: onVolver
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "24px 16px",
-      display: "flex",
-      flexDirection: "column",
-      gap: 12
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...s.card,
-      margin: 0,
-      cursor: "pointer",
-      textAlign: "left",
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "20px 16px"
-    },
-    onClick: onIrPlanilla
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 17,
-      fontWeight: 500,
-      color: "var(--color-text-primary)"
-    }
-  }, "📋 Planilla del día"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      color: "var(--color-text-secondary)",
-      marginTop: 4
-    }
-  }, "Fechas de visita · inicio del reparto · totales")), /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: "var(--color-text-tertiary)",
-      fontSize: 20
-    }
-  }, "→")), ventasPendientesTransfer > 0 && /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...s.card,
-      margin: "0 0 10px",
-      background: "#1e3a5f",
-      border: "1px solid #f5b942",
-      display: "flex",
-      alignItems: "center",
-      gap: 10,
-      width: "100%",
-      textAlign: "left",
-      cursor: "pointer"
-    },
-    onClick: () => (onVerConfirmaciones || onIrClientes)()
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 22
-    }
-  }, "🔴"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      fontWeight: 500,
-      color: "#f5b942"
-    }
-  }, ventasPendientesTransfer, " transferencia", ventasPendientesTransfer > 1 ? "s" : "", " sin confirmar"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "var(--color-text-secondary)"
-    }
-  }, "Tocá para ir a confirmar →")), /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: "#f5b942",
-      fontSize: 18
-    }
-  }, "→")), /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...s.card,
-      margin: 0,
-      cursor: "pointer",
-      textAlign: "left",
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "20px 16px"
-    },
-    onClick: onIrClientes
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 17,
-      fontWeight: 500,
-      color: "var(--color-text-primary)"
-    }
-  }, "👥 Clientes del día"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      color: "var(--color-text-secondary)",
-      marginTop: 4
-    }
-  }, "Registrar entregas y visitas")), /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: "var(--color-text-tertiary)",
-      fontSize: 20
-    }
-  }, "→"))));
 }
 function DetalleTransferencias({
   ventas,

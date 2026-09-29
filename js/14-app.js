@@ -220,7 +220,7 @@ function _lcDedupMantVeh(arr) {
 function App() {
   const [pantalla, setPantalla] = useState(() => {
     const h = window.location.hash.slice(1) || "portada";
-    const needsDia = ["diaPrincipal", "selectorFechaClientes", "selectorFechaPlanilla", "inicioReparto", "clientes", "detalleCliente", "venta", "planilla"]; // historial does NOT need dia
+    const needsDia = ["selectorFechaPlanilla", "inicioReparto", "clientes", "detalleCliente", "venta", "planilla"]; // historial does NOT need dia
     const savedDia = (() => {
       try {
         return JSON.parse(localStorage.getItem("cat_dia_actual") || '""');
@@ -243,11 +243,11 @@ function App() {
   // donde volver despues: directo a la planilla, o a la lista de clientes.
   const [origenFecha, setOrigenFecha] = useState("clientes");
   // Si se entró a "clientes" con el atajo directo desde el menú (tocando el
-  // día, cuando el camión ya estaba cargado hoy — salta diaPrincipal y
-  // selectorFechaClientes), "Volver" tiene que volver directo al menú
-  // también. Si no, "Volver" quedaba yendo por el camino largo de siempre
-  // (selectorFechaClientes → diaPrincipal → menu = 3 pasos) aunque entrar
-  // había sido 1 solo paso.
+  // día, cuando el camión ya estaba cargado hoy — salta selectorFechaPlanilla,
+  // que ahora es la única pantalla de selección de fecha, para Planilla o
+  // Clientes), "Volver" tiene que volver directo al menú también. Si no,
+  // "Volver" quedaba yendo por el camino largo de siempre (selectorFechaPlanilla
+  // → menu = 2 pasos) aunque entrar había sido 1 solo paso.
   const [origenClientes, setOrigenClientes] = useState(null);
   // Antes había 2 pantallas de perfil de cliente casi idénticas: una para
   // cuando entrabas desde Clientes del día ("detalleCliente") y otra para
@@ -624,7 +624,6 @@ function App() {
   const [darkMode, setDarkMode] = useLS("cat_darkmode", false); // ya no controla el tema — ver 01-temas.js
   const [tabConfig, setTabConfig] = useState("stock");
   const [zonasReparto, setZonasReparto] = useLS("cat_zonas_v1", {});
-  const [modalResumenDia, setModalResumenDia] = useState(null); // {dia, fechaKey}
   const [scaleIdx, setScaleIdx] = useLS("cat_scale_v1", 1); // 0=S 1=M 2=L 3=XL
   const SCALES = [0.82, 1.0, 1.18, 1.36];
   const SCALE_LABELS = ["S", "M", "L", "XL"];
@@ -2138,7 +2137,7 @@ function App() {
     menu: "menu"
   })[origenDetalle] || "clientes";
   const irA = p => {
-    const needsDia = ["diaPrincipal", "selectorFechaClientes", "selectorFechaPlanilla", "inicioReparto", "clientes", "detalleCliente", "venta", "planilla"]; // historial does NOT need dia
+    const needsDia = ["selectorFechaPlanilla", "inicioReparto", "clientes", "detalleCliente", "venta", "planilla"]; // historial does NOT need dia
     if (needsDia.includes(p) && !diaActual) {
       setPantalla("menu");
       window.history.pushState({
@@ -2173,10 +2172,12 @@ function App() {
     setJarvisAgendaInicial(datos);
     irA("agenda");
   };
-  // Mismo destino que tocar el día en el Menú, o su atajo "Ver planilla".
+  // Ya no existe una pantalla aparte "Día Principal" (se sacó por duplicar
+  // lo que ya muestra la fila del día en el Menú al expandirse) — el comando
+  // de voz "andá al día X" ahora deja el día elegido y vuelve al Menú.
   const jarvisIrDia = d => {
     setDiaActual(d);
-    irA("diaPrincipal");
+    irA("menu");
   };
   const jarvisIrPlanillaDia = d => {
     setDiaActual(d);
@@ -2186,14 +2187,14 @@ function App() {
     setDiaActual(d);
     const yaIniciado = fechaActual && planillas[`${d}_${fechaActual}`]?.iniciado;
     setOrigenClientes(yaIniciado ? "menu" : null);
-    irA(yaIniciado ? "clientes" : "selectorFechaClientes");
+    irA(yaIniciado ? "clientes" : "selectorFechaPlanilla");
   };
 
   // Handle back button
   React.useEffect(() => {
     const handler = e => {
       const p = e.state?.pantalla || "portada";
-      const needsDia = ["diaPrincipal", "selectorFechaClientes", "selectorFechaPlanilla", "inicioReparto", "clientes", "detalleCliente", "venta", "planilla"]; // historial does NOT need dia
+      const needsDia = ["selectorFechaPlanilla", "inicioReparto", "clientes", "detalleCliente", "venta", "planilla"]; // historial does NOT need dia
       if (needsDia.includes(p) && !diaActual) {
         setPantalla("menu");
         return;
@@ -3114,10 +3115,6 @@ function App() {
     onIngresar: () => irA("menu")
   }), pantalla === "menu" && /*#__PURE__*/React.createElement(MenuDias, {
     dias: DIAS,
-    onDia: d => {
-      setDiaActual(d);
-      irA("diaPrincipal");
-    },
     onPlanillaAtajo: () => irA("atajoPlanillaSemana"),
     onResumen: () => irA("resumen"),
     onConfig: tab => {
@@ -3189,8 +3186,8 @@ function App() {
       setFechaActual(fechaKey);
       setFechaObj(new Date(fechaKey + "T12:00:00"));
       // Atajo directo desde el menú (día ya "Listo") a la planilla, saltando
-      // selectorFechaPlanilla/diaPrincipal — "Volver" tiene que deshacer ese
-      // mismo salto (mismo criterio que origenClientes para "clientes").
+      // selectorFechaPlanilla — "Volver" tiene que deshacer ese mismo salto
+      // (mismo criterio que origenClientes para "clientes").
       setOrigenFecha("menu");
       irA("planilla");
     },
@@ -3198,11 +3195,9 @@ function App() {
     onFiados: () => irA("fiadosPendientes"),
     onMapaClientes: () => irA("mapaClientes"),
     onDormidos: () => irA("clientesDormidos"),
-    // Reemplazan a "diaPrincipal" (pantalla intermedia sin datos que solo
-    // preguntaba Planilla-o-Clientes): ahora esa elección se hace en el
-    // propio menú, tocando el día, y estos dos props van directo al mismo
-    // destino al que iba diaPrincipal — mismo criterio de "saltar Inicio del
-    // reparto si el camión ya salió hoy" que ya usaba onIrClientes.
+    // La elección Planilla-o-Clientes se hace tocando el día en el propio
+    // menú (fila expandida) — mismo criterio de "saltar Inicio del reparto
+    // si el camión ya salió hoy" que ya usaba onIrClientes.
     onIrPlanillaDia: d => {
       setDiaActual(d);
       irA("selectorFechaPlanilla");
@@ -3211,7 +3206,7 @@ function App() {
       setDiaActual(d);
       const yaIniciado = fechaActual && planillas[`${d}_${fechaActual}`]?.iniciado;
       setOrigenClientes(yaIniciado ? "menu" : null);
-      irA(yaIniciado ? "clientes" : "selectorFechaClientes");
+      irA(yaIniciado ? "clientes" : "selectorFechaPlanilla");
     },
     // Abrir la ficha de un cliente en deuda directo desde el cartel "⚠ N
     // clientes deben" del Menú. origenDetalle:"menu" hace que "Volver"
@@ -3246,32 +3241,31 @@ function App() {
       irA("planilla");
     },
     onVolver: () => irA("menu")
-  }), pantalla === "diaPrincipal" && /*#__PURE__*/React.createElement(DiaPrincipal, {
-    dia: diaActual,
-    onIrClientes: () => {
-      // Si ya se venía trabajando esta fecha (camión ya cargado hoy), entrar
-      // directo a la lista en vez de pasar de nuevo por el selector de fecha
-      // + la pantalla de "Inicio del reparto".
-      const yaIniciado = fechaActual && planillas[`${diaActual}_${fechaActual}`]?.iniciado;
-      irA(yaIniciado ? "clientes" : "selectorFechaClientes");
-    },
-    onIrPlanilla: () => irA("selectorFechaPlanilla"),
-    onVolver: () => irA("menu"),
-    onVerConfirmaciones: () => irA("confirmacionesDia"),
-    ventasPendientesTransfer: ventas.filter(v => v.dia === diaActual && v.pago === "transferencia" && !v.transConfirmada).length
   }), pantalla === "selectorFechaPlanilla" && /*#__PURE__*/React.createElement(SelectorFecha, {
     dia: diaActual,
     planillas: planillas,
     ventas: ventas,
     noVisitas: noVisitas,
-   onSeleccionar: (fk, fo) => {
+    // Antes esta pantalla solo llevaba a la Planilla y "selectorFechaClientes"
+    // (ya eliminada) era una copia casi idéntica que solo llevaba a Clientes.
+    // Ahora la fecha se elige una sola vez y desde ahí se puede ir a
+    // cualquiera de los dos destinos (ver SelectorFecha en 05-portada.js).
+    onIrPlanilla: (fk, fo) => {
       setFechaActual(fk);
       setFechaObj(fo);
       setOrigenFecha("planilla");
       const yaIniciado = planillas[`${diaActual}_${fk}`]?.iniciado;
       irA(yaIniciado ? "planilla" : "inicioReparto");
     },
-    onVolver: () => irA("diaPrincipal")
+    onIrClientes: (fk, fo) => {
+      setFechaActual(fk);
+      setFechaObj(fo);
+      setOrigenFecha("clientes");
+      setOrigenClientes(null);
+      const yaIniciado = planillas[`${diaActual}_${fk}`]?.iniciado;
+      irA(yaIniciado ? "clientes" : "inicioReparto");
+    },
+    onVolver: () => irA("menu")
   }), pantalla === "planilla" && /*#__PURE__*/React.createElement(PlanillaDelDia, {
     dia: diaActual,
     fecha: fechaActual,
@@ -3319,24 +3313,6 @@ function App() {
     // la que se salió, incluso si el día ya estaba iniciado (antes, una vez
     // iniciado, no había forma de volver a esa pantalla).
     onEditarCarga: () => irA("inicioReparto")
-  }), pantalla === "selectorFechaClientes" && /*#__PURE__*/React.createElement(SelectorFecha, {
-    dia: diaActual,
-    planillas: planillas,
-    ventas: ventas,
-    noVisitas: noVisitas,
-    onSeleccionar: (fk, fo) => {
-      setFechaActual(fk);
-      setFechaObj(fo);
-      setOrigenFecha("clientes");
-      // Se pasó por selectorFechaClientes (camino normal, no el atajo desde
-      // el menú) — "Volver" desde clientes debe volver ahí, como siempre.
-      setOrigenClientes(null);
-      // Si el camión ya se cargó ese día, no repetir "Inicio del reparto" —
-      // ir directo a la lista de clientes (mismo criterio que selectorFechaPlanilla).
-      const yaIniciado = planillas[`${diaActual}_${fk}`]?.iniciado;
-      irA(yaIniciado ? "clientes" : "inicioReparto");
-    },
-    onVolver: () => irA("diaPrincipal")
   }), pantalla === "inicioReparto" && /*#__PURE__*/React.createElement(InicioReparto, {
     dia: diaActual,
     fecha: fechaActual,
@@ -3390,7 +3366,7 @@ function App() {
       }
       irA(origenFecha === "planilla" ? "planilla" : "clientes");
     },
-    onVolver: () => irA(origenFecha === "planilla" ? "selectorFechaPlanilla" : "selectorFechaClientes")
+    onVolver: () => irA("selectorFechaPlanilla")
   }), pantalla === "clientes" && /*#__PURE__*/React.createElement(ListaClientes, {
     // _retirado: cliente dado de baja por inactividad (4+ visitas seguidas
     // sin comprar) — ya no se le reparte, sale de la lista del día.
@@ -3434,9 +3410,9 @@ function App() {
     onNuevoCliente: () => irA("nuevoCliente"),
     // Si se entró con el atajo directo desde el menú (1 solo toque), volver
     // también directo al menú — si no, "Volver" hacía el camino largo de
-    // siempre (selectorFechaClientes → diaPrincipal → menú, 3 toques) aunque
-    // entrar hubiera sido inmediato. Ver comentario junto a origenClientes.
-    onVolver: () => irA(origenClientes === "menu" ? "menu" : "selectorFechaClientes"),
+    // siempre (selectorFechaPlanilla → menú, 2 toques) aunque entrar hubiera
+    // sido inmediato. Ver comentario junto a origenClientes.
+    onVolver: () => irA(origenClientes === "menu" ? "menu" : "selectorFechaPlanilla"),
     onReordenar: lista => {
       saveClientes(prev => [...prev.filter(c => c.dia !== diaActual), ...lista]);
     },
@@ -4037,131 +4013,7 @@ function App() {
       if (antes) ajustarStockFijoCliente(antes, { ...antes, ...cambios });
     },
     onEliminar: eliminarCliente
-  })), modalResumenDia && (() => {
-    const {
-      dia,
-      fechaKey
-    } = modalResumenDia;
-    const vDia = ventas.filter(v => v.fechaKey === fechaKey && v.dia === dia && !v._esCobro && !v._esAjuste && !v._esMixtoTrans);
-    const efectivo = vDia.filter(v => v.pago === "contado").reduce((a, v) => a + ((Number(v.montoTrans) || 0) > 0 ? Number(v.montoEfec) || 0 : v.pagadoNum || v.neto || 0), 0);
-    const transTot = vDia.filter(v => v.pago === "transferencia").reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
-    const transConf = vDia.filter(v => v.pago === "transferencia" && v.transConfirmada).reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
-    const transPend = transTot - transConf;
-    const fiado = vDia.filter(v => v.pago === "fiado").reduce((a, v) => a + (v.neto || 0), 0);
-    const total = efectivo + transTot + fiado;
-    return /*#__PURE__*/React.createElement("div", {
-      style: {
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: "rgba(0,0,0,0.75)",
-        zIndex: 2000,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 20
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        background: "var(--color-background-primary)",
-        borderRadius: 16,
-        padding: 24,
-        width: "100%",
-        maxWidth: 360,
-        display: "flex",
-        flexDirection: "column",
-        gap: 14
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        textAlign: "center"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 36,
-        marginBottom: 6
-      }
-    }, "✅"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 17,
-        fontWeight: 600,
-        color: "var(--color-text-primary)"
-      }
-    }, "¡Día completado!"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 12,
-        color: "var(--color-text-tertiary)",
-        marginTop: 2,
-        textTransform: "capitalize"
-      }
-    }, dia, " · ", new Date(fechaKey + "T12:00:00").toLocaleDateString("es-AR", {
-      day: "numeric",
-      month: "long"
-    }))), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        flexDirection: "column",
-        gap: 8
-      }
-    }, [["💵 Efectivo", efectivo, "success"], ["💳 Transferencias", transTot, "info"], transPend > 0 && ["   🔴 Pendientes de confirmar", transPend, "warning"], ["📋 Fiado nuevo", fiado, "warning"]].filter(Boolean).map(([l, v, c]) => /*#__PURE__*/React.createElement("div", {
-      key: l,
-      style: {
-        display: "flex",
-        justifyContent: "space-between",
-        padding: "8px 12px",
-        borderRadius: 8,
-        background: "var(--color-background-secondary)"
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 13,
-        color: "var(--color-text-secondary)"
-      }
-    }, l), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 14,
-        fontWeight: 500,
-        color: `var(--color-text-${c})`
-      }
-    }, fmt(v)))), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        justifyContent: "space-between",
-        padding: "10px 12px",
-        borderRadius: 8,
-        background: "var(--color-background-tertiary)",
-        borderTop: "0.5px solid var(--color-border-tertiary)"
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 14,
-        fontWeight: 600,
-        color: "var(--color-text-primary)"
-      }
-    }, "Total del día"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 17,
-        fontWeight: 700,
-        color: "var(--color-text-success)"
-      }
-    }, fmt(total)))), /*#__PURE__*/React.createElement("button", {
-      style: {
-        ...s.btnPrimary
-      },
-      onClick: () => {
-        setModalResumenDia(null);
-        irA("planilla");
-      }
-    }, "Ver planilla completa →"), /*#__PURE__*/React.createElement("button", {
-      style: {
-        ...s.btn,
-        textAlign: "center"
-      },
-      onClick: () => setModalResumenDia(null)
-    }, "Cerrar")));
-  })(), pantalla === "mapaClientes" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(ClientesTabs, {
+  })), pantalla === "mapaClientes" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(ClientesTabs, {
     activo: "mapa",
     onIr: irA
   }), /*#__PURE__*/React.createElement(MapaClientes, {
