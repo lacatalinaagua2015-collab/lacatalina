@@ -331,6 +331,39 @@ function App() {
       return next;
     });
   };
+  // Registro de correcciones manuales de envases (♻️ Envases, en PieEnvases —
+  // 04-componentes.js) — deja constancia de qué cliente, qué cambió (Fijos o
+  // Prestados, por producto) y los valores antes/después, para poder revisar
+  // más adelante quién corrigió qué (pedido del usuario, a raíz de encontrar
+  // clientes con envases "de más" sin poder saber qué había pasado).
+  const [ajustesEnvases, setAjustesEnvases] = useLS("cat_ajustesenvases_v1", []);
+  const registrarAjusteEnvases = (clienteId, clienteNombre, cambios) => {
+    if (!cambios || !cambios.length) return;
+    setAjustesEnvases(prev => {
+      const next = [...prev, {
+        id: Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+        fecha: new Date().toLocaleString("es-AR"),
+        fechaKey: new Date().toLocaleDateString("en-CA"),
+        clienteId,
+        clienteNombre: clienteNombre || null,
+        cambios,
+        _upd: Date.now()
+      }];
+      syncData({
+        ajustesEnvases: next
+      });
+      return next;
+    });
+  };
+  // Expuesto en window para que PieEnvases lo llame sin tener que pasar un
+  // prop nuevo por las 6 pantallas donde se usa (mismo patrón que
+  // window._lcIrA más abajo).
+  React.useEffect(() => {
+    window._lcRegistrarAjusteEnvases = registrarAjusteEnvases;
+    return () => {
+      if (window._lcRegistrarAjusteEnvases === registrarAjusteEnvases) delete window._lcRegistrarAjusteEnvases;
+    };
+  });
   const [recordatorios, setRecordatorios] = useLS("cat_recordatorios_v1", []);
   // recordatorio: {id, clienteId, clienteNombre, fecha, hora, motivo, dia, confirmado}
   // BUG REPORTADO: clientes (y productos/recordatorios) borrados volvían a
@@ -1207,6 +1240,7 @@ function App() {
         }
       };
       _mergeSimple(data.dispMovs, "cat_dispmovs_v1", setDispMovs, "dispMovs", "movimientos de dispenser");
+      _mergeSimple(data.ajustesEnvases, "cat_ajustesenvases_v1", setAjustesEnvases, "ajustesEnvases", "ajustes de envases");
       _mergeSimple(data.prospectos, "cat_prospectos_v1", setProspectos, "prospectos", "prospectos");
       // ── noVisitas: MERGEAR en vez de sobreescribir (mismo problema que clientes/planillas) ──
       // Acá vive "No está" / "No quiere" / "Saltar". Sin esto, una marca recién
@@ -1447,6 +1481,7 @@ function App() {
     recordatorios,
     cargasDia,
     dispMovs,
+    ajustesEnvases,
     prospectos
   });
   React.useEffect(() => {
@@ -1464,6 +1499,7 @@ function App() {
       // Faltaban acá: por eso no entraban ni al respaldo manual descargable
       // ni a lo que "Restaurar" vuelve a subir a la nube.
       dispMovs,
+      ajustesEnvases,
       prospectos
     };
   });
@@ -2011,6 +2047,7 @@ function App() {
         if (data.zonasReparto !== undefined) setZonasReparto(data.zonasReparto || {});
         if (data.cargasDia && Object.keys(data.cargasDia).length) setCargasDia(data.cargasDia);
         if (data.dispMovs !== undefined) setDispMovs(data.dispMovs || []);
+        if (data.ajustesEnvases !== undefined) setAjustesEnvases(data.ajustesEnvases || []);
         if (data.prospectos !== undefined) setProspectos(data.prospectos || []);
         // Subir lo restaurado a la nube, SIN BORRAR.
         //
@@ -2386,18 +2423,46 @@ function App() {
       firma: firmaReg,
       ts: ahoraReg
     };
-    // Auto-detectar envases prestados (solo si no es cobro de deuda)
+    // Auto-detectar envases prestados (solo si no es cobro de deuda).
+    // OJO: si el Fijo de un producto está en 0 (cliente nuevo al que nunca
+    // se le cargó, o quedó desactualizado), ANTES esto tomaba TODA la
+    // cantidad vendida como préstamo, en CADA visita, para siempre — así
+    // se inflaban "Prestados" sin que nadie prestara nada en la realidad
+    // (era solo un envase-por-envase normal). Ahora, cuando el Fijo está en
+    // 0, primero se fija solo mirando el propio historial del cliente — sin
+    // preguntar nada — antes de asumir que es un préstamo real:
+    //  · primera vez que se le vende ese producto → esa cantidad pasa a ser
+    //    el Fijo (es lo normal, no un préstamo).
+    //  · si ya se le vendió antes y las últimas 2 veces fue la MISMA
+    //    cantidad que ahora → también se autoconfigura el Fijo (quedó claro
+    //    que es su pedido habitual, no un préstamo puntual).
+    // En cualquier otro caso (Fijo ya cargado, o cantidad irregular) se
+    // sigue detectando como préstamo real, igual que antes.
     const envAutoDetect = [];
+    const fijosAutoAjuste = {};
     if (opcionSaldo !== "cobro_deuda" && opcionSaldo !== "cambio_envase") {
-      const mapa = {
-        sifon: "Sifón 1.5L",
-        bidon10: "Bidón 10L",
-        bidon20: "Bidón 20L"
+      const campoFijo = {
+        "Sifón 1.5L": "sifon",
+        "Bidón 10L": "bidon10",
+        "Bidón 20L": "bidon20"
       };
       detalle.forEach(d => {
-        const asignado = d.nombre === "Sifón 1.5L" ? c.sifon || 0 : d.nombre === "Bidón 10L" ? c.bidon10 || 0 : d.nombre === "Bidón 20L" ? c.bidon20 || 0 : 0;
+        const k = campoFijo[d.nombre];
+        if (!k) return;
+        const asignado = Number(c[k]) || 0;
         const extra = d.cantidad - asignado;
-        if (extra > 0) envAutoDetect.push({
+        if (extra <= 0) return;
+        if ((envPrest || []).some(ep => ep.prod === d.nombre)) return; // ya lo cargó a mano
+        if (asignado === 0) {
+          const cantsPrevias = ventas.filter(v => v.clienteId === c.id && !v._esCobro && !v._esCambio).map(v => (v.detalle || []).find(x => x.nombre === d.nombre)?.cantidad).filter(cant => cant !== undefined);
+          const esPrimeraVez = cantsPrevias.length === 0;
+          const ultimasDosIguales = cantsPrevias.length >= 2 && cantsPrevias.slice(-2).every(cant => cant === d.cantidad);
+          if (esPrimeraVez || ultimasDosIguales) {
+            fijosAutoAjuste[k] = d.cantidad;
+            return;
+          }
+        }
+        envAutoDetect.push({
           prod: d.nombre,
           cant: String(extra)
         });
@@ -2514,6 +2579,7 @@ function App() {
     const confirmarProspecto = c.esProspecto && totalComprasConEsta >= 5;
     saveClientes(prev => aplicarMovimientoEnvases(prev, ventas, c.id, nuevaVenta.envPrest, nuevaVenta.envDev).map(c2 => c2.id === c.id ? {
       ...c2,
+      ...fijosAutoAjuste,
       saldo: (Number(c2.saldo) || 0) + saldoExtra,
       ...(confirmarProspecto ? { esProspecto: false } : {})
     } : c2));

@@ -381,7 +381,47 @@ function PieEnvases({
       prest: Object.fromEntries(KEYS.map(k => [k, prestadoClienteDe(c, k, ventas)]))
     });
   };
-  const confirmar = () => {
+  // Corregir envases a mano ahora pide confirmación (con el detalle de qué
+  // cambia) y deja registro — antes se guardaba directo al tocar "Confirmar"
+  // sin dejar rastro, así que si algo quedaba mal cargado no había forma de
+  // saber qué se había tocado ni cuándo (pedido del usuario, a raíz de
+  // encontrar clientes con envases "de más" sin explicación).
+  const confirmar = async () => {
+    const NOMBRES = {
+      sifon: "Sifón 1.5L",
+      bidon10: "Bidón 10L",
+      bidon20: "Bidón 20L",
+      dispenser: "Dispenser"
+    };
+    const cambios = [];
+    KEYS.forEach(k => {
+      const antesFijo = Number(c[k]) || 0;
+      const despuesFijo = Math.max(0, draft.fijos[k]);
+      if (despuesFijo !== antesFijo) cambios.push({
+        producto: NOMBRES[k],
+        campo: "Fijos",
+        antes: antesFijo,
+        despues: despuesFijo
+      });
+      const antesPrest = prestadoClienteDe(c, k, ventas);
+      const despuesPrest = Math.max(0, draft.prest[k]);
+      if (despuesPrest !== antesPrest) cambios.push({
+        producto: NOMBRES[k],
+        campo: "Prestados",
+        antes: antesPrest,
+        despues: despuesPrest
+      });
+    });
+    if (!cambios.length) {
+      setDraft(null);
+      return;
+    }
+    const detalle = cambios.map(x => `· ${x.producto} (${x.campo}): ${x.antes} → ${x.despues}`).join("\n");
+    const ok = await window.lcConfirm(`Vas a corregir envases de "${c.nombre}":\n\n${detalle}\n\n¿Confirmar?`, {
+      okText: "Sí, corregir",
+      cancelText: "Cancelar"
+    });
+    if (!ok) return;
     // Los 4 productos (incluido dispenser) se guardan directo en c.prestado
     // — es un campo estable que se mantiene solo, sumando/restando en cada
     // venta (ver aplicarMovimientoEnvases en 14-app.js). Antes dispenser
@@ -395,6 +435,12 @@ function PieEnvases({
         ...Object.fromEntries(KEYS.map(k => [k, Math.max(0, draft.prest[k])]))
       }
     });
+    // Deja constancia de la corrección manual (quién... bueno, no hay login
+    // individual, pero sí cliente/producto/antes/después/cuándo). Lo expone
+    // App como window._lcRegistrarAjusteEnvases (ver 14-app.js) — mismo
+    // patrón que window._lcIrA, para no tener que pasar un prop nuevo por
+    // las 6 pantallas que usan PieEnvases.
+    window._lcRegistrarAjusteEnvases && window._lcRegistrarAjusteEnvases(c.id, c.nombre, cambios);
     setDraft(null);
   };
   const abierto = !!draft;
