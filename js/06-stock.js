@@ -204,14 +204,6 @@ function StockGeneral({
     totalPerdidas.bidon20 += p.bidon20 || 0;
     totalPerdidas.dispenser += p.dispenser || 0;
   });
-  // Mismos 3 totales que la tabla de abajo, pero sumando los 4 productos
-  // juntos — para tener de un vistazo el número de referencia general y
-  // de dónde sale cada parte, sin sumar fila por fila.
-  const totalSoderiaComb = PRODS.reduce((acc, [k]) => acc + (stock.soderia?.[k] || 0) + (stock.soderia_vacios?.[k] || 0), 0);
-  const totalDepositoComb = PRODS.reduce((acc, [k]) => acc + (stock.casa?.[k] || 0), 0);
-  const totalClientesComb = PRODS.reduce((acc, [k]) => acc + (totClientes[k] || 0) + (totPrestados[k] || 0), 0);
-  const totalPerdidosComb = PRODS.reduce((acc, [k]) => acc + (totalPerdidas[k] || 0), 0);
-  const totalGeneralComb = totalSoderiaComb + totalDepositoComb + totalClientesComb;
   const chipResumen = (lbl, val, color) => /*#__PURE__*/React.createElement("span", {
     style: {
       background: "var(--color-background-tertiary)",
@@ -303,30 +295,46 @@ function StockGeneral({
     }
   }, "El número real que existe hoy, sea cual sea la ubicación."), /*#__PURE__*/React.createElement("div", {
     style: {
-      display: "flex",
-      alignItems: "baseline",
-      gap: 7,
-      margin: "2px 0 8px"
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 26,
-      fontWeight: 700,
-      color: "var(--color-text-success)"
-    }
-  }, totalGeneralComb), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: "var(--color-text-tertiary)"
-    }
-  }, "envases en total, entre los 4 productos")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 6,
-      flexWrap: "wrap",
       marginBottom: 10
     }
-  }, chipResumen("🏭 Sodería", totalSoderiaComb, "var(--color-text-info)"), chipResumen("📦 Depósito", totalDepositoComb, "var(--color-text-secondary)"), chipResumen("👥 Clientes", totalClientesComb, "var(--color-text-secondary)"), totalPerdidosComb > 0 && chipResumen("💔 Perdidos", totalPerdidosComb, "var(--color-text-danger)")), /*#__PURE__*/React.createElement("div", {
+  }, PRODS.map(([k, lbl]) => {
+    const enSoderia = (stock.soderia?.[k] || 0) + (stock.soderia_vacios?.[k] || 0);
+    const enDeposito = stock.casa?.[k] || 0;
+    const enClientes = (totClientes[k] || 0) + (totPrestados[k] || 0);
+    const perdido = totalPerdidas[k] || 0;
+    const total = enSoderia + enDeposito + enClientes;
+    return /*#__PURE__*/React.createElement("div", {
+      key: `res-${k}`,
+      style: {
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "baseline",
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        fontWeight: 600,
+        color: "var(--color-text-primary)"
+      }
+    }, lbl.replace(" 1.5L", "")), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 20,
+        fontWeight: 700,
+        color: "var(--color-text-success)"
+      }
+    }, total)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 6,
+        flexWrap: "wrap",
+        marginTop: 3
+      }
+    }, chipResumen("🏭 Sodería", enSoderia, "var(--color-text-info)"), chipResumen("📦 Depósito", enDeposito, "var(--color-text-secondary)"), chipResumen("👥 Clientes", enClientes, "var(--color-text-secondary)"), perdido > 0 && chipResumen("💔 Perdidos", perdido, "var(--color-text-danger)")));
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "1fr 46px 46px 46px 46px 52px",
