@@ -15,6 +15,7 @@ function StockGeneral({
   planillas,
   perdidas,
   registrarPerdida,
+  movStock,
   onVolver,
   onResumen
 }) {
@@ -25,6 +26,7 @@ function StockGeneral({
   const [abiertoProductos, setAbiertoProductos] = React.useState(false);
   const [abiertoCarga, setAbiertoCarga] = React.useState(false);
   const [abiertoPerdidas, setAbiertoPerdidas] = React.useState(false);
+  const [abiertoMovStock, setAbiertoMovStock] = React.useState(false);
   const [formPerdida, setFormPerdida] = React.useState({
     producto: "sifon",
     cantidad: "",
@@ -161,9 +163,9 @@ function StockGeneral({
       totPrestados[k] += prestadoDe(c, k);
     });
   });
-  // Total general por producto: Sodería (llenos+vacíos+camión) + Depósito + Clientes (fijos+prestados)
+  // Total general por producto: Sodería (llenos+vacíos) + Depósito + Clientes (fijos+prestados)
   const totalGeneralDe = k => {
-    const enSoderia = (stock.soderia?.[k] || 0) + (stock.soderia_vacios?.[k] || 0) + (stock.camion?.[k] || 0);
+    const enSoderia = (stock.soderia?.[k] || 0) + (stock.soderia_vacios?.[k] || 0);
     const enDeposito = stock.casa?.[k] || 0;
     const enClientes = (totClientes[k] || 0) + (totPrestados[k] || 0);
     return enSoderia + enDeposito + enClientes;
@@ -202,6 +204,61 @@ function StockGeneral({
     totalPerdidas.bidon20 += p.bidon20 || 0;
     totalPerdidas.dispenser += p.dispenser || 0;
   });
+  // Mismos 3 totales que la tabla de abajo, pero sumando los 4 productos
+  // juntos — para tener de un vistazo el número de referencia general y
+  // de dónde sale cada parte, sin sumar fila por fila.
+  const totalSoderiaComb = PRODS.reduce((acc, [k]) => acc + (stock.soderia?.[k] || 0) + (stock.soderia_vacios?.[k] || 0), 0);
+  const totalDepositoComb = PRODS.reduce((acc, [k]) => acc + (stock.casa?.[k] || 0), 0);
+  const totalClientesComb = PRODS.reduce((acc, [k]) => acc + (totClientes[k] || 0) + (totPrestados[k] || 0), 0);
+  const totalPerdidosComb = PRODS.reduce((acc, [k]) => acc + (totalPerdidas[k] || 0), 0);
+  const totalGeneralComb = totalSoderiaComb + totalDepositoComb + totalClientesComb;
+  const chipResumen = (lbl, val, color) => /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: "var(--color-background-tertiary)",
+      borderRadius: 6,
+      padding: "3px 8px",
+      fontSize: 12,
+      color: "var(--color-text-secondary)"
+    }
+  }, lbl, " ", /*#__PURE__*/React.createElement("b", {
+    style: {
+      color
+    }
+  }, val));
+  const MOV_LBL = {
+    sifon: "Sifón",
+    bidon10: "10L",
+    bidon20: "20L",
+    dispenser: "Dispenser"
+  };
+  const MOV_TIPO_LBL = {
+    cierre: "🔁 Cierre del día",
+    relleno_lunes: "📥 Relleno semanal"
+  };
+  const renderMovDetalle = m => {
+    if (m.tipo === "cierre") {
+      const partes = [];
+      ["sifon", "bidon10", "bidon20"].forEach(k => {
+        const d = m.detalle?.[k];
+        if (!d) return;
+        const bits = [];
+        if (d.soderia) bits.push(`Soder. +${d.soderia}`);
+        if (d.deposito) bits.push(`Depós. ${d.deposito > 0 ? "+" : ""}${d.deposito}`);
+        if (bits.length) partes.push(`${MOV_LBL[k]}: ${bits.join(" / ")}`);
+      });
+      return partes.length ? partes.join(" · ") : "Sin cambios";
+    }
+    if (m.tipo === "relleno_lunes") {
+      const partes = Object.keys(MOV_LBL).map(k => {
+        const d = m.detalle?.[k];
+        if (!d) return null;
+        return `${MOV_LBL[k]} ${d > 0 ? "+" : ""}${d}`;
+      }).filter(Boolean);
+      return partes.length ? partes.join(" · ") : "Sin cambios";
+    }
+    return "";
+  };
+  const movStockOrdenado = [...(movStock || [])].reverse().slice(0, 30);
   const inNum = {
     ...s.inputNum,
     padding: "5px 2px",
@@ -246,6 +303,31 @@ function StockGeneral({
     }
   }, "El número real que existe hoy, sea cual sea la ubicación."), /*#__PURE__*/React.createElement("div", {
     style: {
+      display: "flex",
+      alignItems: "baseline",
+      gap: 7,
+      margin: "2px 0 8px"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 26,
+      fontWeight: 700,
+      color: "var(--color-text-success)"
+    }
+  }, totalGeneralComb), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-tertiary)"
+    }
+  }, "envases en total, entre los 4 productos")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      flexWrap: "wrap",
+      marginBottom: 10
+    }
+  }, chipResumen("🏭 Sodería", totalSoderiaComb, "var(--color-text-info)"), chipResumen("📦 Depósito", totalDepositoComb, "var(--color-text-secondary)"), chipResumen("👥 Clientes", totalClientesComb, "var(--color-text-secondary)"), totalPerdidosComb > 0 && chipResumen("💔 Perdidos", totalPerdidosComb, "var(--color-text-danger)")), /*#__PURE__*/React.createElement("div", {
+    style: {
       display: "grid",
       gridTemplateColumns: "1fr 46px 46px 46px 46px 52px",
       gap: 5,
@@ -277,7 +359,7 @@ function StockGeneral({
       fontWeight: 600
     }
   }, "Total")), PRODS.map(([k, lbl]) => {
-    const enSoderia = (stock.soderia?.[k] || 0) + (stock.soderia_vacios?.[k] || 0) + (stock.camion?.[k] || 0);
+    const enSoderia = (stock.soderia?.[k] || 0) + (stock.soderia_vacios?.[k] || 0);
     const enDeposito = stock.casa?.[k] || 0;
     const enClientes = (totClientes[k] || 0) + (totPrestados[k] || 0);
     const perdido = totalPerdidas[k] || 0;
@@ -1049,6 +1131,80 @@ function StockGeneral({
       }
     }, fecha, " · ", p.motivo, p.clienteNombre ? ` · ${p.clienteNombre}` : ""));
   })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      margin: "0 0 10px"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      width: "100%",
+      background: "var(--color-background-tertiary)",
+      border: "none",
+      borderRadius: 10,
+      padding: "14px 16px",
+      marginBottom: abiertoMovStock ? 10 : 0,
+      display: "flex",
+      alignItems: "center",
+      cursor: "pointer",
+      textAlign: "left"
+    },
+    onClick: () => setAbiertoMovStock(!abiertoMovStock)
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 15,
+      fontWeight: 600,
+      color: "var(--color-text-info)",
+      flex: 1
+    }
+  }, "📜 Movimiento interno ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 400,
+      color: "var(--color-text-tertiary)",
+      fontSize: 12
+    }
+  }, "· traspasos automáticos Sodería ⇄ Depósito")), /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 26,
+      height: 26,
+      borderRadius: "50%",
+      background: "var(--color-background-primary)",
+      color: "var(--color-text-info)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 13,
+      flexShrink: 0
+    }
+  }, abiertoMovStock ? "▲" : "▼")), abiertoMovStock && /*#__PURE__*/React.createElement(React.Fragment, null, movStockOrdenado.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-tertiary)"
+    }
+  }, "Todavía no hay movimientos registrados — se anotan solos en cada cierre de día y en el relleno semanal de los lunes.") : movStockOrdenado.map(m => {
+    return /*#__PURE__*/React.createElement("div", {
+      key: m.id,
+      style: {
+        padding: "6px 0",
+        borderTop: "0.5px solid var(--color-border-tertiary)"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        fontWeight: 500,
+        color: "var(--color-text-primary)"
+      }
+    }, MOV_TIPO_LBL[m.tipo] || m.tipo), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "var(--color-text-secondary)"
+      }
+    }, renderMovDetalle(m)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--color-text-tertiary)"
+      }
+    }, m.fecha, m.nota ? ` · ${m.nota}` : ""));
+  }))), /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
       margin: "0 0 10px"

@@ -364,6 +364,38 @@ function App() {
       if (window._lcRegistrarAjusteEnvases === registrarAjusteEnvases) delete window._lcRegistrarAjusteEnvases;
     };
   });
+  // Registro de movimientos internos de stock entre Sodería y Depósito —
+  // el cierre del día (confirmarCierre, 07-menu.js) y el relleno semanal de
+  // los lunes mueven stock automáticamente; antes no quedaba rastro de
+  // cuánto se movió ni cuándo. "detalle" trae, por producto, lo que se
+  // transfirió en ese movimiento puntual.
+  const [movStock, setMovStock] = useLS("cat_movstock_v1", []);
+  const registrarMovimientoStock = (tipo, detalle, nota) => {
+    if (!detalle || !Object.keys(detalle).length) return;
+    setMovStock(prev => {
+      const next = [...prev, {
+        id: Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+        fecha: new Date().toLocaleString("es-AR"),
+        fechaKey: new Date().toLocaleDateString("en-CA"),
+        tipo,
+        detalle,
+        nota: nota || null,
+        _upd: Date.now()
+      }];
+      syncData({
+        movStock: next
+      });
+      return next;
+    });
+  };
+  // Expuesto en window para que 07-menu.js (cierre del día) lo llame sin
+  // prop-drilling (mismo patrón que window._lcRegistrarAjusteEnvases).
+  React.useEffect(() => {
+    window._lcRegistrarMovimientoStock = registrarMovimientoStock;
+    return () => {
+      if (window._lcRegistrarMovimientoStock === registrarMovimientoStock) delete window._lcRegistrarMovimientoStock;
+    };
+  });
   const [recordatorios, setRecordatorios] = useLS("cat_recordatorios_v1", []);
   // recordatorio: {id, clienteId, clienteNombre, fecha, hora, motivo, dia, confirmado}
   // BUG REPORTADO: clientes (y productos/recordatorios) borrados volvían a
@@ -534,7 +566,6 @@ function App() {
       soderia: e(),
       soderia_vacios: e(),
       casa: e(),
-      camion: e(),
       capacidadFija: { ...BASE_DEFAULT_FIJA }
     };
     if (!s || typeof s !== "object") return base;
@@ -543,7 +574,6 @@ function App() {
         soderia: pick(s.soderia),
         soderia_vacios: pick(s.soderia_vacios),
         casa: pick(s.casa),
-        camion: e(), /* auto-heal: "camion" es vestigial (nada lo incrementa, solo se le resta al cerrar el dia); cualquier valor viejo es basura y se descarta en cada lectura para que nunca vuelva a inflar el Total General */
         capacidadFija: pickFija(s.capacidadFija)
       };
     }
@@ -552,7 +582,6 @@ function App() {
       soderia: pick(s),
       soderia_vacios: e(),
       casa: e(),
-      camion: e(),
       capacidadFija: pickFija(s.capacidadFija)
     };
   };
@@ -570,12 +599,6 @@ function App() {
       dispenser: 0
     },
     casa: {
-      sifon: 0,
-      bidon10: 0,
-      bidon20: 0,
-      dispenser: 0
-    },
-    camion: {
       sifon: 0,
       bidon10: 0,
       bidon20: 0,
@@ -605,8 +628,9 @@ function App() {
   // Relleno automático de sodería los lunes: llega la producción de la
   // semana y la sodería queda a full (según la "Base"/capacidadFija
   // configurada en Stock). De ahí en más el número baja solo con los
-  // movimientos normales del día a día (InicioReparto descuenta al cargar
-  // el camión, cerrarCamion devuelve el sobrante al cerrar el día). Se
+  // movimientos normales del día a día (InicioReparto descuenta de sodería
+  // al cargar el reparto; el cierre del día — confirmarCierre, 07-menu.js —
+  // recalcula sodería/depósito con los números reales de la jornada). Se
   // corre UNA sola vez por semana — se guarda la fecha del lunes ya
   // aplicado en localStorage para no volver a pisar el número si se
   // recarga la app el mismo lunes después de haber cargado/vendido algo.
@@ -617,32 +641,22 @@ function App() {
     if (localStorage.getItem("lc_stock_relleno_lunes") === hoyKey) return;
     setStock(prev => {
       const s = JSON.parse(JSON.stringify(normStock(prev)));
+      const detalleRelleno = {};
       ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
+        const antes = (s.soderia[k] || 0) + (s.soderia_vacios[k] || 0);
         s.soderia[k] = s.capacidadFija?.[k] || 0;
         s.soderia_vacios[k] = 0;
+        const delta = s.soderia[k] - antes;
+        if (delta !== 0) detalleRelleno[k] = delta;
       });
       syncData({
         stock: s
       });
+      registrarMovimientoStock("relleno_lunes", detalleRelleno, "Sodería repuesta a la Base");
       return s;
     });
     localStorage.setItem("lc_stock_relleno_lunes", hoyKey);
   }, []);
-  // Helper: transferir del camión a sodería al cerrar el día
-  const cerrarCamion = (sobrLlenos, vacios) => {
-    setStock(prev => {
-      const s = JSON.parse(JSON.stringify(normStock(prev)));
-      ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
-        s.soderia[k] = (s.soderia[k] || 0) + (sobrLlenos[k] || 0);
-        s.soderia_vacios[k] = (s.soderia_vacios[k] || 0) + (vacios[k] || 0);
-        s.camion[k] = Math.max(0, (s.camion[k] || 0) - (sobrLlenos[k] || 0) - (vacios[k] || 0));
-      });
-      syncData({
-        stock: s
-      });
-      return s;
-    });
-  };
   const [planillas, setPlanillas] = useLS("cat_planillas_v1", {});
   // Cargas de salida por día — declarado acá arriba para que estadoRef pueda incluirlo y viaje a Firebase
   const [cargasDia, setCargasDia] = useLS("cat_cargas_dia_v1", CARGA_DIA_DEFAULT);
@@ -1088,11 +1102,6 @@ function App() {
             sifon: 0,
             bidon10: 0,
             bidon20: 0
-          },
-          camion: {
-            sifon: 0,
-            bidon10: 0,
-            bidon20: 0
           }
         };
         const remoteUpdStock = Number(ds._upd) || 0;
@@ -1241,6 +1250,7 @@ function App() {
       };
       _mergeSimple(data.dispMovs, "cat_dispmovs_v1", setDispMovs, "dispMovs", "movimientos de dispenser");
       _mergeSimple(data.ajustesEnvases, "cat_ajustesenvases_v1", setAjustesEnvases, "ajustesEnvases", "ajustes de envases");
+      _mergeSimple(data.movStock, "cat_movstock_v1", setMovStock, "movStock", "movimientos de stock");
       _mergeSimple(data.prospectos, "cat_prospectos_v1", setProspectos, "prospectos", "prospectos");
       // ── noVisitas: MERGEAR en vez de sobreescribir (mismo problema que clientes/planillas) ──
       // Acá vive "No está" / "No quiere" / "Saltar". Sin esto, una marca recién
@@ -1482,6 +1492,7 @@ function App() {
     cargasDia,
     dispMovs,
     ajustesEnvases,
+    movStock,
     prospectos
   });
   React.useEffect(() => {
@@ -1500,6 +1511,7 @@ function App() {
       // ni a lo que "Restaurar" vuelve a subir a la nube.
       dispMovs,
       ajustesEnvases,
+      movStock,
       prospectos
     };
   });
@@ -2029,11 +2041,6 @@ function App() {
               sifon: 0,
               bidon10: 0,
               bidon20: 0
-            },
-            camion: {
-              sifon: 0,
-              bidon10: 0,
-              bidon20: 0
             }
           };
           setStock(ns);
@@ -2048,6 +2055,7 @@ function App() {
         if (data.cargasDia && Object.keys(data.cargasDia).length) setCargasDia(data.cargasDia);
         if (data.dispMovs !== undefined) setDispMovs(data.dispMovs || []);
         if (data.ajustesEnvases !== undefined) setAjustesEnvases(data.ajustesEnvases || []);
+        if (data.movStock !== undefined) setMovStock(data.movStock || []);
         if (data.prospectos !== undefined) setProspectos(data.prospectos || []);
         // Subir lo restaurado a la nube, SIN BORRAR.
         //
@@ -3404,9 +3412,6 @@ function App() {
           s.soderia.sifon = Math.max(0, (s.soderia.sifon || 0) - dSoda);
           s.soderia.bidon10 = Math.max(0, (s.soderia.bidon10 || 0) - dB10);
           s.soderia.bidon20 = Math.max(0, (s.soderia.bidon20 || 0) - dB20);
-          s.camion.sifon = Math.max(0, (s.camion.sifon || 0) + dSoda);
-          s.camion.bidon10 = Math.max(0, (s.camion.bidon10 || 0) + dB10);
-          s.camion.bidon20 = Math.max(0, (s.camion.bidon20 || 0) + dB20);
           syncData({
             stock: normStock(s)
           });
@@ -3968,6 +3973,7 @@ function App() {
     planillas: planillas,
     perdidas: perdidas,
     registrarPerdida: registrarPerdida,
+    movStock: movStock,
     onVolver: () => irA("menu"),
     onResumen: () => irA("resumen")
   }), pantalla === "resumen" && /*#__PURE__*/React.createElement(Resumen, {

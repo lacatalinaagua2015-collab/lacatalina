@@ -1584,16 +1584,24 @@ function PlanillaDelDia({
         s.soderia_vacios[sk] = (s.soderia_vacios[sk] || 0) + vacVueltaFijo[pk];
         s.casa[sk] = (s.casa[sk] || 0) + diffDeposito[pk];
       });
-      s.camion = {
-        sifon: 0,
-        bidon10: 0,
-        bidon20: 0
-      };
       syncData && syncData({
         stock: s
       });
       return s;
     });
+    if (window._lcRegistrarMovimientoStock) {
+      const detalleCierre = {};
+      ["soda", "b10", "b20"].forEach(pk => {
+        const sk = planKeyToSkL[pk];
+        const soderiaVuelta = (llenVueltaFijo[pk] || 0) + (vacVueltaFijo[pk] || 0);
+        const deposito = diffDeposito[pk] || 0;
+        if (soderiaVuelta || deposito) detalleCierre[sk] = {
+          soderia: soderiaVuelta,
+          deposito
+        };
+      });
+      window._lcRegistrarMovimientoStock("cierre", detalleCierre, `Cierre del día ${dia} (${fecha})`);
+    }
     onGuardar({
       ...datos,
       _diaCerrado: true,
