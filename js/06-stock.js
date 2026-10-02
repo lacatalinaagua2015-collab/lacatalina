@@ -295,55 +295,97 @@ function StockGeneral({
     }
   }, "El número real que existe hoy, sea cual sea la ubicación."), /*#__PURE__*/React.createElement("div", {
     style: {
-      marginBottom: 10
+      display: "grid",
+      gridTemplateColumns: "1fr 46px 46px 46px 46px 52px",
+      gap: 5,
+      fontSize: 12,
+      color: "var(--color-text-tertiary)",
+      marginBottom: 5
     }
-  }, PRODS.map(([k, lbl], idx) => {
+  }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", {
+    style: {
+      textAlign: "center"
+    }
+  }, "Soder."), /*#__PURE__*/React.createElement("span", {
+    style: {
+      textAlign: "center"
+    }
+  }, "Depós."), /*#__PURE__*/React.createElement("span", {
+    style: {
+      textAlign: "center"
+    }
+  }, "Client."), /*#__PURE__*/React.createElement("span", {
+    style: {
+      textAlign: "center",
+      color: "var(--color-text-danger)"
+    }
+  }, "Perdi."), /*#__PURE__*/React.createElement("span", {
+    style: {
+      textAlign: "center",
+      color: "var(--color-text-success)",
+      fontWeight: 600
+    }
+  }, "Total")), PRODS.map(([k, lbl]) => {
     const enSoderia = (stock.soderia?.[k] || 0) + (stock.soderia_vacios?.[k] || 0);
     const enDeposito = stock.casa?.[k] || 0;
     const enClientes = (totClientes[k] || 0) + (totPrestados[k] || 0);
     const perdido = totalPerdidas[k] || 0;
     const total = enSoderia + enDeposito + enClientes;
     return /*#__PURE__*/React.createElement("div", {
-      key: `res-${k}`,
+      key: k,
       style: {
-        padding: idx === 0 ? "0 0 10px" : "10px 0",
-        borderTop: idx === 0 ? "none" : "0.5px solid var(--color-border-tertiary)"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        alignItems: "baseline",
-        justifyContent: "space-between",
-        gap: 6
+        display: "grid",
+        gridTemplateColumns: "1fr 46px 46px 46px 46px 52px",
+        gap: 5,
+        alignItems: "center",
+        padding: "5px 0",
+        borderTop: "0.5px solid var(--color-border-tertiary)"
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: 13,
-        fontWeight: 600,
+        fontSize: 12,
         color: "var(--color-text-primary)"
       }
     }, lbl.replace(" 1.5L", "")), /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: 20,
+        textAlign: "center",
+        fontSize: 12,
+        color: "var(--color-text-secondary)"
+      }
+    }, enSoderia), /*#__PURE__*/React.createElement("span", {
+      style: {
+        textAlign: "center",
+        fontSize: 12,
+        color: "var(--color-text-secondary)"
+      }
+    }, enDeposito), /*#__PURE__*/React.createElement("span", {
+      style: {
+        textAlign: "center",
+        fontSize: 12,
+        color: "var(--color-text-secondary)"
+      }
+    }, enClientes), /*#__PURE__*/React.createElement("span", {
+      style: {
+        textAlign: "center",
+        fontSize: 12,
+        color: perdido > 0 ? "var(--color-text-danger)" : "var(--color-text-tertiary)"
+      }
+    }, perdido > 0 ? `-${perdido}` : "—"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        textAlign: "center",
+        fontSize: 14,
         fontWeight: 700,
         color: "var(--color-text-success)"
       }
     }, total, k === "sifon" && /*#__PURE__*/React.createElement("span", {
       style: {
+        display: "block",
         fontSize: 11,
-        fontWeight: 400,
         color: "var(--color-text-tertiary)",
-        marginLeft: 4
+        fontWeight: 400
       }
-    }, "(", Math.floor(total / 6), " caj)"))), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 6,
-        flexWrap: "wrap",
-        marginTop: 4
-      }
-    }, chipResumen("🏭 Sodería", enSoderia, "var(--color-text-info)"), chipResumen("📦 Depósito", enDeposito, "var(--color-text-secondary)"), chipResumen("👥 Clientes", enClientes, "var(--color-text-secondary)"), perdido > 0 && chipResumen("💔 Perdidos", perdido, "var(--color-text-danger)")));
-  }))), /*#__PURE__*/React.createElement("div", {
+    }, Math.floor(total / 6), " caj")));
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
       color: "var(--color-text-info)",
