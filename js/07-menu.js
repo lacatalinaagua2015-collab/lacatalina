@@ -2334,7 +2334,7 @@ function PlanillaDelDia({
       fontWeight: 500,
       color: "var(--color-text-primary)"
     }
-  }, Object.values(totalesPorProd).reduce((a, p) => a + p.vacios, 0) || "—"), /*#__PURE__*/React.createElement("div", {
+  }, Object.values(totalesPorProd).reduce((a, p) => a + (p.cajones != null ? p.cajones : p.vacios), 0) || "—"), /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "right",
       fontSize: 12,
