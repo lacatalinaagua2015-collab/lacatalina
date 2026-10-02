@@ -1658,7 +1658,12 @@ function PlanillaDelDia({
     retenciones = num(datos.retenciones);
   const sobrante = efectivo - (totalVentaPlata - fiado); // retenciones es informativo, no afecta el sobrante
   const ganancia = cobEfectivo - totalVentaLlenar - totalGastos + cobTransNeto;
-  const totalLlenosIngresados = PRODUCTOS_CONFIG.reduce((a, p) => a + num(datos.productos[p.id]?.llenos), 0);
+  // Antes sumaba unidades sueltas de los 3 productos (bidones + sifones)
+  // sin más — mezclaba "39 bidones" con "90 sifones" en un solo número que
+  // no significaba nada real. Todo en este negocio se piensa en bultos
+  // (igual que "Bultos auto" arriba), así que el total de abajo usa la
+  // misma cuenta: sifones a cajón, bidones 1 bulto cada uno.
+  const totalBultosIngresados = calcCajones(num(datos.productos.soda?.llenos)) + num(datos.productos.b10?.llenos) + num(datos.productos.b20?.llenos);
 
   // ── Early return: pantalla de cierre ─────────────────────────────
   if (mostrarCierre) {
@@ -2312,7 +2317,7 @@ function PlanillaDelDia({
       fontWeight: 500,
       color: "var(--color-text-primary)"
     }
-  }, totalLlenosIngresados || "—"), /*#__PURE__*/React.createElement("div", {
+  }, totalBultosIngresados || "—"), /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "right",
       fontSize: 12,

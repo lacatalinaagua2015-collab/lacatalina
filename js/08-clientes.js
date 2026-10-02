@@ -95,8 +95,8 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontWeight: 500,
-        fontSize: 15,
+        fontWeight: 700,
+        fontSize: 17,
         color: "var(--color-text-primary)",
         overflow: "hidden",
         textOverflow: "ellipsis",
@@ -112,7 +112,17 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         flexShrink: 0,
         marginLeft: 3
       }
-    }, "📷")), (recordatorios || []).some(r => r.clienteId === c.id && !r.confirmado) && /*#__PURE__*/React.createElement("span", {
+    }, "📷")), c.esProspecto && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        fontWeight: 600,
+        padding: "2px 8px",
+        borderRadius: 20,
+        color: "#b794f6",
+        border: "0.5px solid #b794f6",
+        flexShrink: 0
+      }
+    }, "🔸 Prospecto"), (recordatorios || []).some(r => r.clienteId === c.id && !r.confirmado) && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 13,
         flexShrink: 0
@@ -167,7 +177,7 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         fontSize: 17,
         color: "var(--color-text-primary)",
         fontWeight: 600,
-        marginTop: 2
+        marginTop: 3
       }
     }, direccionCliente(c)), c.notas && /*#__PURE__*/React.createElement("div", {
       style: {
@@ -179,8 +189,8 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
       style: {
         display: "flex",
         flexWrap: "wrap",
-        gap: 4,
-        marginTop: 5
+        gap: 5,
+        marginTop: 7
       }
     }, (() => {
       const real = {
@@ -188,21 +198,18 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         bidon10: Math.max(0, (Number(c.bidon10) || 0) + envExtra.bidon10),
         bidon20: Math.max(0, (Number(c.bidon20) || 0) + envExtra.bidon20)
       };
-      return /*#__PURE__*/React.createElement(React.Fragment, null, real.sifon > 0 && /*#__PURE__*/React.createElement("span", {
-        style: s.tag
-      }, "Sifón×", real.sifon), real.bidon10 > 0 && /*#__PURE__*/React.createElement("span", {
-        style: s.tag
-      }, "10L×", real.bidon10), real.bidon20 > 0 && /*#__PURE__*/React.createElement("span", {
-        style: s.tag
-      }, "20L×", real.bidon20), c.dispenser > 0 && /*#__PURE__*/React.createElement("span", {
+      const pill = txt => /*#__PURE__*/React.createElement("span", {
         style: {
-          ...s.tag,
-          color: "#5daaff"
+          fontSize: 12,
+          fontWeight: 600,
+          padding: "4px 10px",
+          borderRadius: 20,
+          background: "var(--color-background-info)",
+          color: "var(--color-text-primary)"
         }
-      }, "Disp×", c.dispenser));
-    })(), c.esProspecto && /*#__PURE__*/React.createElement("span", {
-      style: { ...s.tag, color: "#b794f6", border: "0.5px solid #b794f6" }
-    }, "🔸 Prospecto"), atendido && /*#__PURE__*/React.createElement("span", {
+      }, txt);
+      return /*#__PURE__*/React.createElement(React.Fragment, null, real.sifon > 0 && pill(`Sifón×${real.sifon}`), real.bidon10 > 0 && pill(`10L×${real.bidon10}`), real.bidon20 > 0 && pill(`20L×${real.bidon20}`), c.dispenser > 0 && pill(`Disp×${c.dispenser}`));
+    })(), atendido && /*#__PURE__*/React.createElement("span", {
       style: s.badge("success")
     }, "✓ Listo"), est === "noesta" && !atendido && /*#__PURE__*/React.createElement("span", {
       style: s.badge("warning")

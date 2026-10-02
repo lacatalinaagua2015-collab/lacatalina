@@ -816,6 +816,7 @@ function FormCliente({
   });
   const [gpsEstado, setGpsEstado] = React.useState("");
   const [mostrarFotoComodato, setMostrarFotoComodato] = React.useState(false);
+  const [mostrarFotoCasa, setMostrarFotoCasa] = React.useState(false);
   const set = (k, v) => setDatos(d => ({
     ...d,
     [k]: v
@@ -1003,11 +1004,38 @@ function FormCliente({
     }))
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: s.label
-  }, "Link foto del domicilio (Google Drive, etc)"), /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    placeholder: "https://...",
-    value: datos.foto || "",
-    onChange: e => set("foto", e.target.value)
+  }, "Foto de la casa (útil cuando el mapa no tiene imagen de la zona)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, datos.foto && /*#__PURE__*/React.createElement("img", {
+    src: datos.foto,
+    alt: "Domicilio",
+    onClick: () => setMostrarFotoCasa(true),
+    style: {
+      width: 44,
+      height: 44,
+      objectFit: "cover",
+      borderRadius: 8,
+      border: "0.5px solid var(--color-border-secondary)",
+      cursor: "pointer"
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: {
+      ...s.btn,
+      fontSize: 12,
+      padding: "6px 10px"
+    },
+    onClick: () => setMostrarFotoCasa(true)
+  }, datos.foto ? "🏠 Cambiar foto" : "📷 Cargar foto de la casa")), mostrarFotoCasa && /*#__PURE__*/React.createElement(FotoClienteModal, {
+    cliente: datos,
+    campo: "foto",
+    titulo: "Domicilio",
+    onCerrar: () => setMostrarFotoCasa(false),
+    onGuardarFoto: b64 => set("foto", b64)
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: s.label
   }, "Foto del comodato (la ficha en papel que firma el cliente)"), /*#__PURE__*/React.createElement("div", {
