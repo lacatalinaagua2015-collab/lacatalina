@@ -704,7 +704,7 @@ function DetalleTransferencias({
     }
   }, ventas.map(v => {
     const confirmada = !!v.transConfirmada;
-    const monto = v.pagadoNum || v.neto || 0;
+    const monto = (v.pagadoNum != null ? v.pagadoNum : v.neto) || 0;
     const cli = clientePorId[v.clienteId];
     const tel = cli && cli.telefono;
     // Mensaje pre-armado (mismo texto en toda la app) — ver armarMsjTransferWA
@@ -1237,8 +1237,13 @@ function PlanillaDelDia({
   const totalVentaPlata = Object.values(totalesPorProd).reduce((a, p) => a + p.plata, 0);
   const totalVentaLlenar = Object.values(totalesPorProd).reduce((a, p) => a + p.llenar, 0);
   // Totales ventas de otros días
-  const extraEfectivo = ventasExtraDia.filter(v => v.pago === "contado").reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
-  const extraTrans = ventasExtraDia.filter(v => v.pago === "transferencia").reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
+  // v.pagadoNum || v.neto || 0 trataba un pago totalmente cubierto con saldo
+  // a favor (pagadoNum === 0, un valor real y válido) igual que un pagadoNum
+  // faltante (undefined, dato viejo) — "0 || neto" cae a neto por el 0 ser
+  // falsy en JS, contando como cobrado algo que en realidad se pagó con
+  // crédito. Ahora solo se usa neto como respaldo cuando pagadoNum no existe.
+  const extraEfectivo = ventasExtraDia.filter(v => v.pago === "contado").reduce((a, v) => a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0);
+  const extraTrans = ventasExtraDia.filter(v => v.pago === "transferencia").reduce((a, v) => a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0);
   const extraFiado = ventasExtraDia.filter(v => v.pago === "fiado").reduce((a, v) => a + (v.neto || 0), 0);
   const extraTotal = extraEfectivo + extraTrans + extraFiado;
   // Cobranza — todas las ventas del día (propias + otros días)
@@ -1246,14 +1251,19 @@ function PlanillaDelDia({
   // cobEfectivo debe contar solo la parte efectivo del mixto, no el total
   const cobEfectivo = todasVentasDia.filter(v => v.pago === "contado").reduce((a, v) => {
     const esMixto = (Number(v.montoTrans) || 0) > 0;
-    return a + (esMixto ? Number(v.montoEfec) || 0 : v.pagadoNum || v.neto || 0);
+    return a + (esMixto ? Number(v.montoEfec) || 0 : (v.pagadoNum != null ? v.pagadoNum : v.neto) || 0);
   }, 0);
   // cobTransBruto: transferencias puras + parte transferencia de pagos mixtos
   const cobTransBruto = todasVentasDia.reduce((a, v) => {
-    if (v.pago === "transferencia") return a + (v.pagadoNum || v.neto || 0);
+    if (v.pago === "transferencia") return a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0);
     if (v.pago === "contado" && (Number(v.montoTrans) || 0) > 0) return a + (Number(v.montoTrans) || 0);
     return a;
   }, 0);
+  // Plata del día que se cubrió con saldo a favor (crédito generado en una
+  // planilla anterior) — no es efectivo ni transferencia nueva, así que no
+  // suma a "Total cobrado", pero se muestra aparte para que quede claro
+  // adónde fue esa parte de la venta.
+  const cobSaldoUsado = todasVentasDia.filter(v => v.pago === "contado" || v.pago === "transferencia").reduce((a, v) => a + (Number(v.saldoAplicado) || 0), 0);
   const cobTransDesc = Math.round(cobTransBruto * 0.025);
   const cobTransNeto = cobTransBruto - cobTransDesc;
   const ventasPendTrans = ventas.filter(v => (v.pago === "transferencia" || v.pago === "mixto" && Number(v.montoTrans) > 0) && !v.transConfirmada);
@@ -2731,7 +2741,25 @@ function PlanillaDelDia({
       fontWeight: 500,
       color: "var(--color-text-info)"
     }
-  }, fmt(cobSaldosTrans))), /*#__PURE__*/React.createElement("div", {
+  }, fmt(cobSaldosTrans))), cobSaldoUsado > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      padding: "5px 0",
+      borderBottom: "0.5px solid var(--color-border-tertiary)"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "var(--color-text-secondary)"
+    }
+  }, "💳 Pagado con saldo a favor"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 500,
+      color: "#b794f6"
+    }
+  }, fmt(cobSaldoUsado))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
@@ -2791,7 +2819,7 @@ function PlanillaDelDia({
         fontWeight: 500,
         color: "var(--color-text-info)"
       }
-    }, fmt(v.pagadoNum || v.neto || 0)));
+    }, fmt((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0)));
   }), extraEfectivo > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",

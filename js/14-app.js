@@ -2354,9 +2354,9 @@ function App() {
       if (k) tots[k].vacios += d.cantidad;
     }));
     const sodaCajones = Math.floor(tots.soda.vacios / CAJON_SODA) || 0;
-    const cobEfectivo = ventasDia.filter(v => v.pago === "contado").reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
+    const cobEfectivo = ventasDia.filter(v => v.pago === "contado").reduce((a, v) => a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0);
     const cobFiado = ventasDia.filter(v => v.pago === "fiado").reduce((a, v) => a + (v.neto || 0), 0);
-    const cobTransBruto = ventasDia.filter(v => v.pago === "transferencia").reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
+    const cobTransBruto = ventasDia.filter(v => v.pago === "transferencia").reduce((a, v) => a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0);
     const cobTransDesc = Math.round(cobTransBruto * 0.025);
     const planillaKey = `${diaActual}_${fechaActual}`;
     const planillaActual = planillas[planillaKey] || planillaDiaVacia();
@@ -3230,7 +3230,7 @@ function App() {
         dia,
         fecha: fechas[0] || "",
         count: vts.length,
-        monto: vts.reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0),
+        monto: vts.reduce((a, v) => a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0),
         ventas: vts
       };
     }).filter(Boolean),
