@@ -444,7 +444,7 @@ function armarMsjTransferWA(ventas) {
   });
   const items = Object.keys(porNombre).map(nombre => `${porNombre[nombre]} ${nombre}`);
   const itemsTxt = items.length ? items.reduce((acc, txt, i) => i === 0 ? txt : i === items.length - 1 ? `${acc} y ${txt}` : `${acc}, ${txt}`, "") : "";
-  const total = lista.reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
+  const total = lista.reduce((a, v) => a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0);
   const texto = itemsTxt ? `Buen día, estimado cliente! Hoy le dejé ${itemsTxt}, lo que da un total de ${fmt(total)}. Muchas gracias!` : `Buen día, estimado cliente! Le escribo de La Catalina por la transferencia de hoy, de ${fmt(total)}. Muchas gracias!`;
   return encodeURIComponent(texto);
 }

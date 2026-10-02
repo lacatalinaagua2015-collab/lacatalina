@@ -1532,8 +1532,8 @@ function ConfirmacionesDia({
     porCliente[v.clienteId].ventas.push(v);
   });
   const grupos = Object.values(porCliente);
-  const totalPendiente = pendientes.reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
-  const totalConfirmado = confirmadas.reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
+  const totalPendiente = pendientes.reduce((a, v) => a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0);
+  const totalConfirmado = confirmadas.reduce((a, v) => a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0);
   const confirmadasPorFecha = {};
   confirmadas.forEach(v => {
     const fk = v.fechaKey || "sin fecha";
@@ -1687,7 +1687,7 @@ function ConfirmacionesDia({
       fontWeight: 500,
       color: "#f5b942"
     }
-  }, fmt(v.pagadoNum || v.neto || 0))), /*#__PURE__*/React.createElement("button", {
+  }, fmt((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0))), /*#__PURE__*/React.createElement("button", {
     style: {
       width: "100%",
       padding: "9px",
@@ -1715,7 +1715,7 @@ function ConfirmacionesDia({
     }
   }, "✓ Ya confirmadas"), fechasConf.map(fk => {
     const vtsFecha = confirmadasPorFecha[fk];
-    const totalFecha = vtsFecha.reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
+    const totalFecha = vtsFecha.reduce((a, v) => a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0);
     const open = !!abiertos[fk];
     return /*#__PURE__*/React.createElement("div", {
       key: fk,
@@ -1801,7 +1801,7 @@ function ConfirmacionesDia({
           fontWeight: 500,
           color: "#4dd9a0"
         }
-      }, fmt(v.pagadoNum || v.neto || 0)), /*#__PURE__*/React.createElement("button", {
+      }, fmt((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0)), /*#__PURE__*/React.createElement("button", {
         style: {
           fontSize: 12,
           color: "var(--color-text-tertiary)",

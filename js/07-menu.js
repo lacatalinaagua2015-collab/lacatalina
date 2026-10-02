@@ -2222,7 +2222,7 @@ function PlanillaDelDia({
       borderRadius: 8,
       padding: "6px 10px"
     }
-  }, bultosAuto > 0 && /*#__PURE__*/React.createElement("div", null, "📦 ", /*#__PURE__*/React.createElement("b", null, "Bultos auto:"), " ", cajonesCargados || cajonesLlenos || 0, " cajones soda + ", b10Cargados || b10Llenos || 0, " bid.10L + ", b20Cargados || b20Llenos || 0, " bid.20L = ", /*#__PURE__*/React.createElement("b", null, bultosAuto)), pesoAuto > 0 && /*#__PURE__*/React.createElement("div", null, "⚖️ ", /*#__PURE__*/React.createElement("b", null, "Peso auto:"), " ", cajonesCargados || cajonesLlenos || 0, "×13kg + ", b10Cargados || b10Llenos || 0, "×10kg + ", b20Cargados || b20Llenos || 0, "×20kg = ", /*#__PURE__*/React.createElement("b", null, pesoAuto, " kg"))), /*#__PURE__*/React.createElement("span", {
+  }, bultosAuto > 0 && /*#__PURE__*/React.createElement("div", null, "📦 ", /*#__PURE__*/React.createElement("b", null, "Bultos auto:"), " ", cajonesCargados, " cajones soda + ", b10Cargados, " bid.10L + ", b20Cargados, " bid.20L = ", /*#__PURE__*/React.createElement("b", null, bultosAuto)), pesoAuto > 0 && /*#__PURE__*/React.createElement("div", null, "⚖️ ", /*#__PURE__*/React.createElement("b", null, "Peso auto:"), " ", cajonesCargados, "×13kg + ", b10Cargados, "×10kg + ", b20Cargados, "×20kg = ", /*#__PURE__*/React.createElement("b", null, pesoAuto, " kg"))), /*#__PURE__*/React.createElement("span", {
     style: {
       ...s.sectionTitle,
       padding: "12px 0 8px"

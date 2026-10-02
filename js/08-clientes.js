@@ -160,7 +160,7 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
           fontWeight: 500,
           color: "#f5b942"
         }
-      }, fmt(vt.pagadoNum || vt.neto || 0))), !vt.transConfirmada && c.telefono && /*#__PURE__*/React.createElement("a", {
+      }, fmt((vt.pagadoNum != null ? vt.pagadoNum : vt.neto) || 0))), !vt.transConfirmada && c.telefono && /*#__PURE__*/React.createElement("a", {
         href: `https://wa.me/54${c.telefono}?text=${armarMsjTransferWA([vt])}`,
         target: "_blank",
         rel: "noreferrer",
