@@ -14,6 +14,8 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
   c, atendidos, noVMap, visitados, clienteExpandidoId, setClienteExpandidoId, pendientes, clienteMoviendo, setClienteMoviendo, moverCliente, onSeleccionar, recordatorios, ventas, fecha, onConfirmarTransfer, todasVentas, marcarNoVisita, onGuardarVenta, productos, onNoQuiereConEnvases, onCambiarDispenserCliente, onQuitarNoVisita, clientes, onReordenar
 }) {
     const [fotoOpen, setFotoOpen] = React.useState(false);
+    const [mostrarMas, setMostrarMas] = React.useState(false);
+    const [mostrarDeuda, setMostrarDeuda] = React.useState(false);
     const atendido = atendidos.has(c.id),
       est = noVMap[c.id];
     const bc = atendido ? "#1D9E75" : est === "noesta" ? "#EF9F27" : est === "noesta2" || est === "noquiso" ? "#E24B4A" : "var(--color-border-tertiary)";
@@ -42,7 +44,8 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         // Prospecto: recuadro punteado distinto hasta que se confirme como
         // cliente fijo (5 compras en su día) — para distinguirlos de un
         // vistazo en la lista.
-        border: c.esProspecto ? "1.5px dashed #b794f6" : undefined,
+        border: c.esProspecto ? "1.5px dashed #b794f6" : "1px solid var(--color-border-secondary)",
+        boxShadow: "0 2px 10px rgba(0,0,0,0.35)",
         background: c.esProspecto ? "rgba(183,148,246,0.06)" : undefined,
         borderLeft: `3px solid ${bc}`,
         opacity: visitados.has(c.id) ? 0.65 : est === "noesta" ? 0.85 : 1
@@ -172,7 +175,25 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
           flexShrink: 0
         }
       }, "💬"));
-    })()), /*#__PURE__*/React.createElement("div", {
+    })(), c.saldo < 0 && /*#__PURE__*/React.createElement("button", {
+      style: {
+        fontSize: 12.5,
+        fontWeight: 800,
+        padding: "5px 11px",
+        borderRadius: 20,
+        background: "#7f1d1d",
+        color: "#ffd7d7",
+        border: "0.5px solid rgba(240,112,112,0.5)",
+        cursor: "pointer",
+        flexShrink: 0,
+        marginLeft: "auto"
+      },
+      onClick: e => {
+        e.stopPropagation();
+        if (!expandido) setClienteExpandidoId(c.id);
+        setMostrarDeuda(m => !m);
+      }
+    }, "Debe ", fmt(Math.abs(c.saldo)), " \u203A")), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 17,
         color: "var(--color-text-primary)",
@@ -217,9 +238,7 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
       style: s.badge("warning")
     }, "No estaba"), est === "noquiso" && /*#__PURE__*/React.createElement("span", {
       style: s.badge("danger")
-    }, "No quiso"), c.saldo < 0 && /*#__PURE__*/React.createElement("span", {
-      style: s.badge("danger")
-    }, "Debe ", fmt(Math.abs(c.saldo))), c.saldo > 0 && /*#__PURE__*/React.createElement("span", {
+    }, "No quiso"), c.saldo > 0 && /*#__PURE__*/React.createElement("span", {
       style: s.badge("success")
     }, "A favor ", fmt(c.saldo)))), /*#__PURE__*/React.createElement("div", {
       style: {
@@ -377,12 +396,26 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
     }, "No quiere"), /*#__PURE__*/React.createElement("button", {
       style: {
         ...s.btn,
-        flex: 1.3,
-        fontSize: 13,
-        fontWeight: 500
+        flex: "0 0 38px",
+        width: 38,
+        fontSize: 15,
+        padding: 0,
+        background: mostrarMas ? "#223a52" : undefined,
+        color: mostrarMas ? "var(--color-text-primary)" : undefined
       },
+      title: "Más opciones",
+      onClick: () => setMostrarMas(m => !m)
+    }, "⋮"), /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        flex: "0 0 38px",
+        width: 38,
+        fontSize: 15,
+        padding: 0
+      },
+      title: "Cerrar",
       onClick: () => setClienteExpandidoId(null)
-    }, "▲ Cerrar")), /*#__PURE__*/React.createElement(NuevaVenta, {
+    }, "✕")), /*#__PURE__*/React.createElement(NuevaVenta, {
       key: `${c.id}-${(todasVentas || ventas).filter(v => v.clienteId === c.id).length}`,
       compacto: true,
       cliente: c,
@@ -402,7 +435,9 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         onNoQuiereConEnvases && onNoQuiereConEnvases(c.id, envPrest, envDev);
         irAlSiguientePendiente();
       },
-      onCambiarDispenser: delta => onCambiarDispenserCliente && onCambiarDispenserCliente(c.id, delta)
+      onCambiarDispenser: delta => onCambiarDispenserCliente && onCambiarDispenserCliente(c.id, delta),
+      mostrarMas: mostrarMas,
+      mostrarDeuda: mostrarDeuda
     })), (est === "noesta2" || est === "noquiso") && !atendido && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
