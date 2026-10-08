@@ -1,0 +1,145 @@
+<title>Fecha y hora arriba</title>
+<style>
+  :root{
+    --bg:#0f1923; --sec:#16232f; --ter:#1f2f3f; --txt:#e2eaf4;
+    --txt2:#a8c0d8; --txt3:#7797b5; --bd:#2e4055; --ok:#4dd9a0; --az:#5daaff;
+  }
+  body{background:var(--bg);color:var(--txt);font:14px/1.5 system-ui,-apple-system,sans-serif}
+  .wrap{max-width:900px;margin:0 auto;padding-block:24px;padding-left:16px;padding-right:16px}
+  h1{font-size:19px;margin:0 0 4px}
+  .lead{color:var(--txt2);font-size:13.5px;margin:0 0 24px;max-width:60ch}
+  .cols{display:flex;gap:20px;flex-wrap:wrap}
+  .col{flex:1 1 260px;min-width:0}
+  .tag{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3);margin-bottom:8px}
+  .tag b{color:var(--txt)}
+  .phone{border:1px solid var(--bd);border-radius:14px;overflow:hidden;background:var(--bg)}
+
+  /* header real */
+  .hdr{background:var(--sec);border-bottom:.5px solid var(--bd);padding:10px 14px;
+       display:flex;align-items:center;gap:8px}
+  .back{background:var(--ter);border:none;padding:6px 12px;color:var(--txt2);
+        font-size:13px;border-radius:8px;font-weight:500;white-space:nowrap}
+  .ttl{font-size:15px;font-weight:500;color:var(--txt);flex:1;min-width:0;
+       overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .btn{background:var(--ter);border:none;padding:6px 10px;color:var(--txt2);
+       font-size:13px;border-radius:8px;flex-shrink:0}
+  .sub{font-size:11px;color:var(--txt3);font-weight:400;line-height:1.25;margin-top:1px}
+
+  /* franja */
+  .franja{background:var(--sec);border-bottom:.5px solid var(--bd);
+          padding:5px 14px;display:flex;justify-content:space-between;
+          font-size:11.5px;color:var(--txt3)}
+  .franja .h{color:var(--txt2);font-variant-numeric:tabular-nums;font-weight:500}
+
+  /* chip */
+  .chip{background:var(--ter);border-radius:8px;padding:4px 8px;font-size:11px;
+        color:var(--txt2);line-height:1.25;text-align:right;flex-shrink:0;
+        font-variant-numeric:tabular-nums}
+  .chip b{display:block;font-size:12px;color:var(--txt);font-weight:600}
+
+  .cuerpo{padding:10px 14px 14px}
+  .card{background:var(--sec);border:.5px solid var(--bd);border-radius:12px;
+        padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+  .row1{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+  .nom{font-size:15px;font-weight:500}
+  .zona{font-size:15px;font-weight:500;border-bottom:1px dotted var(--txt3)}
+  .row2{display:flex;justify-content:space-between;gap:12px}
+  .okk{font-size:12px;color:var(--ok)} .cli{font-size:12px;color:var(--txt3)}
+  .fl{color:var(--txt3);font-size:18px}
+  .nota{font-size:12.5px;color:var(--txt2);margin-top:10px}
+  .nota b{color:var(--txt)}
+</style>
+<div class="wrap">
+  <h1>Fecha y hora arriba — 3 opciones</h1>
+  <p class="lead">Las tres van en el encabezado, así aparecen en todas las pantallas.
+     La hora se actualiza sola cada minuto. Decime cuál y la dejo andando.</p>
+
+  <div class="cols">
+
+    <div class="col">
+      <div class="tag"><b>A</b> · Franja abajo del encabezado</div>
+      <div class="phone">
+        <div class="hdr">
+          <button class="back">← Volver</button>
+          <span class="ttl">La Catalina</span>
+          <button class="btn">☀️</button><button class="btn">M</button>
+        </div>
+        <div class="franja"><span>Lunes 14 de septiembre</span><span class="h">09:42</span></div>
+        <div class="cuerpo">
+          <div class="card">
+            <div style="flex:1;min-width:0">
+              <div class="row1"><span class="nom">Lunes</span><span class="nom">·</span><span class="zona">Lomas de Tafí</span></div>
+              <div class="row2"><span class="okk">✓ Sin deudas</span><span class="cli">18 clientes</span></div>
+            </div><span class="fl">→</span>
+          </div>
+          <div class="card">
+            <div style="flex:1;min-width:0">
+              <div class="row1"><span class="nom">Martes</span><span class="nom">·</span><span class="zona">Centro</span></div>
+              <div class="row2"><span class="okk">✓ Sin deudas</span><span class="cli">12 clientes</span></div>
+            </div><span class="fl">→</span>
+          </div>
+        </div>
+      </div>
+      <p class="nota">Fecha completa, bien legible, sin apretar el encabezado.
+         Cuesta ~22px de alto.</p>
+    </div>
+
+    <div class="col">
+      <div class="tag"><b>B</b> · Segunda línea del título</div>
+      <div class="phone">
+        <div class="hdr">
+          <button class="back">← Volver</button>
+          <div class="ttl" style="line-height:1.2">La Catalina
+            <div class="sub">Lun 14 sep · 09:42</div>
+          </div>
+          <button class="btn">☀️</button><button class="btn">M</button>
+        </div>
+        <div class="cuerpo">
+          <div class="card">
+            <div style="flex:1;min-width:0">
+              <div class="row1"><span class="nom">Lunes</span><span class="nom">·</span><span class="zona">Lomas de Tafí</span></div>
+              <div class="row2"><span class="okk">✓ Sin deudas</span><span class="cli">18 clientes</span></div>
+            </div><span class="fl">→</span>
+          </div>
+          <div class="card">
+            <div style="flex:1;min-width:0">
+              <div class="row1"><span class="nom">Martes</span><span class="nom">·</span><span class="zona">Centro</span></div>
+              <div class="row2"><span class="okk">✓ Sin deudas</span><span class="cli">12 clientes</span></div>
+            </div><span class="fl">→</span>
+          </div>
+        </div>
+      </div>
+      <p class="nota">No suma altura casi nada, pero la fecha va abreviada
+         y en pantallas con título largo (“La Catalina · Configuración”) queda apretada.</p>
+    </div>
+
+    <div class="col">
+      <div class="tag"><b>C</b> · Recuadro a la derecha</div>
+      <div class="phone">
+        <div class="hdr">
+          <button class="back">← Volver</button>
+          <span class="ttl">La Catalina</span>
+          <div class="chip"><b>09:42</b>Lun 14 sep</div>
+          <button class="btn">☀️</button>
+        </div>
+        <div class="cuerpo">
+          <div class="card">
+            <div style="flex:1;min-width:0">
+              <div class="row1"><span class="nom">Lunes</span><span class="nom">·</span><span class="zona">Lomas de Tafí</span></div>
+              <div class="row2"><span class="okk">✓ Sin deudas</span><span class="cli">18 clientes</span></div>
+            </div><span class="fl">→</span>
+          </div>
+          <div class="card">
+            <div style="flex:1;min-width:0">
+              <div class="row1"><span class="nom">Martes</span><span class="nom">·</span><span class="zona">Centro</span></div>
+              <div class="row2"><span class="okk">✓ Sin deudas</span><span class="cli">12 clientes</span></div>
+            </div><span class="fl">→</span>
+          </div>
+        </div>
+      </div>
+      <p class="nota">La hora bien grande y a mano, pero le come lugar al título
+         y hay que sacar o mover uno de los botones (☀️ / M).</p>
+    </div>
+
+  </div>
+</div>
