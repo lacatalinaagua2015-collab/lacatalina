@@ -198,9 +198,10 @@ function GestionClientes({
       ...s.card,
       // Prospecto: mismo recuadro punteado distinto que en la lista del
       // día, para reconocerlo también acá.
-      border: c.esProspecto && editandoId !== c.id ? "1.5px dashed #b794f6" : undefined,
+      border: c.esProspecto && editandoId !== c.id ? "1.5px dashed #b794f6" : "1px solid var(--color-border-secondary)",
       background: c.esProspecto && editandoId !== c.id ? "rgba(183,148,246,0.06)" : undefined,
-      borderLeft: editandoId === c.id ? "3px solid #5daaff" : "0.5px solid var(--color-border-tertiary)"
+      borderLeft: editandoId === c.id ? "3px solid #5daaff" : "0.5px solid var(--color-border-tertiary)",
+      boxShadow: "0 2px 10px rgba(0,0,0,0.35)"
     }
   }, editandoId === c.id ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {

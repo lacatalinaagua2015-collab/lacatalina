@@ -645,8 +645,8 @@ function NuevaVenta({
   progressData,
   compacto,
   onCambiarDispenser,
-  mostrarMas = true,
-  mostrarDeuda = true,
+  mostrarMas,
+  mostrarDeuda,
   ventaEditar,
   onCancelar
 }) {
@@ -660,6 +660,9 @@ function NuevaVenta({
   // uno. No es un producto que se cobra — solo mueve cliente.dispenser.
   const [dispDelta, setDispDelta] = React.useState(0);
   const [mostrarRotoCompacto, setMostrarRotoCompacto] = React.useState(false);
+  const [mostrarMasInterno, setMostrarMasInterno] = React.useState(false);
+  if (mostrarMas === undefined) mostrarMas = mostrarMasInterno;
+  if (mostrarDeuda === undefined) mostrarDeuda = mostrarMasInterno;
   const [mostrarCambio, setMostrarCambio] = React.useState(false);
   const sonarTransferencia = () => {
     try {
@@ -1233,8 +1236,8 @@ function NuevaVenta({
         gap: 7,
         padding: "8px 10px",
         borderRadius: 7,
-        background: "#7f1d1d",
-        color: "#ffd7d7",
+        background: "var(--color-background-danger)",
+        color: "var(--color-text-danger)",
         fontSize: 12,
         fontWeight: 600
       }
@@ -1658,9 +1661,9 @@ function NuevaVenta({
       flex: 1,
       background: "var(--color-background-warning)",
       color: "var(--color-text-warning)",
-      border: "0.5px solid var(--color-border-warning)",
-      borderRadius: 8,
-      padding: "11px 8px",
+      border: "1px solid var(--color-border-warning)",
+      borderRadius: 10,
+      padding: "10px 0",
       fontSize: 13,
       fontWeight: 500,
       cursor: "pointer"
@@ -1671,22 +1674,35 @@ function NuevaVenta({
       flex: 1,
       background: "var(--color-background-danger)",
       color: "var(--color-text-danger)",
-      border: "0.5px solid var(--color-border-danger)",
-      borderRadius: 8,
-      padding: "11px 8px",
+      border: "1px solid var(--color-border-danger)",
+      borderRadius: 10,
+      padding: "10px 0",
       fontSize: 13,
       fontWeight: 500,
       cursor: "pointer"
     },
     onClick: () => onNoQuiere(envPrest, envDev)
-  }, "🚫 No quiere"), onSaltar && /*#__PURE__*/React.createElement("button", {
+  }, "🚫 No quiere"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      flex: 1,
+      background: mostrarMasInterno ? "var(--color-background-info)" : "var(--color-background-tertiary)",
+      color: mostrarMasInterno ? "var(--color-text-info)" : "var(--color-text-secondary)",
+      border: mostrarMasInterno ? "1px solid var(--color-border-info)" : "1px solid var(--color-border-secondary)",
+      borderRadius: 10,
+      padding: "10px 0",
+      fontSize: 13,
+      fontWeight: 500,
+      cursor: "pointer"
+    },
+    onClick: () => setMostrarMasInterno(m => !m)
+  }, "⋮ Más"), onSaltar && /*#__PURE__*/React.createElement("button", {
     style: {
       flex: 1,
       background: "var(--color-background-tertiary)",
       color: "var(--color-text-secondary)",
-      border: "0.5px solid var(--color-border-secondary)",
-      borderRadius: 8,
-      padding: "11px 8px",
+      border: "1px solid var(--color-border-secondary)",
+      borderRadius: 10,
+      padding: "10px 0",
       fontSize: 13,
       fontWeight: 500,
       cursor: "pointer"

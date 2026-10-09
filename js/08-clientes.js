@@ -181,9 +181,9 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         fontWeight: 800,
         padding: "5px 11px",
         borderRadius: 20,
-        background: "#7f1d1d",
-        color: "#ffd7d7",
-        border: "0.5px solid rgba(240,112,112,0.5)",
+        background: "var(--color-background-danger)",
+        color: "var(--color-text-danger)",
+        border: "1px solid var(--color-border-danger)",
         cursor: "pointer",
         flexShrink: 0,
         marginLeft: "auto"
@@ -400,8 +400,8 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         width: 38,
         fontSize: 15,
         padding: 0,
-        background: mostrarMas ? "#223a52" : undefined,
-        color: mostrarMas ? "var(--color-text-primary)" : undefined
+        background: mostrarMas ? "var(--color-background-info)" : undefined,
+        color: mostrarMas ? "var(--color-text-info)" : undefined
       },
       title: "Más opciones",
       onClick: () => setMostrarMas(m => !m)
@@ -1466,7 +1466,7 @@ function DetalleCliente({
       color: "var(--color-text-warning)",
       border: "1px solid var(--color-border-warning)",
       borderRadius: 10,
-      padding: "12px 0",
+      padding: "10px 0",
       fontSize: 13,
       cursor: "pointer",
       fontWeight: 500,
@@ -1482,7 +1482,7 @@ function DetalleCliente({
       color: "var(--color-text-danger)",
       border: "1px solid var(--color-border-danger)",
       borderRadius: 10,
-      padding: "12px 0",
+      padding: "10px 0",
       fontSize: 13,
       cursor: "pointer",
       fontWeight: 500,
