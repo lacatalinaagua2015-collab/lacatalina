@@ -1684,31 +1684,27 @@ function NuevaVenta({
     onClick: () => onNoQuiere(envPrest, envDev)
   }, "🚫 No quiere"), /*#__PURE__*/React.createElement("button", {
     style: {
-      flex: 1,
-      background: mostrarMasInterno ? "var(--color-background-info)" : "var(--color-background-tertiary)",
-      color: mostrarMasInterno ? "var(--color-text-info)" : "var(--color-text-secondary)",
-      border: mostrarMasInterno ? "1px solid var(--color-border-info)" : "1px solid var(--color-border-secondary)",
-      borderRadius: 10,
-      padding: "10px 0",
-      fontSize: 13,
-      fontWeight: 500,
-      cursor: "pointer"
+      ...s.btn,
+      flex: "0 0 38px",
+      width: 38,
+      fontSize: 15,
+      padding: 0,
+      background: mostrarMasInterno ? "var(--color-background-info)" : undefined,
+      color: mostrarMasInterno ? "var(--color-text-info)" : undefined
     },
+    title: "Más opciones",
     onClick: () => setMostrarMasInterno(m => !m)
-  }, "⋮ Más"), onSaltar && /*#__PURE__*/React.createElement("button", {
+  }, "⋮"), onSaltar && /*#__PURE__*/React.createElement("button", {
     style: {
-      flex: 1,
-      background: "var(--color-background-tertiary)",
-      color: "var(--color-text-secondary)",
-      border: "1px solid var(--color-border-secondary)",
-      borderRadius: 10,
-      padding: "10px 0",
-      fontSize: 13,
-      fontWeight: 500,
-      cursor: "pointer"
+      ...s.btn,
+      flex: "0 0 38px",
+      width: 38,
+      fontSize: 15,
+      padding: 0
     },
+    title: "Saltar",
     onClick: onSaltar
-  }, "⏭ Saltar")), cuerpoCompacto));
+  }, "⏭")), cuerpoCompacto));
 }
 function NuevoCliente({
   diaActual,
