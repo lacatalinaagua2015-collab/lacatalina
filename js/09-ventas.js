@@ -886,7 +886,7 @@ function NuevaVenta({
       const saldoDelta = totalPagado - totalACobrar;
       if (ef > 0) onGuardar(detalle, "contado", String(ef), saldoApl, envPrest, envDev, obs, "mixto_ef", tr, saldoDelta, transConfMixto);else if (tr > 0) onGuardar(detalle, "transferencia", String(tr), saldoApl, envPrest, envDev, obs, "mixto_tr", ef, saldoDelta, transConfMixto);
     } else {
-      const montoFinal = opcionSaldo === "todo" && !monto ? String(Math.round(Math.abs(cliente.saldo) + aPagar)) : monto;
+      const montoFinal = opcionSaldo === "todo" && cliente.saldo < 0 && !monto ? String(Math.round(Math.abs(cliente.saldo) + aPagar)) : monto;
       const pagadoNum = Number(montoFinal) || 0;
       if (pago !== "fiado" && totalACobrar > 0 && pagadoNum > totalACobrar * 3 && pagadoNum > totalACobrar + 10000) {
         if (!window.confirm(`Estás cobrando ${fmt(pagadoNum)}, bastante más que el total a cobrar (${fmt(totalACobrar)}). ¿Está bien?`)) return;
