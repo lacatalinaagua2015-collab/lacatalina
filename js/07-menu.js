@@ -1551,7 +1551,7 @@ function PlanillaDelDia({
     const llenVueltaFijo = {},
       vacVueltaFijo = {};
     ["soda", "b10", "b20"].forEach(pk => {
-      const esperadoPk = llenosCargados[pk] + devueltosDia[pk] - prestadosDia[pk];
+      const esperadoPk = llenosCargados[pk];
       const vuelveTotalPk = llenVuelta[pk] + vacVuelta[pk];
       diffDeposito[pk] = vuelveTotalPk - esperadoPk;
       const factor = vuelveTotalPk > 0 ? esperadoPk / vuelveTotalPk : 1;
