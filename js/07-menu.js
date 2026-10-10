@@ -1532,13 +1532,18 @@ function PlanillaDelDia({
     // préstamos/devoluciones son un asunto exclusivo del depósito (un
     // préstamo hoy hace que vuelva menos de lo que salió; el depósito repone
     // esa diferencia para que sodería se mantenga siempre en su número
-    // fijo). Si sobra, se suma al depósito; si falta, se resta.
-    // IMPORTANTE: lo esperado tiene que contemplar los préstamos/devoluciones
-    // del día, porque ese movimiento YA está incluido en vaciosRec (y por lo
-    // tanto en vacVuelta) — si no se ajusta acá, cada devolución se contaba
-    // dos veces (una en sodería/vacíos por el flujo normal, y otra de nuevo
-    // acá sumándose al depósito), lo que inflaba el total combinado y hacía
-    // que pareciera que "se acumulan envases" en la sodería día tras día.
+    // fijo, SIEMPRE, sin excepción). Si sobra, se suma al depósito; si
+    // falta, se resta.
+    // CORRECCIÓN 2026-10-10: "esperado" es SOLO llenosCargados — ni +devuelto
+    // ni -prestado. Antes se le restaba/sumaba acá (ver versión vieja en el
+    // historial de git), lo que hacía que la sodería "absorbiera" el préstamo
+    // en vez del depósito, y que una devolución inflara la sodería en vez de
+    // reponer el depósito. vaciosRec (más abajo en vacVuelta) ya incluye el
+    // efecto de hoy (vendidos+devueltos-prestados) UNA sola vez; al comparar
+    // ese total contra el fijo (llenosCargados), diffDeposito queda
+    // exactamente en (devueltosDia − prestadosDia) + cualquier diferencia real
+    // contada a mano — sin doble conteo, y la sodería nunca se mueve de su
+    // número fijo salvo por lo que realmente se cargó/descargó ese día.
     const diffDeposito = {};
     // BUG REAL encontrado (causa de la acumulación "sin sentido" en sodería):
     // acá abajo se sumaba TODO lo que volvió (llenVuelta+vacVuelta) a sodería
