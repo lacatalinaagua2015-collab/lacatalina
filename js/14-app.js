@@ -3013,7 +3013,7 @@ function App() {
       saveVentas(prev => prev.filter(v => !ids.has(v.id)));
     }
   }, [ventas]);
-  const editarVenta = (ventaId, detalle, pago, montoPagado, saldoAplicado, obs, montoTrans2) => {
+  const editarVenta = (ventaId, detalle, pago, montoPagado, saldoAplicado, obs, montoTrans2, transConfirmadaNueva) => {
     // Guard anti doble-tap: ignora una segunda edición IDÉNTICA de la MISMA
     // venta dentro de 2s (mismo motivo que el guard de eliminarVenta).
     const firmaEdit = JSON.stringify({
@@ -3022,7 +3022,8 @@ function App() {
       pago,
       montoPagado,
       saldoAplicado,
-      montoTrans2
+      montoTrans2,
+      transConfirmadaNueva
     });
     const ahoraEdit = Date.now();
     if (ultimoEditadoRef.current.firma === firmaEdit && ahoraEdit - ultimoEditadoRef.current.ts < 2000) {
@@ -3085,6 +3086,7 @@ function App() {
         montoEfec: esMixto ? ef : 0,
         montoTrans: tr,
         ...(montoYaCobrado > 0 ? { _pagada: false, _montoPagadoAcum: 0 } : {}),
+        transConfirmada: pagoReal === "transferencia" ? !!transConfirmadaNueva : false,
         _upd: Date.now()
       } : v);
       if (esMixto && tr > 0) {
@@ -3115,7 +3117,7 @@ function App() {
           envDev: [],
           _esMixtoTrans: true,
           _mixtoDe: ventaId,
-          transConfirmada: transConfirmadaPrevia,
+          transConfirmada: !!transConfirmadaNueva,
           _upd: Date.now()
         };
         nev = [...nev, ventaTr];
