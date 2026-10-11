@@ -163,28 +163,28 @@ function StockGeneral({
       totPrestados[k] += prestadoDe(c, k);
     });
   });
-  // Total general por producto: Sodería (llenos+vacíos) + Depósito + Clientes (fijos+prestados)
+  // Total general por producto: Sodería (llenos+vacíos) + Depósito + Clientes
+  // (fijos+prestados) − Pérdidas (las pérdidas no tocan ningún lugar, solo
+  // se restan acá como referencia — ver confirmarPerdida).
   const totalGeneralDe = k => {
     const enSoderia = (stock.soderia?.[k] || 0) + (stock.soderia_vacios?.[k] || 0);
     const enDeposito = stock.casa?.[k] || 0;
     const enClientes = (totClientes[k] || 0) + (totPrestados[k] || 0);
-    return enSoderia + enDeposito + enClientes;
+    const perdido = (perdidas || []).reduce((a, p) => a + (p[k] || 0), 0);
+    return enSoderia + enDeposito + enClientes - perdido;
   };
   const confirmarPerdida = () => {
     const cant = Math.round(Number(formPerdida.cantidad) || 0);
     if (cant <= 0) return;
-    const ns = JSON.parse(JSON.stringify(stock));
-    if (!ns[formPerdida.ubicacion]) ns[formPerdida.ubicacion] = {
-      sifon: 0,
-      bidon10: 0,
-      bidon20: 0,
-      dispenser: 0
-    };
-    ns[formPerdida.ubicacion][formPerdida.producto] = Math.max(0, (ns[formPerdida.ubicacion][formPerdida.producto] || 0) - cant);
-    setStock(ns);
+    // La pérdida NO modifica ningún lugar (Sodería/Depósito/Cliente) — esos
+    // números son la referencia real de lo que existe ahí. Solo queda
+    // registrada como referencia en el historial de pérdidas, y se resta
+    // únicamente del Total general (ver totalGeneralDe / render de abajo).
+    const UBIC_LBL = { soderia: "Sodería", casa: "Depósito" };
+    const motivoConUbic = `${formPerdida.motivo} (${UBIC_LBL[formPerdida.ubicacion] || formPerdida.ubicacion})`;
     registrarPerdida && registrarPerdida({
       [formPerdida.producto]: cant
-    }, formPerdida.motivo, null);
+    }, motivoConUbic, null);
     setFormPerdida({
       producto: "sifon",
       cantidad: "",
@@ -330,7 +330,7 @@ function StockGeneral({
     const enDeposito = stock.casa?.[k] || 0;
     const enClientes = (totClientes[k] || 0) + (totPrestados[k] || 0);
     const perdido = totalPerdidas[k] || 0;
-    const total = enSoderia + enDeposito + enClientes;
+    const total = enSoderia + enDeposito + enClientes - perdido;
     return /*#__PURE__*/React.createElement("div", {
       key: k,
       style: {
