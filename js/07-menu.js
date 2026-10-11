@@ -10,7 +10,6 @@ function MenuDias({
   onStock,
   onAgenda,
   onNuevoCliente,
-  onPromociones,
   onVolver,
   darkMode,
   onToggleDark,

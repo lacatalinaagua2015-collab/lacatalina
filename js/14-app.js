@@ -497,9 +497,10 @@ function App() {
   // Cuando se toca "Convertir en cliente" en un prospecto, se guarda acá
   // para precargar el formulario de Nuevo Cliente con nombre/teléfono/dirección.
   const [prospectoAConvertir, setProspectoAConvertir] = useState(null);
-  // "Promociones" ahora carga el prospecto directo como cliente (con el
-  // checkbox "Es prospecto" tildado) en vez de una lista aparte — bandera
-  // para precargar ese checkbox al entrar a Nuevo cliente desde ese botón.
+  // Se usaba para precargar el checkbox "Es prospecto" al entrar desde el
+  // botón "Promociones" (eliminado: era la misma pantalla que Nuevo
+  // Cliente, solo con ese checkbox tildado). El checkbox sigue existiendo
+  // en el formulario de Nuevo Cliente; ahora se tilda a mano.
   const [nuevoEsProspecto, setNuevoEsProspecto] = useState(false);
   const [clientes, setClientes] = useLS("cat_clientes_v3", CLIENTES_INICIALES);
   const [ventasRaw, setVentasRaw] = useLS("cat_ventas_v3", []);
