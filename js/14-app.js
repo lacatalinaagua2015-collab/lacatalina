@@ -3214,10 +3214,6 @@ function App() {
     onStock: () => irA("stock"),
     onAgenda: () => irA("agenda"),
     onNuevoCliente: () => irA("nuevoCliente"),
-    onPromociones: () => {
-      setNuevoEsProspecto(true);
-      irA("nuevoCliente");
-    },
     onVolver: () => irA("portada"),
     darkMode: darkMode,
     onToggleDark: () => setDarkMode(!darkMode),

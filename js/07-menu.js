@@ -539,7 +539,7 @@ function MenuDias({
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
-      gridTemplateColumns: "1fr 1fr 1fr 1fr",
+      gridTemplateColumns: "1fr 1fr 1fr",
       gap: 6,
       padding: "4px 0 8px"
     }
@@ -551,10 +551,6 @@ function MenuDias({
     ico: "📋",
     lbl: "Planilla",
     fn: () => onPlanillaAtajo && onPlanillaAtajo()
-  }, {
-    ico: "📣",
-    lbl: "Promociones",
-    fn: () => onPromociones && onPromociones()
   }, {
     ico: "➕",
     lbl: "Nuevo cliente",
