@@ -754,8 +754,7 @@ function Config({
   const [abiertoNotif, setAbiertoNotif] = useState(false);
   const [abiertoAcceso, setAbiertoAcceso] = useState(false);
   const [abiertoCuenta, setAbiertoCuenta] = useState(false);
-  const [abiertoRespaldo, setAbiertoRespaldo] = useState(false);
-  const [abiertoMant, setAbiertoMant] = useState(false);
+  const [abiertoDatos, setAbiertoDatos] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [importando, setImportando] = useState(false);
   const [mantVeh, setMantVeh] = React.useState(() => {
@@ -1450,19 +1449,19 @@ function Config({
       cursor: "pointer",
       textAlign: "left"
     },
-    onClick: () => setAbiertoRespaldo(!abiertoRespaldo)
+    onClick: () => setAbiertoDatos(!abiertoDatos)
   }, /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 18
     }
-  }, "💾"), /*#__PURE__*/React.createElement("span", {
+  }, "🗄️"), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 16,
       fontWeight: 600,
       color: "var(--color-text-primary)",
       flex: 1
     }
-  }, "Respaldo"), /*#__PURE__*/React.createElement("span", {
+  }, "Datos y respaldo"), /*#__PURE__*/React.createElement("span", {
     style: {
       width: 26,
       height: 26,
@@ -1475,11 +1474,18 @@ function Config({
       fontSize: 13,
       flexShrink: 0
     }
-  }, abiertoRespaldo ? "▲" : "▼")), abiertoRespaldo && /*#__PURE__*/React.createElement("div", {
+  }, abiertoDatos ? "▲" : "▼")), abiertoDatos && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 10
     }
-  }, /*#__PURE__*/React.createElement("p", {
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: "var(--color-text-secondary)",
+      margin: "0 0 10px"
+    }
+  }, "💾 Respaldo"), /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 12,
       color: "var(--color-text-tertiary)",
@@ -1554,54 +1560,19 @@ function Config({
       fontSize: 12
     },
     onClick: () => exportarExcel(clientes, ventas, productos, planillas)
-  }, "📊 Exportar Excel")))), /*#__PURE__*/React.createElement("div", {
+  }, "📊 Exportar Excel")), /*#__PURE__*/React.createElement("div", {
     style: {
-      ...s.card,
-      margin: 0
+      borderTop: "0.5px solid var(--color-border-tertiary)",
+      margin: "16px 0"
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
-      width: "100%",
-      background: "var(--color-background-tertiary)",
-      border: "none",
-      borderRadius: 10,
-      padding: "14px 16px",
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      cursor: "pointer",
-      textAlign: "left"
-    },
-    onClick: () => setAbiertoMant(!abiertoMant)
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 18
-    }
-  }, "🔧"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 16,
-      fontWeight: 600,
-      color: "var(--color-text-primary)",
-      flex: 1
-    }
-  }, "Mantenimiento de datos"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      width: 26,
-      height: 26,
-      borderRadius: "50%",
-      background: "var(--color-background-primary)",
-      color: "var(--color-text-info)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
       fontSize: 13,
-      flexShrink: 0
+      fontWeight: 600,
+      color: "var(--color-text-secondary)",
+      margin: "0 0 10px"
     }
-  }, abiertoMant ? "▲" : "▼")), abiertoMant && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 10
-    }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, "🔧 Mantenimiento de datos"), /*#__PURE__*/React.createElement("button", {
     style: {
       ...s.btn,
       width: "100%",
@@ -1630,12 +1601,12 @@ function Config({
       marginTop: 8
     },
     onClick: onDiagnostico
-  }, "🩺 Diagnóstico / registro de errores"))), /*#__PURE__*/React.createElement("div", {
+  }, "🩺 Diagnóstico / registro de errores"), /*#__PURE__*/React.createElement("div", {
     style: {
-      ...s.card,
-      margin: 0
+      borderTop: "0.5px solid var(--color-border-tertiary)",
+      margin: "16px 0"
     }
-  }, (() => {
+  }), (() => {
     let total = 0;
     try {
       for (let k in localStorage) {
@@ -1661,7 +1632,7 @@ function Config({
         fontWeight: 500,
         color: "var(--color-text-secondary)"
       }
-    }, "💾 Espacio usado"), /*#__PURE__*/React.createElement("span", {
+    }, "📦 Espacio usado"), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 12,
         color: "var(--color-text-tertiary)"
@@ -1688,8 +1659,6 @@ function Config({
         marginTop: 6
       }
     }, "📷 ", fotos, " fotos guardadas"),
-    // Desglose: qué ocupa el espacio, de mayor a menor. Sin esto no se puede
-    // saber qué conviene aliviar — y el total solo no dice nada.
     (() => {
       const filas = [];
       try {
@@ -1750,23 +1719,19 @@ function Config({
         marginTop: 8
       }
     }, "⚠️ Espacio alto. Eliminá fotos si la app deja de funcionar."), /*#__PURE__*/React.createElement(LimpiarBackupsLocales, null));
-  })()), /*#__PURE__*/React.createElement("details", {
+  })(), /*#__PURE__*/React.createElement("div", {
     style: {
-      ...s.card,
-      margin: 0
+      borderTop: "0.5px solid var(--color-border-tertiary)",
+      margin: "16px 0"
     }
-  }, /*#__PURE__*/React.createElement("summary", {
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: 600,
-      color: "var(--color-text-primary)",
-      cursor: "pointer"
+      color: "var(--color-text-secondary)",
+      margin: "0 0 10px"
     }
   }, "🔗 Vincular con Emma Control"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 10
-    }
-  }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
       color: "var(--color-text-secondary)",
