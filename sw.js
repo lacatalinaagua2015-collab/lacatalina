@@ -1,6 +1,10 @@
 // ── La Catalina · Service Worker ─────────────────────────────────────────────
 // Cache offline + notificaciones push.
+<<<<<<< HEAD
 const CACHE = 'lc-v95';
+=======
+const CACHE = 'lc-v94';
+>>>>>>> 4e0c63c46b1f198ebc56174490c138e4a014b5ee
 const ASSETS = [
   'https://unpkg.com/react@18/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
