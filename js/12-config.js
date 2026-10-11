@@ -1385,7 +1385,15 @@ function Config({
     }
   }, "Acceso con huella"), /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "var(--color-text-tertiary)",
+      width: 26,
+      height: 26,
+      borderRadius: "50%",
+      background: "var(--color-background-primary)",
+      color: "var(--color-text-info)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 13,
       flexShrink: 0
     }
   }, abiertoAcceso ? "▲" : "▼")), abiertoAcceso && /*#__PURE__*/React.createElement("div", {
@@ -1424,7 +1432,15 @@ function Config({
     }
   }, "Cuenta"), /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "var(--color-text-tertiary)",
+      width: 26,
+      height: 26,
+      borderRadius: "50%",
+      background: "var(--color-background-primary)",
+      color: "var(--color-text-info)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 13,
       flexShrink: 0
     }
   }, abiertoCuenta ? "▲" : "▼")), abiertoCuenta && /*#__PURE__*/React.createElement("div", {
