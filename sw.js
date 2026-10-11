@@ -1,6 +1,6 @@
 // ── La Catalina · Service Worker ─────────────────────────────────────────────
 // Cache offline + notificaciones push.
-const CACHE = 'lc-v93';
+const CACHE = 'lc-v94';
 const ASSETS = [
   'https://unpkg.com/react@18/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -110,7 +110,10 @@ self.addEventListener('push', e => {
       icon: data.icon || './icon-192.png',
       badge: './icon-192.png',
       tag: data.tag || 'reparto',
-      requireInteraction: data.requireInteraction !== false,
+      // El enviador manda un mensaje de datos de FCM, y ahí todos los
+      // valores llegan como string — por eso se compara también contra
+      // la palabra 'false', no solo el booleano.
+      requireInteraction: data.requireInteraction !== false && data.requireInteraction !== 'false',
       data: { url: './' },
     };
     try {
