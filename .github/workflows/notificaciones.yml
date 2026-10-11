@@ -23,11 +23,8 @@ jobs:
         with:
           node-version: '20'
       - name: Instalar dependencias
-        run: npm install web-push firebase-admin
+        run: npm install firebase-admin
       - name: Enviar notificación
         run: node scripts/enviar-notif.js
         env:
-          VAPID_PUBLIC_KEY:  ${{ secrets.VAPID_PUBLIC_KEY }}
-          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
-          VAPID_EMAIL:       ${{ secrets.VAPID_EMAIL }}
-          FIREBASE_SA:       ${{ secrets.FIREBASE_SA }}
+          FIREBASE_SA: ${{ secrets.FIREBASE_SA }}
