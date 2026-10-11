@@ -625,15 +625,20 @@ function App() {
     const normalized = normStock(stockRaw);
     if (JSON.stringify(normalized) !== JSON.stringify(stockRaw)) setStockRaw(normalized);
   }, []);
-  // Relleno automático de sodería los lunes: llega la producción de la
-  // semana y la sodería queda a full (según la "Base"/capacidadFija
-  // configurada en Stock). De ahí en más el número baja solo con los
-  // movimientos normales del día a día (InicioReparto descuenta de sodería
-  // al cargar el reparto; el cierre del día — confirmarCierre, 07-menu.js —
-  // recalcula sodería/depósito con los números reales de la jornada). Se
-  // corre UNA sola vez por semana — se guarda la fecha del lunes ya
-  // aplicado en localStorage para no volver a pisar el número si se
-  // recarga la app el mismo lunes después de haber cargado/vendido algo.
+  // Relleno automático de sodería los lunes: la sodería queda a full (según
+  // la "Base"/capacidadFija configurada en Stock), sacando lo que falte del
+  // Depósito (o devolviéndole lo que sobre) — nunca "de la nada". Los
+  // envases nuevos solo entran cargándolos en el Depósito; este relleno no
+  // crea stock, solo mueve Depósito↔Sodería (CORRECCIÓN 2026-10-11: antes
+  // forzaba la sodería a la Base sin tocar el depósito, inflando el total
+  // general cada lunes que hubiera préstamos activos). De ahí en más el
+  // número baja solo con los movimientos normales del día a día (InicioReparto
+  // descuenta de sodería al cargar el reparto; el cierre del día —
+  // confirmarCierre, 07-menu.js — recalcula sodería/depósito con los números
+  // reales de la jornada). Se corre UNA sola vez por semana — se guarda la
+  // fecha del lunes ya aplicado en localStorage para no volver a pisar el
+  // número si se recarga la app el mismo lunes después de haber
+  // cargado/vendido algo.
   React.useEffect(() => {
     const hoy = new Date();
     if (hoy.getDay() !== 1) return; // 1 = lunes
@@ -642,17 +647,25 @@ function App() {
     setStock(prev => {
       const s = JSON.parse(JSON.stringify(normStock(prev)));
       const detalleRelleno = {};
+      // El total general (Sodería + Depósito + Clientes) no cambia solo —
+      // los envases nuevos entran SIEMPRE por el Depósito (si no se cargaron
+      // ahí, no existen). Este relleno no "crea" stock: lo que falta en
+      // Sodería para llegar a la Base se saca del Depósito, y si sobra, se
+      // devuelve al Depósito — igual criterio que el cierre del día.
+      if (!s.casa) s.casa = { sifon: 0, bidon10: 0, bidon20: 0, dispenser: 0 };
       ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
         const antes = (s.soderia[k] || 0) + (s.soderia_vacios[k] || 0);
-        s.soderia[k] = s.capacidadFija?.[k] || 0;
+        const base = s.capacidadFija?.[k] || 0;
+        const delta = base - antes; // falta (+) o sobra (-) para llegar a la Base
+        s.soderia[k] = base;
         s.soderia_vacios[k] = 0;
-        const delta = s.soderia[k] - antes;
+        s.casa[k] = Math.max(0, (s.casa[k] || 0) - delta);
         if (delta !== 0) detalleRelleno[k] = delta;
       });
       syncData({
         stock: s
       });
-      registrarMovimientoStock("relleno_lunes", detalleRelleno, "Sodería repuesta a la Base");
+      registrarMovimientoStock("relleno_lunes", detalleRelleno, "Sodería repuesta a la Base (desde/hacia Depósito)");
       return s;
     });
     localStorage.setItem("lc_stock_relleno_lunes", hoyKey);
