@@ -1252,6 +1252,8 @@ function PlanillaDelDia({
   onEditarCarga,
   onRegistrarNoVisita,
   onQuitarNoVisita,
+  perdidas,
+  movStock,
   ecToken
 }) {
   // Separar ventas del día propio vs ventas de clientes de otro día
@@ -1476,6 +1478,41 @@ function PlanillaDelDia({
   // para que aparezca en el mismo informe del día que sifón/bidones.
   (dispMovs || []).forEach(m => {
     if (m.delta > 0) prestadosDia.disp += m.delta;else devueltosDia.disp += -m.delta;
+  });
+  // Perdidos y retirados de HOY (pedido del usuario: que el movimiento de
+  // envases del día se vea reflejado en la planilla de cierre, no solo el
+  // neto). "fecha" acá es la fecha de ESTA planilla (no necesariamente la
+  // de hoy-hoy si se está cerrando un día atrasado) — se compara contra
+  // eso, no contra la fecha real del sistema.
+  const skToPl = {
+    sifon: "soda",
+    bidon10: "b10",
+    bidon20: "b20",
+    dispenser: "disp"
+  };
+  const perdidosDia = {
+    soda: 0,
+    b10: 0,
+    b20: 0,
+    disp: 0
+  };
+  (perdidas || []).forEach(p => {
+    if ((p.fecha || "").slice(0, 10) !== fecha) return;
+    Object.keys(skToPl).forEach(sk => {
+      perdidosDia[skToPl[sk]] += Number(p[sk]) || 0;
+    });
+  });
+  const retiradosDia = {
+    soda: 0,
+    b10: 0,
+    b20: 0,
+    disp: 0
+  };
+  (movStock || []).forEach(m => {
+    if (m.tipo !== "retiro" || (m.fecha || "").slice(0, 10) !== fecha) return;
+    Object.keys(skToPl).forEach(sk => {
+      retiradosDia[skToPl[sk]] += Number(m.detalle?.[sk]) || 0;
+    });
   });
   // FÓRMULA CORRECTA:
   // Sobrantes llenos = cargados − vendidos (prestados no reducen llenos, se compensan con devueltos)
@@ -2161,7 +2198,24 @@ function PlanillaDelDia({
           style: { display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr 1fr 1fr", gap: 4, alignItems: "center", padding: "5px 0", borderTop: "0.5px solid var(--color-border-tertiary)" }
         }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: "var(--color-text-primary)" } }, f.label), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: "var(--color-text-secondary)" } }, f.div(f.quedaLleno)), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: "var(--color-text-secondary)" } }, f.div(f.quedaVacio)), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: "var(--color-text-secondary)" } }, f.div(f.paraLlenarReal)), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: "var(--color-text-secondary)" } }, f.div(totalF)), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, fontWeight: 700, color: faltaF < 0 ? "#ff6b6b" : faltaF === 0 ? "var(--color-text-success)" : "var(--color-text-secondary)" } }, faltaF < 0 ? `⚠ ${faltaF}` : faltaF));
       }));
-      return [productCards, resumenTabla];
+      const movLabels = [["Sifón", "soda"], ["Bidón 10L", "b10"], ["Bidón 20L", "b20"], ["Dispenser", "disp"]];
+      const detalleMovimientos = /*#__PURE__*/React.createElement("div", {
+        key: "detalle-movimientos",
+        style: { ...s.card, margin: "0 0 10px", padding: "12px" }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: { fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 8 }
+      }, "📋 Movimiento de envases de hoy"), /*#__PURE__*/React.createElement("p", {
+        style: { fontSize: 11, color: "var(--color-text-tertiary)", margin: "-4px 0 8px" }
+      }, "Préstamos, devoluciones, pérdidas y retiros de clientes registrados en el día."), /*#__PURE__*/React.createElement("div", {
+        style: { display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr 1fr 1fr", gap: 4, fontSize: 10, color: "var(--color-text-tertiary)", marginBottom: 4 }
+      }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Prestado"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Devuelto"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Perdido"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Retirado")), movLabels.map(([label, pk]) => {
+        const dv = n => pk === "soda" ? Math.floor(n / CAJON) : n;
+        return /*#__PURE__*/React.createElement("div", {
+          key: pk,
+          style: { display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr 1fr 1fr", gap: 4, alignItems: "center", padding: "5px 0", borderTop: "0.5px solid var(--color-border-tertiary)" }
+        }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: "var(--color-text-primary)" } }, label), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: prestadosDia[pk] ? "var(--color-text-warning)" : "var(--color-text-tertiary)" } }, dv(prestadosDia[pk]) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: devueltosDia[pk] ? "var(--color-text-success)" : "var(--color-text-tertiary)" } }, dv(devueltosDia[pk]) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: perdidosDia[pk] ? "#ff6b6b" : "var(--color-text-tertiary)" } }, dv(perdidosDia[pk]) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: retiradosDia[pk] ? "var(--color-text-secondary)" : "var(--color-text-tertiary)" } }, dv(retiradosDia[pk]) || "—"));
+      }));
+      return [productCards, resumenTabla, detalleMovimientos];
     })(), /*#__PURE__*/React.createElement("button", {
       style: {
         width: "100%",

@@ -237,7 +237,8 @@ function StockGeneral({
   const MOV_TIPO_LBL = {
     cierre: "🔁 Cierre del día",
     carga: "🚚 Carga del camión",
-    ajuste: "✏️ Ajuste manual"
+    ajuste: "✏️ Ajuste manual",
+    retiro: "🚪 Cliente retirado"
   };
   const renderMovDetalle = m => {
     if (m.tipo === "cierre") {
@@ -262,6 +263,14 @@ function StockGeneral({
         const d = m.detalle?.[k];
         if (!d) return null;
         return `${MOV_LBL[k]} ${d > 0 ? "+" : ""}${d} (sodería)`;
+      }).filter(Boolean);
+      return partes.length ? partes.join(" · ") : "Sin cambios";
+    }
+    if (m.tipo === "retiro") {
+      const partes = Object.keys(MOV_LBL).map(k => {
+        const d = m.detalle?.[k];
+        if (!d) return null;
+        return `${MOV_LBL[k]} +${d} (depósito)`;
       }).filter(Boolean);
       return partes.length ? partes.join(" · ") : "Sin cambios";
     }

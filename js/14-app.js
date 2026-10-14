@@ -2898,6 +2898,16 @@ function App() {
       });
       return s;
     });
+    // Queda anotado en el historial de Movimientos (antes esto no dejaba
+    // rastro — ni en Stock ni en la Planilla del día de ese día) para poder
+    // ver después cuánto volvió al depósito por clientes retirados.
+    if (window._lcRegistrarMovimientoStock) {
+      const det = {};
+      ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
+        if (totalEnvases[k]) det[k] = totalEnvases[k];
+      });
+      if (Object.keys(det).length) window._lcRegistrarMovimientoStock("retiro", det, `Cliente retirado: ${cli.nombre}`);
+    }
     saveClientes(prev => (prev || []).map(c => c.id === clienteId ? {
       ...c,
       sifon: 0,
@@ -3383,6 +3393,8 @@ function App() {
     syncData: syncData,
     autoCierre: !!planillas[`${diaActual}_${fechaActual}`]?.iniciado,
     cargasDia: cargasDia,
+    perdidas: perdidas,
+    movStock: movStock,
     onGuardar: d => {
       savePlanilla(`${diaActual}_${fechaActual}`, d);
       if (!d._diaCerrado) irA(origenFecha === "atajo" ? "atajoPlanillaSemana" : origenFecha === "menu" ? "menu" : "selectorFechaPlanilla");
