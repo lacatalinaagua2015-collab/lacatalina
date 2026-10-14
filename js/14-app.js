@@ -2648,7 +2648,26 @@ function App() {
       bidon20: (Number(d.bidon20) || 0) - (Number(a.bidon20) || 0),
       dispenser: (Number(d.dispenser) || 0) - (Number(a.dispenser) || 0)
     };
-    if (!delta.sifon && !delta.bidon10 && !delta.bidon20 && !delta.dispenser) return;
+    // TERCERA VUELTA 2026-10-14 (pedido del usuario: "necesito que todo el
+    // círculo cierre, que esos envases se vean reflejados en la sodería y
+    // no solo en el cliente"): corregir "Prestados" a mano (✏️ Envases)
+    // antes solo tocaba el número del cliente — el envase "desaparecía" del
+    // total general (ni en el cliente, ni en sodería, ni en depósito).
+    // Ahora también mueve stock, igual que ya pasa con los Fijos. Para que
+    // suba (corrección hacia más prestado) sale de sodería llena primero,
+    // resto de Depósito — es como prestarle un envase de más. Para que baje
+    // (una devolución que no se había registrado) entra a sodería como
+    // VACÍO, no lleno — es un envase que vuelve de lo del cliente, hay que
+    // lavarlo/llenarlo antes de poder vender con él.
+    const ap = a.prestado || {};
+    const dp = d.prestado || {};
+    const deltaPrest = {
+      sifon: (Number(dp.sifon) || 0) - (Number(ap.sifon) || 0),
+      bidon10: (Number(dp.bidon10) || 0) - (Number(ap.bidon10) || 0),
+      bidon20: (Number(dp.bidon20) || 0) - (Number(ap.bidon20) || 0),
+      dispenser: (Number(dp.dispenser) || 0) - (Number(ap.dispenser) || 0)
+    };
+    if (!delta.sifon && !delta.bidon10 && !delta.bidon20 && !delta.dispenser && !deltaPrest.sifon && !deltaPrest.bidon10 && !deltaPrest.bidon20 && !deltaPrest.dispenser) return;
     setStock(prev => {
       const s = JSON.parse(JSON.stringify(normStock(prev)));
       if (!s.casa) s.casa = {
@@ -2679,9 +2698,32 @@ function App() {
           detSoderia[k] = -dk;
         }
       });
+      const detSoderiaPrest = {};
+      const detDepositoPrest = {};
+      const detSoderiaVaciosPrest = {};
+      ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
+        const dk = deltaPrest[k];
+        if (!dk) return;
+        if (dk > 0) {
+          const deSoderia = Math.min(dk, Math.max(0, s.soderia[k] || 0));
+          const resto = dk - deSoderia;
+          s.soderia[k] = (s.soderia[k] || 0) - deSoderia;
+          if (deSoderia) detSoderiaPrest[k] = -deSoderia;
+          if (resto > 0) {
+            s.casa[k] = Math.max(0, (s.casa[k] || 0) - resto);
+            detDepositoPrest[k] = -resto;
+          }
+        } else {
+          s.soderia_vacios[k] = (s.soderia_vacios[k] || 0) - dk;
+          detSoderiaVaciosPrest[k] = -dk;
+        }
+      });
       if (window._lcRegistrarMovimientoStock) {
         if (Object.keys(detSoderia).length) window._lcRegistrarMovimientoStock("ajuste", detSoderia, "Envases fijos de cliente (alta/edición)");
         if (Object.keys(detDeposito).length) window._lcRegistrarMovimientoStock("ajuste", detDeposito, "Envases fijos de cliente — faltó en sodería, se completó desde Depósito");
+        if (Object.keys(detSoderiaPrest).length) window._lcRegistrarMovimientoStock("ajuste", detSoderiaPrest, "Envases prestados de cliente (corrección manual)");
+        if (Object.keys(detDepositoPrest).length) window._lcRegistrarMovimientoStock("ajuste", detDepositoPrest, "Envases prestados de cliente — faltó en sodería, se completó desde Depósito");
+        if (Object.keys(detSoderiaVaciosPrest).length) window._lcRegistrarMovimientoStock("ajuste", detSoderiaVaciosPrest, "Envases prestados de cliente — devolución registrada manualmente");
       }
       syncData({
         stock: s

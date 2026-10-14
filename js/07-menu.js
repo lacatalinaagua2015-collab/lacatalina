@@ -1539,7 +1539,7 @@ function PlanillaDelDia({
     disp: 0
   };
   (movStock || []).forEach(m => {
-    if (m.tipo !== "ajuste" || !(m.nota || "").startsWith("Envases fijos de cliente") || (m.fecha || "").slice(0, 10) !== fecha) return;
+    if (m.tipo !== "ajuste" || !((m.nota || "").startsWith("Envases fijos de cliente") || (m.nota || "").startsWith("Envases prestados de cliente")) || (m.fecha || "").slice(0, 10) !== fecha) return;
     Object.keys(skToPl).forEach(sk => {
       const d = Number(m.detalle?.[sk]) || 0;
       // detalle viene negativo (sale de sodería) — acá se muestra en positivo,
