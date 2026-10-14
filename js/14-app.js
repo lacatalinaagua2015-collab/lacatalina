@@ -2626,19 +2626,19 @@ function App() {
     irA("clientes");
   };
 
-  // ── Ajusta stock.soderia (llenos) cuando se crea o edita el fijo de
-  // envases/dispenser de un cliente. "antes" = valores previos (null si es
-  // alta nueva), "despues" = valores nuevos.
+  // ── Ajusta stock cuando se crea o edita el fijo de envases/dispenser de
+  // un cliente. "antes" = valores previos (null si es alta nueva),
+  // "despues" = valores nuevos.
   // REDISEÑADO 2026-10-14 (antes restaba de Depósito): Depósito está
   // rotulado en la pantalla de Stock como "vacíos nuevos, sin uso" — stock
   // recién comprado, todavía sin circular. Los envases que se le dejan a un
-  // cliente (de alta o al editar su fijo) salen de la sodería, no de ahí —
-  // son envases llenos que el repartidor ya tiene en circulación. Restarlos
-  // de Depósito hacía que pareciera que "no se descontaba de ningún lado"
-  // (Depósito casi nunca se mira ni se usa) y además dejaba a Sodería sin
-  // reflejar lo que de verdad pasó en la calle. Ahora se resta directo de
-  // sodería.llenos (sin piso en 0: si da negativo, avisa que hace falta
-  // reponer sodería, en vez de taparlo).
+  // cliente (de alta o al editar su fijo) salen de la sodería primero —
+  // son envases llenos que el repartidor ya tiene en circulación.
+  // SEGUNDA VUELTA 2026-10-14 (pedido del usuario): si sodería no tiene
+  // suficiente para cubrir lo que se le da al cliente, el resto se saca de
+  // Depósito (en vez de dejar que sodería quede en negativo). Si en cambio
+  // se le BAJA el fijo a un cliente (delta negativo), lo que devuelve
+  // entra de nuevo a sodería, lista para usar — no a Depósito.
   const ajustarStockFijoCliente = (antes, despues) => {
     const a = antes || {};
     const d = despues || {};
@@ -2651,16 +2651,37 @@ function App() {
     if (!delta.sifon && !delta.bidon10 && !delta.bidon20 && !delta.dispenser) return;
     setStock(prev => {
       const s = JSON.parse(JSON.stringify(normStock(prev)));
-      s.soderia.sifon = (s.soderia.sifon || 0) - delta.sifon;
-      s.soderia.bidon10 = (s.soderia.bidon10 || 0) - delta.bidon10;
-      s.soderia.bidon20 = (s.soderia.bidon20 || 0) - delta.bidon20;
-      s.soderia.dispenser = (s.soderia.dispenser || 0) - delta.dispenser;
+      if (!s.casa) s.casa = {
+        sifon: 0,
+        bidon10: 0,
+        bidon20: 0,
+        dispenser: 0
+      };
+      const detSoderia = {};
+      const detDeposito = {};
+      ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
+        const dk = delta[k];
+        if (!dk) return;
+        if (dk > 0) {
+          // Sale hacia el cliente: primero de sodería (hasta donde tenga),
+          // y si no alcanza, el resto sale de Depósito.
+          const deSoderia = Math.min(dk, Math.max(0, s.soderia[k] || 0));
+          const resto = dk - deSoderia;
+          s.soderia[k] = (s.soderia[k] || 0) - deSoderia;
+          if (deSoderia) detSoderia[k] = -deSoderia;
+          if (resto > 0) {
+            s.casa[k] = Math.max(0, (s.casa[k] || 0) - resto);
+            detDeposito[k] = -resto;
+          }
+        } else {
+          // Se le bajó el fijo: lo que devuelve vuelve a sodería.
+          s.soderia[k] = (s.soderia[k] || 0) - dk;
+          detSoderia[k] = -dk;
+        }
+      });
       if (window._lcRegistrarMovimientoStock) {
-        const det = {};
-        ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
-          if (delta[k]) det[k] = -delta[k];
-        });
-        if (Object.keys(det).length) window._lcRegistrarMovimientoStock("ajuste", det, "Envases fijos de cliente (alta/edición)");
+        if (Object.keys(detSoderia).length) window._lcRegistrarMovimientoStock("ajuste", detSoderia, "Envases fijos de cliente (alta/edición)");
+        if (Object.keys(detDeposito).length) window._lcRegistrarMovimientoStock("ajuste", detDeposito, "Envases fijos de cliente — faltó en sodería, se completó desde Depósito");
       }
       syncData({
         stock: s

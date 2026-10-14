@@ -258,11 +258,22 @@ function StockGeneral({
       });
       return partes.length ? partes.join(" · ") : "Sin cambios";
     }
-    if (m.tipo === "carga" || m.tipo === "ajuste") {
+    if (m.tipo === "carga") {
       const partes = Object.keys(MOV_LBL).map(k => {
         const d = m.detalle?.[k];
         if (!d) return null;
         return `${MOV_LBL[k]} ${d > 0 ? "+" : ""}${d} (sodería)`;
+      }).filter(Boolean);
+      return partes.length ? partes.join(" · ") : "Sin cambios";
+    }
+    if (m.tipo === "ajuste") {
+      // No siempre es sodería (ver nota del movimiento, se muestra abajo):
+      // puede ser un ajuste manual en Stock o un faltante que se completó
+      // desde Depósito al asignarle envases a un cliente.
+      const partes = Object.keys(MOV_LBL).map(k => {
+        const d = m.detalle?.[k];
+        if (!d) return null;
+        return `${MOV_LBL[k]} ${d > 0 ? "+" : ""}${d}`;
       }).filter(Boolean);
       return partes.length ? partes.join(" · ") : "Sin cambios";
     }
