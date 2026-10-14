@@ -2767,6 +2767,69 @@ function App() {
     }
     return nv;
   };
+  // ── Dejar rastro de una corrección manual de envases (♻️ Envases → Prestados) ──
+  // BUG REPORTADO: un cliente devolvía/recibía envases prestados corrigiendo
+  // a mano con el botón ♻️ Envases (PieEnvases, en 04-componentes.js) y esa
+  // devolución no aparecía en el resumen de "vacíos recibidos" del Cierre
+  // del día. Causa: PieEnvases llama a window._lcRegistrarAjusteEnvases
+  // para dejar constancia del movimiento del día, pero esa función nunca
+  // había sido definida en ningún archivo del proyecto (mismo tipo de bug
+  // que lcAlert/lcConfirm, ver comentario en index.html) — la llamada
+  // quedaba en silencio (`window._lcRegistrarAjusteEnvases && ...`) y el
+  // cambio de "Prestados" solo tocaba c.prestado, sin dejar registro del
+  // día. OJO: acá NO se vuelve a tocar c.prestado (eso ya lo hizo PieEnvases
+  // con onEditar) — esta función solo registra el movimiento para que lo
+  // sume el resumen de la Planilla, igual que ya hacen las ventas normales
+  // y dispMovs para el dispenser.
+  const registrarAjusteEnvasesManual = (clienteId, nombreCliente, cambios) => {
+    const prestChanges = (cambios || []).filter(x => x.campo === "Prestados");
+    if (!prestChanges.length) return;
+    const envPrest = [];
+    const envDev = [];
+    prestChanges.forEach(x => {
+      const delta = Number(x.despues) - Number(x.antes);
+      if (!delta) return;
+      if (x.producto === "Dispenser") {
+        // El dispenser se informa en el Cierre vía dispMovs, no vía
+        // envPrest/envDev (ver registrarDispMov más arriba).
+        registrarDispMov(clienteId, nombreCliente, delta);
+        return;
+      }
+      if (delta > 0) envPrest.push({ prod: x.producto, cant: delta });
+      else envDev.push({ prod: x.producto, cant: -delta });
+    });
+    if (!envPrest.length && !envDev.length) return;
+    const fk = new Date().toLocaleDateString("en-CA");
+    saveVentas(prev => [...prev, {
+      id: Date.now(),
+      clienteId,
+      cliente: nombreCliente || "",
+      dia: diaActual,
+      fechaKey: fk,
+      fecha: new Date().toLocaleString("es-AR"),
+      hora: new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
+      detalle: [{
+        nombre: "Corrección de envases",
+        cantidad: 1,
+        precio: 0,
+        total: 0
+      }],
+      pago: "-",
+      obs: "Corrección manual de envases prestados (♻️ Envases)",
+      neto: 0,
+      bruto: 0,
+      desc: 0,
+      costo: 0,
+      ganancia: 0,
+      pagadoNum: 0,
+      saldoDelta: 0,
+      envPrest,
+      envDev,
+      _esAjuste: true,
+      _esAjusteEnvases: true
+    }]);
+  };
+  window._lcRegistrarAjusteEnvases = registrarAjusteEnvasesManual;
   // Retirar cliente por inactividad (4+ visitas seguidas sin comprar,
   // marcado desde el perfil del cliente): devuelve al depósito TODOS los
   // envases que tenga asignados (fijos + prestados) y lo da de baja del
