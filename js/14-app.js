@@ -2644,10 +2644,19 @@ function App() {
     if (!delta.sifon && !delta.bidon10 && !delta.bidon20 && !delta.dispenser) return;
     setStock(prev => {
       const s = JSON.parse(JSON.stringify(normStock(prev)));
-      s.casa.sifon = Math.max(0, (s.casa.sifon || 0) - delta.sifon);
-      s.casa.bidon10 = Math.max(0, (s.casa.bidon10 || 0) - delta.bidon10);
-      s.casa.bidon20 = Math.max(0, (s.casa.bidon20 || 0) - delta.bidon20);
-      s.casa.dispenser = Math.max(0, (s.casa.dispenser || 0) - delta.dispenser);
+      // BUG REPORTADO: "di de alta un cliente nuevo con envases asignados y
+      // no se descontó de ningún lado". Causa: acá abajo el Math.max(0, ...)
+      // tapaba el número en 0 apenas Depósito no tenía stock suficiente
+      // para "darle" al cliente — la resta se perdía en silencio, se viera
+      // o no se viera el cambio. confirmarCierre() (07-menu.js) ya deja a
+      // Depósito ir en negativo cuando falta algo (mismo criterio: "si
+      // falta, se resta, sin excepción") — acá se saca el mismo piso, así
+      // un negativo en Depósito avisa de verdad que hay que reponer stock
+      // ahí en vez de desaparecer la diferencia.
+      s.casa.sifon = (s.casa.sifon || 0) - delta.sifon;
+      s.casa.bidon10 = (s.casa.bidon10 || 0) - delta.bidon10;
+      s.casa.bidon20 = (s.casa.bidon20 || 0) - delta.bidon20;
+      s.casa.dispenser = (s.casa.dispenser || 0) - delta.dispenser;
       syncData({
         stock: s
       });
