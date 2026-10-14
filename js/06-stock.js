@@ -247,10 +247,12 @@ function StockGeneral({
         if (!d) return;
         const bits = [];
         if (d.soderia) bits.push(`Soder. +${d.soderia}`);
-        // "dif" es informativo — cuánto difirió de lo cargado hoy (ej. una
-        // devolución vieja o un préstamo); ya no mueve Depósito, ver nota
-        // en calcularMovimientoDeposito (07-menu.js).
-        if (d.dif) bits.push(`dif. vs. cargado: ${d.dif > 0 ? "+" : ""}${d.dif}`);
+        // "dif" = cuánto difirió de la Base de sodería hoy (ej. una
+        // devolución vieja o un préstamo). "aDeposito" = lo que realmente
+        // se movió con Depósito ese día (+ entró, − salió) — ver nota en
+        // calcularMovimientoDeposito (07-menu.js).
+        if (d.dif) bits.push(`dif. vs. base: ${d.dif > 0 ? "+" : ""}${d.dif}`);
+        if (d.aDeposito) bits.push(`Depós. ${d.aDeposito > 0 ? "+" : ""}${d.aDeposito}`);
         if (bits.length) partes.push(`${MOV_LBL[k]}: ${bits.join(" / ")}`);
       });
       return partes.length ? partes.join(" · ") : "Sin cambios";

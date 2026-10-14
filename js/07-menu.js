@@ -1424,6 +1424,11 @@ function PlanillaDelDia({
     b10: "bidon10",
     b20: "bidon20"
   };
+  // Base de referencia de sodería (se edita solo desde la pantalla Stock,
+  // acá es de solo lectura). Se usa para saber cuánto es "de más" al
+  // cerrar el día — ver calcularMovimientoDeposito más abajo.
+  const BASE_DEFAULT_REF = { sifon: 150, bidon10: 70, bidon20: 21 };
+  const baseRefFor = sk => stock?.capacidadFija?.[sk] ?? BASE_DEFAULT_REF[sk] ?? 0;
   const llenosCargados = {
     soda: Number(datos.productos?.soda?.llenos || 0),
     b10: Number(datos.productos?.b10?.llenos || 0),
@@ -1617,22 +1622,61 @@ function PlanillaDelDia({
     // diferencias que no le correspondían.
     // Ahora sodería recibe el conteo REAL de hoy tal cual (llenVuelta +
     // vacVuelta, sin escalar) — si devolvieron algo, sube; si se prestó o
-    // se perdió algo, baja. diffDeposito queda solo como dato informativo
-    // (cuánto difiere de lo cargado) para el historial de Movimientos; ya
-    // NO se le suma ni resta al Depósito automáticamente en cada cierre.
-    const diffDeposito = {};
+    // se perdió algo, baja.
+    // SEGUNDA VUELTA 2026-10-14: sodería SÍ se vincula con Depósito, y es
+    // en los DOS sentidos — al cerrar, el total de sodería (lo que quedó
+    // sin cargar + lo que vuelve) se compara contra la Base de ese
+    // producto: si sobra, el excedente pasa a Depósito; si falta, el
+    // faltante se completa automáticamente sacándolo de Depósito (son
+    // envases vacíos sin usar todavía, listos para llenar). Si Depósito no
+    // tiene suficiente para cubrir el faltante, se saca lo que haya y
+    // sodería queda corta en el resto (no se puede sacar de donde no hay).
+    // Ejemplo real del usuario: sodería con Base 20 (bidón 10L), salen 7
+    // cargados, vuelven 1 lleno + 6 vacíos (ventas) + 2 vacíos (una
+    // devolución vieja, sin venta) = 9; más los 13 que quedaron sin cargar
+    // = 22. Como la Base es 20, los 2 de más pasan a Depósito y sodería se
+    // queda en 20.
     const llenVueltaFijo = {},
       vacVueltaFijo = {};
+    const diffBase = {},
+      movDeposito = {}; // > 0: entra a Depósito · < 0: sale de Depósito
     ["soda", "b10", "b20"].forEach(pk => {
-      const esperadoPk = llenosCargados[pk];
-      const vuelveTotalPk = llenVuelta[pk] + vacVuelta[pk];
-      diffDeposito[pk] = vuelveTotalPk - esperadoPk;
+      const sk = planKeyToSkL[pk];
       llenVueltaFijo[pk] = Math.max(0, Math.round(llenVuelta[pk]));
       vacVueltaFijo[pk] = Math.max(0, Math.round(vacVuelta[pk]));
+      const baseRef = baseRefFor(sk);
+      const quedoLleno = (soderiaActual[sk] || 0) + llenVueltaFijo[pk];
+      const quedoVacio = (soderiaVaciosActual[sk] || 0) + vacVueltaFijo[pk];
+      diffBase[pk] = quedoLleno + quedoVacio - baseRef;
+      if (diffBase[pk] > 0) {
+        // Sobra: el excedente sale primero de los vacíos que vuelven (ahí
+        // es donde entran las devoluciones de más); si no alcanza, se saca
+        // de los llenos. Lo que efectivamente se sacó es lo que entra a
+        // Depósito.
+        let restante = diffBase[pk];
+        const deVacios = Math.min(restante, vacVueltaFijo[pk]);
+        vacVueltaFijo[pk] -= deVacios;
+        restante -= deVacios;
+        const deLlenos = Math.min(restante, llenVueltaFijo[pk]);
+        llenVueltaFijo[pk] -= deLlenos;
+        restante -= deLlenos;
+        movDeposito[pk] = deVacios + deLlenos;
+      } else if (diffBase[pk] < 0) {
+        // Falta: se completa con lo que haya en Depósito, como vacíos
+        // (envases sin usar todavía, listos para llenar mañana).
+        const faltante = -diffBase[pk];
+        const disponibleDeposito = stock?.casa?.[sk] || 0;
+        const aTomar = Math.min(faltante, disponibleDeposito);
+        vacVueltaFijo[pk] += aTomar;
+        movDeposito[pk] = -aTomar;
+      } else {
+        movDeposito[pk] = 0;
+      }
     });
     return {
       diffs,
-      diffDeposito,
+      diffBase,
+      movDeposito,
       llenVueltaFijo,
       vacVueltaFijo
     };
@@ -1647,7 +1691,8 @@ function PlanillaDelDia({
     localStorage.setItem(cierreKey, "1"); // marcar como confirmado
     const {
       diffs,
-      diffDeposito,
+      diffBase,
+      movDeposito,
       llenVueltaFijo,
       vacVueltaFijo
     } = calcularMovimientoDeposito();
@@ -1672,6 +1717,10 @@ function PlanillaDelDia({
         const sk = planKeyToSkL[pk];
         s.soderia[sk] = (s.soderia[sk] || 0) + llenVueltaFijo[pk];
         s.soderia_vacios[sk] = (s.soderia_vacios[sk] || 0) + vacVueltaFijo[pk];
+        // Depósito se mueve en los dos sentidos acá — ver nota en
+        // calcularMovimientoDeposito. Si sobró, suma; si faltó y había
+        // stock en depósito, resta (ya viene recortado a lo disponible).
+        if (movDeposito[pk]) s.casa[sk] = Math.max(0, (s.casa[sk] || 0) + movDeposito[pk]);
       });
       syncData && syncData({
         stock: s
@@ -1683,13 +1732,14 @@ function PlanillaDelDia({
       ["soda", "b10", "b20"].forEach(pk => {
         const sk = planKeyToSkL[pk];
         const soderiaVuelta = (llenVueltaFijo[pk] || 0) + (vacVueltaFijo[pk] || 0);
-        const dif = diffDeposito[pk] || 0;
-        // "dif" acá es solo informativo (cuánto difirió del "esperado" de
-        // hoy, por ejemplo una devolución vieja o un préstamo) — ya NO se
-        // aplica a Depósito, ver nota en calcularMovimientoDeposito.
+        const dif = diffBase[pk] || 0;
+        const aDeposito = movDeposito[pk] || 0;
+        // "dif" = cuánto difirió de la Base de sodería; "aDeposito" = lo
+        // que efectivamente se movió con Depósito (+ entra, − sale).
         if (soderiaVuelta || dif) detalleCierre[sk] = {
           soderia: soderiaVuelta,
-          dif
+          dif,
+          aDeposito
         };
       });
       window._lcRegistrarMovimientoStock("cierre", detalleCierre, `Cierre del día ${dia} (${fecha})`);
@@ -1708,8 +1758,8 @@ function PlanillaDelDia({
   // nada, se cierra directo sin molestar con un cartel de más.
   const intentarCerrar = () => {
     if (enviandoCierre) return;
-    const { diffDeposito } = calcularMovimientoDeposito();
-    const hayMovimiento = ["soda", "b10", "b20"].some(pk => diffDeposito[pk] !== 0);
+    const { diffBase } = calcularMovimientoDeposito();
+    const hayMovimiento = ["soda", "b10", "b20"].some(pk => diffBase[pk] !== 0);
     if (hayMovimiento) setMostrarConfirmDeposito(true);else confirmarCierre();
   };
   const setProd = (pid, campo, v) => setDatos(d => ({
@@ -1914,25 +1964,16 @@ function PlanillaDelDia({
       const paraLlenarReal = realesParaLlenar[pk] !== "" ? Number(realesParaLlenar[pk]) * cajon : paraLlenarCalc[pk] * cajon;
       const vacReal = (realesVacios[pk] !== "" ? Number(realesVacios[pk]) * cajon : vaciosRestoCalc[pk] * cajon) + sueltosVV;
       const salio = llenosCargados[pk];
-      const vuelveTotal = llenReal + paraLlenarReal + vacReal;
-      // Sodería solo controla que vuelva todo lo que salió cargado — los
-      // préstamos/devoluciones son un asunto del depósito, no de acá.
-      // Por eso lo esperado se ajusta por los préstamos/devoluciones del
-      // día (ya están incluidos en vacReal vía vaciosRec): si no se ajusta,
-      // esta planilla y confirmarCierre no coinciden y además cada
-      // devolución se cuenta dos veces (ver nota en confirmarCierre).
-      const esperado = salio + devueltosDia[pk] - prestadosDia[pk];
       const quedaLleno = (soderiaActual[planKeyToSk[pk]] || 0) + llenReal;
       const quedaVacio = (soderiaVaciosActual[planKeyToSk[pk]] || 0) + vacReal;
-      // Diferencia entre lo que volvió y lo que salió — esta planilla es
-      // solo control de sodería: si sobra se guarda en el depósito, si
-      // falta (por ejemplo por un préstamo) se descuenta de ahí (ver
-      // confirmarCierre).
-      const diffDeposito = div(vuelveTotal) - div(esperado);
       // Base de referencia de sodería (se edita solo desde la pantalla
       // Stock, acá es de solo lectura para tener el número a la vista).
-      const BASE_DEFAULT_REF = { sifon: 150, bidon10: 70, bidon20: 21 };
-      const baseRef = stock?.capacidadFija?.[planKeyToSk[pk]] ?? BASE_DEFAULT_REF[planKeyToSk[pk]] ?? 0;
+      const baseRef = baseRefFor(planKeyToSk[pk]);
+      // Diferencia contra la BASE (no contra lo que salió cargado) — así
+      // esta previsualización coincide con lo que calcularMovimientoDeposito
+      // va a hacer de verdad al cerrar: si sobra pasa a depósito, si falta
+      // se completa desde depósito (ver esa función en detalle).
+      const diffDeposito = div(quedaLleno + quedaVacio) - div(baseRef);
       const fmtDual = raw => pk === "soda" ? `${raw} sif / ${div(raw)} caj` : `${raw} un`;
       const filaCampo = (titulo, valor, color) => {
         const etiqueta = /*#__PURE__*/React.createElement("span", {
@@ -2138,9 +2179,9 @@ function PlanillaDelDia({
       disabled: enviandoCierre,
       onClick: intentarCerrar
     }, enviandoCierre ? "⏳ Cerrando día..." : "✓ Cerrar día y actualizar stock"), mostrarConfirmDeposito && (() => {
-      const { diffDeposito } = calcularMovimientoDeposito();
+      const { diffBase, movDeposito } = calcularMovimientoDeposito();
       const LBL = { soda: "Sifón", b10: "Bidón 10L", b20: "Bidón 20L" };
-      const filas = ["soda", "b10", "b20"].filter(pk => diffDeposito[pk] !== 0);
+      const filas = ["soda", "b10", "b20"].filter(pk => diffBase[pk] !== 0);
       return /*#__PURE__*/React.createElement("div", {
         style: {
           position: "fixed",
@@ -2169,17 +2210,29 @@ function PlanillaDelDia({
           color: "var(--color-text-primary)",
           marginBottom: 6
         }
-      }, "🔁 Diferencia respecto a lo cargado"), /*#__PURE__*/React.createElement("p", {
+      }, "🔁 Diferencia respecto a la Base"), /*#__PURE__*/React.createElement("p", {
         style: {
           fontSize: 12,
           color: "var(--color-text-tertiary)",
           margin: "0 0 12px"
         }
-      }, "Hoy sodería va a quedar con más o menos de lo que salió cargado (por una devolución, un préstamo, etc.) — así va a terminar:"), filas.map(pk => {
-        const diff = diffDeposito[pk];
+      }, "Hoy sodería va a quedar con más o menos que su Base (por una devolución, un préstamo, etc.) — la diferencia se ajusta con Depósito:"), filas.map(pk => {
+        const diff = diffBase[pk];
+        const mov = movDeposito[pk] || 0;
         const cajon = pk === "soda" ? CAJON : 1;
         const cant = pk === "soda" ? Math.round(Math.abs(diff) / cajon) : Math.abs(diff);
+        const movCant = pk === "soda" ? Math.round(Math.abs(mov) / cajon) : Math.abs(mov);
         const unidad = pk === "soda" ? (cant === 1 ? "cajón" : "cajones") : cant === 1 ? "unidad" : "unidades";
+        let texto;
+        if (diff > 0) {
+          texto = `+ ${cant} ${unidad} de más → pasan a Depósito`;
+        } else if (movCant >= cant) {
+          texto = `− ${cant} ${unidad} de menos → se completan desde Depósito`;
+        } else if (movCant > 0) {
+          texto = `− ${cant} ${unidad} de menos → Depósito solo cubre ${movCant}, queda corto el resto`;
+        } else {
+          texto = `− ${cant} ${unidad} de menos → Depósito no tiene stock para cubrir esto`;
+        }
         return /*#__PURE__*/React.createElement("div", {
           key: pk,
           style: {
@@ -2196,7 +2249,7 @@ function PlanillaDelDia({
             fontWeight: 600,
             color: diff > 0 ? "var(--color-text-success)" : "var(--color-text-warning)"
           }
-        }, diff > 0 ? `+ ${cant} ${unidad} de más` : `− ${cant} ${unidad} de menos`));
+        }, texto));
       }), /*#__PURE__*/React.createElement("div", {
         style: {
           display: "flex",
