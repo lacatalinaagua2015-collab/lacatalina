@@ -871,6 +871,16 @@ function DetalleVentasDia({
         bg: "var(--color-background-warning)",
         color: "var(--color-text-warning)",
         txt: "Fiado"
+      },
+      cambio: {
+        bg: "rgba(129,140,248,0.15)",
+        color: "#818cf8",
+        txt: "🔄 Cambio"
+      },
+      devolucion: {
+        bg: "rgba(29,158,117,0.15)",
+        color: "#1D9E75",
+        txt: "↩️ Devolución"
       }
     }[v.pago] || {
       bg: "var(--color-background-tertiary)",
@@ -890,6 +900,7 @@ function DetalleVentasDia({
     const esCobro = v.pagadoNum > 0 && v.neto === 0 && !v._esAjuste;
     const esAjuste = v._esAjuste || false;
     const esCambio = v._esCambio || false;
+    const esDevolucion = v._esDevolucion || false;
     const esCompraReal = !esCobro && !esAjuste && !esCambio;
     const cardStyle = {
       padding: "10px 16px",
@@ -941,7 +952,7 @@ function DetalleVentasDia({
         padding: "3px 8px"
       },
       onClick: () => {
-        const tipo = esCobro ? "este cobro" : esAjuste ? "este ajuste" : esCambio ? "este cambio" : "esta venta";
+        const tipo = esCobro ? "este cobro" : esAjuste ? "este ajuste" : esDevolucion ? "esta devolución" : esCambio ? "este cambio" : "esta venta";
         if (window.confirm(`¿Eliminar ${tipo}?`)) onEliminarVenta(v.id);
       }
     }, "🗑 Eliminar")) : null;

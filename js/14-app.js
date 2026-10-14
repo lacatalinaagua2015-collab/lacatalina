@@ -2407,7 +2407,7 @@ function App() {
     };
     // Auto-detectar envases prestados (solo si no es cobro de deuda)
     const envAutoDetect = [];
-    if (opcionSaldo !== "cobro_deuda" && opcionSaldo !== "cambio_envase") {
+    if (opcionSaldo !== "cobro_deuda" && opcionSaldo !== "cambio_envase" && opcionSaldo !== "devolucion_envase") {
       const mapa = {
         sifon: "Sifón 1.5L",
         bidon10: "Bidón 10L",
@@ -2460,6 +2460,14 @@ function App() {
       } : {}),
       ...(opcionSaldo === "cambio_envase" ? {
         _esCambio: true,
+        neto: 0,
+        bruto: 0,
+        costo: 0,
+        ganancia: 0
+      } : {}),
+      ...(opcionSaldo === "devolucion_envase" ? {
+        _esCambio: true,
+        _esDevolucion: true,
         neto: 0,
         bruto: 0,
         costo: 0,
@@ -2527,7 +2535,7 @@ function App() {
     // Prospecto → cliente fijo automático: a la 5ta compra real en su día
     // (esta cuenta si no es un cobro de deuda ni un cambio de envase) se
     // confirma solo, sin botón — pedido explícito del usuario.
-    const esVentaReal = opcionSaldo !== "cobro_deuda" && opcionSaldo !== "cambio_envase";
+    const esVentaReal = opcionSaldo !== "cobro_deuda" && opcionSaldo !== "cambio_envase" && opcionSaldo !== "devolucion_envase";
     const comprasPrevias = ventas.filter(v => v.clienteId === c.id && !v._esCobro && !v._esAjuste && !v._esAjusteEnvases && !v._esCambio && !v._esMixtoTrans).length;
     const totalComprasConEsta = comprasPrevias + (esVentaReal ? 1 : 0);
     const confirmarProspecto = c.esProspecto && totalComprasConEsta >= 5;

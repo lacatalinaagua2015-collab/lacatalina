@@ -1123,7 +1123,7 @@ function NuevaVenta({
         border: mostrarCambio ? "none" : undefined
       },
       onClick: () => setMostrarCambio(m => !m)
-    }, "🔄 Cambio de envase")),
+    }, "🔄 Cambio/Devolución")),
     mostrarMas && !ventaEditar && mostrarRotoCompacto && dispenser && /*#__PURE__*/React.createElement("div", {
       style: {
         ...s.card,
@@ -1155,19 +1155,20 @@ function NuevaVenta({
     mostrarMas && !ventaEditar && mostrarCambio && /*#__PURE__*/React.createElement(CambioEnvasePanel, {
       productos: productos,
       onConfirmar: (productoViejo, productoNuevo, motivo) => {
-        const obsTxt = `Cambio: ${productoViejo} → ${productoNuevo}${motivo.trim() ? ` · ${motivo.trim()}` : ""}`;
+        const esDevol = !productoNuevo;
+        const obsTxt = esDevol ? `Devolución: ${productoViejo}${motivo.trim() ? ` · ${motivo.trim()}` : ""}` : `Cambio: ${productoViejo} → ${productoNuevo}${motivo.trim() ? ` · ${motivo.trim()}` : ""}`;
         onGuardar([{
-          nombre: "Cambio de envase",
+          nombre: esDevol ? "Devolución de envase" : "Cambio de envase",
           cantidad: 1,
           precio: 0,
           total: 0
-        }], "cambio", "0", 0, [{
+        }], esDevol ? "devolucion" : "cambio", "0", 0, esDevol ? [] : [{
           prod: productoNuevo,
           cant: 1
         }], [{
           prod: productoViejo,
           cant: 1
-        }], obsTxt, "cambio_envase");
+        }], obsTxt, esDevol ? "devolucion_envase" : "cambio_envase");
         setMostrarCambio(false);
       },
       onCancelar: () => setMostrarCambio(false)
