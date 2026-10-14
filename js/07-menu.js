@@ -776,6 +776,7 @@ function DetalleVentasDia({
   ventas,
   clientes,
   noVisitas,
+  dia,
   fecha,
   productos,
   todasLasVentas,
@@ -783,9 +784,14 @@ function DetalleVentasDia({
   onEliminarVenta,
   onEditarCliente,
   onPerdidaCliente,
-  onConfirmarTransfer
+  onConfirmarTransfer,
+  onRegistrarNoVisita,
+  onQuitarNoVisita
 }) {
   const [abierto, setAbierto] = React.useState(false);
+  // Fila de "No compraron" cuyo menú de edición está desplegado (clienteId o null) —
+  // para poder corregir la marca si se tocó sin querer o se marcó mal.
+  const [editandoNVId, setEditandoNVId] = React.useState(null);
   // Qué venta se está editando in-place (solo aplica a compras reales —
   // cobros/ajustes/cambios de envase solo se pueden eliminar, no editar,
   // mismo criterio que el historial del perfil del cliente).
@@ -1136,12 +1142,86 @@ function DetalleVentasDia({
           color: info.c,
           flexShrink: 0
         }
-      }, info.ic, " ", info.t)), p.id && /*#__PURE__*/React.createElement(PieEnvases, {
+      }, info.ic, " ", info.t)), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 6,
+          marginTop: 8
+        }
+      }, p.id && /*#__PURE__*/React.createElement(PieEnvases, {
         c: p,
         ventas: todasLasVentas || [],
         onEditar: onEditarCliente,
         onPerdidaCliente: onPerdidaCliente
-      }));
+      }), (onRegistrarNoVisita || onQuitarNoVisita) && /*#__PURE__*/React.createElement("button", {
+        style: {
+          fontSize: 11,
+          fontWeight: 600,
+          padding: "5px 12px",
+          borderRadius: 20,
+          cursor: "pointer",
+          background: editandoNVId === n.clienteId ? "var(--color-background-info)" : "var(--color-background-tertiary)",
+          color: editandoNVId === n.clienteId ? "var(--color-text-info)" : "var(--color-text-secondary)",
+          border: editandoNVId === n.clienteId ? "1px solid var(--color-border-info)" : "0.5px solid var(--color-border-secondary)"
+        },
+        onClick: () => setEditandoNVId(editandoNVId === n.clienteId ? null : n.clienteId)
+      }, "✏️ Editar")), editandoNVId === n.clienteId && /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 6,
+          marginTop: 8,
+          paddingTop: 8,
+          borderTop: "0.5px dashed var(--color-border-tertiary)"
+        }
+      }, /*#__PURE__*/React.createElement("button", {
+        style: {
+          fontSize: 11,
+          fontWeight: 600,
+          padding: "5px 12px",
+          borderRadius: 20,
+          cursor: "pointer",
+          background: "var(--color-background-warning)",
+          color: "var(--color-text-warning)",
+          border: "1px solid var(--color-border-warning)"
+        },
+        onClick: () => {
+          onRegistrarNoVisita && onRegistrarNoVisita(n.clienteId, "noesta");
+          setEditandoNVId(null);
+        }
+      }, "🚪 No estaba"), /*#__PURE__*/React.createElement("button", {
+        style: {
+          fontSize: 11,
+          fontWeight: 600,
+          padding: "5px 12px",
+          borderRadius: 20,
+          cursor: "pointer",
+          background: "var(--color-background-danger)",
+          color: "var(--color-text-danger)",
+          border: "1px solid var(--color-border-danger)"
+        },
+        onClick: () => {
+          onRegistrarNoVisita && onRegistrarNoVisita(n.clienteId, "noquiso");
+          setEditandoNVId(null);
+        }
+      }, "🙅 No quiso"), /*#__PURE__*/React.createElement("button", {
+        style: {
+          fontSize: 11,
+          fontWeight: 600,
+          padding: "5px 12px",
+          borderRadius: 20,
+          cursor: "pointer",
+          background: "var(--color-background-tertiary)",
+          color: "var(--color-text-secondary)",
+          border: "0.5px solid var(--color-border-secondary)"
+        },
+        onClick: () => {
+          onQuitarNoVisita && onQuitarNoVisita(n.clienteId);
+          setEditandoNVId(null);
+        }
+      }, "🗑️ Quitar marca")));
     }));
   })()));
 }
@@ -2658,6 +2738,7 @@ function PlanillaDelDia({
     ventas: todasVentasDia,
     clientes: clientes,
     noVisitas: noVisitas,
+    dia: dia,
     fecha: fecha,
     productos: productos,
     todasLasVentas: todasLasVentas,
@@ -2665,7 +2746,9 @@ function PlanillaDelDia({
     onEliminarVenta: onEliminarVenta,
     onEditarCliente: onEditarCliente,
     onPerdidaCliente: onPerdidaCliente,
-    onConfirmarTransfer: onConfirmarTransfer
+    onConfirmarTransfer: onConfirmarTransfer,
+    onRegistrarNoVisita: onRegistrarNoVisita,
+    onQuitarNoVisita: onQuitarNoVisita
   }) : /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,

@@ -220,7 +220,7 @@ function _lcDedupMantVeh(arr) {
 function App() {
   const [pantalla, setPantalla] = useState(() => {
     const h = window.location.hash.slice(1) || "portada";
-    const needsDia = ["selectorFechaPlanilla", "inicioReparto", "clientes", "detalleCliente", "venta", "planilla"]; // historial does NOT need dia
+    const needsDia = ["diaPrincipal", "selectorFechaClientes", "selectorFechaPlanilla", "inicioReparto", "clientes", "detalleCliente", "venta", "planilla"]; // historial does NOT need dia
     const savedDia = (() => {
       try {
         return JSON.parse(localStorage.getItem("cat_dia_actual") || '""');
@@ -231,18 +231,6 @@ function App() {
     if (needsDia.includes(h) && !savedDia) return "portada";
     return h;
   });
-  // Base del historial: así, al navegar hacia adelante con irA() (que
-  // apila entradas) y volver con "Volver" (window.history.back()), el
-  // primer "atrás" aterriza en esta pantalla inicial en vez de salir de
-  // la app. Se hace una sola vez al montar (replaceState, no pushState:
-  // no agrega una entrada nueva, solo etiqueta la que ya existe).
-  React.useEffect(() => {
-    try {
-      window.history.replaceState({
-        pantalla
-      }, '', `#${pantalla}`);
-    } catch (e) {}
-  }, []);
   const [diaActual, setDiaActual] = useLS("cat_dia_actual", "");
   // Reset diaActual when it's invalid
   React.useEffect(() => {
@@ -255,11 +243,11 @@ function App() {
   // donde volver despues: directo a la planilla, o a la lista de clientes.
   const [origenFecha, setOrigenFecha] = useState("clientes");
   // Si se entró a "clientes" con el atajo directo desde el menú (tocando el
-  // día, cuando el camión ya estaba cargado hoy — salta selectorFechaPlanilla,
-  // que ahora es la única pantalla de selección de fecha, para Planilla o
-  // Clientes), "Volver" tiene que volver directo al menú también. Si no,
-  // "Volver" quedaba yendo por el camino largo de siempre (selectorFechaPlanilla
-  // → menu = 2 pasos) aunque entrar había sido 1 solo paso.
+  // día, cuando el camión ya estaba cargado hoy — salta diaPrincipal y
+  // selectorFechaClientes), "Volver" tiene que volver directo al menú
+  // también. Si no, "Volver" quedaba yendo por el camino largo de siempre
+  // (selectorFechaClientes → diaPrincipal → menu = 3 pasos) aunque entrar
+  // había sido 1 solo paso.
   const [origenClientes, setOrigenClientes] = useState(null);
   // Antes había 2 pantallas de perfil de cliente casi idénticas: una para
   // cuando entrabas desde Clientes del día ("detalleCliente") y otra para
@@ -343,71 +331,6 @@ function App() {
       return next;
     });
   };
-  // Registro de correcciones manuales de envases (♻️ Envases, en PieEnvases —
-  // 04-componentes.js) — deja constancia de qué cliente, qué cambió (Fijos o
-  // Prestados, por producto) y los valores antes/después, para poder revisar
-  // más adelante quién corrigió qué (pedido del usuario, a raíz de encontrar
-  // clientes con envases "de más" sin poder saber qué había pasado).
-  const [ajustesEnvases, setAjustesEnvases] = useLS("cat_ajustesenvases_v1", []);
-  const registrarAjusteEnvases = (clienteId, clienteNombre, cambios) => {
-    if (!cambios || !cambios.length) return;
-    setAjustesEnvases(prev => {
-      const next = [...prev, {
-        id: Date.now() + "_" + Math.random().toString(36).slice(2, 7),
-        fecha: new Date().toLocaleString("es-AR"),
-        fechaKey: new Date().toLocaleDateString("en-CA"),
-        clienteId,
-        clienteNombre: clienteNombre || null,
-        cambios,
-        _upd: Date.now()
-      }];
-      syncData({
-        ajustesEnvases: next
-      });
-      return next;
-    });
-  };
-  // Expuesto en window para que PieEnvases lo llame sin tener que pasar un
-  // prop nuevo por las 6 pantallas donde se usa (mismo patrón que
-  // window._lcIrA más abajo).
-  React.useEffect(() => {
-    window._lcRegistrarAjusteEnvases = registrarAjusteEnvases;
-    return () => {
-      if (window._lcRegistrarAjusteEnvases === registrarAjusteEnvases) delete window._lcRegistrarAjusteEnvases;
-    };
-  });
-  // Registro de movimientos internos de stock entre Sodería y Depósito —
-  // el cierre del día (confirmarCierre, 07-menu.js) y el relleno semanal de
-  // los lunes mueven stock automáticamente; antes no quedaba rastro de
-  // cuánto se movió ni cuándo. "detalle" trae, por producto, lo que se
-  // transfirió en ese movimiento puntual.
-  const [movStock, setMovStock] = useLS("cat_movstock_v1", []);
-  const registrarMovimientoStock = (tipo, detalle, nota) => {
-    if (!detalle || !Object.keys(detalle).length) return;
-    setMovStock(prev => {
-      const next = [...prev, {
-        id: Date.now() + "_" + Math.random().toString(36).slice(2, 7),
-        fecha: new Date().toLocaleString("es-AR"),
-        fechaKey: new Date().toLocaleDateString("en-CA"),
-        tipo,
-        detalle,
-        nota: nota || null,
-        _upd: Date.now()
-      }];
-      syncData({
-        movStock: next
-      });
-      return next;
-    });
-  };
-  // Expuesto en window para que 07-menu.js (cierre del día) lo llame sin
-  // prop-drilling (mismo patrón que window._lcRegistrarAjusteEnvases).
-  React.useEffect(() => {
-    window._lcRegistrarMovimientoStock = registrarMovimientoStock;
-    return () => {
-      if (window._lcRegistrarMovimientoStock === registrarMovimientoStock) delete window._lcRegistrarMovimientoStock;
-    };
-  });
   const [recordatorios, setRecordatorios] = useLS("cat_recordatorios_v1", []);
   // recordatorio: {id, clienteId, clienteNombre, fecha, hora, motivo, dia, confirmado}
   // BUG REPORTADO: clientes (y productos/recordatorios) borrados volvían a
@@ -497,10 +420,9 @@ function App() {
   // Cuando se toca "Convertir en cliente" en un prospecto, se guarda acá
   // para precargar el formulario de Nuevo Cliente con nombre/teléfono/dirección.
   const [prospectoAConvertir, setProspectoAConvertir] = useState(null);
-  // Se usaba para precargar el checkbox "Es prospecto" al entrar desde el
-  // botón "Promociones" (eliminado: era la misma pantalla que Nuevo
-  // Cliente, solo con ese checkbox tildado). El checkbox sigue existiendo
-  // en el formulario de Nuevo Cliente; ahora se tilda a mano.
+  // "Promociones" ahora carga el prospecto directo como cliente (con el
+  // checkbox "Es prospecto" tildado) en vez de una lista aparte — bandera
+  // para precargar ese checkbox al entrar a Nuevo cliente desde ese botón.
   const [nuevoEsProspecto, setNuevoEsProspecto] = useState(false);
   const [clientes, setClientes] = useLS("cat_clientes_v3", CLIENTES_INICIALES);
   const [ventasRaw, setVentasRaw] = useLS("cat_ventas_v3", []);
@@ -579,6 +501,7 @@ function App() {
       soderia: e(),
       soderia_vacios: e(),
       casa: e(),
+      camion: e(),
       capacidadFija: { ...BASE_DEFAULT_FIJA }
     };
     if (!s || typeof s !== "object") return base;
@@ -587,6 +510,7 @@ function App() {
         soderia: pick(s.soderia),
         soderia_vacios: pick(s.soderia_vacios),
         casa: pick(s.casa),
+        camion: e(), /* auto-heal: "camion" es vestigial (nada lo incrementa, solo se le resta al cerrar el dia); cualquier valor viejo es basura y se descarta en cada lectura para que nunca vuelva a inflar el Total General */
         capacidadFija: pickFija(s.capacidadFija)
       };
     }
@@ -595,6 +519,7 @@ function App() {
       soderia: pick(s),
       soderia_vacios: e(),
       casa: e(),
+      camion: e(),
       capacidadFija: pickFija(s.capacidadFija)
     };
   };
@@ -612,6 +537,12 @@ function App() {
       dispenser: 0
     },
     casa: {
+      sifon: 0,
+      bidon10: 0,
+      bidon20: 0,
+      dispenser: 0
+    },
+    camion: {
       sifon: 0,
       bidon10: 0,
       bidon20: 0,
@@ -638,20 +569,14 @@ function App() {
     const normalized = normStock(stockRaw);
     if (JSON.stringify(normalized) !== JSON.stringify(stockRaw)) setStockRaw(normalized);
   }, []);
-  // Relleno automático de sodería los lunes: la sodería queda a full (según
-  // la "Base"/capacidadFija configurada en Stock), sacando lo que falte del
-  // Depósito (o devolviéndole lo que sobre) — nunca "de la nada". Los
-  // envases nuevos solo entran cargándolos en el Depósito; este relleno no
-  // crea stock, solo mueve Depósito↔Sodería (CORRECCIÓN 2026-10-11: antes
-  // forzaba la sodería a la Base sin tocar el depósito, inflando el total
-  // general cada lunes que hubiera préstamos activos). De ahí en más el
-  // número baja solo con los movimientos normales del día a día (InicioReparto
-  // descuenta de sodería al cargar el reparto; el cierre del día —
-  // confirmarCierre, 07-menu.js — recalcula sodería/depósito con los números
-  // reales de la jornada). Se corre UNA sola vez por semana — se guarda la
-  // fecha del lunes ya aplicado en localStorage para no volver a pisar el
-  // número si se recarga la app el mismo lunes después de haber
-  // cargado/vendido algo.
+  // Relleno automático de sodería los lunes: llega la producción de la
+  // semana y la sodería queda a full (según la "Base"/capacidadFija
+  // configurada en Stock). De ahí en más el número baja solo con los
+  // movimientos normales del día a día (InicioReparto descuenta al cargar
+  // el camión, cerrarCamion devuelve el sobrante al cerrar el día). Se
+  // corre UNA sola vez por semana — se guarda la fecha del lunes ya
+  // aplicado en localStorage para no volver a pisar el número si se
+  // recarga la app el mismo lunes después de haber cargado/vendido algo.
   React.useEffect(() => {
     const hoy = new Date();
     if (hoy.getDay() !== 1) return; // 1 = lunes
@@ -659,30 +584,32 @@ function App() {
     if (localStorage.getItem("lc_stock_relleno_lunes") === hoyKey) return;
     setStock(prev => {
       const s = JSON.parse(JSON.stringify(normStock(prev)));
-      const detalleRelleno = {};
-      // El total general (Sodería + Depósito + Clientes) no cambia solo —
-      // los envases nuevos entran SIEMPRE por el Depósito (si no se cargaron
-      // ahí, no existen). Este relleno no "crea" stock: lo que falta en
-      // Sodería para llegar a la Base se saca del Depósito, y si sobra, se
-      // devuelve al Depósito — igual criterio que el cierre del día.
-      if (!s.casa) s.casa = { sifon: 0, bidon10: 0, bidon20: 0, dispenser: 0 };
       ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
-        const antes = (s.soderia[k] || 0) + (s.soderia_vacios[k] || 0);
-        const base = s.capacidadFija?.[k] || 0;
-        const delta = base - antes; // falta (+) o sobra (-) para llegar a la Base
-        s.soderia[k] = base;
+        s.soderia[k] = s.capacidadFija?.[k] || 0;
         s.soderia_vacios[k] = 0;
-        s.casa[k] = Math.max(0, (s.casa[k] || 0) - delta);
-        if (delta !== 0) detalleRelleno[k] = delta;
       });
       syncData({
         stock: s
       });
-      registrarMovimientoStock("relleno_lunes", detalleRelleno, "Sodería repuesta a la Base (desde/hacia Depósito)");
       return s;
     });
     localStorage.setItem("lc_stock_relleno_lunes", hoyKey);
   }, []);
+  // Helper: transferir del camión a sodería al cerrar el día
+  const cerrarCamion = (sobrLlenos, vacios) => {
+    setStock(prev => {
+      const s = JSON.parse(JSON.stringify(normStock(prev)));
+      ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
+        s.soderia[k] = (s.soderia[k] || 0) + (sobrLlenos[k] || 0);
+        s.soderia_vacios[k] = (s.soderia_vacios[k] || 0) + (vacios[k] || 0);
+        s.camion[k] = Math.max(0, (s.camion[k] || 0) - (sobrLlenos[k] || 0) - (vacios[k] || 0));
+      });
+      syncData({
+        stock: s
+      });
+      return s;
+    });
+  };
   const [planillas, setPlanillas] = useLS("cat_planillas_v1", {});
   // Cargas de salida por día — declarado acá arriba para que estadoRef pueda incluirlo y viaje a Firebase
   const [cargasDia, setCargasDia] = useLS("cat_cargas_dia_v1", CARGA_DIA_DEFAULT);
@@ -697,6 +624,7 @@ function App() {
   const [darkMode, setDarkMode] = useLS("cat_darkmode", false); // ya no controla el tema — ver 01-temas.js
   const [tabConfig, setTabConfig] = useState("stock");
   const [zonasReparto, setZonasReparto] = useLS("cat_zonas_v1", {});
+  const [modalResumenDia, setModalResumenDia] = useState(null); // {dia, fechaKey}
   const [scaleIdx, setScaleIdx] = useLS("cat_scale_v1", 1); // 0=S 1=M 2=L 3=XL
   const SCALES = [0.82, 1.0, 1.18, 1.36];
   const SCALE_LABELS = ["S", "M", "L", "XL"];
@@ -1128,6 +1056,11 @@ function App() {
             sifon: 0,
             bidon10: 0,
             bidon20: 0
+          },
+          camion: {
+            sifon: 0,
+            bidon10: 0,
+            bidon20: 0
           }
         };
         const remoteUpdStock = Number(ds._upd) || 0;
@@ -1275,8 +1208,6 @@ function App() {
         }
       };
       _mergeSimple(data.dispMovs, "cat_dispmovs_v1", setDispMovs, "dispMovs", "movimientos de dispenser");
-      _mergeSimple(data.ajustesEnvases, "cat_ajustesenvases_v1", setAjustesEnvases, "ajustesEnvases", "ajustes de envases");
-      _mergeSimple(data.movStock, "cat_movstock_v1", setMovStock, "movStock", "movimientos de stock");
       _mergeSimple(data.prospectos, "cat_prospectos_v1", setProspectos, "prospectos", "prospectos");
       // ── noVisitas: MERGEAR en vez de sobreescribir (mismo problema que clientes/planillas) ──
       // Acá vive "No está" / "No quiere" / "Saltar". Sin esto, una marca recién
@@ -1517,8 +1448,6 @@ function App() {
     recordatorios,
     cargasDia,
     dispMovs,
-    ajustesEnvases,
-    movStock,
     prospectos
   });
   React.useEffect(() => {
@@ -1536,8 +1465,6 @@ function App() {
       // Faltaban acá: por eso no entraban ni al respaldo manual descargable
       // ni a lo que "Restaurar" vuelve a subir a la nube.
       dispMovs,
-      ajustesEnvases,
-      movStock,
       prospectos
     };
   });
@@ -2067,6 +1994,11 @@ function App() {
               sifon: 0,
               bidon10: 0,
               bidon20: 0
+            },
+            camion: {
+              sifon: 0,
+              bidon10: 0,
+              bidon20: 0
             }
           };
           setStock(ns);
@@ -2080,8 +2012,6 @@ function App() {
         if (data.zonasReparto !== undefined) setZonasReparto(data.zonasReparto || {});
         if (data.cargasDia && Object.keys(data.cargasDia).length) setCargasDia(data.cargasDia);
         if (data.dispMovs !== undefined) setDispMovs(data.dispMovs || []);
-        if (data.ajustesEnvases !== undefined) setAjustesEnvases(data.ajustesEnvases || []);
-        if (data.movStock !== undefined) setMovStock(data.movStock || []);
         if (data.prospectos !== undefined) setProspectos(data.prospectos || []);
         // Subir lo restaurado a la nube, SIN BORRAR.
         //
@@ -2208,7 +2138,7 @@ function App() {
     menu: "menu"
   })[origenDetalle] || "clientes";
   const irA = p => {
-    const needsDia = ["selectorFechaPlanilla", "inicioReparto", "clientes", "detalleCliente", "venta", "planilla"]; // historial does NOT need dia
+    const needsDia = ["diaPrincipal", "selectorFechaClientes", "selectorFechaPlanilla", "inicioReparto", "clientes", "detalleCliente", "venta", "planilla"]; // historial does NOT need dia
     if (needsDia.includes(p) && !diaActual) {
       setPantalla("menu");
       window.history.pushState({
@@ -2243,12 +2173,10 @@ function App() {
     setJarvisAgendaInicial(datos);
     irA("agenda");
   };
-  // Ya no existe una pantalla aparte "Día Principal" (se sacó por duplicar
-  // lo que ya muestra la fila del día en el Menú al expandirse) — el comando
-  // de voz "andá al día X" ahora deja el día elegido y vuelve al Menú.
+  // Mismo destino que tocar el día en el Menú, o su atajo "Ver planilla".
   const jarvisIrDia = d => {
     setDiaActual(d);
-    irA("menu");
+    irA("diaPrincipal");
   };
   const jarvisIrPlanillaDia = d => {
     setDiaActual(d);
@@ -2258,14 +2186,14 @@ function App() {
     setDiaActual(d);
     const yaIniciado = fechaActual && planillas[`${d}_${fechaActual}`]?.iniciado;
     setOrigenClientes(yaIniciado ? "menu" : null);
-    irA(yaIniciado ? "clientes" : "selectorFechaPlanilla");
+    irA(yaIniciado ? "clientes" : "selectorFechaClientes");
   };
 
   // Handle back button
   React.useEffect(() => {
     const handler = e => {
       const p = e.state?.pantalla || "portada";
-      const needsDia = ["selectorFechaPlanilla", "inicioReparto", "clientes", "detalleCliente", "venta", "planilla"]; // historial does NOT need dia
+      const needsDia = ["diaPrincipal", "selectorFechaClientes", "selectorFechaPlanilla", "inicioReparto", "clientes", "detalleCliente", "venta", "planilla"]; // historial does NOT need dia
       if (needsDia.includes(p) && !diaActual) {
         setPantalla("menu");
         return;
@@ -2380,9 +2308,9 @@ function App() {
       if (k) tots[k].vacios += d.cantidad;
     }));
     const sodaCajones = Math.floor(tots.soda.vacios / CAJON_SODA) || 0;
-    const cobEfectivo = ventasDia.filter(v => v.pago === "contado").reduce((a, v) => a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0);
+    const cobEfectivo = ventasDia.filter(v => v.pago === "contado").reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
     const cobFiado = ventasDia.filter(v => v.pago === "fiado").reduce((a, v) => a + (v.neto || 0), 0);
-    const cobTransBruto = ventasDia.filter(v => v.pago === "transferencia").reduce((a, v) => a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0);
+    const cobTransBruto = ventasDia.filter(v => v.pago === "transferencia").reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
     const cobTransDesc = Math.round(cobTransBruto * 0.025);
     const planillaKey = `${diaActual}_${fechaActual}`;
     const planillaActual = planillas[planillaKey] || planillaDiaVacia();
@@ -2457,46 +2385,18 @@ function App() {
       firma: firmaReg,
       ts: ahoraReg
     };
-    // Auto-detectar envases prestados (solo si no es cobro de deuda).
-    // OJO: si el Fijo de un producto está en 0 (cliente nuevo al que nunca
-    // se le cargó, o quedó desactualizado), ANTES esto tomaba TODA la
-    // cantidad vendida como préstamo, en CADA visita, para siempre — así
-    // se inflaban "Prestados" sin que nadie prestara nada en la realidad
-    // (era solo un envase-por-envase normal). Ahora, cuando el Fijo está en
-    // 0, primero se fija solo mirando el propio historial del cliente — sin
-    // preguntar nada — antes de asumir que es un préstamo real:
-    //  · primera vez que se le vende ese producto → esa cantidad pasa a ser
-    //    el Fijo (es lo normal, no un préstamo).
-    //  · si ya se le vendió antes y las últimas 2 veces fue la MISMA
-    //    cantidad que ahora → también se autoconfigura el Fijo (quedó claro
-    //    que es su pedido habitual, no un préstamo puntual).
-    // En cualquier otro caso (Fijo ya cargado, o cantidad irregular) se
-    // sigue detectando como préstamo real, igual que antes.
+    // Auto-detectar envases prestados (solo si no es cobro de deuda)
     const envAutoDetect = [];
-    const fijosAutoAjuste = {};
     if (opcionSaldo !== "cobro_deuda" && opcionSaldo !== "cambio_envase") {
-      const campoFijo = {
-        "Sifón 1.5L": "sifon",
-        "Bidón 10L": "bidon10",
-        "Bidón 20L": "bidon20"
+      const mapa = {
+        sifon: "Sifón 1.5L",
+        bidon10: "Bidón 10L",
+        bidon20: "Bidón 20L"
       };
       detalle.forEach(d => {
-        const k = campoFijo[d.nombre];
-        if (!k) return;
-        const asignado = Number(c[k]) || 0;
+        const asignado = d.nombre === "Sifón 1.5L" ? c.sifon || 0 : d.nombre === "Bidón 10L" ? c.bidon10 || 0 : d.nombre === "Bidón 20L" ? c.bidon20 || 0 : 0;
         const extra = d.cantidad - asignado;
-        if (extra <= 0) return;
-        if ((envPrest || []).some(ep => ep.prod === d.nombre)) return; // ya lo cargó a mano
-        if (asignado === 0) {
-          const cantsPrevias = ventas.filter(v => v.clienteId === c.id && !v._esCobro && !v._esCambio).map(v => (v.detalle || []).find(x => x.nombre === d.nombre)?.cantidad).filter(cant => cant !== undefined);
-          const esPrimeraVez = cantsPrevias.length === 0;
-          const ultimasDosIguales = cantsPrevias.length >= 2 && cantsPrevias.slice(-2).every(cant => cant === d.cantidad);
-          if (esPrimeraVez || ultimasDosIguales) {
-            fijosAutoAjuste[k] = d.cantidad;
-            return;
-          }
-        }
-        envAutoDetect.push({
+        if (extra > 0) envAutoDetect.push({
           prod: d.nombre,
           cant: String(extra)
         });
@@ -2613,7 +2513,6 @@ function App() {
     const confirmarProspecto = c.esProspecto && totalComprasConEsta >= 5;
     saveClientes(prev => aplicarMovimientoEnvases(prev, ventas, c.id, nuevaVenta.envPrest, nuevaVenta.envDev).map(c2 => c2.id === c.id ? {
       ...c2,
-      ...fijosAutoAjuste,
       saldo: (Number(c2.saldo) || 0) + saldoExtra,
       ...(confirmarProspecto ? { esProspecto: false } : {})
     } : c2));
@@ -3039,7 +2938,7 @@ function App() {
       saveVentas(prev => prev.filter(v => !ids.has(v.id)));
     }
   }, [ventas]);
-  const editarVenta = (ventaId, detalle, pago, montoPagado, saldoAplicado, obs, montoTrans2, transConfirmadaNueva) => {
+  const editarVenta = (ventaId, detalle, pago, montoPagado, saldoAplicado, obs, montoTrans2) => {
     // Guard anti doble-tap: ignora una segunda edición IDÉNTICA de la MISMA
     // venta dentro de 2s (mismo motivo que el guard de eliminarVenta).
     const firmaEdit = JSON.stringify({
@@ -3048,8 +2947,7 @@ function App() {
       pago,
       montoPagado,
       saldoAplicado,
-      montoTrans2,
-      transConfirmadaNueva
+      montoTrans2
     });
     const ahoraEdit = Date.now();
     if (ultimoEditadoRef.current.firma === firmaEdit && ahoraEdit - ultimoEditadoRef.current.ts < 2000) {
@@ -3112,7 +3010,6 @@ function App() {
         montoEfec: esMixto ? ef : 0,
         montoTrans: tr,
         ...(montoYaCobrado > 0 ? { _pagada: false, _montoPagadoAcum: 0 } : {}),
-        transConfirmada: pagoReal === "transferencia" ? !!transConfirmadaNueva : false,
         _upd: Date.now()
       } : v);
       if (esMixto && tr > 0) {
@@ -3143,7 +3040,7 @@ function App() {
           envDev: [],
           _esMixtoTrans: true,
           _mixtoDe: ventaId,
-          transConfirmada: !!transConfirmadaNueva,
+          transConfirmada: transConfirmadaPrevia,
           _upd: Date.now()
         };
         nev = [...nev, ventaTr];
@@ -3217,6 +3114,10 @@ function App() {
     onIngresar: () => irA("menu")
   }), pantalla === "menu" && /*#__PURE__*/React.createElement(MenuDias, {
     dias: DIAS,
+    onDia: d => {
+      setDiaActual(d);
+      irA("diaPrincipal");
+    },
     onPlanillaAtajo: () => irA("atajoPlanillaSemana"),
     onResumen: () => irA("resumen"),
     onConfig: tab => {
@@ -3227,7 +3128,11 @@ function App() {
     onStock: () => irA("stock"),
     onAgenda: () => irA("agenda"),
     onNuevoCliente: () => irA("nuevoCliente"),
-    onVolver: () => window.history.back(),
+    onPromociones: () => {
+      setNuevoEsProspecto(true);
+      irA("nuevoCliente");
+    },
+    onVolver: () => irA("portada"),
     darkMode: darkMode,
     onToggleDark: () => setDarkMode(!darkMode),
     scaleIdx: scaleIdx,
@@ -3254,7 +3159,7 @@ function App() {
         dia,
         fecha: fechas[0] || "",
         count: vts.length,
-        monto: vts.reduce((a, v) => a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0),
+        monto: vts.reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0),
         ventas: vts
       };
     }).filter(Boolean),
@@ -3284,8 +3189,8 @@ function App() {
       setFechaActual(fechaKey);
       setFechaObj(new Date(fechaKey + "T12:00:00"));
       // Atajo directo desde el menú (día ya "Listo") a la planilla, saltando
-      // selectorFechaPlanilla — "Volver" tiene que deshacer ese mismo salto
-      // (mismo criterio que origenClientes para "clientes").
+      // selectorFechaPlanilla/diaPrincipal — "Volver" tiene que deshacer ese
+      // mismo salto (mismo criterio que origenClientes para "clientes").
       setOrigenFecha("menu");
       irA("planilla");
     },
@@ -3293,11 +3198,20 @@ function App() {
     onFiados: () => irA("fiadosPendientes"),
     onMapaClientes: () => irA("mapaClientes"),
     onDormidos: () => irA("clientesDormidos"),
-    // Tocar el día en el Menú va directo a la lista de fechas — ahí, tocando
-    // una fecha, se elige Planilla o Clientes (ver SelectorFecha).
+    // Reemplazan a "diaPrincipal" (pantalla intermedia sin datos que solo
+    // preguntaba Planilla-o-Clientes): ahora esa elección se hace en el
+    // propio menú, tocando el día, y estos dos props van directo al mismo
+    // destino al que iba diaPrincipal — mismo criterio de "saltar Inicio del
+    // reparto si el camión ya salió hoy" que ya usaba onIrClientes.
     onIrPlanillaDia: d => {
       setDiaActual(d);
       irA("selectorFechaPlanilla");
+    },
+    onIrClientesDia: d => {
+      setDiaActual(d);
+      const yaIniciado = fechaActual && planillas[`${d}_${fechaActual}`]?.iniciado;
+      setOrigenClientes(yaIniciado ? "menu" : null);
+      irA(yaIniciado ? "clientes" : "selectorFechaClientes");
     },
     // Abrir la ficha de un cliente en deuda directo desde el cartel "⚠ N
     // clientes deben" del Menú. origenDetalle:"menu" hace que "Volver"
@@ -3319,7 +3233,7 @@ function App() {
         _upd: Date.now()
       } : v));
     },
-    onVolver: () => window.history.back()
+    onVolver: () => irA("menu")
   }), pantalla === "atajoPlanillaSemana" && /*#__PURE__*/React.createElement(AtajoPlanillaSemana, {
     planillas: planillas,
     ventas: ventas,
@@ -3331,32 +3245,33 @@ function App() {
       setOrigenFecha("atajo");
       irA("planilla");
     },
-    onVolver: () => window.history.back()
+    onVolver: () => irA("menu")
+  }), pantalla === "diaPrincipal" && /*#__PURE__*/React.createElement(DiaPrincipal, {
+    dia: diaActual,
+    onIrClientes: () => {
+      // Si ya se venía trabajando esta fecha (camión ya cargado hoy), entrar
+      // directo a la lista en vez de pasar de nuevo por el selector de fecha
+      // + la pantalla de "Inicio del reparto".
+      const yaIniciado = fechaActual && planillas[`${diaActual}_${fechaActual}`]?.iniciado;
+      irA(yaIniciado ? "clientes" : "selectorFechaClientes");
+    },
+    onIrPlanilla: () => irA("selectorFechaPlanilla"),
+    onVolver: () => irA("menu"),
+    onVerConfirmaciones: () => irA("confirmacionesDia"),
+    ventasPendientesTransfer: ventas.filter(v => v.dia === diaActual && v.pago === "transferencia" && !v.transConfirmada).length
   }), pantalla === "selectorFechaPlanilla" && /*#__PURE__*/React.createElement(SelectorFecha, {
     dia: diaActual,
     planillas: planillas,
     ventas: ventas,
     noVisitas: noVisitas,
-    // Antes esta pantalla solo llevaba a la Planilla y "selectorFechaClientes"
-    // (ya eliminada) era una copia casi idéntica que solo llevaba a Clientes.
-    // Ahora la fecha se elige una sola vez y desde ahí se puede ir a
-    // cualquiera de los dos destinos (ver SelectorFecha en 05-portada.js).
-    onIrPlanilla: (fk, fo) => {
+   onSeleccionar: (fk, fo) => {
       setFechaActual(fk);
       setFechaObj(fo);
       setOrigenFecha("planilla");
       const yaIniciado = planillas[`${diaActual}_${fk}`]?.iniciado;
       irA(yaIniciado ? "planilla" : "inicioReparto");
     },
-    onIrClientes: (fk, fo) => {
-      setFechaActual(fk);
-      setFechaObj(fo);
-      setOrigenFecha("clientes");
-      setOrigenClientes(null);
-      const yaIniciado = planillas[`${diaActual}_${fk}`]?.iniciado;
-      irA(yaIniciado ? "clientes" : "inicioReparto");
-    },
-    onVolver: () => window.history.back()
+    onVolver: () => irA("diaPrincipal")
   }), pantalla === "planilla" && /*#__PURE__*/React.createElement(PlanillaDelDia, {
     dia: diaActual,
     fecha: fechaActual,
@@ -3377,7 +3292,7 @@ function App() {
       // Si es cierre de d\xc3\xada, no navega: setMostrarCierre(false) vuelve a la planilla normal
     },
     onAutoGuardar: d => savePlanilla(`${diaActual}_${fechaActual}`, d),
-    onVolver: () => window.history.back(),
+    onVolver: () => irA(origenFecha === "atajo" ? "atajoPlanillaSemana" : origenFecha === "menu" ? "menu" : "selectorFechaPlanilla"),
     noVisitas: noVisitas,
     // Editar/eliminar venta y registrar envases prestados/devueltos directo
     // desde la Planilla del día (antes solo se podía desde el perfil del
@@ -3404,6 +3319,24 @@ function App() {
     // la que se salió, incluso si el día ya estaba iniciado (antes, una vez
     // iniciado, no había forma de volver a esa pantalla).
     onEditarCarga: () => irA("inicioReparto")
+  }), pantalla === "selectorFechaClientes" && /*#__PURE__*/React.createElement(SelectorFecha, {
+    dia: diaActual,
+    planillas: planillas,
+    ventas: ventas,
+    noVisitas: noVisitas,
+    onSeleccionar: (fk, fo) => {
+      setFechaActual(fk);
+      setFechaObj(fo);
+      setOrigenFecha("clientes");
+      // Se pasó por selectorFechaClientes (camino normal, no el atajo desde
+      // el menú) — "Volver" desde clientes debe volver ahí, como siempre.
+      setOrigenClientes(null);
+      // Si el camión ya se cargó ese día, no repetir "Inicio del reparto" —
+      // ir directo a la lista de clientes (mismo criterio que selectorFechaPlanilla).
+      const yaIniciado = planillas[`${diaActual}_${fk}`]?.iniciado;
+      irA(yaIniciado ? "clientes" : "inicioReparto");
+    },
+    onVolver: () => irA("diaPrincipal")
   }), pantalla === "inicioReparto" && /*#__PURE__*/React.createElement(InicioReparto, {
     dia: diaActual,
     fecha: fechaActual,
@@ -3436,6 +3369,9 @@ function App() {
           s.soderia.sifon = Math.max(0, (s.soderia.sifon || 0) - dSoda);
           s.soderia.bidon10 = Math.max(0, (s.soderia.bidon10 || 0) - dB10);
           s.soderia.bidon20 = Math.max(0, (s.soderia.bidon20 || 0) - dB20);
+          s.camion.sifon = Math.max(0, (s.camion.sifon || 0) + dSoda);
+          s.camion.bidon10 = Math.max(0, (s.camion.bidon10 || 0) + dB10);
+          s.camion.bidon20 = Math.max(0, (s.camion.bidon20 || 0) + dB20);
           syncData({
             stock: normStock(s)
           });
@@ -3454,7 +3390,7 @@ function App() {
       }
       irA(origenFecha === "planilla" ? "planilla" : "clientes");
     },
-    onVolver: () => window.history.back()
+    onVolver: () => irA(origenFecha === "planilla" ? "selectorFechaPlanilla" : "selectorFechaClientes")
   }), pantalla === "clientes" && /*#__PURE__*/React.createElement(ListaClientes, {
     // _retirado: cliente dado de baja por inactividad (4+ visitas seguidas
     // sin comprar) — ya no se le reparte, sale de la lista del día.
@@ -3498,9 +3434,9 @@ function App() {
     onNuevoCliente: () => irA("nuevoCliente"),
     // Si se entró con el atajo directo desde el menú (1 solo toque), volver
     // también directo al menú — si no, "Volver" hacía el camino largo de
-    // siempre (selectorFechaPlanilla → menú, 2 toques) aunque entrar hubiera
-    // sido inmediato. Ver comentario junto a origenClientes.
-    onVolver: () => window.history.back(),
+    // siempre (selectorFechaClientes → diaPrincipal → menú, 3 toques) aunque
+    // entrar hubiera sido inmediato. Ver comentario junto a origenClientes.
+    onVolver: () => irA(origenClientes === "menu" ? "menu" : "selectorFechaClientes"),
     onReordenar: lista => {
       saveClientes(prev => [...prev.filter(c => c.dia !== diaActual), ...lista]);
     },
@@ -3557,7 +3493,7 @@ function App() {
       }
       irA("venta");
     },
-    onVolver: () => window.history.back(),
+    onVolver: () => irA(pantallaOrigenDetalle()),
     onEditar: cambios => updateCliente(cliente.id, cambios),
     onEliminarVenta: eliminarVenta,
     onEditarVenta: editarVenta,
@@ -3796,7 +3732,7 @@ function App() {
         irA("venta");
       } else irA("clientes");
     },
-    onVolver: () => window.history.back()
+    onVolver: () => irA(volverVentaA || "detalleCliente")
   }), pantalla === "nuevoCliente" && /*#__PURE__*/React.createElement(NuevoCliente, {
     diaActual: diaActual,
     prefill: prospectoAConvertir ? {
@@ -3857,9 +3793,10 @@ function App() {
       }
     },
     onVolver: () => {
+      const veniaDeProspecto = !!prospectoAConvertir;
       setProspectoAConvertir(null);
       setNuevoEsProspecto(false);
-      window.history.back();
+      irA(veniaDeProspecto ? "prospectos" : "clientes");
     }
   }), pantalla === "prospectos" && /*#__PURE__*/React.createElement(Prospectos, {
     prospectos: prospectos,
@@ -3869,7 +3806,7 @@ function App() {
       setProspectoAConvertir(p);
       irA("nuevoCliente");
     },
-    onVolver: () => window.history.back()
+    onVolver: () => irA("menu")
   }), pantalla === "gestionClientes" && /*#__PURE__*/React.createElement(GestionClientes, {
     onIrTab: irA,
     clientes: clientes,
@@ -3917,7 +3854,7 @@ function App() {
       });
       ajustarStockFijoCliente(null, datos);
     },
-    onVolver: () => window.history.back(),
+    onVolver: () => irA("menu"),
     onRegistrarVenta: c => {
       setClienteId(c.id);
       // Asegurar que fechaActual esté seteado a hoy
@@ -3976,7 +3913,7 @@ function App() {
       setOrigenDetalle("agenda");
       irA("detalleCliente");
     },
-    onVolver: () => window.history.back()
+    onVolver: () => irA("menu")
   }), pantalla === "stock" && /*#__PURE__*/React.createElement(StockGeneral, {
     stock: stockNorm,
     setStock: ns => {
@@ -3996,8 +3933,7 @@ function App() {
     planillas: planillas,
     perdidas: perdidas,
     registrarPerdida: registrarPerdida,
-    movStock: movStock,
-    onVolver: () => window.history.back(),
+    onVolver: () => irA("menu"),
     onResumen: () => irA("resumen")
   }), pantalla === "resumen" && /*#__PURE__*/React.createElement(Resumen, {
     ventas: ventas,
@@ -4005,7 +3941,7 @@ function App() {
     productos: productos,
     planillas: planillas,
     noVisitas: noVisitas || [],
-    onVolver: () => window.history.back(),
+    onVolver: () => irA("menu"),
     onSeleccionarCliente: c => {
       // Resumen no exige haber elegido un día de reparto (a diferencia de
       // Clientes/Planilla), pero detalleCliente sí lo necesita para
@@ -4067,7 +4003,7 @@ function App() {
         saldo: (Number(c.saldo) || 0) + monto
       } : c));
     },
-    onVolver: () => window.history.back(),
+    onVolver: () => irA("menu"),
     ventas: ventas,
     onEditarCliente: (id, cambios) => {
       const antes = clientes.find(c => c.id === id);
@@ -4085,7 +4021,7 @@ function App() {
     ventas: ventas,
     onPerdida: registrarPerdida,
     onPerdidaCliente: registrarPerdidaCliente,
-    onVolver: () => window.history.back(),
+    onVolver: () => irA("menu"),
     onSeleccionar: c => {
       setClienteId(c.id);
       setDiaActual(c.dia);
@@ -4101,7 +4037,131 @@ function App() {
       if (antes) ajustarStockFijoCliente(antes, { ...antes, ...cambios });
     },
     onEliminar: eliminarCliente
-  })), pantalla === "mapaClientes" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(ClientesTabs, {
+  })), modalResumenDia && (() => {
+    const {
+      dia,
+      fechaKey
+    } = modalResumenDia;
+    const vDia = ventas.filter(v => v.fechaKey === fechaKey && v.dia === dia && !v._esCobro && !v._esAjuste && !v._esMixtoTrans);
+    const efectivo = vDia.filter(v => v.pago === "contado").reduce((a, v) => a + ((Number(v.montoTrans) || 0) > 0 ? Number(v.montoEfec) || 0 : v.pagadoNum || v.neto || 0), 0);
+    const transTot = vDia.filter(v => v.pago === "transferencia").reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
+    const transConf = vDia.filter(v => v.pago === "transferencia" && v.transConfirmada).reduce((a, v) => a + (v.pagadoNum || v.neto || 0), 0);
+    const transPend = transTot - transConf;
+    const fiado = vDia.filter(v => v.pago === "fiado").reduce((a, v) => a + (v.neto || 0), 0);
+    const total = efectivo + transTot + fiado;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: "rgba(0,0,0,0.75)",
+        zIndex: 2000,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "var(--color-background-primary)",
+        borderRadius: 16,
+        padding: 24,
+        width: "100%",
+        maxWidth: 360,
+        display: "flex",
+        flexDirection: "column",
+        gap: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 36,
+        marginBottom: 6
+      }
+    }, "✅"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 17,
+        fontWeight: 600,
+        color: "var(--color-text-primary)"
+      }
+    }, "¡Día completado!"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "var(--color-text-tertiary)",
+        marginTop: 2,
+        textTransform: "capitalize"
+      }
+    }, dia, " · ", new Date(fechaKey + "T12:00:00").toLocaleDateString("es-AR", {
+      day: "numeric",
+      month: "long"
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 8
+      }
+    }, [["💵 Efectivo", efectivo, "success"], ["💳 Transferencias", transTot, "info"], transPend > 0 && ["   🔴 Pendientes de confirmar", transPend, "warning"], ["📋 Fiado nuevo", fiado, "warning"]].filter(Boolean).map(([l, v, c]) => /*#__PURE__*/React.createElement("div", {
+      key: l,
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        padding: "8px 12px",
+        borderRadius: 8,
+        background: "var(--color-background-secondary)"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        color: "var(--color-text-secondary)"
+      }
+    }, l), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 14,
+        fontWeight: 500,
+        color: `var(--color-text-${c})`
+      }
+    }, fmt(v)))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        padding: "10px 12px",
+        borderRadius: 8,
+        background: "var(--color-background-tertiary)",
+        borderTop: "0.5px solid var(--color-border-tertiary)"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 14,
+        fontWeight: 600,
+        color: "var(--color-text-primary)"
+      }
+    }, "Total del día"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 17,
+        fontWeight: 700,
+        color: "var(--color-text-success)"
+      }
+    }, fmt(total)))), /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btnPrimary
+      },
+      onClick: () => {
+        setModalResumenDia(null);
+        irA("planilla");
+      }
+    }, "Ver planilla completa →"), /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        textAlign: "center"
+      },
+      onClick: () => setModalResumenDia(null)
+    }, "Cerrar")));
+  })(), pantalla === "mapaClientes" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(ClientesTabs, {
     activo: "mapa",
     onIr: irA
   }), /*#__PURE__*/React.createElement(MapaClientes, {
@@ -4116,7 +4176,7 @@ function App() {
       setOrigenDetalle("mapa");
       irA("detalleCliente");
     },
-    onVolver: () => window.history.back()
+    onVolver: () => irA("menu")
   })), pantalla === "config" && /*#__PURE__*/React.createElement(Config, {
     productos: productos,
     setProductos: saveProductos,
@@ -4138,7 +4198,7 @@ function App() {
     cargasDia: cargasDia,
     setCargasDia: saveCargasDia,
     syncData: syncData,
-    onVolver: () => window.history.back(),
+    onVolver: () => irA("menu"),
     ecToken: ecToken,
     // Al cargar o cambiar el código en Config, además de guardarlo acá se
     // sincroniza, para que el otro dispositivo también quede vinculado.
@@ -4152,7 +4212,7 @@ function App() {
     noVisitas: noVisitas,
     onDiagnostico: () => irA("diagnostico")
   }), pantalla === "diagnostico" && /*#__PURE__*/React.createElement(Diagnostico, {
-    onVolver: () => window.history.back()
+    onVolver: () => irA("config")
   }), deshacerVenta && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
