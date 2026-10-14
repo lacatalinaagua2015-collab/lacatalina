@@ -2886,12 +2886,16 @@ function App() {
   };
   window._lcRegistrarAjusteEnvases = registrarAjusteEnvasesManual;
   // Retirar cliente por inactividad (4+ visitas seguidas sin comprar,
-  // marcado desde el perfil del cliente): devuelve al depósito TODOS los
-  // envases que tenga asignados (fijos + prestados) y lo da de baja del
-  // reparto — son "envases parados que no producen" según lo pedido.
-  // No se borra el historial de ventas, solo se limpia su asignación de
-  // envases y se marca _retirado para que salga de las listas del día.
-  const retirarCliente = clienteId => {
+  // marcado desde el perfil del cliente), o porque se fue/desapareció del
+  // reparto: da de baja al cliente y pregunta por los envases que tenía —
+  // mismo criterio que eliminarCliente (ver más arriba). No se borra el
+  // historial de ventas, solo se limpia su asignación de envases y se
+  // marca _retirado para que salga de las listas del día.
+  // 2026-10-14: antes esto SIEMPRE sumaba los envases al depósito, sin
+  // preguntar — no había forma de anotar que un cliente se fugó o
+  // desapareció CON los envases. Ahora pregunta igual que al eliminar un
+  // cliente: si no los devolvió, quedan en Pérdidas con su nombre.
+  const retirarCliente = async clienteId => {
     const cli = clientes.find(c => c.id === clienteId);
     if (!cli) return;
     const totalEnvases = {
@@ -2900,34 +2904,49 @@ function App() {
       bidon20: (Number(cli.bidon20) || 0) + (Number(cli.prestado?.bidon20) || 0),
       dispenser: (Number(cli.dispenser) || 0) + (Number(cli.prestado?.dispenser) || 0)
     };
+    const totalEnv = totalEnvases.sifon + totalEnvases.bidon10 + totalEnvases.bidon20 + totalEnvases.dispenser;
     const detalleTexto = [totalEnvases.sifon > 0 && `${totalEnvases.sifon} sifón`, totalEnvases.bidon10 > 0 && `${totalEnvases.bidon10} bidón 10L`, totalEnvases.bidon20 > 0 && `${totalEnvases.bidon20} bidón 20L`, totalEnvases.dispenser > 0 && `${totalEnvases.dispenser} dispenser`].filter(Boolean).join(", ") || "ningún envase asignado";
-    const ok = window.confirm(`Vas a retirar a ${cli.nombre} (${detalleTexto}) y darlo de baja del reparto. Los envases vuelven al depósito. ¿Confirmás?`);
-    if (!ok) return;
-    setStock(prev => {
-      const s = JSON.parse(JSON.stringify(prev || {}));
-      if (!s.casa) s.casa = {
-        sifon: 0,
-        bidon10: 0,
-        bidon20: 0,
-        dispenser: 0
-      };
-      ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
-        s.casa[k] = (s.casa[k] || 0) + (totalEnvases[k] || 0);
+    let devolvio = true;
+    if (totalEnv > 0) {
+      devolvio = await window.lcConfirm(`Vas a retirar a "${cli.nombre}" (${detalleTexto}) y darlo de baja del reparto.\n\n¿Los devolvió?\n\n• Confirmar = SÍ, sumarlos al depósito\n• Cancelar = NO, se dan por perdidos (se fugó/desapareció con ellos)\n\n(Cualquiera de las dos opciones lo retira igual)`, {
+        okText: "Sí, los devolvió",
+        cancelText: "No, perdidos"
       });
-      syncData({
-        stock: s
+    } else {
+      if (!window.confirm(`Vas a retirar a ${cli.nombre} (ningún envase asignado) y darlo de baja del reparto. ¿Confirmás?`)) return;
+    }
+    if (totalEnv > 0 && devolvio) {
+      setStock(prev => {
+        const s = JSON.parse(JSON.stringify(prev || {}));
+        if (!s.casa) s.casa = {
+          sifon: 0,
+          bidon10: 0,
+          bidon20: 0,
+          dispenser: 0
+        };
+        ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
+          s.casa[k] = (s.casa[k] || 0) + (totalEnvases[k] || 0);
+        });
+        syncData({
+          stock: s
+        });
+        return s;
       });
-      return s;
-    });
-    // Queda anotado en el historial de Movimientos (antes esto no dejaba
-    // rastro — ni en Stock ni en la Planilla del día de ese día) para poder
-    // ver después cuánto volvió al depósito por clientes retirados.
-    if (window._lcRegistrarMovimientoStock) {
-      const det = {};
-      ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
-        if (totalEnvases[k]) det[k] = totalEnvases[k];
-      });
-      if (Object.keys(det).length) window._lcRegistrarMovimientoStock("retiro", det, `Cliente retirado: ${cli.nombre}`);
+      // Queda anotado en el historial de Movimientos (antes esto no dejaba
+      // rastro — ni en Stock ni en la Planilla del día de ese día) para
+      // poder ver después cuánto volvió al depósito por clientes retirados.
+      if (window._lcRegistrarMovimientoStock) {
+        const det = {};
+        ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
+          if (totalEnvases[k]) det[k] = totalEnvases[k];
+        });
+        if (Object.keys(det).length) window._lcRegistrarMovimientoStock("retiro", det, `Cliente retirado: ${cli.nombre}`);
+      }
+    } else if (totalEnv > 0 && !devolvio) {
+      // No se pudieron recuperar — mismo tratamiento que al eliminar un
+      // cliente: quedan en Pérdidas con su nombre, no desaparecen sin dejar
+      // rastro ni se le suman de prepo al depósito.
+      registrarPerdida(totalEnvases, "Cliente retirado sin recuperar envases (se fugó/desapareció)", cli.nombre);
     }
     saveClientes(prev => (prev || []).map(c => c.id === clienteId ? {
       ...c,
