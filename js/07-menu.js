@@ -1523,13 +1523,28 @@ function PlanillaDelDia({
     b20: 0,
     disp: 0
   };
+  // Envases que un cliente devolvió hoy porque se le achicó el fijo (no un
+  // préstamo) — ej. edición manual en "♻️ Envases → Fijos". BUG REPORTADO:
+  // esto SÍ movía el stock bien (ajustarStockFijoCliente ya sumaba de
+  // vuelta a sodería), pero no se veía en ningún lado de la planilla — la
+  // devolución sólo deja rastro acá vía movStock (nota "Envases fijos de
+  // cliente..."), no como venta, así que NO entra a devueltosDia (que sale
+  // de ventas.envDev) para no duplicar el ajuste de stock que ya se hizo al
+  // toque. Se suma aparte y se mezcla solo en la columna "Devuelto" de la
+  // tabla de abajo, a efectos de mostrarlo.
+  const devueltosFijoDia = {
+    soda: 0,
+    b10: 0,
+    b20: 0,
+    disp: 0
+  };
   (movStock || []).forEach(m => {
     if (m.tipo !== "ajuste" || !(m.nota || "").startsWith("Envases fijos de cliente") || (m.fecha || "").slice(0, 10) !== fecha) return;
     Object.keys(skToPl).forEach(sk => {
       const d = Number(m.detalle?.[sk]) || 0;
       // detalle viene negativo (sale de sodería) — acá se muestra en positivo,
-      // como cantidad entregada.
-      if (d < 0) clientesNuevosDia[skToPl[sk]] += -d;
+      // como cantidad entregada. Si es positivo, es lo opuesto: volvió.
+      if (d < 0) clientesNuevosDia[skToPl[sk]] += -d;else if (d > 0) devueltosFijoDia[skToPl[sk]] += d;
     });
   });
   // FÓRMULA CORRECTA:
@@ -2228,10 +2243,11 @@ function PlanillaDelDia({
         style: { display: "grid", gridTemplateColumns: "1.1fr 1fr 1fr 1fr 1fr 1fr", gap: 4, fontSize: 10, color: "var(--color-text-tertiary)", marginBottom: 4 }
       }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Prestado"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Devuelto"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Perdido"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Retirado"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Cliente nuevo")), movLabels.map(([label, pk]) => {
         const dv = n => pk === "soda" ? Math.floor(n / CAJON) : n;
+        const devueltoTotal = (devueltosDia[pk] || 0) + (devueltosFijoDia[pk] || 0);
         return /*#__PURE__*/React.createElement("div", {
           key: pk,
           style: { display: "grid", gridTemplateColumns: "1.1fr 1fr 1fr 1fr 1fr 1fr", gap: 4, alignItems: "center", padding: "5px 0", borderTop: "0.5px solid var(--color-border-tertiary)" }
-        }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: "var(--color-text-primary)" } }, label), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: prestadosDia[pk] ? "var(--color-text-warning)" : "var(--color-text-tertiary)" } }, dv(prestadosDia[pk]) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: devueltosDia[pk] ? "var(--color-text-success)" : "var(--color-text-tertiary)" } }, dv(devueltosDia[pk]) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: perdidosDia[pk] ? "#ff6b6b" : "var(--color-text-tertiary)" } }, dv(perdidosDia[pk]) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: retiradosDia[pk] ? "var(--color-text-secondary)" : "var(--color-text-tertiary)" } }, dv(retiradosDia[pk]) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: clientesNuevosDia[pk] ? "#5daaff" : "var(--color-text-tertiary)" } }, dv(clientesNuevosDia[pk]) || "—"));
+        }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: "var(--color-text-primary)" } }, label), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: prestadosDia[pk] ? "var(--color-text-warning)" : "var(--color-text-tertiary)" } }, dv(prestadosDia[pk]) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: devueltoTotal ? "var(--color-text-success)" : "var(--color-text-tertiary)" } }, dv(devueltoTotal) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: perdidosDia[pk] ? "#ff6b6b" : "var(--color-text-tertiary)" } }, dv(perdidosDia[pk]) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: retiradosDia[pk] ? "var(--color-text-secondary)" : "var(--color-text-tertiary)" } }, dv(retiradosDia[pk]) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: clientesNuevosDia[pk] ? "#5daaff" : "var(--color-text-tertiary)" } }, dv(clientesNuevosDia[pk]) || "—"));
       }));
       return [productCards, resumenTabla, detalleMovimientos];
     })(), /*#__PURE__*/React.createElement("button", {
