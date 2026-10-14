@@ -3401,7 +3401,24 @@ function App() {
     // Volver a "Inicio del reparto" para corregir la cantidad de envases con
     // la que se salió, incluso si el día ya estaba iniciado (antes, una vez
     // iniciado, no había forma de volver a esa pantalla).
-    onEditarCarga: () => irA("inicioReparto")
+    onEditarCarga: () => irA("inicioReparto"),
+    // Editar "No compraron" (No estaba / No quiso / Quitar marca) directo
+    // desde la Planilla — mismas funciones que ya usa ListaClientes, ver
+    // más abajo (BUG: faltaba pasarlas acá, por eso tiraba "onRegistrarNoVisita
+    // is not defined" al tocar "Editar" en una fila de "No compraron").
+    onRegistrarNoVisita: (clienteId, motivo) => {
+      saveNoVisitas(prev => [...(prev || []).filter(v => !(v.clienteId === clienteId && v.dia === diaActual && v.fecha === fechaActual)), {
+        clienteId,
+        dia: diaActual,
+        fecha: fechaActual,
+        motivo,
+        _upd: Date.now()
+      }]);
+    },
+    onQuitarNoVisita: clienteId => {
+      registrarTombstoneNoVisita(clienteId, diaActual, fechaActual);
+      saveNoVisitas(prev => (prev || []).filter(v => !(v.clienteId === clienteId && v.dia === diaActual && v.fecha === fechaActual)));
+    }
   }), pantalla === "selectorFechaClientes" && /*#__PURE__*/React.createElement(SelectorFecha, {
     dia: diaActual,
     planillas: planillas,

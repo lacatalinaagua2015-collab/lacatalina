@@ -1250,6 +1250,8 @@ function PlanillaDelDia({
   onPerdidaCliente,
   onConfirmarTransfer,
   onEditarCarga,
+  onRegistrarNoVisita,
+  onQuitarNoVisita,
   ecToken
 }) {
   // Separar ventas del día propio vs ventas de clientes de otro día
