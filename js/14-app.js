@@ -2626,12 +2626,19 @@ function App() {
     irA("clientes");
   };
 
-  // ── Ajusta stock.casa (depósito) cuando se crea o edita el fijo de
-  // envases/dispenser de un cliente. Antes esto NO pasaba en ningún lado:
-  // al dar de alta un cliente con envases fijos (o un dispenser), esos
-  // envases nunca se descontaban del depósito — el stock quedaba mal desde
-  // el primer día. "antes" = valores previos (null si es alta nueva),
-  // "despues" = valores nuevos.
+  // ── Ajusta stock.soderia (llenos) cuando se crea o edita el fijo de
+  // envases/dispenser de un cliente. "antes" = valores previos (null si es
+  // alta nueva), "despues" = valores nuevos.
+  // REDISEÑADO 2026-10-14 (antes restaba de Depósito): Depósito está
+  // rotulado en la pantalla de Stock como "vacíos nuevos, sin uso" — stock
+  // recién comprado, todavía sin circular. Los envases que se le dejan a un
+  // cliente (de alta o al editar su fijo) salen de la sodería, no de ahí —
+  // son envases llenos que el repartidor ya tiene en circulación. Restarlos
+  // de Depósito hacía que pareciera que "no se descontaba de ningún lado"
+  // (Depósito casi nunca se mira ni se usa) y además dejaba a Sodería sin
+  // reflejar lo que de verdad pasó en la calle. Ahora se resta directo de
+  // sodería.llenos (sin piso en 0: si da negativo, avisa que hace falta
+  // reponer sodería, en vez de taparlo).
   const ajustarStockFijoCliente = (antes, despues) => {
     const a = antes || {};
     const d = despues || {};
@@ -2644,19 +2651,17 @@ function App() {
     if (!delta.sifon && !delta.bidon10 && !delta.bidon20 && !delta.dispenser) return;
     setStock(prev => {
       const s = JSON.parse(JSON.stringify(normStock(prev)));
-      // BUG REPORTADO: "di de alta un cliente nuevo con envases asignados y
-      // no se descontó de ningún lado". Causa: acá abajo el Math.max(0, ...)
-      // tapaba el número en 0 apenas Depósito no tenía stock suficiente
-      // para "darle" al cliente — la resta se perdía en silencio, se viera
-      // o no se viera el cambio. confirmarCierre() (07-menu.js) ya deja a
-      // Depósito ir en negativo cuando falta algo (mismo criterio: "si
-      // falta, se resta, sin excepción") — acá se saca el mismo piso, así
-      // un negativo en Depósito avisa de verdad que hay que reponer stock
-      // ahí en vez de desaparecer la diferencia.
-      s.casa.sifon = (s.casa.sifon || 0) - delta.sifon;
-      s.casa.bidon10 = (s.casa.bidon10 || 0) - delta.bidon10;
-      s.casa.bidon20 = (s.casa.bidon20 || 0) - delta.bidon20;
-      s.casa.dispenser = (s.casa.dispenser || 0) - delta.dispenser;
+      s.soderia.sifon = (s.soderia.sifon || 0) - delta.sifon;
+      s.soderia.bidon10 = (s.soderia.bidon10 || 0) - delta.bidon10;
+      s.soderia.bidon20 = (s.soderia.bidon20 || 0) - delta.bidon20;
+      s.soderia.dispenser = (s.soderia.dispenser || 0) - delta.dispenser;
+      if (window._lcRegistrarMovimientoStock) {
+        const det = {};
+        ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
+          if (delta[k]) det[k] = -delta[k];
+        });
+        if (Object.keys(det).length) window._lcRegistrarMovimientoStock("ajuste", det, "Envases fijos de cliente (alta/edición)");
+      }
       syncData({
         stock: s
       });

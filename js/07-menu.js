@@ -1605,40 +1605,30 @@ function PlanillaDelDia({
         vacios: dv
       };
     });
-    // Sodería solo controla que vuelva TODO lo que salió cargado — los
-    // préstamos/devoluciones son un asunto exclusivo del depósito (un
-    // préstamo hoy hace que vuelva menos de lo que salió; el depósito repone
-    // esa diferencia para que sodería se mantenga siempre en su número
-    // fijo, SIEMPRE, sin excepción). Si sobra, se suma al depósito; si
-    // falta, se resta.
-    // CORRECCIÓN 2026-10-10: "esperado" es SOLO llenosCargados — ni +devuelto
-    // ni -prestado. Antes se le restaba/sumaba acá (ver versión vieja en el
-    // historial de git), lo que hacía que la sodería "absorbiera" el préstamo
-    // en vez del depósito, y que una devolución inflara la sodería en vez de
-    // reponer el depósito. vaciosRec (más abajo en vacVuelta) ya incluye el
-    // efecto de hoy (vendidos+devueltos-prestados) UNA sola vez; al comparar
-    // ese total contra el fijo (llenosCargados), diffDeposito queda
-    // exactamente en (devueltosDia − prestadosDia) + cualquier diferencia real
-    // contada a mano — sin doble conteo, y la sodería nunca se mueve de su
-    // número fijo salvo por lo que realmente se cargó/descargó ese día.
+    // REDISEÑADO 2026-10-14: antes, acá se forzaba a que lo que vuelve a
+    // sodería sea SIEMPRE exactamente "lo que salió cargado" (esperado),
+    // escalando llenVuelta/vacVuelta con un factor para que sumen justo eso
+    // — cualquier diferencia real (una devolución de envases viejos, un
+    // préstamo, una pérdida) se mandaba entera al Depósito en vez de
+    // reflejarse en sodería. Resultado reportado por el usuario: devolvían
+    // envases y "no se registraba nada en sodería" — el factor los
+    // absorbía para mantener el número fijo, y el Depósito (rotulado en
+    // Stock como "vacíos nuevos, sin uso") terminaba siendo un bolsón de
+    // diferencias que no le correspondían.
+    // Ahora sodería recibe el conteo REAL de hoy tal cual (llenVuelta +
+    // vacVuelta, sin escalar) — si devolvieron algo, sube; si se prestó o
+    // se perdió algo, baja. diffDeposito queda solo como dato informativo
+    // (cuánto difiere de lo cargado) para el historial de Movimientos; ya
+    // NO se le suma ni resta al Depósito automáticamente en cada cierre.
     const diffDeposito = {};
-    // BUG REAL encontrado (causa de la acumulación "sin sentido" en sodería):
-    // acá abajo se sumaba TODO lo que volvió (llenVuelta+vacVuelta) a sodería
-    // Y ADEMÁS, por separado, la diferencia contra "esperado" se sumaba al
-    // depósito — contando esa diferencia dos veces cada vez que el usuario
-    // corrige un número a mano (algo que pasa todos los días). Resultado:
-    // sodería nunca volvía a su número fijo, solo crecía. Ahora sodería
-    // recibe SOLO lo esperado (mantiene su número fijo, tal cual el flujo
-    // real) y el depósito se lleva toda la diferencia — no ambos.
     const llenVueltaFijo = {},
       vacVueltaFijo = {};
     ["soda", "b10", "b20"].forEach(pk => {
       const esperadoPk = llenosCargados[pk];
       const vuelveTotalPk = llenVuelta[pk] + vacVuelta[pk];
       diffDeposito[pk] = vuelveTotalPk - esperadoPk;
-      const factor = vuelveTotalPk > 0 ? esperadoPk / vuelveTotalPk : 1;
-      llenVueltaFijo[pk] = Math.max(0, Math.round(llenVuelta[pk] * factor));
-      vacVueltaFijo[pk] = Math.max(0, Math.round(vacVuelta[pk] * factor));
+      llenVueltaFijo[pk] = Math.max(0, Math.round(llenVuelta[pk]));
+      vacVueltaFijo[pk] = Math.max(0, Math.round(vacVuelta[pk]));
     });
     return {
       diffs,
@@ -1682,7 +1672,6 @@ function PlanillaDelDia({
         const sk = planKeyToSkL[pk];
         s.soderia[sk] = (s.soderia[sk] || 0) + llenVueltaFijo[pk];
         s.soderia_vacios[sk] = (s.soderia_vacios[sk] || 0) + vacVueltaFijo[pk];
-        s.casa[sk] = (s.casa[sk] || 0) + diffDeposito[pk];
       });
       syncData && syncData({
         stock: s
@@ -1694,10 +1683,13 @@ function PlanillaDelDia({
       ["soda", "b10", "b20"].forEach(pk => {
         const sk = planKeyToSkL[pk];
         const soderiaVuelta = (llenVueltaFijo[pk] || 0) + (vacVueltaFijo[pk] || 0);
-        const deposito = diffDeposito[pk] || 0;
-        if (soderiaVuelta || deposito) detalleCierre[sk] = {
+        const dif = diffDeposito[pk] || 0;
+        // "dif" acá es solo informativo (cuánto difirió del "esperado" de
+        // hoy, por ejemplo una devolución vieja o un préstamo) — ya NO se
+        // aplica a Depósito, ver nota en calcularMovimientoDeposito.
+        if (soderiaVuelta || dif) detalleCierre[sk] = {
           soderia: soderiaVuelta,
-          deposito
+          dif
         };
       });
       window._lcRegistrarMovimientoStock("cierre", detalleCierre, `Cierre del día ${dia} (${fecha})`);
@@ -2177,13 +2169,13 @@ function PlanillaDelDia({
           color: "var(--color-text-primary)",
           marginBottom: 6
         }
-      }, "📦 Movimiento en el Depósito"), /*#__PURE__*/React.createElement("p", {
+      }, "🔁 Diferencia respecto a lo cargado"), /*#__PURE__*/React.createElement("p", {
         style: {
           fontSize: 12,
           color: "var(--color-text-tertiary)",
           margin: "0 0 12px"
         }
-      }, "Sodería tiene que volver a su número fijo — esto es lo que se va a mover en el Depósito para compensar."), filas.map(pk => {
+      }, "Hoy sodería va a quedar con más o menos de lo que salió cargado (por una devolución, un préstamo, etc.) — así va a terminar:"), filas.map(pk => {
         const diff = diffDeposito[pk];
         const cajon = pk === "soda" ? CAJON : 1;
         const cant = pk === "soda" ? Math.round(Math.abs(diff) / cajon) : Math.abs(diff);
@@ -2204,7 +2196,7 @@ function PlanillaDelDia({
             fontWeight: 600,
             color: diff > 0 ? "var(--color-text-success)" : "var(--color-text-warning)"
           }
-        }, diff > 0 ? `+ guardar ${cant} ${unidad}` : `− sacar ${cant} ${unidad}`));
+        }, diff > 0 ? `+ ${cant} ${unidad} de más` : `− ${cant} ${unidad} de menos`));
       }), /*#__PURE__*/React.createElement("div", {
         style: {
           display: "flex",
