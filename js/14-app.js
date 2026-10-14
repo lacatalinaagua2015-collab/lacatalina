@@ -331,6 +331,36 @@ function App() {
       return next;
     });
   };
+  // Historial de movimientos de stock de sodería (carga del camión, cierre
+  // del día, ajustes) — para poder ver qué pasó día a día en vez de
+  // adivinar cuando el número de sodería no coincide con lo físico.
+  // BUG REPORTADO: la pantalla de Stock → Movimientos siempre mostraba
+  // "no hay movimientos registrados": window._lcRegistrarMovimientoStock se
+  // llamaba desde confirmarCierre (07-menu.js) pero nunca había sido
+  // definida en ningún archivo (mismo tipo de bug que lcAlert/lcConfirm/
+  // _lcRegistrarAjusteEnvases) — la llamada quedaba en silencio y nunca se
+  // guardaba nada. Se guarda acotado a los últimos 200 para no crecer sin
+  // límite.
+  const [movStock, setMovStock] = useLS("cat_movstock_v1", []);
+  const registrarMovimientoStock = (tipo, detalle, nota) => {
+    setMovStock(prev => {
+      const next = [...prev, {
+        id: Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+        fecha: new Date().toISOString(),
+        tipo,
+        // tipo: "carga" | "cierre" | "ajuste"
+        detalle: detalle || {},
+        nota: nota || "",
+        _upd: Date.now()
+      }];
+      const acotado = next.length > 200 ? next.slice(next.length - 200) : next;
+      syncData({
+        movStock: acotado
+      });
+      return acotado;
+    });
+  };
+  window._lcRegistrarMovimientoStock = registrarMovimientoStock;
   const [recordatorios, setRecordatorios] = useLS("cat_recordatorios_v1", []);
   // recordatorio: {id, clienteId, clienteNombre, fecha, hora, motivo, dia, confirmado}
   // BUG REPORTADO: clientes (y productos/recordatorios) borrados volvían a
@@ -569,56 +599,20 @@ function App() {
     const normalized = normStock(stockRaw);
     if (JSON.stringify(normalized) !== JSON.stringify(stockRaw)) setStockRaw(normalized);
   }, []);
-  // Relleno automático de sodería los lunes: llega la producción de la
-  // semana y la sodería queda a full (según la "Base"/capacidadFija
-  // configurada en Stock). De ahí en más el número baja solo con los
-  // movimientos normales del día a día (InicioReparto descuenta al cargar
-  // el camión, cerrarCamion devuelve el sobrante al cerrar el día). Se
-  // corre UNA sola vez por semana — se guarda la fecha del lunes ya
-  // aplicado en localStorage para no volver a pisar el número si se
-  // recarga la app el mismo lunes después de haber cargado/vendido algo.
-  React.useEffect(() => {
-    // BUG REPORTADO: "sigue acumulando envases en la sodería" — los vacíos
-    // de Sodería nunca se achicaban solos, semana tras semana. Causa: este
-    // relleno semanal solo se disparaba si la app se abría justo UN LUNES
-    // (`hoy.getDay() !== 1` cortaba cualquier otro día). Si ese lunes no se
-    // abría la app (no reparte ese día), el relleno de esa semana se
-    // perdía para siempre y los vacíos seguían sumando la semana
-    // siguiente, y la siguiente. Ahora se calcula el lunes más reciente
-    // (hoy mismo si hoy es lunes) y se aplica apenas se abre la app
-    // cualquier día de la semana, mientras no se haya aplicado ESE lunes
-    // todavía — así nunca se salta un relleno por no haber abierto la app
-    // justo ese día.
-    const hoy = new Date();
-    const diasDesdeLunes = (hoy.getDay() + 6) % 7; // lunes=0, martes=1, ..., domingo=6
-    const ultimoLunes = new Date(hoy);
-    ultimoLunes.setDate(hoy.getDate() - diasDesdeLunes);
-    const lunesKey = ultimoLunes.toLocaleDateString("en-CA");
-    // Migración única: la primera vez que corre esta versión arreglada, NO
-    // dispara un relleno retroactivo de la semana en curso (podría borrar
-    // vacíos reales que ya están físicamente en la Sodería ahora mismo, si
-    // la semana pasada se saltó un lunes por este mismo bug) — solo marca
-    // esta semana como "ya al día" y deja que el chequeo normal rija desde
-    // el próximo lunes en adelante.
-    if (!localStorage.getItem("lc_stock_relleno_lunes_v2")) {
-      localStorage.setItem("lc_stock_relleno_lunes_v2", "1");
-      localStorage.setItem("lc_stock_relleno_lunes", lunesKey);
-      return;
-    }
-    if (localStorage.getItem("lc_stock_relleno_lunes") === lunesKey) return;
-    setStock(prev => {
-      const s = JSON.parse(JSON.stringify(normStock(prev)));
-      ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
-        s.soderia[k] = s.capacidadFija?.[k] || 0;
-        s.soderia_vacios[k] = 0;
-      });
-      syncData({
-        stock: s
-      });
-      return s;
-    });
-    localStorage.setItem("lc_stock_relleno_lunes", lunesKey);
-  }, []);
+  // ELIMINADO 2026-10-14 (relleno automático de sodería los lunes): esta
+  // rutina ponía sodería.llenos = capacidadFija y sodería.vacíos = 0 a la
+  // fuerza cada semana, SIN restar nada del depósito (casa). Eso crea stock
+  // de la nada cada vez que corre: si sodería tenía menos que la Base
+  // (normal — parte de ese stock legítimamente está en el depósito), la
+  // rutina "completaba" la diferencia regalándosela a sodería sin que salga
+  // de ningún lado. Causa real reportada por el usuario de la acumulación
+  // de cajones de más en sodería sin que baje en otro lado. No hacía falta
+  // además: confirmarCierre() (js/07-menu.js) ya mantiene el total de
+  // sodería exacto todos los días — lo que sale se descuenta al cargar el
+  // camión (InicioReparto) y vuelve entero (llenos+vacíos) al cerrar, sin
+  // ningún reset periódico. Si en el futuro hace falta un "relleno" real de
+  // fábrica, tiene que mover stock DESDE casa/depósito HACIA sodería
+  // (restando de uno, sumando al otro), nunca fijar un número a lo loco.
   // Helper: transferir del camión a sodería al cerrar el día
   const cerrarCamion = (sobrLlenos, vacios) => {
     setStock(prev => {
@@ -1232,6 +1226,7 @@ function App() {
         }
       };
       _mergeSimple(data.dispMovs, "cat_dispmovs_v1", setDispMovs, "dispMovs", "movimientos de dispenser");
+      _mergeSimple(data.movStock, "cat_movstock_v1", setMovStock, "movStock", "movimientos de stock");
       _mergeSimple(data.prospectos, "cat_prospectos_v1", setProspectos, "prospectos", "prospectos");
       // ── noVisitas: MERGEAR en vez de sobreescribir (mismo problema que clientes/planillas) ──
       // Acá vive "No está" / "No quiere" / "Saltar". Sin esto, una marca recién
@@ -2036,6 +2031,7 @@ function App() {
         if (data.zonasReparto !== undefined) setZonasReparto(data.zonasReparto || {});
         if (data.cargasDia && Object.keys(data.cargasDia).length) setCargasDia(data.cargasDia);
         if (data.dispMovs !== undefined) setDispMovs(data.dispMovs || []);
+        if (data.movStock !== undefined) setMovStock(data.movStock || []);
         if (data.prospectos !== undefined) setProspectos(data.prospectos || []);
         // Subir lo restaurado a la nube, SIN BORRAR.
         //
@@ -3464,6 +3460,13 @@ function App() {
           });
           return normStock(s);
         });
+        if (dSoda || dB10 || dB20) {
+          registrarMovimientoStock("carga", {
+            sifon: -dSoda,
+            bidon10: -dB10,
+            bidon20: -dB20
+          }, `Carga del camión · ${diaActual} (${fechaActual})`);
+        }
         // La carga real de hoy queda como sugerencia para la próxima vez que
         // toque este día — así no depende de un número fijo cargado una vez.
         saveCargasDia(prev => ({
@@ -4020,6 +4023,7 @@ function App() {
     planillas: planillas,
     perdidas: perdidas,
     registrarPerdida: registrarPerdida,
+    movStock: movStock,
     onVolver: () => irA("menu"),
     onResumen: () => irA("resumen")
   }), pantalla === "resumen" && /*#__PURE__*/React.createElement(Resumen, {

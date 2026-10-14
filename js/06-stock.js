@@ -44,8 +44,19 @@ function StockGeneral({
       bidon20: 0,
       dispenser: 0
     };
-    ns[loc][key] = Math.max(0, Math.round(Number(val) || 0));
+    const antes = Number(ns[loc][key] || 0);
+    const despues = Math.max(0, Math.round(Number(val) || 0));
+    ns[loc][key] = despues;
     setStock(ns);
+    // Dejar rastro de las correcciones manuales en Stock → Sodería (pedido
+    // del usuario: necesita ver qué se corrigió día a día, no solo el
+    // número final) — se ve en "Movimientos" junto con carga y cierre.
+    const delta = despues - antes;
+    if (delta !== 0 && (loc === "soderia" || loc === "soderia_vacios") && window._lcRegistrarMovimientoStock) {
+      window._lcRegistrarMovimientoStock("ajuste", {
+        [key]: delta
+      }, `Edición manual en Stock · Sodería ${loc === "soderia" ? "llenos" : "vacíos"}`);
+    }
   };
   const setClienteEnv = (id, key, val) => {
     setClientes((clientes || []).map(c => c.id === id ? {
@@ -225,7 +236,8 @@ function StockGeneral({
   };
   const MOV_TIPO_LBL = {
     cierre: "🔁 Cierre del día",
-    relleno_lunes: "📥 Relleno semanal"
+    carga: "🚚 Carga del camión",
+    ajuste: "✏️ Ajuste manual"
   };
   const renderMovDetalle = m => {
     if (m.tipo === "cierre") {
@@ -240,11 +252,11 @@ function StockGeneral({
       });
       return partes.length ? partes.join(" · ") : "Sin cambios";
     }
-    if (m.tipo === "relleno_lunes") {
+    if (m.tipo === "carga" || m.tipo === "ajuste") {
       const partes = Object.keys(MOV_LBL).map(k => {
         const d = m.detalle?.[k];
         if (!d) return null;
-        return `${MOV_LBL[k]} ${d > 0 ? "+" : ""}${d}`;
+        return `${MOV_LBL[k]} ${d > 0 ? "+" : ""}${d} (sodería)`;
       }).filter(Boolean);
       return partes.length ? partes.join(" · ") : "Sin cambios";
     }
