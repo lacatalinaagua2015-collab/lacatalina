@@ -578,10 +578,34 @@ function App() {
   // aplicado en localStorage para no volver a pisar el número si se
   // recarga la app el mismo lunes después de haber cargado/vendido algo.
   React.useEffect(() => {
+    // BUG REPORTADO: "sigue acumulando envases en la sodería" — los vacíos
+    // de Sodería nunca se achicaban solos, semana tras semana. Causa: este
+    // relleno semanal solo se disparaba si la app se abría justo UN LUNES
+    // (`hoy.getDay() !== 1` cortaba cualquier otro día). Si ese lunes no se
+    // abría la app (no reparte ese día), el relleno de esa semana se
+    // perdía para siempre y los vacíos seguían sumando la semana
+    // siguiente, y la siguiente. Ahora se calcula el lunes más reciente
+    // (hoy mismo si hoy es lunes) y se aplica apenas se abre la app
+    // cualquier día de la semana, mientras no se haya aplicado ESE lunes
+    // todavía — así nunca se salta un relleno por no haber abierto la app
+    // justo ese día.
     const hoy = new Date();
-    if (hoy.getDay() !== 1) return; // 1 = lunes
-    const hoyKey = hoy.toLocaleDateString("en-CA");
-    if (localStorage.getItem("lc_stock_relleno_lunes") === hoyKey) return;
+    const diasDesdeLunes = (hoy.getDay() + 6) % 7; // lunes=0, martes=1, ..., domingo=6
+    const ultimoLunes = new Date(hoy);
+    ultimoLunes.setDate(hoy.getDate() - diasDesdeLunes);
+    const lunesKey = ultimoLunes.toLocaleDateString("en-CA");
+    // Migración única: la primera vez que corre esta versión arreglada, NO
+    // dispara un relleno retroactivo de la semana en curso (podría borrar
+    // vacíos reales que ya están físicamente en la Sodería ahora mismo, si
+    // la semana pasada se saltó un lunes por este mismo bug) — solo marca
+    // esta semana como "ya al día" y deja que el chequeo normal rija desde
+    // el próximo lunes en adelante.
+    if (!localStorage.getItem("lc_stock_relleno_lunes_v2")) {
+      localStorage.setItem("lc_stock_relleno_lunes_v2", "1");
+      localStorage.setItem("lc_stock_relleno_lunes", lunesKey);
+      return;
+    }
+    if (localStorage.getItem("lc_stock_relleno_lunes") === lunesKey) return;
     setStock(prev => {
       const s = JSON.parse(JSON.stringify(normStock(prev)));
       ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
@@ -593,7 +617,7 @@ function App() {
       });
       return s;
     });
-    localStorage.setItem("lc_stock_relleno_lunes", hoyKey);
+    localStorage.setItem("lc_stock_relleno_lunes", lunesKey);
   }, []);
   // Helper: transferir del camión a sodería al cerrar el día
   const cerrarCamion = (sobrLlenos, vacios) => {
