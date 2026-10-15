@@ -2196,7 +2196,7 @@ function App() {
   // Mismo destino que tocar el día en el Menú, o su atajo "Ver planilla".
   const jarvisIrDia = d => {
     setDiaActual(d);
-    irA("diaPrincipal");
+    irA("selectorFechaPlanilla");
   };
   const jarvisIrPlanillaDia = d => {
     setDiaActual(d);
@@ -3313,7 +3313,7 @@ function App() {
     dias: DIAS,
     onDia: d => {
       setDiaActual(d);
-      irA("diaPrincipal");
+      irA("selectorFechaPlanilla");
     },
     onPlanillaAtajo: () => irA("atajoPlanillaSemana"),
     onResumen: () => irA("resumen"),
@@ -3443,32 +3443,44 @@ function App() {
       irA("planilla");
     },
     onVolver: () => irA("menu")
-  }), pantalla === "diaPrincipal" && /*#__PURE__*/React.createElement(DiaPrincipal, {
-    dia: diaActual,
-    onIrClientes: () => {
-      // Si ya se venía trabajando esta fecha (camión ya cargado hoy), entrar
-      // directo a la lista en vez de pasar de nuevo por el selector de fecha
-      // + la pantalla de "Inicio del reparto".
-      const yaIniciado = fechaActual && planillas[`${diaActual}_${fechaActual}`]?.iniciado;
-      irA(yaIniciado ? "clientes" : "selectorFechaClientes");
-    },
-    onIrPlanilla: () => irA("selectorFechaPlanilla"),
-    onVolver: () => irA("menu"),
-    onVerConfirmaciones: () => irA("confirmacionesDia"),
-    ventasPendientesTransfer: ventas.filter(v => v.dia === diaActual && v.pago === "transferencia" && !v.transConfirmada).length
-  }), pantalla === "selectorFechaPlanilla" && /*#__PURE__*/React.createElement(SelectorFecha, {
+  }),
+  // "diaPrincipal" (pantalla intermedia Planilla/Clientes) fue reemplazada
+  // por los atajos onIrPlanillaDia/onIrClientesDia del Menú (ver comentario
+  // más abajo, junto a esos props) — el componente DiaPrincipal se borró en
+  // ese momento, pero esta rama de render y varios irA("diaPrincipal")
+  // quedaron apuntando a un componente que ya no existe. BUG REPORTADO
+  // 2026-10-15: "Algo salió mal — DiaPrincipal is not defined", la app
+  // entera quedaba en blanco apenas algo navegaba para acá (ej. "Volver"
+  // desde Fechas de visita). Se saca la rama entera y se redirigen todos
+  // los irA("diaPrincipal") que quedaban (jarvisIrDia, el onDia del Menú —
+  // ya sin uso ahí — y "Volver" de los dos SelectorFecha) a destinos reales.
+  pantalla === "selectorFechaPlanilla" && /*#__PURE__*/React.createElement(SelectorFecha, {
     dia: diaActual,
     planillas: planillas,
     ventas: ventas,
     noVisitas: noVisitas,
-   onSeleccionar: (fk, fo) => {
+    // BUG REPORTADO 2026-10-15: SelectorFecha se unificó para que cada fila
+    // tenga sus propios botones "📋 Planilla" / "👥 Clientes" (onIrPlanilla/
+    // onIrClientes), pero acá le seguía llegando el prop viejo
+    // "onSeleccionar" de cuando eran 2 pantallas separadas — el componente
+    // nunca recibía onIrClientes, entonces tocar "👥 Clientes" tiraba
+    // "onIrClientes is not a function" y no navegaba a ningún lado.
+    onIrPlanilla: (fk, fo) => {
       setFechaActual(fk);
       setFechaObj(fo);
       setOrigenFecha("planilla");
       const yaIniciado = planillas[`${diaActual}_${fk}`]?.iniciado;
       irA(yaIniciado ? "planilla" : "inicioReparto");
     },
-    onVolver: () => irA("diaPrincipal")
+    onIrClientes: (fk, fo) => {
+      setFechaActual(fk);
+      setFechaObj(fo);
+      setOrigenFecha("clientes");
+      setOrigenClientes(null);
+      const yaIniciado = planillas[`${diaActual}_${fk}`]?.iniciado;
+      irA(yaIniciado ? "clientes" : "inicioReparto");
+    },
+    onVolver: () => irA("menu")
   }), pantalla === "planilla" && /*#__PURE__*/React.createElement(PlanillaDelDia, {
     dia: diaActual,
     fecha: fechaActual,
@@ -3540,7 +3552,17 @@ function App() {
     planillas: planillas,
     ventas: ventas,
     noVisitas: noVisitas,
-    onSeleccionar: (fk, fo) => {
+    // Mismo arreglo que en selectorFechaPlanilla — acá también le faltaba
+    // onIrPlanilla (el botón "📋 Planilla" de cada fila tiraba el mismo
+    // TypeError, solo que con onIrPlanilla en vez de onIrClientes).
+    onIrPlanilla: (fk, fo) => {
+      setFechaActual(fk);
+      setFechaObj(fo);
+      setOrigenFecha("planilla");
+      const yaIniciado = planillas[`${diaActual}_${fk}`]?.iniciado;
+      irA(yaIniciado ? "planilla" : "inicioReparto");
+    },
+    onIrClientes: (fk, fo) => {
       setFechaActual(fk);
       setFechaObj(fo);
       setOrigenFecha("clientes");
@@ -3552,7 +3574,7 @@ function App() {
       const yaIniciado = planillas[`${diaActual}_${fk}`]?.iniciado;
       irA(yaIniciado ? "clientes" : "inicioReparto");
     },
-    onVolver: () => irA("diaPrincipal")
+    onVolver: () => irA("menu")
   }), pantalla === "inicioReparto" && /*#__PURE__*/React.createElement(InicioReparto, {
     dia: diaActual,
     fecha: fechaActual,
