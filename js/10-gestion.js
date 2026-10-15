@@ -25,6 +25,20 @@ function GestionClientes({
   const [editandoId, setEditandoId] = useState(null);
   const [cambioId, setCambioId] = useState(null);
   const [clienteMoviendo, setClienteMoviendo] = useState(null); // id del cliente "levantado", esperando destino (mismo día)
+  // WhatsApp grupal — pedido del usuario: "al apretar los clientes, se
+  // pueda mandar un msj de whatsapp grupal". WhatsApp no deja mandar un
+  // solo mensaje a varios números de una, así que esto arma una cola: se
+  // selecciona a varios clientes, se escribe el mensaje una sola vez, y
+  // después se va abriendo WhatsApp cliente por cliente (vos apretás
+  // "Enviar" en WhatsApp y acá "Siguiente" para pasar al que sigue).
+  const [modoSeleccionWA, setModoSeleccionWA] = useState(false);
+  const [seleccionadosWA, setSeleccionadosWA] = useState(() => new Set());
+  const [envioWA, setEnvioWA] = useState(null); // null | { mensaje, cola: [cliente...], indice }
+  const toggleSeleccionWA = id => setSeleccionadosWA(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id);else next.add(id);
+    return next;
+  });
 
   const moverCliente = (idOrigen, idDestino) => {
     if (idOrigen === idDestino) return;
@@ -137,7 +151,20 @@ function GestionClientes({
       });
       if (window.confirm("¿Reordenar todos los clientes eliminando los huecos en la numeración?")) onReordenarTodo(compactados);
     }
-  }, "↺ Reordenar")), /*#__PURE__*/React.createElement("p", {
+  }, "↺ Reordenar"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      fontSize: 11,
+      padding: "3px 10px",
+      background: modoSeleccionWA ? "#1D9E75" : "var(--color-background-tertiary)",
+      color: modoSeleccionWA ? "#fff" : "var(--color-text-secondary)",
+      border: modoSeleccionWA ? "none" : "0.5px solid var(--color-border-secondary)"
+    },
+    onClick: () => {
+      if (modoSeleccionWA) setSeleccionadosWA(new Set());
+      setModoSeleccionWA(v => !v);
+    }
+  }, modoSeleccionWA ? "✕ Cancelar selección" : "📲 WhatsApp grupal")), /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 11,
       color: clienteMoviendo ? "var(--color-text-warning)" : "var(--color-text-tertiary)",
@@ -236,7 +263,27 @@ function GestionClientes({
       cursor: onVerDetalle ? "pointer" : "default"
     },
     onClick: () => onVerDetalle && onVerDetalle(c)
-  }, /*#__PURE__*/React.createElement("div", {
+  }, modoSeleccionWA && /*#__PURE__*/React.createElement("div", {
+    onClick: e => {
+      e.stopPropagation();
+      toggleSeleccionWA(c.id);
+    },
+    style: {
+      width: 22,
+      height: 22,
+      flexShrink: 0,
+      marginTop: 2,
+      borderRadius: 5,
+      border: seleccionadosWA.has(c.id) ? "none" : "1.5px solid var(--color-border-secondary)",
+      background: seleccionadosWA.has(c.id) ? "#1D9E75" : "transparent",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 13,
+      color: "#fff",
+      cursor: "pointer"
+    }
+  }, seleccionadosWA.has(c.id) ? "✓" : ""), /*#__PURE__*/React.createElement("div", {
     style: {
       width: 32,
       height: 32,
@@ -503,7 +550,189 @@ function GestionClientes({
         foto: b64
       });
     }
+  }), modoSeleccionWA && seleccionadosWA.size > 0 && !envioWA && /*#__PURE__*/React.createElement(BarraSeleccionWA, {
+    cantidad: seleccionadosWA.size,
+    onEnviar: mensaje => {
+      const cola = filtrados.filter(c => seleccionadosWA.has(c.id));
+      setEnvioWA({
+        mensaje,
+        cola,
+        indice: 0
+      });
+    }
+  }), envioWA && /*#__PURE__*/React.createElement(EnvioWAModal, {
+    envio: envioWA,
+    onSiguiente: () => setEnvioWA(prev => {
+      if (!prev) return null;
+      if (prev.indice + 1 >= prev.cola.length) {
+        setModoSeleccionWA(false);
+        setSeleccionadosWA(new Set());
+        return null;
+      }
+      return {
+        ...prev,
+        indice: prev.indice + 1
+      };
+    }),
+    onCerrar: () => {
+      setEnvioWA(null);
+      setModoSeleccionWA(false);
+      setSeleccionadosWA(new Set());
+    }
   }));
+}
+
+// WhatsApp grupal — barra que aparece al pie con clientes seleccionados,
+// para escribir el mensaje una sola vez antes de arrancar la cola de envío.
+function BarraSeleccionWA({
+  cantidad,
+  onEnviar
+}) {
+  const [mensaje, setMensaje] = useState("Buen día! Le escribo de La Catalina.");
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 1500,
+      background: "var(--color-background-secondary)",
+      borderTop: "1px solid var(--color-border-secondary)",
+      boxShadow: "0 -4px 16px rgba(0,0,0,0.4)",
+      padding: "10px 14px calc(10px + env(safe-area-inset-bottom))"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: "var(--color-text-primary)",
+      marginBottom: 6
+    }
+  }, "📲 ", cantidad, " cliente", cantidad === 1 ? "" : "s", " seleccionado", cantidad === 1 ? "" : "s"), /*#__PURE__*/React.createElement("textarea", {
+    style: {
+      ...s.input,
+      minHeight: 56,
+      resize: "vertical",
+      fontSize: 13,
+      marginBottom: 8
+    },
+    value: mensaje,
+    onChange: e => setMensaje(e.target.value),
+    placeholder: "Mensaje para todos... (podés usar {nombre})"
+  }), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 10,
+      color: "var(--color-text-tertiary)",
+      margin: "-4px 0 8px"
+    }
+  }, "{nombre} se reemplaza por el nombre de cada cliente."), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btnPrimary,
+      width: "100%",
+      opacity: mensaje.trim() ? 1 : 0.5
+    },
+    disabled: !mensaje.trim(),
+    onClick: () => mensaje.trim() && onEnviar(mensaje.trim())
+  }, "📲 Empezar envío (", cantidad, ")"));
+}
+
+// WhatsApp grupal — modal que va mostrando un cliente a la vez de la cola.
+// No hay forma de mandar un solo mensaje a varios números de WhatsApp, así
+// que esto abre wa.me con el chat y el texto ya escrito; el usuario aprieta
+// "Enviar" en WhatsApp y después "Siguiente ▶" acá para pasar al que sigue.
+function EnvioWAModal({
+  envio,
+  onSiguiente,
+  onCerrar
+}) {
+  const {
+    mensaje,
+    cola,
+    indice
+  } = envio;
+  const cliente = cola[indice];
+  const tieneTelefono = !!(cliente && cliente.telefono);
+  const textoFinal = (mensaje || "").split("{nombre}").join(cliente?.nombre || "");
+  const href = tieneTelefono ? `https://wa.me/54${cliente.telefono}?text=${encodeURIComponent(textoFinal)}` : null;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "rgba(0,0,0,0.75)",
+      zIndex: 2000,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      maxWidth: 380,
+      width: "100%",
+      margin: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-tertiary)",
+      marginBottom: 4
+    }
+  }, "Cliente ", indice + 1, " de ", cola.length), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 17,
+      fontWeight: 600,
+      color: "var(--color-text-primary)",
+      marginBottom: 10
+    }
+  }, cliente?.nombre || "—"), !tieneTelefono ? /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 13,
+      color: "#ff6b6b",
+      marginBottom: 14
+    }
+  }, "⚠️ Este cliente no tiene teléfono cargado — no se le puede mandar WhatsApp. Apretá \"Siguiente\" para seguir con el que sigue.") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      background: "var(--color-background-tertiary)",
+      padding: "10px 12px",
+      fontSize: 13,
+      color: "var(--color-text-secondary)",
+      whiteSpace: "pre-wrap",
+      marginBottom: 14
+    }
+  }, textoFinal), /*#__PURE__*/React.createElement("a", {
+    href,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    style: {
+      ...s.btnPrimary,
+      display: "block",
+      textAlign: "center",
+      textDecoration: "none",
+      marginBottom: 10
+    }
+  }, "📲 Abrir WhatsApp")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      flex: 1
+    },
+    onClick: onCerrar
+  }, "✕ Cancelar envío"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btnPrimary,
+      flex: 1
+    },
+    onClick: onSiguiente
+  }, indice + 1 >= cola.length ? "✓ Terminar" : "Siguiente ▶"))));
 }
 
 // ── CargaGPSMasiva ────────────────────────────────────────────────────────────
