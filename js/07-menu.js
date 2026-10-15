@@ -3423,7 +3423,35 @@ function PlanillaDelDia({
       fontWeight: 500,
       color: ganancia >= 0 ? "var(--color-text-success)" : "var(--color-text-danger)"
     }
-  }, fmt(ganancia)))), /*#__PURE__*/React.createElement("button", {
+  }, fmt(ganancia)))), (() => {
+    // Pedido del usuario: ver el movimiento de envases del día (prestado,
+    // devuelto, perdido, retirado, cliente nuevo) directamente en la
+    // planilla de siempre, SIN tener que entrar al flujo de "Cerrar el
+    // día" — antes esta tarjeta sólo existía adentro de ese flujo
+    // (gateado por mostrarCierre, con un return temprano), así que una
+    // vez cerrado el día (o si autoCierre no la disparaba) no se veía
+    // en ningún lado. Reusa los mismos datos ya calculados más arriba
+    // (prestadosDia/devueltosDia/perdidosDia/retiradosDia/
+    // clientesNuevosDia/devueltosFijoDia), filtrados por "fecha" (la de
+    // esta planilla), para que coincida con la tarjeta del cierre.
+    const movLabels = [["Sifón", "soda"], ["Bidón 10L", "b10"], ["Bidón 20L", "b20"], ["Dispenser", "disp"]];
+    const dv = (pk, n) => pk === "soda" ? Math.floor(n / CAJON) : n;
+    return /*#__PURE__*/React.createElement("div", {
+      style: { ...s.card, margin: "0 0 16px", padding: "14px 16px" }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 14, fontWeight: 500, color: "var(--color-text-primary)", marginBottom: 4 }
+    }, "📋 Movimiento de envases de hoy"), /*#__PURE__*/React.createElement("p", {
+      style: { fontSize: 11, color: "var(--color-text-tertiary)", margin: "0 0 8px" }
+    }, "Préstamos, devoluciones, pérdidas, retiros y altas nuevas registrados en el día."), /*#__PURE__*/React.createElement("div", {
+      style: { display: "grid", gridTemplateColumns: "1.1fr 1fr 1fr 1fr 1fr 1fr", gap: 4, fontSize: 10, color: "var(--color-text-tertiary)", marginBottom: 4 }
+    }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Prestado"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Devuelto"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Perdido"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Retirado"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Cliente nuevo")), movLabels.map(([label, pk]) => {
+      const devueltoTotal = (devueltosDia[pk] || 0) + (devueltosFijoDia[pk] || 0);
+      return /*#__PURE__*/React.createElement("div", {
+        key: pk,
+        style: { display: "grid", gridTemplateColumns: "1.1fr 1fr 1fr 1fr 1fr 1fr", gap: 4, alignItems: "center", padding: "5px 0", borderTop: "0.5px solid var(--color-border-tertiary)" }
+      }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: "var(--color-text-primary)" } }, label), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: prestadosDia[pk] ? "var(--color-text-warning)" : "var(--color-text-tertiary)" } }, dv(pk, prestadosDia[pk]) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: devueltoTotal ? "var(--color-text-success)" : "var(--color-text-tertiary)" } }, dv(pk, devueltoTotal) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: perdidosDia[pk] ? "#ff6b6b" : "var(--color-text-tertiary)" } }, dv(pk, perdidosDia[pk]) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: retiradosDia[pk] ? "var(--color-text-secondary)" : "var(--color-text-tertiary)" } }, dv(pk, retiradosDia[pk]) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: clientesNuevosDia[pk] ? "#5daaff" : "var(--color-text-tertiary)" } }, dv(pk, clientesNuevosDia[pk]) || "—"));
+    }));
+  })(), /*#__PURE__*/React.createElement("button", {
     style: s.btnPrimary,
     onClick: () => {
       // Enviar a Emma Control los valores NETOS que se ven en esta pantalla:
