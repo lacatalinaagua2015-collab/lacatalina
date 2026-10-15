@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Preview estilos</title>
+<style>
+  :root{
+    --color-background-info:#EAF2FB;
+    --color-text-info:#185FA5;
+    --color-text-primary:#1a1a1a;
+    --color-text-secondary:#555;
+    --color-text-tertiary:#888;
+    --color-text-success:#1D9E75;
+    --color-border-tertiary:#e2e2e2;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --color-background-info:#122c45;
+      --color-text-info:#7fb4ec;
+      --color-text-primary:#f2f2f2;
+      --color-text-secondary:#bbb;
+      --color-text-tertiary:#8a8a8a;
+      --color-text-success:#3fd19a;
+      --color-border-tertiary:#333;
+    }
+  }
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:#fff; margin:0; padding:20px; max-width:480px;
+  }
+  @media (prefers-color-scheme: dark){ body{ background:#0f0f0f; } }
+  h2{font-size:14px;color:var(--color-text-tertiary);margin:22px 0 8px;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+  .card{
+    margin:0 0 10px; border-radius:12px; overflow:hidden;
+    border:1.5px solid #185FA5; background:var(--color-background-info);
+  }
+  .card button{
+    width:100%; padding:12px 16px; background:none; border:none; cursor:pointer;
+    display:flex; justify-content:space-between; align-items:center; text-align:left;
+  }
+  .card .left{display:flex;align-items:center;gap:8px}
+  .card .ico{font-size:16px}
+  .card .titulo{font-size:13px;font-weight:500;color:var(--color-text-info)}
+  .card .cuenta{font-size:11px;color:var(--color-text-tertiary)}
+  .card .chev{color:var(--color-text-info);font-size:14px}
+  .venta{
+    padding:10px 16px; border-bottom:.5px solid var(--color-border-tertiary);
+    border-radius:8px; margin-bottom:8px;
+  }
+  .venta.destacada{
+    background:rgba(24,95,165,0.06); border-left:3px solid #185FA5;
+  }
+  .venta .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px}
+  .venta .nombre{font-size:13px;font-weight:500;color:var(--color-text-primary)}
+  .venta .badge{margin-left:6px;font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(29,158,117,0.15);color:var(--color-text-success);font-weight:600}
+  .venta .monto{font-size:14px;font-weight:500;color:var(--color-text-primary)}
+  .detalle-linea{font-size:12px;color:var(--color-text-secondary);display:flex;justify-content:space-between;padding:2px 0 2px 8px}
+  .extra{display:flex;flex-direction:column;gap:4px;padding:5px 0 0 8px;margin-top:4px;border-top:.5px solid var(--color-border-tertiary)}
+  .pago-deuda{font-size:11px;color:var(--color-text-success)}
+  .chip-prest{font-size:11px;font-weight:600;color:#f5b942;background:rgba(245,185,66,0.15);padding:3px 8px;border-radius:6;width:fit-content;display:inline-block}
+  .nota{font-size:12px;color:var(--color-text-tertiary);margin-top:16px;line-height:1.5}
+</style>
+</head>
+<body>
+
+<h2>Antes</h2>
+<div class="venta" style="border-radius:8px;border:1px solid #ddd;">
+  <div class="top">
+    <span class="nombre">Heit</span><span class="badge" style="background:rgba(29,158,117,.15)">Contado</span>
+    <span class="monto">$3.000</span>
+  </div>
+  <div class="detalle-linea"><span>Bidón 10L × 1</span><span>$3.000</span></div>
+  <div class="extra">
+    <span class="pago-deuda">💵 Pagó deuda: +$1.000</span>
+  </div>
+</div>
+<p class="nota">— fila sin destacar, se mezclaba con el resto</p>
+
+<h2>Ahora</h2>
+<div class="venta destacada">
+  <div class="top">
+    <span class="nombre">Heit</span><span class="badge">Contado</span>
+    <span class="monto">$3.000</span>
+  </div>
+  <div class="detalle-linea"><span>Bidón 10L × 1</span><span>$3.000</span></div>
+  <div class="extra">
+    <span class="pago-deuda">💵 Pagó deuda: +$1.000</span>
+    <span class="chip-prest">📦 Prestó: 1 Sifón</span>
+  </div>
+</div>
+<p class="nota">— fondo celeste clarito + borde azul a la izquierda, se nota al toque sin tapar el texto</p>
+
+<h2>Toggles (mismo look que "Detalle de ventas del día")</h2>
+<div class="card">
+  <button>
+    <span class="left"><span class="ico">💸</span><span class="titulo">Detalle de transferencias</span><span class="cuenta">🔴 2 pend.</span></span>
+    <span class="chev">▾</span>
+  </button>
+</div>
+<div class="card">
+  <button>
+    <span class="left"><span class="ico">👥</span><span class="titulo">Detalle por cliente</span><span class="cuenta">6 clientes</span></span>
+    <span class="chev">▾</span>
+  </button>
+</div>
+
+</body>
+</html>
