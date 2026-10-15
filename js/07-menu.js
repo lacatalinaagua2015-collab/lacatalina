@@ -1082,12 +1082,22 @@ function DetalleVentasDia({
     }, "💵 Pagó deuda: +", fmt(deudaPagada)), prestStr && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,
-        color: "#f5b942"
+        fontWeight: 600,
+        color: "#f5b942",
+        background: "rgba(245,185,66,0.15)",
+        padding: "3px 8px",
+        borderRadius: 6,
+        width: "fit-content"
       }
     }, "📦 Prestó: ", prestStr), devStr && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,
-        color: "var(--color-text-info)"
+        fontWeight: 600,
+        color: "#1D9E75",
+        background: "rgba(29,158,117,0.15)",
+        padding: "3px 8px",
+        borderRadius: 6,
+        width: "fit-content"
       }
     }, "↩️ Devolvió: ", devStr)), accionesRow);
   }), (() => {
@@ -1183,12 +1193,22 @@ function DetalleVentasDia({
       }, prestStrNV && /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 11,
-          color: "#f5b942"
+          fontWeight: 600,
+          color: "#f5b942",
+          background: "rgba(245,185,66,0.15)",
+          padding: "3px 8px",
+          borderRadius: 6,
+          width: "fit-content"
         }
       }, "📦 Prestó: ", prestStrNV), devStrNV && /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 11,
-          color: "var(--color-text-info)"
+          fontWeight: 600,
+          color: "#1D9E75",
+          background: "rgba(29,158,117,0.15)",
+          padding: "3px 8px",
+          borderRadius: 6,
+          width: "fit-content"
         }
       }, "↩️ Devolvió: ", devStrNV)), /*#__PURE__*/React.createElement("div", {
         style: {
