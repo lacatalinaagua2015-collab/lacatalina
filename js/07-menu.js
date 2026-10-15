@@ -1091,7 +1091,19 @@ function DetalleVentasDia({
       }
     }, "↩️ Devolvió: ", devStr)), accionesRow);
   }), (() => {
-    const ventaIds = new Set(ventas.map(v => v.clienteId));
+    // BUG REPORTADO 2026-10-15: "registrarNoQuiereConEnvases" (14-app.js)
+    // crea un registro en "ventas" cuando el cliente que dijo "No quiere"
+    // igual dejó/llevó envases (para que quede el movimiento asentado y
+    // mueva stock) — pero ese registro NO es una compra real. Acá abajo se
+    // armaba "ventaIds" con TODAS las ventas del día sin filtrar, así que
+    // ese cliente dejaba de aparecer en "No compraron" (quedaba "tapado"
+    // por su propio registro de envases) aunque sí dijo que no quería —
+    // exactamente lo que el usuario reportó: "No se registra la devolución"
+    // cuando en realidad sí se registraba, solo que el cliente desaparecía
+    // de la lista donde se esperaba verlo. Ahora solo cuentan como "ya
+    // compró" las ventas reales (se excluyen cobros, ajustes, cambios de
+    // envase y la parte-transferencia de un pago mixto).
+    const ventaIds = new Set(ventas.filter(v => !v._esCobro && !v._esAjuste && !v._esCambio && !v._esMixtoTrans).map(v => v.clienteId));
     const noComp = (noVisitas || []).filter(n => n.fecha === fecha && !ventaIds.has(n.clienteId) && n.motivo !== "salteado");
     if (noComp.length === 0) return null;
     const lbl = m => m === "noquiso" ? {
@@ -1120,6 +1132,14 @@ function DetalleVentasDia({
       const p = (clientes || []).find(x => x.id === n.clienteId) || {};
       const info = lbl(n.motivo);
       const dir = direccionCliente(p);
+      // Si "No quiere" vino con envases (ver registrarNoQuiereConEnvases en
+      // 14-app.js), queda un registro en "ventas" solo para eso — mostrarlo
+      // acá también, al lado de "No quiso", que es donde el usuario lo
+      // busca primero (antes solo se veía en "Detalle de ventas del día").
+      const ventaEnvNV = ventas.find(v => v.clienteId === n.clienteId && v._esAjuste && ((v.envPrest || []).length || (v.envDev || []).length));
+      const fmtEnvNV = arr => (arr || []).filter(e => e.prod && Number(e.cant) > 0).map(e => `${e.cant} ${e.prod}`).join(", ");
+      const prestStrNV = ventaEnvNV ? fmtEnvNV(ventaEnvNV.envPrest) : "";
+      const devStrNV = ventaEnvNV ? fmtEnvNV(ventaEnvNV.envDev) : "";
       return /*#__PURE__*/React.createElement("div", {
         key: "nv" + i,
         style: {
@@ -1153,7 +1173,24 @@ function DetalleVentasDia({
           color: info.c,
           flexShrink: 0
         }
-      }, info.ic, " ", info.t)), /*#__PURE__*/React.createElement("div", {
+      }, info.ic, " ", info.t)), (prestStrNV || devStrNV) && /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 10,
+          marginTop: 4
+        }
+      }, prestStrNV && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 11,
+          color: "#f5b942"
+        }
+      }, "📦 Prestó: ", prestStrNV), devStrNV && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 11,
+          color: "var(--color-text-info)"
+        }
+      }, "↩️ Devolvió: ", devStrNV)), /*#__PURE__*/React.createElement("div", {
         style: {
           display: "flex",
           flexWrap: "wrap",
