@@ -3466,7 +3466,13 @@ function PlanillaDelDia({
     // clientesNuevosDia/devueltosFijoDia), filtrados por "fecha" (la de
     // esta planilla), para que coincida con la tarjeta del cierre.
     const movLabels = [["Sifón", "soda"], ["Bidón 10L", "b10"], ["Bidón 20L", "b20"], ["Dispenser", "disp"]];
-    const dv = (pk, n) => pk === "soda" ? Math.floor(n / CAJON) : n;
+    // OJO: acá se muestra en UNIDADES para los 4 productos (antes el Sifón
+    // se dividía por CAJON=6, como en la pantalla de Cierre) — pedido del
+    // usuario: "la parte de arriba no coincide con lo de abajo". El detalle
+    // por cliente, más abajo, siempre mostró unidades (así vienen
+    // envPrest/envDev), así que dividir el Sifón acá arriba hacía que la
+    // tabla y el detalle no coincidieran nunca para ese producto.
+    const dv = (pk, n) => n;
     // Detalle por cliente — pedido del usuario: "que se vea quien fue el
     // que devolvio y a quien se le presto", no solo el total agregado.
     const PROD_LBL = { soda: "Sifón", b10: "Bidón 10L", b20: "Bidón 20L", disp: "Dispenser" };
