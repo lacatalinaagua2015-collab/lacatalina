@@ -2421,6 +2421,34 @@ function App() {
           cant: String(extra)
         });
       });
+      // Auto-detectar "intercambio de envase": pedido del usuario — "por
+      // lógica debería entender que si me entrega un bidón de 20 y yo le
+      // entrego un bidón de 10, es un intercambio". Si en la misma venta el
+      // cliente devuelve un tipo de envase (envDev) y se le vende un tipo
+      // DISTINTO, ese envase vendido también queda circulando con el
+      // cliente aunque coincida con su Fijo (no es un reabastecimiento
+      // normal del mismo tamaño — reemplaza al que devolvió). Solo cubre lo
+      // que el chequeo de arriba no haya marcado ya como extra.
+      const envasesTipos = Object.values(mapa);
+      (envDev || []).filter(e => e.prod && Number(e.cant) > 0).forEach(dev => {
+        let restante = Number(dev.cant) || 0;
+        if (!restante) return;
+        detalle.forEach(d => {
+          if (restante <= 0) return;
+          if (!envasesTipos.includes(d.nombre) || d.nombre === dev.prod) return;
+          const yaAuto = envAutoDetect.find(e => e.prod === d.nombre);
+          const yaCubierto = yaAuto ? Number(yaAuto.cant) || 0 : 0;
+          const disponibleSinCubrir = Math.max(0, d.cantidad - yaCubierto);
+          const cant = Math.min(restante, disponibleSinCubrir);
+          if (cant > 0) {
+            if (yaAuto) yaAuto.cant = String((Number(yaAuto.cant) || 0) + cant);else envAutoDetect.push({
+              prod: d.nombre,
+              cant: String(cant)
+            });
+            restante -= cant;
+          }
+        });
+      });
     }
     const envPrestFinal = [...(envPrest || []).filter(e => e.prod && e.cant), ...envAutoDetect.filter(e => !(envPrest || []).some(ep => ep.prod === e.prod))];
 
