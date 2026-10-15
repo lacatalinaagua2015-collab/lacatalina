@@ -915,7 +915,7 @@ function DetalleVentasDia({
     const cardStyle = {
       padding: "10px 16px",
       borderBottom: idx < ventas.length - 1 ? "0.5px solid var(--color-border-tertiary)" : "none",
-      ...(esNuevo ? { background: "rgba(93,170,255,0.10)", borderLeft: "3px solid #5daaff" } : hayMovExtra ? { background: "rgba(24,95,165,0.06)", borderLeft: "3px solid #185FA5" } : {})
+      ...(esNuevo ? { background: "rgba(93,170,255,0.10)", borderLeft: "3px solid #5daaff" } : hayMovExtra ? { background: "var(--color-background-info)", borderLeft: "3px solid var(--color-border-info)" } : {})
     };
     if (editandoVentaId === v.id && esCompraReal && cli) {
       return /*#__PURE__*/React.createElement("div", {
