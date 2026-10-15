@@ -907,15 +907,10 @@ function DetalleVentasDia({
     const esCambio = v._esCambio || false;
     const esDevolucion = v._esDevolucion || false;
     const esCompraReal = !esCobro && !esAjuste && !esCambio;
-    // Destacar con un color más claro la fila que tiene algo para notar:
-    // pago de deuda, saldo a favor aplicado, o movimiento de envases
-    // (préstamo/devolución) — pedido del usuario para que no se pierda
-    // entre el resto de las ventas normales.
-    const hayMovExtra = v.saldoAplicado > 0 || deudaPagada > 0 || !!prestStr || !!devStr;
     const cardStyle = {
       padding: "10px 16px",
       borderBottom: idx < ventas.length - 1 ? "0.5px solid var(--color-border-tertiary)" : "none",
-      ...(esNuevo ? { background: "rgba(93,170,255,0.10)", borderLeft: "3px solid #5daaff" } : hayMovExtra ? { background: "var(--color-background-info)", borderLeft: "3px solid var(--color-border-info)" } : {})
+      ...(esNuevo ? { background: "rgba(93,170,255,0.10)", borderLeft: "3px solid #5daaff" } : {})
     };
     if (editandoVentaId === v.id && esCompraReal && cli) {
       return /*#__PURE__*/React.createElement("div", {
@@ -1074,10 +1069,11 @@ function DetalleVentasDia({
       style: {
         display: "flex",
         flexDirection: "column",
-        gap: 2,
-        padding: "3px 0 0 8px",
-        marginTop: 2,
-        borderTop: "0.5px solid var(--color-border-tertiary)"
+        gap: 3,
+        padding: "6px 8px",
+        marginTop: 4,
+        borderRadius: 6,
+        background: "var(--color-background-info)"
       }
     }, v.saldoAplicado > 0 && /*#__PURE__*/React.createElement("span", {
       style: {
