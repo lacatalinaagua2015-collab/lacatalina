@@ -48,8 +48,8 @@
     padding:10px 16px; border-bottom:.5px solid var(--color-border-tertiary);
     border-radius:8px; margin-bottom:8px;
   }
-  .venta.destacada{
-    background:var(--color-background-info); border-left:3px solid var(--color-text-info);
+  .extra.destacada{
+    background:var(--color-background-info); border-radius:6px; padding:6px 8px; margin-top:4px; border-top:none;
   }
   .venta .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px}
   .venta .nombre{font-size:13px;font-weight:500;color:var(--color-text-primary)}
@@ -77,19 +77,19 @@
 </div>
 <p class="nota">— fila sin destacar, se mezclaba con el resto</p>
 
-<h2>Ahora (color real, más claro)</h2>
-<div class="venta destacada">
+<h2>Ahora (solo el renglón de detalle)</h2>
+<div class="venta" style="border-radius:8px;border:1px solid #ddd;">
   <div class="top">
     <span class="nombre">Heit</span><span class="badge">Contado</span>
     <span class="monto">$3.000</span>
   </div>
   <div class="detalle-linea"><span>Bidón 10L × 1</span><span>$3.000</span></div>
-  <div class="extra">
+  <div class="extra destacada">
     <span class="pago-deuda">💵 Pagó deuda: +$1.000</span>
     <span class="chip-prest">📦 Prestó: 1 Sifón</span>
   </div>
 </div>
-<p class="nota">— fondo celeste clarito + borde azul a la izquierda, se nota al toque sin tapar el texto</p>
+<p class="nota">— el resto de la tarjeta queda igual que siempre; solo el renglón de abajo (pago/préstamo/devolución) tiene fondo celeste</p>
 
 <h2>Toggles (mismo look que "Detalle de ventas del día")</h2>
 <div class="card">
