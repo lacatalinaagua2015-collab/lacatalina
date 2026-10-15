@@ -431,8 +431,13 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         irAlSiguientePendiente();
       },
       onNoQuiere: (envPrest, envDev) => {
-        marcarNoVisita(c.id, "noquiso");
-        onNoQuiereConEnvases && onNoQuiereConEnvases(c.id, envPrest, envDev);
+        // Antes esto llamaba a marcarNoVisita Y a onNoQuiereConEnvases, las
+        // dos casi al mismo tiempo — ambas terminan guardando noVisitas, así
+        // que quedaba una carrera donde una podía pisar a la otra. Con una
+        // sola vía (onNoQuiereConEnvases, que adentro ya marca "noquiso" Y
+        // deja asentado el envase prestado/devuelto) no hay forma de que el
+        // envase se pierda por el orden de guardado.
+        if (onNoQuiereConEnvases) onNoQuiereConEnvases(c.id, envPrest, envDev);else marcarNoVisita(c.id, "noquiso");
         irAlSiguientePendiente();
       },
       onCambiarDispenser: delta => onCambiarDispenserCliente && onCambiarDispenserCliente(c.id, delta),
