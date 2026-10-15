@@ -1486,6 +1486,10 @@ function PlanillaDelDia({
   // Cartel de confirmación antes de mover algo del/al Depósito — pedido del
   // usuario: la app tiene que avisar y preguntar, no mover en silencio.
   const [mostrarConfirmDeposito, setMostrarConfirmDeposito] = useState(false);
+  // Detalle por cliente en "Movimiento de envases de hoy" — pedido del
+  // usuario: "que se vea quien fue el que devolvio y a quien se le
+  // presto", desplegable y arranca cerrado para no alargar la planilla.
+  const [mostrarDetalleClientesEnv, setMostrarDetalleClientesEnv] = useState(false);
 
   // ── Cálculo de stock para el cierre del día ──────────────────
   const CAJON = 6;
@@ -1607,7 +1611,14 @@ function PlanillaDelDia({
     disp: 0
   };
   (movStock || []).forEach(m => {
-    if (m.tipo !== "ajuste" || !((m.nota || "").startsWith("Envases fijos de cliente") || (m.nota || "").startsWith("Envases prestados de cliente")) || (m.fecha || "").slice(0, 10) !== fecha) return;
+    // OJO: solo "Envases fijos de cliente..." — las correcciones de
+    // "Envases prestados de cliente..." (✏️ Envases → Prestados) quedan
+    // AFUERA a propósito: esas ya se cuentan en prestadosDia/devueltosDia
+    // más arriba (vía el registro de venta que genera
+    // window._lcRegistrarAjusteEnvases al confirmar el panel). Si también
+    // entraran acá, cada corrección de Prestados se contaba DOBLE: una vez
+    // en Prestado/Devuelto y otra vez en Cliente nuevo/Devuelto.
+    if (m.tipo !== "ajuste" || !(m.nota || "").startsWith("Envases fijos de cliente") || (m.fecha || "").slice(0, 10) !== fecha) return;
     Object.keys(skToPl).forEach(sk => {
       const d = Number(m.detalle?.[sk]) || 0;
       // detalle viene negativo (sale de sodería) — acá se muestra en positivo,
@@ -3456,6 +3467,59 @@ function PlanillaDelDia({
     // esta planilla), para que coincida con la tarjeta del cierre.
     const movLabels = [["Sifón", "soda"], ["Bidón 10L", "b10"], ["Bidón 20L", "b20"], ["Dispenser", "disp"]];
     const dv = (pk, n) => pk === "soda" ? Math.floor(n / CAJON) : n;
+    // Detalle por cliente — pedido del usuario: "que se vea quien fue el
+    // que devolvio y a quien se le presto", no solo el total agregado.
+    const PROD_LBL = { soda: "Sifón", b10: "Bidón 10L", b20: "Bidón 20L", disp: "Dispenser" };
+    const porClienteEnv = {};
+    const addMovCliente = (nombre, tipo, texto) => {
+      const key = (nombre || "").trim() || "Sin nombre";
+      if (!porClienteEnv[key]) porClienteEnv[key] = { prestado: [], devuelto: [] };
+      porClienteEnv[key][tipo].push(texto);
+    };
+    // 1) Préstamos/devoluciones de una visita normal (ventas de hoy)
+    ventas.forEach(v => {
+      (v.envPrest || []).forEach(e => {
+        const cant = Number(e.cant) || 0;
+        if (cant > 0) addMovCliente(v.cliente, "prestado", `${cant} ${e.prod}`);
+      });
+      (v.envDev || []).forEach(e => {
+        const cant = Number(e.cant) || 0;
+        if (cant > 0) addMovCliente(v.cliente, "devuelto", `${cant} ${e.prod}`);
+      });
+    });
+    // 2) Correcciones de Fijo (✏️ Envases → Fijos) — quedan en movStock,
+    // con el nombre del cliente al final de la nota.
+    (movStock || []).forEach(m => {
+      if (m.tipo !== "ajuste" || (m.fecha || "").slice(0, 10) !== fecha) return;
+      if (!(m.nota || "").startsWith("Envases fijos de cliente")) return;
+      const nombre = (m.nota.split(" — ")[1] || "").trim();
+      if (!nombre) return;
+      Object.keys(skToPl).forEach(sk => {
+        const d = Number(m.detalle?.[sk]) || 0;
+        if (!d) return;
+        const pk = skToPl[sk];
+        const lbl = PROD_LBL[pk];
+        if (d < 0) addMovCliente(nombre, "prestado", `${-d} ${lbl} (fijo)`);else addMovCliente(nombre, "devuelto", `${d} ${lbl} (fijo)`);
+      });
+    });
+    // 3) Dispenser (comodato aparte — ver registrarDispMov en 14-app.js)
+    (dispMovs || []).forEach(m => {
+      const nombre = m.clienteNombre;
+      if (!nombre || !m.delta) return;
+      if (m.delta > 0) addMovCliente(nombre, "prestado", `${m.delta} Dispenser`);else addMovCliente(nombre, "devuelto", `${-m.delta} Dispenser`);
+    });
+    // 4) Bajas de cliente con retiro total de envases
+    (movStock || []).forEach(m => {
+      if (m.tipo !== "retiro" || (m.fecha || "").slice(0, 10) !== fecha) return;
+      const nombre = (m.nota || "").replace("Cliente retirado:", "").trim();
+      if (!nombre) return;
+      const partes = Object.keys(skToPl).map(sk => {
+        const d = Number(m.detalle?.[sk]) || 0;
+        return d ? `${d} ${PROD_LBL[skToPl[sk]]}` : null;
+      }).filter(Boolean);
+      if (partes.length) addMovCliente(nombre, "devuelto", `${partes.join(", ")} (baja de cliente)`);
+    });
+    const nombresConMovEnv = Object.keys(porClienteEnv).sort((a, b) => a.localeCompare(b, "es"));
     return /*#__PURE__*/React.createElement("div", {
       style: { ...s.card, margin: "0 0 16px", padding: "14px 16px" }
     }, /*#__PURE__*/React.createElement("div", {
@@ -3470,7 +3534,32 @@ function PlanillaDelDia({
         key: pk,
         style: { display: "grid", gridTemplateColumns: "1.1fr 1fr 1fr 1fr 1fr 1fr", gap: 4, alignItems: "center", padding: "5px 0", borderTop: "0.5px solid var(--color-border-tertiary)" }
       }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: "var(--color-text-primary)" } }, label), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: prestadosDia[pk] ? "var(--color-text-warning)" : "var(--color-text-tertiary)" } }, dv(pk, prestadosDia[pk]) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: devueltoTotal ? "var(--color-text-success)" : "var(--color-text-tertiary)" } }, dv(pk, devueltoTotal) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: perdidosDia[pk] ? "#ff6b6b" : "var(--color-text-tertiary)" } }, dv(pk, perdidosDia[pk]) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: retiradosDia[pk] ? "var(--color-text-secondary)" : "var(--color-text-tertiary)" } }, dv(pk, retiradosDia[pk]) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: clientesNuevosDia[pk] ? "#5daaff" : "var(--color-text-tertiary)" } }, dv(pk, clientesNuevosDia[pk]) || "—"));
-    }));
+    }), nombresConMovEnv.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: 10, paddingTop: 8, borderTop: "0.5px solid var(--color-border-tertiary)" }
+    }, /*#__PURE__*/React.createElement("div", {
+      onClick: () => setMostrarDetalleClientesEnv(v => !v),
+      style: { display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: { fontSize: 12, fontWeight: 500, color: "var(--color-text-info)" }
+    }, "👥 Detalle por cliente (", nombresConMovEnv.length, ")"), /*#__PURE__*/React.createElement("span", {
+      style: { fontSize: 11, color: "var(--color-text-tertiary)" }
+    }, mostrarDetalleClientesEnv ? "▲ ocultar" : "▼ ver")), mostrarDetalleClientesEnv && /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: 6 }
+    }, nombresConMovEnv.map(nombre => {
+      const mov = porClienteEnv[nombre];
+      return /*#__PURE__*/React.createElement("div", {
+        key: nombre,
+        style: { padding: "6px 0", borderTop: "0.5px solid var(--color-border-tertiary)" }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: { fontSize: 12, fontWeight: 500, color: "var(--color-text-primary)", marginBottom: 2 }
+      }, nombre), /*#__PURE__*/React.createElement("div", {
+        style: { display: "flex", flexWrap: "wrap", gap: 6 }
+      }, mov.prestado.length > 0 && /*#__PURE__*/React.createElement("span", {
+        style: { fontSize: 11, fontWeight: 600, color: "#f5b942", background: "rgba(245,185,66,0.15)", padding: "2px 7px", borderRadius: 6 }
+      }, "📦 Prestó: ", mov.prestado.join(", ")), mov.devuelto.length > 0 && /*#__PURE__*/React.createElement("span", {
+        style: { fontSize: 11, fontWeight: 600, color: "#1D9E75", background: "rgba(29,158,117,0.15)", padding: "2px 7px", borderRadius: 6 }
+      }, "↩️ Devolvió: ", mov.devuelto.join(", "))));
+    }))));
   })(), /*#__PURE__*/React.createElement("button", {
     style: s.btnPrimary,
     onClick: () => {

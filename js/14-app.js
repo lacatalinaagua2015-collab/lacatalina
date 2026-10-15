@@ -2755,11 +2755,17 @@ function App() {
         }
       });
       if (window._lcRegistrarMovimientoStock) {
-        if (Object.keys(detSoderia).length) window._lcRegistrarMovimientoStock("ajuste", detSoderia, "Envases fijos de cliente (alta/edición)");
-        if (Object.keys(detDeposito).length) window._lcRegistrarMovimientoStock("ajuste", detDeposito, "Envases fijos de cliente — faltó en sodería, se completó desde Depósito");
-        if (Object.keys(detSoderiaPrest).length) window._lcRegistrarMovimientoStock("ajuste", detSoderiaPrest, "Envases prestados de cliente (corrección manual)");
-        if (Object.keys(detDepositoPrest).length) window._lcRegistrarMovimientoStock("ajuste", detDepositoPrest, "Envases prestados de cliente — faltó en sodería, se completó desde Depósito");
-        if (Object.keys(detSoderiaVaciosPrest).length) window._lcRegistrarMovimientoStock("ajuste", detSoderiaVaciosPrest, "Envases prestados de cliente — devolución registrada manualmente");
+        // Pedido del usuario: "necesito que se vea quien fue el que
+        // devolvio y a quien se le presto" — antes estas notas eran
+        // anónimas (no decían de qué cliente era el ajuste). Ahora llevan
+        // el nombre al final, así la Planilla puede armar el detalle por
+        // cliente (ver 07-menu.js, tarjeta "Movimiento de envases de hoy").
+        const nombreCli = a.nombre || "Cliente";
+        if (Object.keys(detSoderia).length) window._lcRegistrarMovimientoStock("ajuste", detSoderia, `Envases fijos de cliente (alta/edición) — ${nombreCli}`);
+        if (Object.keys(detDeposito).length) window._lcRegistrarMovimientoStock("ajuste", detDeposito, `Envases fijos de cliente — faltó en sodería, se completó desde Depósito — ${nombreCli}`);
+        if (Object.keys(detSoderiaPrest).length) window._lcRegistrarMovimientoStock("ajuste", detSoderiaPrest, `Envases prestados de cliente (corrección manual) — ${nombreCli}`);
+        if (Object.keys(detDepositoPrest).length) window._lcRegistrarMovimientoStock("ajuste", detDepositoPrest, `Envases prestados de cliente — faltó en sodería, se completó desde Depósito — ${nombreCli}`);
+        if (Object.keys(detSoderiaVaciosPrest).length) window._lcRegistrarMovimientoStock("ajuste", detSoderiaVaciosPrest, `Envases prestados de cliente — devolución registrada manualmente — ${nombreCli}`);
       }
       syncData({
         stock: s
