@@ -655,35 +655,40 @@ function DetalleTransferencias({
   }, [clientes]);
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      marginTop: 8,
-      borderTop: "0.5px solid var(--color-border-tertiary)",
-      paddingTop: 8
+      margin: "8px 0",
+      borderRadius: 12,
+      overflow: "hidden",
+      border: "1.5px solid #185FA5",
+      background: "var(--color-background-info)"
     }
   }, /*#__PURE__*/React.createElement("button", {
     style: {
       width: "100%",
+      padding: "12px 16px",
       background: "none",
       border: "none",
       cursor: "pointer",
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      padding: "2px 0"
+      textAlign: "left"
     },
     onClick: () => setAbierto(o => !o)
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
-      gap: 6
+      gap: 8
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: 11,
-      color: "var(--color-text-secondary)",
+      fontSize: 16
+    }
+  }, "💸"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
       fontWeight: 500,
-      textTransform: "uppercase",
-      letterSpacing: "0.05em"
+      color: "var(--color-text-info)"
     }
   }, "Detalle de transferencias"), pendientes > 0 && /*#__PURE__*/React.createElement("span", {
     style: {
@@ -696,14 +701,14 @@ function DetalleTransferencias({
     }
   }, "🔴 ", pendientes, " pend.")), /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: 13,
-      color: "var(--color-text-tertiary)",
+      color: "var(--color-text-info)",
+      fontSize: 14,
       display: "inline-block",
       transform: abierto ? "rotate(180deg)" : "rotate(0deg)"
     }
   }, "▾")), abierto && /*#__PURE__*/React.createElement("div", {
     style: {
-      marginTop: 6
+      padding: "0 16px 12px"
     }
   }, ventas.map(v => {
     const confirmada = !!v.transConfirmada;
@@ -902,10 +907,15 @@ function DetalleVentasDia({
     const esCambio = v._esCambio || false;
     const esDevolucion = v._esDevolucion || false;
     const esCompraReal = !esCobro && !esAjuste && !esCambio;
+    // Destacar con un color más claro la fila que tiene algo para notar:
+    // pago de deuda, saldo a favor aplicado, o movimiento de envases
+    // (préstamo/devolución) — pedido del usuario para que no se pierda
+    // entre el resto de las ventas normales.
+    const hayMovExtra = v.saldoAplicado > 0 || deudaPagada > 0 || !!prestStr || !!devStr;
     const cardStyle = {
       padding: "10px 16px",
       borderBottom: idx < ventas.length - 1 ? "0.5px solid var(--color-border-tertiary)" : "none",
-      ...(esNuevo ? { background: "rgba(93,170,255,0.10)", borderLeft: "3px solid #5daaff" } : {})
+      ...(esNuevo ? { background: "rgba(93,170,255,0.10)", borderLeft: "3px solid #5daaff" } : hayMovExtra ? { background: "rgba(24,95,165,0.06)", borderLeft: "3px solid #185FA5" } : {})
     };
     if (editandoVentaId === v.id && esCompraReal && cli) {
       return /*#__PURE__*/React.createElement("div", {
@@ -3541,16 +3551,22 @@ function PlanillaDelDia({
         style: { display: "grid", gridTemplateColumns: "1.1fr 1fr 1fr 1fr 1fr 1fr", gap: 4, alignItems: "center", padding: "5px 0", borderTop: "0.5px solid var(--color-border-tertiary)" }
       }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: "var(--color-text-primary)" } }, label), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: prestadosDia[pk] ? "var(--color-text-warning)" : "var(--color-text-tertiary)" } }, dv(pk, prestadosDia[pk]) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: devueltoTotal ? "var(--color-text-success)" : "var(--color-text-tertiary)" } }, dv(pk, devueltoTotal) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: perdidosDia[pk] ? "#ff6b6b" : "var(--color-text-tertiary)" } }, dv(pk, perdidosDia[pk]) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: retiradosDia[pk] ? "var(--color-text-secondary)" : "var(--color-text-tertiary)" } }, dv(pk, retiradosDia[pk]) || "—"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center", fontSize: 12, color: clientesNuevosDia[pk] ? "#5daaff" : "var(--color-text-tertiary)" } }, dv(pk, clientesNuevosDia[pk]) || "—"));
     }), nombresConMovEnv.length > 0 && /*#__PURE__*/React.createElement("div", {
-      style: { marginTop: 10, paddingTop: 8, borderTop: "0.5px solid var(--color-border-tertiary)" }
-    }, /*#__PURE__*/React.createElement("div", {
+      style: { margin: "10px 0 0", borderRadius: 12, overflow: "hidden", border: "1.5px solid #185FA5", background: "var(--color-background-info)" }
+    }, /*#__PURE__*/React.createElement("button", {
       onClick: () => setMostrarDetalleClientesEnv(v => !v),
-      style: { display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" }
+      style: { width: "100%", padding: "12px 16px", background: "none", border: "none", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", textAlign: "left" }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", alignItems: "center", gap: 8 }
     }, /*#__PURE__*/React.createElement("span", {
-      style: { fontSize: 12, fontWeight: 500, color: "var(--color-text-info)" }
-    }, "👥 Detalle por cliente (", nombresConMovEnv.length, ")"), /*#__PURE__*/React.createElement("span", {
+      style: { fontSize: 16 }
+    }, "👥"), /*#__PURE__*/React.createElement("span", {
+      style: { fontSize: 13, fontWeight: 500, color: "var(--color-text-info)" }
+    }, "Detalle por cliente"), /*#__PURE__*/React.createElement("span", {
       style: { fontSize: 11, color: "var(--color-text-tertiary)" }
-    }, mostrarDetalleClientesEnv ? "▲ ocultar" : "▼ ver")), mostrarDetalleClientesEnv && /*#__PURE__*/React.createElement("div", {
-      style: { marginTop: 6 }
+    }, nombresConMovEnv.length, " cliente", nombresConMovEnv.length === 1 ? "" : "s")), /*#__PURE__*/React.createElement("span", {
+      style: { color: "var(--color-text-info)", fontSize: 14, display: "inline-block", transform: mostrarDetalleClientesEnv ? "rotate(180deg)" : "rotate(0deg)" }
+    }, "▾")), mostrarDetalleClientesEnv && /*#__PURE__*/React.createElement("div", {
+      style: { padding: "0 16px 12px" }
     }, nombresConMovEnv.map(nombre => {
       const mov = porClienteEnv[nombre];
       return /*#__PURE__*/React.createElement("div", {
