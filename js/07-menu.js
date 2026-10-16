@@ -106,6 +106,14 @@ function MenuDias({
     const noVisitasDIds = new Set((noVisitas || []).filter(v => v.fecha >= ultimaFechaKey && (v.motivo === "noesta2" || v.motivo === "noquiso")).map(v => v.clienteId));
     const visitadosD = clientesD.filter(c => ventasDIds.has(c.id) || noVisitasDIds.has(c.id));
     const completoD = clientesD.length > 0 && visitadosD.length >= clientesD.length;
+    // BUG REPORTADO 2026-10-16: un día anterior ya completo (ej. Martes,
+    // Miércoles, Jueves ya cerrados) seguía mostrando el ✅ verde toda la
+    // semana. Antes esos íconos desaparecían apenas dejaba de ser "hoy" —
+    // tiene que seguir así: el cartel de acceso rápido solo se queda
+    // prendido mientras hay algo PENDIENTE sin terminar; si ya está
+    // completo y no es el día de hoy, no corresponde mostrar nada (se
+    // vuelve a habilitar recién cuando llegue su turno la semana que viene).
+    if (!esHoyDia && completoD) return;
     // Fecha real de la sesión: si ya se arrancó (hay planilla, venta o marca
     // cargada desde ultimaFechaKey en adelante), se sigue esa misma fecha —
     // así no se parte un mismo reparto en dos fechas. Si todavía no se tocó
