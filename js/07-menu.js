@@ -91,6 +91,11 @@ function MenuDias({
     // Mismo criterio que ListaClientes (08-clientes.js): un cliente recién
     // creado HOY no cuenta para el total — cargarlo YA fue la visita.
     const clientesD = (clientes || []).filter(c => c.dia === d && !c._retirado && c.creadoFecha !== hoyFechaKey);
+    // BUG REPORTADO 2026-10-16: un día sin ningún cliente cargado (ej.
+    // "Lunes" con 0 clientes) quedaba igual con el ícono en rojo
+    // "Pendiente 0/0" — no hay nada que entregar, no corresponde mostrar
+    // nada.
+    if (clientesD.length === 0) return;
     // OJO: acá NO se filtra por v.dia === d (a propósito). Un cliente
     // pendiente de Lunes puede terminar comprando desde la lista combinada
     // de Martes (sección "⏪ Pendientes de Lunes" en ListaClientes), y esa
