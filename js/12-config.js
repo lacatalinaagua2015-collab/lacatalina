@@ -1929,7 +1929,20 @@ function Config({
       reparacion: { label: "🛠 Reparación", color: "#5daaff" },
       gnc: { label: "🟢 Oblea GNC", color: "#22c55e" },
       vtv: { label: "🔵 VTV", color: "#3b82f6" },
+      carnet: { label: "🪪 Carnet de manejo", color: "#a78bfa" },
       otro: { label: "📋 Otro", color: "#a0aec0" }
+    };
+    // "Vence" prioriza la fecha real elegida en el formulario
+    // (proximaFechaISO, la misma que usan las notificaciones) por sobre la
+    // nota de texto libre — para VTV/Carnet lo que importa es la fecha de
+    // vencimiento, no una descripción.
+    const fmtVencimiento = m => {
+      if (m.proximaFechaISO) {
+        try {
+          return new Date(m.proximaFechaISO + "T12:00:00").toLocaleDateString("es-AR");
+        } catch {}
+      }
+      return m.proximo || "";
     };
     // Agrupado por tipo: cada tarjeta es UN tipo de mantenimiento (aceite,
     // VTV, etc.), con la fecha/próximo más reciente a la vista, y adentro —
@@ -2001,13 +2014,13 @@ function Config({
           color: "var(--color-text-tertiary)",
           marginTop: 2
         }
-      }, "Último: ", ultimo.fecha, g.registros.length > 1 ? ` · ${g.registros.length} registros` : ""), ultimo.proximo && /*#__PURE__*/React.createElement("div", {
+      }, "Último: ", ultimo.fecha, g.registros.length > 1 ? ` · ${g.registros.length} registros` : ""), fmtVencimiento(ultimo) && /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 11,
           color: "#f5b942",
           marginTop: 2
         }
-      }, "⏰ Próximo: ", ultimo.proximo)), /*#__PURE__*/React.createElement("span", {
+      }, "⏰ Vence: ", fmtVencimiento(ultimo))), /*#__PURE__*/React.createElement("span", {
         style: {
           color: "var(--color-text-tertiary)",
           fontSize: 14,
@@ -2058,7 +2071,13 @@ function Config({
           fontSize: 12,
           color: "var(--color-text-tertiary)"
         }
-      }, "💰 $", Number(m.costo).toLocaleString("es-AR")))), /*#__PURE__*/React.createElement("div", {
+      }, "💰 $", Number(m.costo).toLocaleString("es-AR"))), fmtVencimiento(m) && /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: "#f5b942",
+          marginTop: 4
+        }
+      }, "⏰ Vence: ", fmtVencimiento(m))), /*#__PURE__*/React.createElement("div", {
         style: {
           display: "flex",
           flexDirection: "column",

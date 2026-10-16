@@ -38,6 +38,10 @@ function VehiculoMantModal({
     label: "🔵 VTV",
     color: "#3b82f6"
   }, {
+    id: "carnet",
+    label: "🪪 Carnet de manejo",
+    color: "#a78bfa"
+  }, {
     id: "otro",
     label: "📋 Otro",
     color: "#a0aec0"
