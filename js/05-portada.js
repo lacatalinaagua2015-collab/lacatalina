@@ -108,7 +108,33 @@ function SelectorFecha({
   onIrClientes,
   onVolver
 }) {
-  const fechas = getFechasDelAnio(dia);
+  // getFechasDelAnio solo da las fechas reales que coinciden con el día de
+  // semana (ej. todos los viernes del año) — pero desde que el Menú puede
+  // registrar un reparto con la fecha real en la que se hizo (ej. el
+  // reparto del viernes, terminado el sábado, queda con fecha de sábado),
+  // puede haber una planilla/venta/marca con una fecha que no coincide con
+  // ningún viernes. Si no se agrega acá, esa sesión queda inencontrable
+  // desde "Fechas de visita". Se juntan esas fechas extra y se intercalan
+  // en orden cronológico junto con las normales.
+  const fechasAuto = getFechasDelAnio(dia);
+  const fechasVistas = new Set(fechasAuto.map(f => fechaKey(f)));
+  const fechasExtra = [];
+  const agregarExtra = fk => {
+    if (fk && !fechasVistas.has(fk)) {
+      fechasVistas.add(fk);
+      fechasExtra.push(fk);
+    }
+  };
+  Object.keys(planillas || {}).forEach(k => {
+    if (k.indexOf(dia + "_") === 0) agregarExtra(k.slice(dia.length + 1));
+  });
+  (ventas || []).forEach(v => {
+    if (v.dia === dia) agregarExtra(v.fechaKey || (v.fecha || "").slice(0, 10));
+  });
+  (noVisitas || []).forEach(v => {
+    if (v.dia === dia) agregarExtra(v.fecha);
+  });
+  const fechas = [...fechasAuto, ...fechasExtra.map(fk => new Date(fk + "T12:00:00"))].sort((a, b) => a - b);
   const hoy = hoyKey();
   const [mostrarTodas, setMostrarTodas] = useState(false);
   // Antes esta pantalla tenía 2 versiones (una para ir a Planilla, otra

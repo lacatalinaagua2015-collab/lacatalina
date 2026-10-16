@@ -24,6 +24,7 @@ function MenuDias({
   ventas,
   stock,
   zonasReparto,
+  planillas,
   onSetZona,
   onDiaHoy,
   onDiaResumen,
@@ -52,22 +53,73 @@ function MenuDias({
     month: "short"
   });
 
-  // Calcular si el día de hoy está completo (todos los clientes visitados)
+  // "Día vigente" = el último día hábil (Lun-Vie) hasta hoy inclusive. Antes
+  // el ícono de acceso rápido del Menú solo se mostraba si hoy coincidía
+  // justo con el día de reparto (d === hoyDiaNombre) — si quedaba pendiente
+  // y pasaba la fecha (ej. el reparto del viernes se termina el sábado), el
+  // ícono desaparecía de golpe y había que ir a buscarlo por "Fechas de
+  // visita". BUG REPORTADO 2026-10-16. Ahora el ícono se queda en la fila
+  // del día de reparto que haya quedado pendiente, aunque ya no sea hoy,
+  // hasta que se complete.
+  const diaVigenteInfo = (() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
+    const nombre = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"][d.getDay()];
+    const fk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return {
+      nombre,
+      fechaKey: fk
+    };
+  })();
+  const diaVigente = diaVigenteInfo.nombre;
+  const desdeFechaKey = diaVigenteInfo.fechaKey;
+  // Calcular si el día vigente está completo (todos los clientes visitados).
   // Mismo criterio que ListaClientes (08-clientes.js): un cliente (prospecto
   // o no) recién creado HOY no cuenta para el total — cargarlo YA fue la
   // visita de hoy. Si no se excluye acá también, este badge del menú queda
   // en rojo "Pendiente" mientras la pantalla de clientes ya muestra todo
   // listo (verde) — misma inconsistencia que se vio con los prospectos.
-  const clientesHoy = (clientes || []).filter(c => c.dia === hoyDiaNombre && !c._retirado && c.creadoFecha !== hoyFechaKey);
-  const ventasHoyIds = new Set((ventas || []).filter(v => v.fechaKey === hoyFechaKey).map(v => v.clienteId));
-  const noVisitasHoyIds = new Set((noVisitas || []).filter(v => v.fecha === hoyFechaKey && (v.motivo === "noesta2" || v.motivo === "noquiso")).map(v => v.clienteId));
+  // Se busca por `dia` (no por una fecha exacta) desde `desdeFechaKey` en
+  // adelante: así, si el reparto se termina un día después (ej. el sábado
+  // para el reparto del viernes), esas ventas/marcas también cuentan como
+  // "visitado" de este mismo reparto pendiente.
+  const clientesHoy = (clientes || []).filter(c => c.dia === diaVigente && !c._retirado && c.creadoFecha !== hoyFechaKey);
+  const ventasHoyIds = new Set((ventas || []).filter(v => v.dia === diaVigente && v.fechaKey >= desdeFechaKey).map(v => v.clienteId));
+  const noVisitasHoyIds = new Set((noVisitas || []).filter(v => v.dia === diaVigente && v.fecha >= desdeFechaKey && (v.motivo === "noesta2" || v.motivo === "noquiso")).map(v => v.clienteId));
   const visitadosHoy = clientesHoy.filter(c => ventasHoyIds.has(c.id) || noVisitasHoyIds.has(c.id));
   const diaCompleto = clientesHoy.length > 0 && visitadosHoy.length >= clientesHoy.length;
-  // Estado del recuadro de HOY según la hora del reloj (si quedó sin terminar):
+  // Fecha real de la sesión vigente: si ya se arrancó (hay planilla, venta o
+  // marca cargada desde desdeFechaKey en adelante), seguimos usando esa
+  // misma fecha real — así no se parte un mismo reparto en dos fechas
+  // distintas. Si todavía no se tocó nada, al arrancarlo ahora queda con la
+  // fecha real de HOY — la fecha del día en que efectivamente se hizo, no
+  // la del día de reparto nominal (pedido 2026-10-16: la planilla es del
+  // día viernes, pero si se hace el sábado, la fecha queda el sábado).
+  const fechaSesionVigente = (() => {
+    let max = null;
+    Object.keys(planillas || {}).forEach(k => {
+      if (k.indexOf(diaVigente + "_") === 0) {
+        const fk = k.slice(diaVigente.length + 1);
+        if (fk >= desdeFechaKey && (!max || fk > max)) max = fk;
+      }
+    });
+    (ventas || []).forEach(v => {
+      if (v.dia === diaVigente && v.fechaKey >= desdeFechaKey && (!max || v.fechaKey > max)) max = v.fechaKey;
+    });
+    (noVisitas || []).forEach(v => {
+      if (v.dia === diaVigente && v.fecha >= desdeFechaKey && (!max || v.fecha > max)) max = v.fecha;
+    });
+    return max || hoyFechaKey;
+  })();
+  // Estado del recuadro según la hora del reloj (si quedó sin terminar):
   //   antes de las 12 → normal (azul) · 12 a 17 hs → naranja · 17 hs en adelante → rojo/pendiente
+  // Si el día vigente ya no es hoy (quedó de un día anterior sin cerrar),
+  // directamente rojo: ya está vencido, no depende de la hora del reloj.
   const horaActual = new Date().getHours();
+  const esVigenteHoy = diaVigente === hoyDiaNombre;
   const hayPendHoy = clientesHoy.length > 0 && !diaCompleto;
-  const estadoHoy = diaCompleto ? "listo" : hayPendHoy && horaActual >= 17 ? "rojo" : hayPendHoy && horaActual >= 12 ? "naranja" : "normal";
+  const estadoHoy = diaCompleto ? "listo" : hayPendHoy && !esVigenteHoy ? "rojo" : hayPendHoy && horaActual >= 17 ? "rojo" : hayPendHoy && horaActual >= 12 ? "naranja" : "normal";
   // Notificaciones (Recordatorios pendientes / Transferencias sin confirmar):
   // en vez de un solo número, mostrar días y clientes distintos por
   // separado ("2d, 5c") para saber de un vistazo el alcance real.
@@ -373,7 +425,7 @@ function MenuDias({
         fontSize: 18,
         marginLeft: 10
       }
-    }, "→")), d === hoyDiaNombre && onDiaHoy && (() => {
+    }, "→")), d === diaVigente && onDiaHoy && (() => {
       const cfg = {
         listo: {
           bg: "#0a5c3a",
@@ -424,7 +476,7 @@ function MenuDias({
           cursor: "pointer",
           flexShrink: 0
         },
-        onClick: () => diaCompleto ? onDiaResumen && onDiaResumen(d, hoyFechaKey) : onDiaHoy(d, hoyFechaKey)
+        onClick: () => diaCompleto ? onDiaResumen && onDiaResumen(d, fechaSesionVigente) : onDiaHoy(d, fechaSesionVigente)
       }, /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 16

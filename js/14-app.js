@@ -3381,6 +3381,7 @@ function App() {
     clientes: clientes,
     ventas: ventas,
     stock: stockNorm,
+    planillas: planillas,
     recordatoriosActivos: recordatoriosActivos,
     onConfirmarRecordatorio: id => saveRecordatorios(prev => (prev || []).map(r => r.id === id ? {
       ...r,
