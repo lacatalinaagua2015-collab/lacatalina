@@ -200,13 +200,29 @@ function _lcDedupMantVeh(arr) {
   if (!Array.isArray(arr)) return [];
   const vistos = new Set();
   const limpio = [];
-  arr.forEach(function (r) {
+  arr.forEach(function (rOriginal) {
+    // MIGRACIÓN 2026-10-16: se unificaron categorías del vehículo — pedido
+    // del usuario: "preventivo" es lo mismo que "aceite", y "embrague" pasa
+    // a ser un caso particular de "reparación" (junto con batería/cubiertas,
+    // ahora elegibles ahí). Los registros viejos se reclasifican solos acá,
+    // que es el único lugar por el que pasan todas las lecturas/guardados.
+    let r = rOriginal;
+    if (r && r.tipo === "preventivo") {
+      r = { ...r, tipo: "aceite" };
+    } else if (r && r.tipo === "embrague") {
+      r = { ...r, tipo: "reparacion", descripcion: r.descripcion || "Cambio de embrague" };
+    }
     const firma = JSON.stringify({
       km: r && r.km,
       fecha: r && r.fecha,
       costo: r && r.costo,
       proximo: r && r.proximo,
-      desc: r && (r.desc || r.tipo) || ''
+      // Antes decía "r.desc" (campo que nunca existió — el real es
+      // "descripcion") así que la firma nunca distinguía por descripción,
+      // solo por tipo. Con "reparación" ahora agrupando embrague/batería/
+      // cubiertas, dos reparaciones distintas el mismo día con mismo
+      // costo/km/próximo se habrían confundido como duplicadas.
+      desc: r && (r.descripcion || r.tipo) || ''
     });
     // REPORTADO 2026-10-16: seguían apareciendo registros repetidos. Antes
     // acá solo se dedupeaba por id cuando existía — pero el caso real es

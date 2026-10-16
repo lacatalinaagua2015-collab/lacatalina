@@ -16,18 +16,15 @@ function VehiculoMantModal({
   const [proximaFechaISO, setProximaFechaISO] = React.useState("");
   const [fechaISO, setFechaISO] = React.useState(new Date().toISOString().slice(0, 10));
   const fechaDisplay = fechaISO ? new Date(fechaISO + 'T12:00:00').toLocaleDateString("es-AR") : "";
+  // Pedido del usuario: "aceite" y "preventivo" eran lo mismo para él, y
+  // "embrague" es un caso particular de "reparación" (junto con batería y
+  // cubiertas, que antes no tenían dónde ir más que el texto libre) — se
+  // unifican acá. Los registros viejos con tipo "preventivo"/"embrague" se
+  // migran solos al cargar (ver _lcDedupMantVeh en 14-app.js).
   const tipos = [{
     id: "aceite",
-    label: "🛢 Cambio de aceite",
+    label: "🛢 Aceite / Mant. preventivo",
     color: "#f5b942"
-  }, {
-    id: "preventivo",
-    label: "🔩 Mantenimiento preventivo",
-    color: "#4dd9a0"
-  }, {
-    id: "embrague",
-    label: "⚙️ Cambio de embrague",
-    color: "#e05c5c"
   }, {
     id: "reparacion",
     label: "🛠 Reparación",
@@ -44,6 +41,16 @@ function VehiculoMantModal({
     id: "otro",
     label: "📋 Otro",
     color: "#a0aec0"
+  }];
+  const subReparaciones = [{
+    label: "⚙️ Embrague",
+    desc: "Cambio de embrague"
+  }, {
+    label: "🔋 Batería",
+    desc: "Cambio de batería"
+  }, {
+    label: "🛞 Cubiertas",
+    desc: "Cambio de cubiertas"
   }];
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -145,7 +152,36 @@ function VehiculoMantModal({
       cursor: "pointer",
       fontWeight: tipo === t.id ? 600 : 400
     }
-  }, t.label)))), tipo === "otro" && /*#__PURE__*/React.createElement("div", {
+  }, t.label)))), tipo === "reparacion" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12,
+      color: "var(--color-text-secondary)",
+      display: "block",
+      marginBottom: 6
+    }
+  }, "¿Qué se reparó? (opcional, lo completa abajo)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 6
+    }
+  }, subReparaciones.map(sr => /*#__PURE__*/React.createElement("button", {
+    key: sr.desc,
+    onClick: () => setDescripcion(sr.desc),
+    style: {
+      padding: "6px 10px",
+      borderRadius: 8,
+      border: descripcion === sr.desc ? "1.5px solid #5daaff" : "1.5px solid var(--color-border-tertiary)",
+      background: descripcion === sr.desc ? "#5daaff22" : "transparent",
+      color: descripcion === sr.desc ? "#5daaff" : "var(--color-text-secondary)",
+      fontSize: 12,
+      cursor: "pointer"
+    }
+  }, sr.label)))), tipo === "otro" && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 10
     }

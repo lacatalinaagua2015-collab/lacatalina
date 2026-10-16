@@ -1921,10 +1921,11 @@ function Config({
       marginTop: 6
     }
   }, "Registrá cambios de aceite, service y reparaciones")), (() => {
+    // "preventivo" y "embrague" ya no son tipos propios — se migran solos a
+    // "aceite" y "reparación" en _lcDedupMantVeh (14-app.js), así que para
+    // cuando esta lista llega acá ya vienen reclasificados.
     const TIPOS_INFO = {
-      aceite: { label: "🛢 Cambio de aceite", color: "#f5b942" },
-      preventivo: { label: "🔩 Mantenimiento preventivo", color: "#4dd9a0" },
-      embrague: { label: "⚙️ Cambio de embrague", color: "#e05c5c" },
+      aceite: { label: "🛢 Aceite / Mant. preventivo", color: "#f5b942" },
       reparacion: { label: "🛠 Reparación", color: "#5daaff" },
       gnc: { label: "🟢 Oblea GNC", color: "#22c55e" },
       vtv: { label: "🔵 VTV", color: "#3b82f6" },
