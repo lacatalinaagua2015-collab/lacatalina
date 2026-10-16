@@ -208,9 +208,17 @@ function _lcDedupMantVeh(arr) {
       proximo: r && r.proximo,
       desc: r && (r.desc || r.tipo) || ''
     });
-    const clave = r && r.id != null ? String(r.id) : firma;
-    if (!vistos.has(clave)) {
-      vistos.add(clave);
+    // REPORTADO 2026-10-16: seguían apareciendo registros repetidos. Antes
+    // acá solo se dedupeaba por id cuando existía — pero el caso real es
+    // una pantalla de Configuración que queda abierta mientras otro
+    // dispositivo sincroniza algo nuevo; al cargar un registro ahí, se
+    // guarda de nuevo la lista vieja (sin lo que llegó de afuera) MÁS lo
+    // nuevo, y lo que ya estaba "resucita" con un id distinto al original.
+    // Dedupear siempre por contenido (ignorando el id) agarra ese caso
+    // también — dos registros genuinamente distintos nunca comparten
+    // km+fecha+costo+próximo+descripción.
+    if (!vistos.has(firma)) {
+      vistos.add(firma);
       limpio.push(r && r.id != null ? r : { ...r, id: 'mv_' + _lcHashCorto(firma) });
     }
   });

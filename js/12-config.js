@@ -759,18 +759,25 @@ function Config({
   const [importando, setImportando] = useState(false);
   const [mantVeh, setMantVeh] = React.useState(() => {
     try {
-      return JSON.parse(localStorage.getItem("cat_mant_vehiculo_v1") || "[]");
+      return _lcDedupMantVeh(JSON.parse(localStorage.getItem("cat_mant_vehiculo_v1") || "[]"));
     } catch {
       return [];
     }
   });
   const [mostrarNuevoMant, setMostrarNuevoMant] = React.useState(false);
+  // Pedido del usuario: cada "tipo" de mantenimiento (aceite, VTV, etc.) se
+  // agrupa en una sola tarjeta con su fecha/próximo más reciente, y se abre
+  // para ver el historial completo de ESE tipo — antes era una lista plana
+  // con una fila por registro, y varios cambios de aceite seguidos se veían
+  // "repetidos" en vez de como el historial de una sola cosa.
+  const [tipoMantAbierto, setTipoMantAbierto] = React.useState({});
   const [notifPermiso, setNotifPermiso] = React.useState('Notification' in window ? Notification.permission : 'no-soportado');
   const saveMantVeh = lista => {
-    setMantVeh(lista);
-    localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(lista));
+    const limpia = _lcDedupMantVeh(lista);
+    setMantVeh(limpia);
+    localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(limpia));
     if (syncData) syncData({
-      mantVeh: lista
+      mantVeh: limpia
     });
   };
 
@@ -1913,89 +1920,185 @@ function Config({
       fontSize: 12,
       marginTop: 6
     }
-  }, "Registrá cambios de aceite, service y reparaciones")), [...mantVeh].reverse().map((m, i) => /*#__PURE__*/React.createElement("div", {
-    key: i,
-    style: {
-      ...s.card,
-      margin: "0 0 10px",
-      borderLeft: `3px solid ${m.tipo === "aceite" ? "#f5b942" : m.tipo === "preventivo" ? "#4dd9a0" : m.tipo === "embrague" ? "#e05c5c" : m.tipo === "reparacion" ? "#5daaff" : m.tipo === "gnc" ? "#22c55e" : m.tipo === "vtv" ? "#3b82f6" : "#a0aec0"}`
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "flex-start"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 14,
-      fontWeight: 600,
-      color: "var(--color-text-primary)"
-    }
-  }, m.tipo === "aceite" ? "🛢 Cambio de aceite" : m.tipo === "preventivo" ? "🔩 Mantenimiento preventivo" : m.tipo === "embrague" ? "⚙️ Cambio de embrague" : m.tipo === "reparacion" ? "🛠 Reparación" : m.tipo === "gnc" ? "🟢 Oblea GNC" : m.tipo === "vtv" ? "🔵 VTV" : m.tipo === "otro" ? "📋 " + (m.otroDetalle || "Otro") : "📋 " + m.tipo), m.descripcion && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "var(--color-text-secondary)",
-      marginTop: 4
-    }
-  }, m.descripcion), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 12,
-      marginTop: 6,
-      flexWrap: "wrap"
-    }
-  }, m.km && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: "var(--color-text-tertiary)"
-    }
-  }, "📊 ", Number(m.km).toLocaleString("es-AR"), " km"), m.costo && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: "var(--color-text-tertiary)"
-    }
-  }, "💰 $", Number(m.costo).toLocaleString("es-AR"))), m.proximo && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#f5b942",
-      marginTop: 4,
-      borderTop: "0.5px solid var(--color-border-tertiary)",
-      paddingTop: 4
-    }
-  }, "⏰ Próximo: ", m.proximo)), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "flex-end",
-      gap: 6,
-      marginLeft: 10,
-      flexShrink: 0
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 11,
-      color: "var(--color-text-tertiary)"
-    }
-  }, m.fecha), /*#__PURE__*/React.createElement("button", {
-    style: {
-      background: "#3a2020",
-      color: "#e05c5c",
-      border: "none",
-      borderRadius: 6,
-      padding: "3px 8px",
-      fontSize: 11,
-      cursor: "pointer"
-    },
-    onClick: () => saveMantVeh(mantVeh.filter((_, j) => mantVeh.length - 1 - j !== i))
-  }, "Borrar"))))), mostrarNuevoMant && /*#__PURE__*/React.createElement(VehiculoMantModal, {
+  }, "Registrá cambios de aceite, service y reparaciones")), (() => {
+    const TIPOS_INFO = {
+      aceite: { label: "🛢 Cambio de aceite", color: "#f5b942" },
+      preventivo: { label: "🔩 Mantenimiento preventivo", color: "#4dd9a0" },
+      embrague: { label: "⚙️ Cambio de embrague", color: "#e05c5c" },
+      reparacion: { label: "🛠 Reparación", color: "#5daaff" },
+      gnc: { label: "🟢 Oblea GNC", color: "#22c55e" },
+      vtv: { label: "🔵 VTV", color: "#3b82f6" },
+      otro: { label: "📋 Otro", color: "#a0aec0" }
+    };
+    // Agrupado por tipo: cada tarjeta es UN tipo de mantenimiento (aceite,
+    // VTV, etc.), con la fecha/próximo más reciente a la vista, y adentro —
+    // desplegable — el historial completo de ese tipo (de más nuevo a más
+    // viejo). Se guarda el índice original (_idx) para poder ordenar.
+    const porTipo = {};
+    mantVeh.forEach((m, idx) => {
+      const t = m.tipo || "otro";
+      (porTipo[t] = porTipo[t] || []).push({ ...m, _idx: idx });
+    });
+    const grupos = Object.keys(porTipo).map(t => ({
+      tipo: t,
+      registros: porTipo[t].slice().sort((a, b) => b._idx - a._idx)
+    })).sort((a, b) => b.registros[0]._idx - a.registros[0]._idx);
+    const borrarRegistro = regId => {
+      // Borra contra la lista más fresca posible (localStorage, deduplicada)
+      // en vez de confiar ciegamente en el estado de React de esta pantalla
+      // — así una corrección no "resucita" algo que llegó de otro
+      // dispositivo mientras esta pantalla estaba abierta.
+      const base = (() => {
+        try {
+          return _lcDedupMantVeh(JSON.parse(localStorage.getItem("cat_mant_vehiculo_v1") || "[]"));
+        } catch {
+          return mantVeh;
+        }
+      })();
+      saveMantVeh(base.filter(x => x.id !== regId));
+    };
+    return grupos.map(g => {
+      const info = TIPOS_INFO[g.tipo] || { label: g.tipo === "otro" ? "📋 " + (g.registros[0].otroDetalle || "Otro") : "📋 " + g.tipo, color: "#a0aec0" };
+      const abierto = !!tipoMantAbierto[g.tipo];
+      const ultimo = g.registros[0];
+      return /*#__PURE__*/React.createElement("div", {
+        key: g.tipo,
+        style: {
+          ...s.card,
+          margin: "0 0 10px",
+          padding: 0,
+          overflow: "hidden",
+          borderLeft: `3px solid ${info.color}`
+        }
+      }, /*#__PURE__*/React.createElement("button", {
+        style: {
+          width: "100%",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          padding: "12px 14px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          textAlign: "left"
+        },
+        onClick: () => setTipoMantAbierto(e => ({ ...e, [g.tipo]: !e[g.tipo] }))
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          flex: 1,
+          minWidth: 0
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 14,
+          fontWeight: 600,
+          color: "var(--color-text-primary)"
+        }
+      }, info.label), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: "var(--color-text-tertiary)",
+          marginTop: 2
+        }
+      }, "Último: ", ultimo.fecha, g.registros.length > 1 ? ` · ${g.registros.length} registros` : ""), ultimo.proximo && /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: "#f5b942",
+          marginTop: 2
+        }
+      }, "⏰ Próximo: ", ultimo.proximo)), /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: "var(--color-text-tertiary)",
+          fontSize: 14,
+          display: "inline-block",
+          transform: abierto ? "rotate(180deg)" : "rotate(0deg)",
+          marginLeft: 8,
+          flexShrink: 0
+        }
+      }, "▾")), abierto && /*#__PURE__*/React.createElement("div", {
+        style: {
+          padding: "0 14px 10px"
+        }
+      }, g.registros.map((m, i) => /*#__PURE__*/React.createElement("div", {
+        key: m.id || i,
+        style: {
+          padding: "8px 0",
+          borderTop: i > 0 ? "0.5px solid var(--color-border-tertiary)" : "none"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          flex: 1
+        }
+      }, m.descripcion && /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 12,
+          color: "var(--color-text-secondary)"
+        }
+      }, m.descripcion), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          gap: 12,
+          marginTop: 4,
+          flexWrap: "wrap"
+        }
+      }, m.km && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: "var(--color-text-tertiary)"
+        }
+      }, "📊 ", Number(m.km).toLocaleString("es-AR"), " km"), m.costo && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: "var(--color-text-tertiary)"
+        }
+      }, "💰 $", Number(m.costo).toLocaleString("es-AR")))), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-end",
+          gap: 6,
+          marginLeft: 10,
+          flexShrink: 0
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 11,
+          color: "var(--color-text-tertiary)"
+        }
+      }, m.fecha), /*#__PURE__*/React.createElement("button", {
+        style: {
+          background: "#3a2020",
+          color: "#e05c5c",
+          border: "none",
+          borderRadius: 6,
+          padding: "3px 8px",
+          fontSize: 11,
+          cursor: "pointer"
+        },
+        onClick: () => borrarRegistro(m.id)
+      }, "Borrar")))))));
+    });
+  })(), mostrarNuevoMant && /*#__PURE__*/React.createElement(VehiculoMantModal, {
     onGuardar: reg => {
       const regConId = reg.id != null ? reg : { ...reg, id: 'mant_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7) };
-      saveMantVeh([...mantVeh, regConId]);
+      // Misma defensa que al borrar: sumar lo nuevo sobre la lista más
+      // fresca de localStorage, no sobre el estado de React que puede haber
+      // quedado viejo si otro dispositivo sincronizó algo mientras esta
+      // pantalla de Configuración seguía abierta.
+      const base = (() => {
+        try {
+          return _lcDedupMantVeh(JSON.parse(localStorage.getItem("cat_mant_vehiculo_v1") || "[]"));
+        } catch {
+          return mantVeh;
+        }
+      })();
+      saveMantVeh([...base, regConId]);
       setMostrarNuevoMant(false);
     },
     onCerrar: () => setMostrarNuevoMant(false)
