@@ -3684,6 +3684,38 @@ function App() {
     // _retirado: cliente dado de baja por inactividad (4+ visitas seguidas
     // sin comprar) — ya no se le reparte, sale de la lista del día.
     clientes: clientes.filter(c => c.dia === diaActual && !c._retirado),
+    // Clientes pendientes de un día hábil anterior de esta misma semana que
+    // todavía no se cerró (ej. quedó algo de Lunes y hoy se abre Martes) —
+    // pedido 2026-10-16. Las ventas/marcas que se carguen acá quedan con
+    // dia:diaActual/fecha:fechaActual (los de HOY), no con el día original.
+    clientesArrastrados: (() => {
+      const DIAS5 = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
+      if (DIAS5.indexOf(diaActual) === -1) return [];
+      const hoy0b = new Date();
+      hoy0b.setHours(0, 0, 0, 0);
+      const inicioSemanaB = new Date(hoy0b);
+      const deltaB = inicioSemanaB.getDay() === 0 ? 6 : inicioSemanaB.getDay() - 1;
+      inicioSemanaB.setDate(inicioSemanaB.getDate() - deltaB);
+      const out = [];
+      DIAS5.forEach(d => {
+        if (d === diaActual) return;
+        const dowTarget = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"].indexOf(d);
+        const cur = new Date(hoy0b);
+        while (cur.getDay() !== dowTarget) cur.setDate(cur.getDate() - 1);
+        if (cur.getTime() >= hoy0b.getTime() || cur.getTime() < inicioSemanaB.getTime()) return;
+        const ultimaFK = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
+        const visitadosIds = new Set([...ventas.filter(v => v.fechaKey >= ultimaFK).map(v => v.clienteId), ...(noVisitas || []).filter(v => v.fecha >= ultimaFK && (v.motivo === "noesta2" || v.motivo === "noquiso")).map(v => v.clienteId)]);
+        clientes.filter(c => c.dia === d && !c._retirado && !visitadosIds.has(c.id)).forEach(c => out.push({
+          ...c,
+          _arrastreDia: d,
+          _arrastreFecha: cur.toLocaleDateString("es-AR", {
+            day: "numeric",
+            month: "short"
+          })
+        }));
+      });
+      return out;
+    })(),
     dia: diaActual,
     fecha: fechaActual,
     ventas: ventas.filter(v => v.fechaKey === fechaActual && v.dia === diaActual),

@@ -53,73 +53,88 @@ function MenuDias({
     month: "short"
   });
 
-  // "Día vigente" = el último día hábil (Lun-Vie) hasta hoy inclusive. Antes
-  // el ícono de acceso rápido del Menú solo se mostraba si hoy coincidía
-  // justo con el día de reparto (d === hoyDiaNombre) — si quedaba pendiente
-  // y pasaba la fecha (ej. el reparto del viernes se termina el sábado), el
-  // ícono desaparecía de golpe y había que ir a buscarlo por "Fechas de
-  // visita". BUG REPORTADO 2026-10-16. Ahora el ícono se queda en la fila
-  // del día de reparto que haya quedado pendiente, aunque ya no sea hoy,
-  // hasta que se complete.
-  const diaVigenteInfo = (() => {
+  // Ícono de acceso rápido, por día — ANTES solo se mostraba un ícono, en el
+  // día que coincidía justo con hoy (d === hoyDiaNombre): si quedaba
+  // pendiente y pasaba la fecha (ej. el reparto del lunes sin terminar, y
+  // ya es martes), el ícono de Lunes desaparecía de golpe. BUG REPORTADO
+  // 2026-10-16: tiene que seguir cada día con lo suyo — si quedó algo
+  // pendiente de Lunes y además salís el Martes, tienen que aparecer LOS 2
+  // íconos (Lunes en rojo por lo pendiente, Martes con el suyo para
+  // arrancar). Por día se calcula si corresponde mostrar ícono, si ya está
+  // completo, y con qué fecha real sigue la sesión.
+  const horaActual = new Date().getHours();
+  const hoy0 = (() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
-    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
-    const nombre = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"][d.getDay()];
-    const fk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    return {
-      nombre,
-      fechaKey: fk
-    };
+    return d;
   })();
-  const diaVigente = diaVigenteInfo.nombre;
-  const desdeFechaKey = diaVigenteInfo.fechaKey;
-  // Calcular si el día vigente está completo (todos los clientes visitados).
-  // Mismo criterio que ListaClientes (08-clientes.js): un cliente (prospecto
-  // o no) recién creado HOY no cuenta para el total — cargarlo YA fue la
-  // visita de hoy. Si no se excluye acá también, este badge del menú queda
-  // en rojo "Pendiente" mientras la pantalla de clientes ya muestra todo
-  // listo (verde) — misma inconsistencia que se vio con los prospectos.
-  // Se busca por `dia` (no por una fecha exacta) desde `desdeFechaKey` en
-  // adelante: así, si el reparto se termina un día después (ej. el sábado
-  // para el reparto del viernes), esas ventas/marcas también cuentan como
-  // "visitado" de este mismo reparto pendiente.
-  const clientesHoy = (clientes || []).filter(c => c.dia === diaVigente && !c._retirado && c.creadoFecha !== hoyFechaKey);
-  const ventasHoyIds = new Set((ventas || []).filter(v => v.dia === diaVigente && v.fechaKey >= desdeFechaKey).map(v => v.clienteId));
-  const noVisitasHoyIds = new Set((noVisitas || []).filter(v => v.dia === diaVigente && v.fecha >= desdeFechaKey && (v.motivo === "noesta2" || v.motivo === "noquiso")).map(v => v.clienteId));
-  const visitadosHoy = clientesHoy.filter(c => ventasHoyIds.has(c.id) || noVisitasHoyIds.has(c.id));
-  const diaCompleto = clientesHoy.length > 0 && visitadosHoy.length >= clientesHoy.length;
-  // Fecha real de la sesión vigente: si ya se arrancó (hay planilla, venta o
-  // marca cargada desde desdeFechaKey en adelante), seguimos usando esa
-  // misma fecha real — así no se parte un mismo reparto en dos fechas
-  // distintas. Si todavía no se tocó nada, al arrancarlo ahora queda con la
-  // fecha real de HOY — la fecha del día en que efectivamente se hizo, no
-  // la del día de reparto nominal (pedido 2026-10-16: la planilla es del
-  // día viernes, pero si se hace el sábado, la fecha queda el sábado).
-  const fechaSesionVigente = (() => {
-    let max = null;
+  // Lunes de esta semana — un día sin cerrar de la semana PASADA ya no se
+  // arrastra acá con ícono propio (sigue accesible por "Fechas de visita"),
+  // para no acumular íconos indefinidamente.
+  const inicioSemana = (() => {
+    const d = new Date(hoy0);
+    const delta = d.getDay() === 0 ? 6 : d.getDay() - 1;
+    d.setDate(d.getDate() - delta);
+    return d;
+  })();
+  const estadoPorDia = {};
+  (dias || []).forEach(d => {
+    const dowTarget = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"].indexOf(d);
+    const cur = new Date(hoy0);
+    while (cur.getDay() !== dowTarget) cur.setDate(cur.getDate() - 1);
+    const ultimaFechaKey = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
+    const esHoyDia = d === hoyDiaNombre;
+    const esPasado = cur.getTime() < hoy0.getTime();
+    // Se muestra ícono si es el día de hoy, o si quedó pendiente de un día
+    // hábil anterior DENTRO de esta misma semana.
+    if (!esHoyDia && !(esPasado && cur.getTime() >= inicioSemana.getTime())) return;
+    // Mismo criterio que ListaClientes (08-clientes.js): un cliente recién
+    // creado HOY no cuenta para el total — cargarlo YA fue la visita.
+    const clientesD = (clientes || []).filter(c => c.dia === d && !c._retirado && c.creadoFecha !== hoyFechaKey);
+    // OJO: acá NO se filtra por v.dia === d (a propósito). Un cliente
+    // pendiente de Lunes puede terminar comprando desde la lista combinada
+    // de Martes (sección "⏪ Pendientes de Lunes" en ListaClientes), y esa
+    // venta queda etiquetada con dia:"Martes" — si acá exigiéramos
+    // v.dia==="Lunes" para contarlo como visitado, el ícono de Lunes se
+    // quedaría en rojo para siempre aunque ya se le haya entregado.
+    const ventasDIds = new Set((ventas || []).filter(v => v.fechaKey >= ultimaFechaKey).map(v => v.clienteId));
+    const noVisitasDIds = new Set((noVisitas || []).filter(v => v.fecha >= ultimaFechaKey && (v.motivo === "noesta2" || v.motivo === "noquiso")).map(v => v.clienteId));
+    const visitadosD = clientesD.filter(c => ventasDIds.has(c.id) || noVisitasDIds.has(c.id));
+    const completoD = clientesD.length > 0 && visitadosD.length >= clientesD.length;
+    // Fecha real de la sesión: si ya se arrancó (hay planilla, venta o marca
+    // cargada desde ultimaFechaKey en adelante), se sigue esa misma fecha —
+    // así no se parte un mismo reparto en dos fechas. Si todavía no se tocó
+    // nada, al arrancarlo ahora queda con la fecha real de HOY — la fecha
+    // del día en que efectivamente se hizo (pedido 2026-10-16: la planilla
+    // es del día que corresponde, pero la fecha es la del día en que se
+    // hizo, p.ej. viernes hecho el sábado queda con fecha de sábado).
+    let fechaSesion = null;
     Object.keys(planillas || {}).forEach(k => {
-      if (k.indexOf(diaVigente + "_") === 0) {
-        const fk = k.slice(diaVigente.length + 1);
-        if (fk >= desdeFechaKey && (!max || fk > max)) max = fk;
+      if (k.indexOf(d + "_") === 0) {
+        const fk = k.slice(d.length + 1);
+        if (fk >= ultimaFechaKey && (!fechaSesion || fk > fechaSesion)) fechaSesion = fk;
       }
     });
     (ventas || []).forEach(v => {
-      if (v.dia === diaVigente && v.fechaKey >= desdeFechaKey && (!max || v.fechaKey > max)) max = v.fechaKey;
+      if (v.dia === d && v.fechaKey >= ultimaFechaKey && (!fechaSesion || v.fechaKey > fechaSesion)) fechaSesion = v.fechaKey;
     });
     (noVisitas || []).forEach(v => {
-      if (v.dia === diaVigente && v.fecha >= desdeFechaKey && (!max || v.fecha > max)) max = v.fecha;
+      if (v.dia === d && v.fecha >= ultimaFechaKey && (!fechaSesion || v.fecha > fechaSesion)) fechaSesion = v.fecha;
     });
-    return max || hoyFechaKey;
-  })();
-  // Estado del recuadro según la hora del reloj (si quedó sin terminar):
-  //   antes de las 12 → normal (azul) · 12 a 17 hs → naranja · 17 hs en adelante → rojo/pendiente
-  // Si el día vigente ya no es hoy (quedó de un día anterior sin cerrar),
-  // directamente rojo: ya está vencido, no depende de la hora del reloj.
-  const horaActual = new Date().getHours();
-  const esVigenteHoy = diaVigente === hoyDiaNombre;
-  const hayPendHoy = clientesHoy.length > 0 && !diaCompleto;
-  const estadoHoy = diaCompleto ? "listo" : hayPendHoy && !esVigenteHoy ? "rojo" : hayPendHoy && horaActual >= 17 ? "rojo" : hayPendHoy && horaActual >= 12 ? "naranja" : "normal";
+    if (!fechaSesion) fechaSesion = hoyFechaKey;
+    // Estado del recuadro según la hora del reloj (si quedó sin terminar):
+    //   antes de las 12 → normal (azul) · 12 a 17 hs → naranja · 17 hs en
+    //   adelante → rojo/pendiente. Si no es el día de hoy (quedó de un día
+    //   anterior sin cerrar), directamente rojo: ya está vencido.
+    const estado = completoD ? "listo" : !esHoyDia ? "rojo" : horaActual >= 17 ? "rojo" : horaActual >= 12 ? "naranja" : "normal";
+    estadoPorDia[d] = {
+      clientesD,
+      visitadosD,
+      completoD,
+      fechaSesion,
+      estado
+    };
+  });
   // Notificaciones (Recordatorios pendientes / Transferencias sin confirmar):
   // en vez de un solo número, mostrar días y clientes distintos por
   // separado ("2d, 5c") para saber de un vistazo el alcance real.
@@ -425,7 +440,8 @@ function MenuDias({
         fontSize: 18,
         marginLeft: 10
       }
-    }, "→")), d === diaVigente && onDiaHoy && (() => {
+    }, "→")), estadoPorDia[d] && onDiaHoy && (() => {
+      const info = estadoPorDia[d];
       const cfg = {
         listo: {
           bg: "#0a5c3a",
@@ -459,8 +475,8 @@ function MenuDias({
           txtCol: "#e2eaf4",
           subCol: "#b5d4f4"
         }
-      }[estadoHoy];
-      const sub = diaCompleto ? "Listo" : `${visitadosHoy.length}/${clientesHoy.length}`;
+      }[info.estado];
+      const sub = info.completoD ? "Listo" : `${info.visitadosD.length}/${info.clientesD.length}`;
       return /*#__PURE__*/React.createElement("button", {
         style: {
           background: cfg.bg,
@@ -476,7 +492,7 @@ function MenuDias({
           cursor: "pointer",
           flexShrink: 0
         },
-        onClick: () => diaCompleto ? onDiaResumen && onDiaResumen(d, fechaSesionVigente) : onDiaHoy(d, fechaSesionVigente)
+        onClick: () => info.completoD ? onDiaResumen && onDiaResumen(d, info.fechaSesion) : onDiaHoy(d, info.fechaSesion)
       }, /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 16

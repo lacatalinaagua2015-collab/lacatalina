@@ -468,6 +468,13 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
 
 function ListaClientes({
   clientes,
+  // Clientes pendientes de un día hábil anterior de esta misma semana que
+  // todavía no se cerró (ej. quedaron 3 de Lunes y hoy es Martes) — pedido
+  // 2026-10-16: se muestran en su propia sección, ARRIBA de "Pendientes",
+  // para terminarlos antes de arrancar con los de hoy. Las ventas/marcas que
+  // se carguen acá quedan con el día y fecha de HOY (dia/fecha de abajo, los
+  // de la pantalla), no con el día original — así lo pidió Guillermo.
+  clientesArrastrados,
   dia,
   fecha,
   ventas,
@@ -725,7 +732,28 @@ function ListaClientes({
       color: "var(--color-text-tertiary)",
       fontSize: 14
     }
-  }, "No hay clientes para ", dia, "."), pendientesNormales.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+  }, "No hay clientes para ", dia, "."), (clientesArrastrados || []).length > 0 && (() => {
+    const grupos = {};
+    clientesArrastrados.forEach(c => {
+      const k = c._arrastreDia;
+      if (!grupos[k]) grupos[k] = {
+        fecha: c._arrastreFecha,
+        items: []
+      };
+      grupos[k].items.push(c);
+    });
+    return Object.keys(grupos).map(k => /*#__PURE__*/React.createElement(React.Fragment, {
+      key: "arrastre_" + k
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        ...s.sectionTitle,
+        color: "#fca5a5"
+      }
+    }, "⏪ Pendientes de ", k, " ", grupos[k].fecha, " (", grupos[k].items.length, ")"), grupos[k].items.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
+      key: "arr_" + c.id,
+      ...cardProps(c)
+    }))));
+  })(), pendientesNormales.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
     style: s.sectionTitle
   }, "Pendientes (", pendientesNormales.length, ")"), pendientesNormales.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
     key: c.id,
