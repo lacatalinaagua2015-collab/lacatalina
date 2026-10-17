@@ -113,18 +113,19 @@ function MenuDias({
     // del día en que efectivamente se hizo (pedido 2026-10-16: la planilla
     // es del día que corresponde, pero la fecha es la del día en que se
     // hizo, p.ej. viernes hecho el sábado queda con fecha de sábado).
+    // BUG REPORTADO 2026-10-17: acá también se seguía cualquier venta o
+    // marca suelta con este día para encontrar la fecha de la sesión — una
+    // venta puntual a un cliente de este día hecha desde Gestión/Agenda/
+    // Mapa/Dormidos otro día (ver fix en 14-app.js) hacía que el ícono
+    // apuntara a esa fecha suelta en vez de la propia. Ahora sólo cuenta
+    // una planilla real (la crea "Inicio del reparto" al arrancar de
+    // verdad la jornada de este día).
     let fechaSesion = null;
     Object.keys(planillas || {}).forEach(k => {
       if (k.indexOf(d + "_") === 0) {
         const fk = k.slice(d.length + 1);
         if (fk >= ultimaFechaKey && (!fechaSesion || fk > fechaSesion)) fechaSesion = fk;
       }
-    });
-    (ventas || []).forEach(v => {
-      if (v.dia === d && v.fechaKey >= ultimaFechaKey && (!fechaSesion || v.fechaKey > fechaSesion)) fechaSesion = v.fechaKey;
-    });
-    (noVisitas || []).forEach(v => {
-      if (v.dia === d && v.fecha >= ultimaFechaKey && (!fechaSesion || v.fecha > fechaSesion)) fechaSesion = v.fecha;
     });
     if (!fechaSesion) fechaSesion = hoyFechaKey;
     // BUG REPORTADO 2026-10-16: un día anterior ya completo (ej. Martes,
@@ -3666,18 +3667,18 @@ function AtajoPlanillaSemana({
       // planilla, inencontrable desde acá. Se busca la fecha real más
       // nueva (desde la nominal en adelante) donde haya quedado algo
       // cargado para este día, y se usa esa en vez de la nominal.
+      // BUG REPORTADO 2026-10-17: acá también se buscaba por cualquier
+      // venta/marca suelta con este día (no sólo por planilla real) — una
+      // venta puntual a un cliente de Miércoles hecha desde Gestión otro
+      // día (ver fix en 14-app.js) terminaba mostrando "Miércoles" fechado
+      // ese otro día, mezclado con lo real. Pedido del usuario: sólo
+      // cuentan planillas reales (las crea "Inicio del reparto").
       let fechaKeyReal = null;
       Object.keys(planillas || {}).forEach(k => {
         if (k.indexOf(diaNombre + "_") === 0) {
           const fk = k.slice(diaNombre.length + 1);
           if (fk >= fechaKeyNominal && (!fechaKeyReal || fk > fechaKeyReal)) fechaKeyReal = fk;
         }
-      });
-      (ventas || []).forEach(v => {
-        if (v.dia === diaNombre && v.fechaKey >= fechaKeyNominal && (!fechaKeyReal || v.fechaKey > fechaKeyReal)) fechaKeyReal = v.fechaKey;
-      });
-      (noVisitas || []).forEach(v => {
-        if (v.dia === diaNombre && v.fecha >= fechaKeyNominal && (!fechaKeyReal || v.fecha > fechaKeyReal)) fechaKeyReal = v.fecha;
       });
       const fechaKey = fechaKeyReal || fechaKeyNominal;
       dias5.push({

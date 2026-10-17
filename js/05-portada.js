@@ -125,14 +125,18 @@ function SelectorFecha({
       fechasExtra.push(fk);
     }
   };
+  // BUG REPORTADO 2026-10-17: antes también se agregaba una fecha extra por
+  // cualquier venta o marca "no visita" de este día, aunque no hubiera una
+  // planilla real detrás — eso mezclaba acá ventas sueltas (ej. una venta
+  // puntual a un cliente de Miércoles hecha desde Gestión otro día, ver
+  // fix en jarvisAbrirVenta/onRegistrarVenta/onVenta en 14-app.js) con
+  // sesiones reales de reparto. Pedido del usuario: "solo deben aparecer
+  // las planillas de los miércoles, no mezcladas" — ahora una fecha extra
+  // sólo se agrega si hay una planilla real para ese día_fecha (la crea
+  // "Inicio del reparto" al arrancar la jornada de verdad, no una venta
+  // puntual aislada).
   Object.keys(planillas || {}).forEach(k => {
     if (k.indexOf(dia + "_") === 0) agregarExtra(k.slice(dia.length + 1));
-  });
-  (ventas || []).forEach(v => {
-    if (v.dia === dia) agregarExtra(v.fechaKey || (v.fecha || "").slice(0, 10));
-  });
-  (noVisitas || []).forEach(v => {
-    if (v.dia === dia) agregarExtra(v.fecha);
   });
   const fechas = [...fechasAuto, ...fechasExtra.map(fk => new Date(fk + "T12:00:00"))].sort((a, b) => a - b);
   const hoy = hoyKey();
