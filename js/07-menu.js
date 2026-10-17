@@ -1580,6 +1580,10 @@ function PlanillaDelDia({
   // usuario: "que se vea quien fue el que devolvio y a quien se le
   // presto", desplegable y arranca cerrado para no alargar la planilla.
   const [mostrarDetalleClientesEnv, setMostrarDetalleClientesEnv] = useState(false);
+  // "Ventas de otros días" — pedido del usuario 2026-10-17: que sea
+  // desplegable (arranca cerrado) para no mostrar de entrada las ventas
+  // de otro día que solo sirven para reconciliar caja.
+  const [mostrarExtraDia, setMostrarExtraDia] = useState(false);
 
   // ── Cálculo de stock para el cierre del día ──────────────────
   const CAJON = 6;
@@ -2848,15 +2852,40 @@ function PlanillaDelDia({
       borderLeft: "3px solid var(--color-border-info)"
     }
   }, /*#__PURE__*/React.createElement("div", {
+    onClick: () => setMostrarExtraDia(v => !v),
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      cursor: "pointer",
+      marginBottom: mostrarExtraDia ? 8 : 0
+    }
+  }, /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 12,
       fontWeight: 500,
       color: "var(--color-text-info)",
-      marginBottom: 8,
       textTransform: "uppercase",
       letterSpacing: "0.05em"
     }
-  }, "📦 Ventas de otros días (", ventasExtraDia.length, ")"), ventasExtraDia.map(v => {
+  }, "📦 Ventas de otros días (", ventasExtraDia.length, ")"), /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", alignItems: "center", gap: 6 }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 500,
+      color: "var(--color-text-info)"
+    }
+  }, fmt(extraTotal)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "var(--color-text-info)",
+      fontSize: 14,
+      display: "inline-block",
+      transform: mostrarExtraDia ? "rotate(180deg)" : "rotate(0deg)"
+    }
+  }, "▾"))), mostrarExtraDia && /*#__PURE__*/React.createElement("div", {
+    style: { marginTop: 4 }
+  }, ventasExtraDia.map(v => {
     const c = (clientes || []).find(x => x.id === v.clienteId);
     return /*#__PURE__*/React.createElement("div", {
       key: v.id,
@@ -2951,7 +2980,7 @@ function PlanillaDelDia({
       fontWeight: 500,
       color: "var(--color-text-info)"
     }
-  }, fmt(extraTotal)))), /*#__PURE__*/React.createElement("div", {
+  }, fmt(extraTotal))))), /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
       margin: "0 0 8px",
