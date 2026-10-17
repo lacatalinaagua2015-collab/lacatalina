@@ -3743,8 +3743,14 @@ function AtajoPlanillaSemana({
     const clientesDia = (clientes || []).filter(c => c.dia === dia);
     const totalClientes = clientesDia.length;
     const esPasado = fecha.getTime() < hoy0.getTime();
-    const ventaIdsDia = new Set((ventas || []).filter(v => v.fechaKey === fechaKey).map(v => v.clienteId));
-    const noVisitaIdsDia = new Set((noVisitas || []).filter(n => n.fecha === fechaKey).map(n => n.clienteId));
+    // BUG 2026-10-17: antes filtraba sólo por fechaKey, sin exigir que la
+    // venta/marca sea realmente DE ESE día (v.dia). Si dos días terminan
+    // compartiendo la misma fecha real (ej. se tocó la planilla propia de
+    // Miércoles el mismo jueves que se hizo la de Jueves), un cliente de
+    // Miércoles visitado en otro momento contaminaba el conteo de Jueves
+    // y viceversa. Ahora exige fecha Y día — cada conteo sólo ve lo suyo.
+    const ventaIdsDia = new Set((ventas || []).filter(v => v.fechaKey === fechaKey && v.dia === dia).map(v => v.clienteId));
+    const noVisitaIdsDia = new Set((noVisitas || []).filter(n => n.fecha === fechaKey && n.dia === dia).map(n => n.clienteId));
     // VISITADOS: clientes ÚNICOS del día con alguna venta registrada. Se cuenta
     // por cliente y no por registro de venta a propósito: un cliente que no
     // compró pero pagó deuda vieja SÍ fue visitado (queda como venta _esCobro),
