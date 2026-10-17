@@ -2204,13 +2204,21 @@ function App() {
   // para que la persona las confirme a mano.
   const jarvisAbrirVenta = c => {
     setClienteId(c.id);
-    // Venta por voz: visita puntual, mismo criterio que las demás "visita
-    // puntual" (Gestión/detalleCliente, ver comentarios ahí) — día del
-    // cliente, pero fecha SIEMPRE hoy (antes solo se forzaba si estaba
-    // vacía, y podía quedar pegada a la fecha de otra ruta en curso).
+    // RAÍZ DEL BUG 2026-10-17 (ver también detalleCliente/Gestión más abajo):
+    // diaActual es UNA sola variable global, compartida por TODA la app
+    // (Planilla, Clientes, el auto-guardado de planilla, el progreso del
+    // recorrido). Antes, una venta puntual (a un cliente que no es del día
+    // activo) pisaba diaActual con el día PROPIO del cliente — si en ese
+    // momento ya había una ruta real en curso (ej. Jueves), quedaba
+    // reemplazada por "Miércoles" para TODO lo demás de la app hasta que
+    // se volviera a entrar a Jueves a mano. Eso dejó planillas fantasma de
+    // días que nunca se trabajaron de verdad. Ahora: si ya hay una ruta
+    // activa, la venta puntual se suma a ESA ruta (día en que se atendió
+    // de verdad) — sólo se usa el día del cliente como último recurso, si
+    // no había ninguna ruta abierta.
     const hoyKey = new Date().toLocaleDateString("en-CA");
     if (fechaActual !== hoyKey) setFechaActual(hoyKey);
-    setDiaActual(c.dia);
+    if (!diaActual) setDiaActual(c.dia);
     // Venta disparada por voz: visita puntual, no forma parte del
     // recorrido diario — al guardar, vuelve al menú.
     setVolverVentaA("menu");
@@ -3401,7 +3409,9 @@ function App() {
       _upd: Date.now()
     } : r)),
     onVerConfirmaciones: dia => {
-      if (dia) setDiaActual(dia);
+      // Mismo criterio que onVerDeudor/ClientesDormidos — no pisar una ruta
+      // activa con el día de esta lista.
+      if (dia && !diaActual) setDiaActual(dia);
       irA("confirmacionesDia");
     },
     transferenciasPendientes: DIAS.map(dia => {
@@ -3470,7 +3480,17 @@ function App() {
     // clientes deben" del Menú. origenDetalle:"menu" hace que "Volver"
     // regrese acá en vez de a la lista de Clientes del día.
     onVerDeudor: (c, d) => {
-      setDiaActual(d);
+      // RAÍZ DEL BUG 2026-10-17: esta es, probablemente, la causa real de
+      // las planillas fantasma — mirar "N clientes deben" y tocar un
+      // deudor es una acción de todos los días, y antes pisaba diaActual
+      // (la variable global que usa TODA la app) con el día propio de ESE
+      // cliente, aunque hubiera una ruta real en curso (ej. Jueves). Desde
+      // ahí, cualquier venta o auto-guardado quedaba atado al día del
+      // deudor en vez de al día que de verdad se estaba trabajando. Ahora
+      // sólo se usa "d" si no había ninguna ruta activa — ver el día del
+      // cliente queda igual, sólo que ya no corre el riesgo de "robarse"
+      // el día activo.
+      if (!diaActual) setDiaActual(d);
       setClienteId(c.id);
       setOrigenDetalle("menu");
       irA("detalleCliente");
@@ -3819,17 +3839,21 @@ function App() {
         // "de ayer" si quedó una fecha vieja seleccionada en Planilla).
         if (fechaActual !== hoyKey) setFechaActual(hoyKey);
       } else {
-        // Visita puntual (Gestión/Agenda/Mapa/Dormidos): el cliente puede no
-        // pertenecer al día activo — usar el día real del cliente. PERO la
-        // fecha siempre tiene que ser HOY: antes solo se ponía si fechaActual
-        // estaba vacío, así que si ya venías de trabajar otro día (ej. la
-        // ruta de Jueves con fechaActual ya seteado), una venta puntual acá
-        // a un cliente de Miércoles quedaba con el día de Miércoles pero la
-        // fecha vieja del Jueves — una "planilla fantasma" de Miércoles con
-        // la fecha de otro día (bug reportado 2026-10-17: "Últimos días"
-        // mostraba Miércoles con 1 visita fechada jueves, sin haber tocado
-        // esa planilla para nada).
-        setDiaActual(cliente.dia);
+        // RAÍZ DEL BUG 2026-10-17: diaActual es UNA sola variable global que
+        // usa TODA la app (Planilla, Clientes, auto-guardado, progreso del
+        // recorrido). Acá se entra por ejemplo desde el cartel "N clientes
+        // deben" del Menú (onVerDeudor), que puede abrir un cliente que no
+        // es del día activo. Antes esto pisaba diaActual con el día PROPIO
+        // del cliente (ej. "Miércoles"), aunque ya hubiera una ruta real en
+        // curso (ej. Jueves) — esa ruta quedaba "reemplazada" para TODA la
+        // app hasta volver a entrar a mano, y la venta puntual dejaba una
+        // planilla fantasma de un día que nunca se trabajó de verdad
+        // ("Últimos días" mostraba Miércoles con 1 visita fechada jueves,
+        // sin que nadie tocara esa planilla). Ahora: si ya hay una ruta
+        // activa, la venta puntual se suma a ESA ruta (el día en que se
+        // atendió de verdad) — el día del cliente sólo se usa si no había
+        // ninguna ruta abierta.
+        if (!diaActual) setDiaActual(cliente.dia);
         if (fechaActual !== hoyKey) setFechaActual(hoyKey);
       }
       irA("venta");
@@ -4199,14 +4223,13 @@ function App() {
     onRegistrarVenta: c => {
       setClienteId(c.id);
       // Visita puntual desde Gestión: mismo criterio que detalleCliente (ver
-      // comentario ahí, bug reportado 2026-10-17) — el día es el del
-      // cliente (puede no ser el día activo), pero la fecha SIEMPRE es hoy
-      // (antes solo se forzaba si fechaActual estaba vacío, así que una
-      // venta puntual acá a mitad de otra ruta quedaba con el día del
-      // cliente pero la fecha vieja de esa otra ruta).
+      // comentario ahí, raíz del bug reportado 2026-10-17) — si ya hay una
+      // ruta activa, la venta se suma a ESA ruta (no pisa diaActual con el
+      // día del cliente); el día del cliente sólo se usa si no había
+      // ninguna ruta abierta. La fecha siempre es hoy.
       const hoyKey = new Date().toLocaleDateString("en-CA");
       if (fechaActual !== hoyKey) setFechaActual(hoyKey);
-      setDiaActual(c.dia);
+      if (!diaActual) setDiaActual(c.dia);
       // Visita puntual desde Gestión (no forma parte del recorrido diario):
       // al guardar, vuelve directo acá — no auto-avanza por la ruta.
       setVolverVentaA("gestionClientes");
@@ -4370,7 +4393,9 @@ function App() {
     onVolver: () => irA("menu"),
     onSeleccionar: c => {
       setClienteId(c.id);
-      setDiaActual(c.dia);
+      // Mismo criterio que onVerDeudor (ver comentario ahí) — no pisar una
+      // ruta activa con el día de este cliente.
+      if (!diaActual) setDiaActual(c.dia);
       setOrigenDetalle("dormidos");
       irA("detalleCliente");
     },
