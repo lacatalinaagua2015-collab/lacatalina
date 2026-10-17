@@ -106,14 +106,6 @@ function MenuDias({
     const noVisitasDIds = new Set((noVisitas || []).filter(v => v.fecha >= ultimaFechaKey && (v.motivo === "noesta2" || v.motivo === "noquiso")).map(v => v.clienteId));
     const visitadosD = clientesD.filter(c => ventasDIds.has(c.id) || noVisitasDIds.has(c.id));
     const completoD = clientesD.length > 0 && visitadosD.length >= clientesD.length;
-    // BUG REPORTADO 2026-10-16: un día anterior ya completo (ej. Martes,
-    // Miércoles, Jueves ya cerrados) seguía mostrando el ✅ verde toda la
-    // semana. Antes esos íconos desaparecían apenas dejaba de ser "hoy" —
-    // tiene que seguir así: el cartel de acceso rápido solo se queda
-    // prendido mientras hay algo PENDIENTE sin terminar; si ya está
-    // completo y no es el día de hoy, no corresponde mostrar nada (se
-    // vuelve a habilitar recién cuando llegue su turno la semana que viene).
-    if (!esHoyDia && completoD) return;
     // Fecha real de la sesión: si ya se arrancó (hay planilla, venta o marca
     // cargada desde ultimaFechaKey en adelante), se sigue esa misma fecha —
     // así no se parte un mismo reparto en dos fechas. Si todavía no se tocó
@@ -135,6 +127,16 @@ function MenuDias({
       if (v.dia === d && v.fecha >= ultimaFechaKey && (!fechaSesion || v.fecha > fechaSesion)) fechaSesion = v.fecha;
     });
     if (!fechaSesion) fechaSesion = hoyFechaKey;
+    // BUG REPORTADO 2026-10-16: un día anterior ya completo (ej. Martes,
+    // Miércoles, Jueves ya cerrados hace días) seguía mostrando el ✅ verde
+    // toda la semana — tiene que desaparecer, se vuelve a habilitar recién
+    // cuando llegue su turno la semana que viene. PERO — BUG REPORTADO
+    // 2026-10-17: si lo que se completó es un arrastre que se terminó HOY
+    // (ej. el reparto del viernes, terminado hoy sábado), tiene que seguir
+    // apareciendo: es la única forma de entrar directo a su planilla del
+    // día recién cerrado. La diferencia es si la sesión real (fechaSesion)
+    // es la de HOY o la de un día anterior.
+    if (!esHoyDia && completoD && fechaSesion !== hoyFechaKey) return;
     // Estado del recuadro según la hora del reloj (si quedó sin terminar):
     //   antes de las 12 → normal (azul) · 12 a 17 hs → naranja · 17 hs en
     //   adelante → rojo/pendiente. Si no es el día de hoy (quedó de un día
@@ -3987,11 +3989,34 @@ function AtajoPlanillaSemana({
   while (dias5.length < 5) {
     const dow = cur.getDay();
     if (dow !== 0 && dow !== 6) {
-      const fechaKey = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
+      const fechaKeyNominal = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
+      const diaNombre = DIAS_NOMBRE[dow];
+      // BUG REPORTADO 2026-10-17: si el reparto de este día se terminó en
+      // otra fecha real (ej. el viernes arrastrado y cerrado el sábado),
+      // esta tarjeta seguía mirando la fecha nominal (el viernes calendario)
+      // y mostraba todo vacío/"Sin iniciar" — los datos reales quedaron
+      // guardados bajo la fecha en que efectivamente se hizo, otra
+      // planilla, inencontrable desde acá. Se busca la fecha real más
+      // nueva (desde la nominal en adelante) donde haya quedado algo
+      // cargado para este día, y se usa esa en vez de la nominal.
+      let fechaKeyReal = null;
+      Object.keys(planillas || {}).forEach(k => {
+        if (k.indexOf(diaNombre + "_") === 0) {
+          const fk = k.slice(diaNombre.length + 1);
+          if (fk >= fechaKeyNominal && (!fechaKeyReal || fk > fechaKeyReal)) fechaKeyReal = fk;
+        }
+      });
+      (ventas || []).forEach(v => {
+        if (v.dia === diaNombre && v.fechaKey >= fechaKeyNominal && (!fechaKeyReal || v.fechaKey > fechaKeyReal)) fechaKeyReal = v.fechaKey;
+      });
+      (noVisitas || []).forEach(v => {
+        if (v.dia === diaNombre && v.fecha >= fechaKeyNominal && (!fechaKeyReal || v.fecha > fechaKeyReal)) fechaKeyReal = v.fecha;
+      });
+      const fechaKey = fechaKeyReal || fechaKeyNominal;
       dias5.push({
-        fecha: new Date(cur),
+        fecha: fechaKey === fechaKeyNominal ? new Date(cur) : new Date(fechaKey + "T12:00:00"),
         fechaKey,
-        dia: DIAS_NOMBRE[dow]
+        dia: diaNombre
       });
     }
     cur.setDate(cur.getDate() - 1);
