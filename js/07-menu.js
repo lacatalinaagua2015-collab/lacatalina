@@ -1433,8 +1433,21 @@ function PlanillaDelDia({
     "Bidón 20L": "b20",
     "Sifón 1.5L": "soda"
   };
-  // Todas las ventas del día (propias + otros días) para envases y plata
-  const todasVentasDia = [...ventasPropias, ...ventasExtraDia];
+  // BUG RAÍZ 2026-10-17 (reportado por el usuario: "esta planilla está
+  // agregando ventas y plata a las listas de los días"): antes esto incluía
+  // ventasExtraDia (ventas de clientes de OTRO día que cayeron en esta misma
+  // fecha calendario) en TODOS los cálculos de plata y envases de este día
+  // — cobEfectivo, cobFiado, cobTransBruto, ganancia, el botón
+  // "Autocompletar desde ventas", "Guardar planilla" y el envío a Emma
+  // Control. Si esta pantalla no era la dueña real de esa fecha (ej. una
+  // planilla con el día pisado por el bug de diaActual ya arreglado más
+  // arriba), terminaba guardando y hasta cerrando el día con la plata de
+  // OTRO día — duplicándola en cualquier resumen que sume todas las
+  // planillas, y hasta duplicando el movimiento de stock del cierre.
+  // Las ventas de otros días siguen mostrándose aparte (más abajo, tarjeta
+  // "Ventas de otros días"), pero ya NUNCA se suman a la plata/stock de
+  // ESTE día.
+  const todasVentasDia = ventasPropias;
   const totalesPorProd = {
     b10: {
       vacios: 0,
@@ -3133,7 +3146,8 @@ function PlanillaDelDia({
     }
   }, fmt(cobTransNeto))), (() => {
     // Transferencias puras del día + parte transferencia de pagos mixtos
-    const mixtoTransDia = ventas.filter(v => v._esMixtoTrans && v.fechaKey === fecha);
+    // (mismo fix de raíz: solo clientes propios de este día, nunca de otro)
+    const mixtoTransDia = ventas.filter(v => v._esMixtoTrans && v.fechaKey === fecha && clientesDia.has(v.clienteId));
     const transDelDia = [...todasVentasDia.filter(v => v.pago === "transferencia"), ...mixtoTransDia];
     if (!transDelDia.length) return null;
     return /*#__PURE__*/React.createElement(DetalleTransferencias, {
