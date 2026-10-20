@@ -385,6 +385,32 @@ function App() {
     });
   };
   window._lcRegistrarMovimientoStock = registrarMovimientoStock;
+  // ── Auditoría de cambios en ventas ──────────────────────────────────────────
+  // Pedido del usuario: un registro aparte de lo que NO queda a la vista en
+  // el historial normal de cada cliente — ventas ELIMINADAS (desaparecen del
+  // todo) y ventas EDITADAS (se pisa el valor viejo sin dejar rastro). Los
+  // ajustes de saldo YA quedan registrados como ventas _esAjuste (se ven en
+  // el historial de cada cliente); acá no se duplican, la pantalla de
+  // Auditoría los junta en vivo desde `ventas` para tener todo en un lugar.
+  // Capado a 200 para no crecer sin límite, mismo patrón que movStock.
+  const [auditoria, setAuditoria] = useLS("cat_auditoria_v1", []);
+  const registrarAuditoria = (tipo, detalle) => {
+    setAuditoria(prev => {
+      const next = [...prev, {
+        id: Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+        fecha: new Date().toISOString(),
+        tipo,
+        // tipo: "eliminada" | "editada"
+        ...detalle,
+        _upd: Date.now()
+      }];
+      const acotado = next.length > 200 ? next.slice(next.length - 200) : next;
+      syncData({
+        auditoria: acotado
+      });
+      return acotado;
+    });
+  };
   const [recordatorios, setRecordatorios] = useLS("cat_recordatorios_v1", []);
   // recordatorio: {id, clienteId, clienteNombre, fecha, hora, motivo, dia, confirmado}
   // BUG REPORTADO: clientes (y productos/recordatorios) borrados volvían a
@@ -1251,6 +1277,7 @@ function App() {
       };
       _mergeSimple(data.dispMovs, "cat_dispmovs_v1", setDispMovs, "dispMovs", "movimientos de dispenser");
       _mergeSimple(data.movStock, "cat_movstock_v1", setMovStock, "movStock", "movimientos de stock");
+      _mergeSimple(data.auditoria, "cat_auditoria_v1", setAuditoria, "auditoria", "auditoría de cambios");
       _mergeSimple(data.prospectos, "cat_prospectos_v1", setProspectos, "prospectos", "prospectos");
       // ── noVisitas: MERGEAR en vez de sobreescribir (mismo problema que clientes/planillas) ──
       // Acá vive "No está" / "No quiere" / "Saltar". Sin esto, una marca recién
@@ -2056,6 +2083,7 @@ function App() {
         if (data.cargasDia && Object.keys(data.cargasDia).length) setCargasDia(data.cargasDia);
         if (data.dispMovs !== undefined) setDispMovs(data.dispMovs || []);
         if (data.movStock !== undefined) setMovStock(data.movStock || []);
+        if (data.auditoria !== undefined) setAuditoria(data.auditoria || []);
         if (data.prospectos !== undefined) setProspectos(data.prospectos || []);
         // Subir lo restaurado a la nube, SIN BORRAR.
         //
@@ -3123,6 +3151,20 @@ function App() {
     } catch {}
     // Guardar lo borrado para poder "Deshacer" — antes de tocar nada
     const ventasBorradas = ventas.filter(x => idsABorrar.has(x.id));
+    // Dejar constancia en Auditoría (Config → "📜 Auditoría de cambios") de
+    // qué se borró — una vez que sale de `ventas` no queda rastro en el
+    // historial del cliente, así que si no se registra acá se pierde del todo.
+    ventasBorradas.filter(x => !x._esMixtoTrans).forEach(x => {
+      const det = (Array.isArray(x.detalle) ? x.detalle : Object.values(x.detalle || {})).map(d => `${d.cantidad}× ${d.nombre}`).join(", ");
+      registrarAuditoria("eliminada", {
+        clienteId: x.clienteId,
+        cliente: x.cliente || "",
+        fechaVenta: x.fecha || "",
+        detalleTxt: det || "(sin productos)",
+        pago: x.pago || "",
+        monto: x.neto || 0
+      });
+    });
     const ajusteTotal = v.saldoDelta + ajusteSaldoExtra;
     if (deshacerTimerRef.current) clearTimeout(deshacerTimerRef.current);
     setDeshacerVenta({
@@ -3258,6 +3300,23 @@ function App() {
     // no depende del saldo actual del cliente (por eso es seguro aplicarlo después
     // sobre el saldo más reciente, en vez de sobre el que había al abrir la pantalla).
     const netDeltaCambio = calc.saldoDelta - vV.saldoDelta - ajusteLigadas - montoYaCobrado;
+    // Dejar constancia en Auditoría del antes/después — al editar se pisa
+    // el valor viejo de la venta sin dejar rastro en el historial normal.
+    if (vV.pago !== pagoReal || (Number(vV.neto) || 0) !== (Number(calc.neto) || 0)) {
+      const detAntes = (Array.isArray(vV.detalle) ? vV.detalle : Object.values(vV.detalle || {})).map(d => `${d.cantidad}× ${d.nombre}`).join(", ");
+      const detDespues = detalle.map(d => `${d.cantidad}× ${d.nombre}`).join(", ");
+      registrarAuditoria("editada", {
+        clienteId: vV.clienteId,
+        cliente: vV.cliente || "",
+        fechaVenta: vV.fecha || "",
+        pagoAntes: vV.pago || "",
+        pagoDespues: pagoReal,
+        montoAntes: vV.neto || 0,
+        montoDespues: calc.neto || 0,
+        detalleAntes: detAntes || "(sin productos)",
+        detalleDespues: detDespues || "(sin productos)"
+      });
+    }
     saveVentas(prev => {
       let nev = prev.filter(v => !idsLigados.has(v.id));
       nev = nev.map(v => v.id === ventaId ? {
@@ -4556,6 +4615,7 @@ function App() {
     setClientes: saveClientes,
     ventas: ventas,
     setVentas: saveVentas,
+    auditoria: auditoria,
     planillas: planillas,
     setPlanillas: savePlanillasCloud,
     stock: stockNorm,
