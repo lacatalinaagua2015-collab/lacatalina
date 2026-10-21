@@ -160,78 +160,253 @@ function MenuDias({
   const transClientesCount = new Set((transferenciasPendientes || []).flatMap(t => (t.ventas || []).map(v => v.clienteId))).size;
   const transMontoBruto = (transferenciasPendientes || []).reduce((a, t) => a + (t.monto || 0), 0);
   const transMontoNeto = transMontoBruto - Math.round(transMontoBruto * 0.025);
-  return /*#__PURE__*/React.createElement("div", {
-    style: s.screen
-  }, /*#__PURE__*/React.createElement(HeaderApp, {
-    onVolver: onVolver
-  }), recordatoriosActivos && recordatoriosActivos.length > 0 && /*#__PURE__*/React.createElement("div", {
+  const DIA_COLORS = ["var(--color-text-success)", "var(--color-text-warning)", "var(--color-text-info)", "var(--color-text-danger)"];
+  const diasRows = [];
+  for (let i = 0; i < (dias || []).length; i += 3) diasRows.push(dias.slice(i, i + 3));
+  const cfgEstado = {
+    listo: { bg: "#0a5c3a", border: "1.5px solid #4dd9a0", icon: "✅", subCol: "#9FE1CB" },
+    rojo: { bg: "#b91c1c", border: "1.5px solid #fca5a5", icon: "🔴", subCol: "#ffc9c9" },
+    naranja: { bg: "#b45309", border: "1.5px solid #fcd34d", icon: "⏰", subCol: "#ffe0b5" },
+    normal: { bg: "#185FA5", border: "none", icon: "📅", subCol: "#b5d4f4" }
+  };
+  const renderDia = (d, globalIdx, centered) => {
+    const deudas = (clientes || []).filter(c => c.dia === d && c.saldo < 0);
+    const totalDeuda = deudas.reduce((a, c) => a + Math.abs(c.saldo), 0);
+    const totalClientes = (clientes || []).filter(c => c.dia === d).length;
+    const zona = (zonasReparto || {})[d] || "";
+    const color = DIA_COLORS[globalIdx % DIA_COLORS.length];
+    const info = estadoPorDia[d];
+    const cfg = info ? cfgEstado[info.estado] : null;
+    const sub = info ? (info.completoD ? "Listo" : `${info.visitadosD.length}/${info.clientesD.length}`) : null;
+    return React.createElement("button", {
+      key: d,
+      style: {
+        ...s.card,
+        margin: 0,
+        flex: centered ? "0 0 31%" : "1 1 0",
+        minWidth: 0,
+        padding: "14px 8px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        textAlign: "center",
+        cursor: "pointer",
+        position: "relative"
+      },
+      onClick: () => onIrPlanillaDia(d)
+    }, cfg && React.createElement("div", {
+      onClick: e => {
+        e.stopPropagation();
+        info.completoD ? (onDiaResumen && onDiaResumen(d, info.fechaSesion)) : onDiaHoy(d, info.fechaSesion);
+      },
+      style: {
+        position: "absolute",
+        top: 5,
+        right: 5,
+        background: cfg.bg,
+        border: cfg.border,
+        borderRadius: 8,
+        padding: "2px 5px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        cursor: "pointer",
+        lineHeight: 1.1
+      }
+    }, React.createElement("span", { style: { fontSize: 11 } }, cfg.icon), React.createElement("span", { style: { fontSize: 7, color: cfg.subCol } }, sub)), React.createElement("div", {
+      style: { fontSize: 15, fontWeight: 800, color }
+    }, d), zona ? React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: "var(--color-text-tertiary)",
+        marginTop: 4,
+        borderBottom: "1px dotted var(--color-text-tertiary)",
+        maxWidth: "100%",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      },
+      onClick: e => {
+        e.stopPropagation();
+        setEditandoZona(d);
+      }
+    }, zona) : React.createElement("div", {
+      style: { fontSize: 10, color: "var(--color-text-tertiary)", fontStyle: "italic", marginTop: 4 },
+      onClick: e => {
+        e.stopPropagation();
+        setEditandoZona(d);
+      }
+    }, "+ zona"), totalDeuda > 0 ? React.createElement("div", {
+      style: { fontSize: 10.5, fontWeight: 700, color: "var(--color-text-danger)", marginTop: 6 },
+      onClick: e => {
+        e.stopPropagation();
+        setDeudaExpandida(deudaExpandida === d ? null : d);
+      }
+    }, "⚠ ", fmt(totalDeuda)) : React.createElement("div", {
+      style: { fontSize: 10.5, fontWeight: 700, color: "var(--color-text-success)", marginTop: 6 }
+    }, "✓ Sin deudas"), React.createElement("div", {
+      style: { fontSize: 10, color: "var(--color-text-tertiary)", marginTop: 3 }
+    }, totalClientes, " cliente", totalClientes !== 1 ? "s" : ""));
+  };
+  const notifItems = [];
+  if (transferenciasPendientes && transferenciasPendientes.length > 0) notifItems.push(React.createElement("button", {
+    key: "trans",
+    onClick: () => setMostrarTransferencias(v => !v),
     style: {
-      margin: "8px 14px 4px"
+      flex: 1,
+      textAlign: "left",
+      background: "var(--color-background-danger)",
+      border: "1px solid var(--color-border-danger)",
+      borderRadius: 13,
+      padding: "11px 12px",
+      cursor: "pointer"
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, React.createElement("div", {
+    style: { fontSize: 10, fontWeight: 800, color: "var(--color-text-danger)", textTransform: "uppercase", letterSpacing: "0.04em" }
+  }, "🔴 Transferencias"), React.createElement("div", {
+    style: { fontSize: 14, fontWeight: 800, color: "var(--color-text-danger)", marginTop: 3 }
+  }, fmt(transMontoNeto)), React.createElement("div", {
+    style: { fontSize: 10.5, color: "var(--color-text-danger)", opacity: 0.8, marginTop: 1 }
+  }, transClientesCount, " sin confirmar")));
+  if (recordatoriosActivos && recordatoriosActivos.length > 0) notifItems.push(React.createElement("button", {
+    key: "rec",
+    onClick: () => setMostrarRecordatorios(v => !v),
+    style: {
+      flex: 1,
+      textAlign: "left",
+      background: "var(--color-background-info)",
+      border: "1px solid var(--color-border-info)",
+      borderRadius: 13,
+      padding: "11px 12px",
+      cursor: "pointer"
+    }
+  }, React.createElement("div", {
+    style: { fontSize: 10, fontWeight: 800, color: "var(--color-text-info)", textTransform: "uppercase", letterSpacing: "0.04em" }
+  }, "🔔 Recordatorios"), React.createElement("div", {
+    style: { fontSize: 14, fontWeight: 800, color: "var(--color-text-info)", marginTop: 3 }
+  }, recClientesCount, " pendientes"), React.createElement("div", {
+    style: { fontSize: 10.5, color: "var(--color-text-info)", opacity: 0.8, marginTop: 1 }
+  }, recDiasCount, " día", recDiasCount !== 1 ? "s" : "")));
+
+  return React.createElement("div", { style: s.screen },
+  React.createElement(HeaderApp, { onVolver: onVolver }),
+
+  React.createElement("div", {
     style: {
       fontSize: 11,
-      fontWeight: 500,
-      color: "#5daaff",
-      marginBottom: 6,
+      fontWeight: 700,
+      color: "var(--color-text-tertiary)",
       textTransform: "uppercase",
-      letterSpacing: "0.05em",
-      cursor: "pointer",
+      letterSpacing: "0.06em",
+      textAlign: "center",
+      padding: "14px 0 8px"
+    }
+  }, "Días de reparto"),
+
+  React.createElement("div", {
+    style: { padding: "0 16px", display: "flex", flexDirection: "column", gap: 10 }
+  }, diasRows.map((row, ri) => React.createElement("div", {
+    key: ri,
+    style: { display: "flex", gap: 10, justifyContent: row.length < 3 ? "center" : "flex-start" }
+  }, row.map((d, ci) => renderDia(d, ri * 3 + ci, row.length < 3))))),
+
+  editandoZona && React.createElement("div", {
+    style: {
+      background: "var(--color-background-secondary)",
+      border: "0.5px solid var(--color-border-secondary)",
+      borderRadius: 10,
+      padding: "10px 14px",
+      margin: "8px 16px 0"
+    }
+  }, React.createElement("div", {
+    style: { fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 6 }
+  }, "Zona de reparto del ", editandoZona), React.createElement("div", {
+    style: { display: "flex", gap: 8 }
+  }, React.createElement("input", {
+    id: `zona-${editandoZona}`,
+    style: s.input,
+    defaultValue: (zonasReparto || {})[editandoZona] || "",
+    placeholder: "Ej: Lomas de Tafí",
+    autoFocus: true
+  }), React.createElement("button", {
+    style: { ...s.btnPrimary, padding: "6px 14px", fontSize: 13, whiteSpace: "nowrap" },
+    onClick: () => {
+      const v = document.getElementById(`zona-${editandoZona}`).value.trim();
+      onSetZona(editandoZona, v);
+      setEditandoZona(null);
+    }
+  }, "OK"), React.createElement("button", {
+    style: { ...s.btn, padding: "6px 10px", fontSize: 13 },
+    onClick: () => setEditandoZona(null)
+  }, "✕"))),
+
+  deudaExpandida && React.createElement("div", {
+    style: {
+      background: "var(--color-background-secondary)",
+      border: "0.5px solid var(--color-border-secondary)",
+      borderRadius: 10,
+      padding: "8px 10px",
+      margin: "8px 16px 0",
       display: "flex",
+      flexDirection: "column",
+      gap: 4
+    }
+  }, [...(clientes || []).filter(c => c.dia === deudaExpandida && c.saldo < 0)].sort((a, b) => a.saldo - b.saldo).map(c => React.createElement("button", {
+    key: c.id,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
       alignItems: "center",
-      gap: 4,
-      // Mismo recuadro que el encabezado de "Transferencias sin confirmar",
-      // con los colores azules propios de los recordatorios.
-      background: "#1e2e4a",
-      border: "1px solid #5daaff",
-      borderRadius: 8,
-      padding: "8px 10px"
+      gap: 8,
+      background: "none",
+      border: "none",
+      borderBottom: "0.5px solid var(--color-border-tertiary)",
+      padding: "8px 4px",
+      cursor: "pointer",
+      textAlign: "left"
     },
-    onClick: () => setMostrarRecordatorios(v => !v)
-  }, mostrarRecordatorios ? "▼" : "▶", " 🔔 Recordatorios pendientes (D:", recDiasCount, ") ; (C:", recClientesCount, ")"), mostrarRecordatorios && recordatoriosActivos.slice(0, 5).map(r => /*#__PURE__*/React.createElement("div", {
+    onClick: () => {
+      setDeudaExpandida(null);
+      onVerDeudor && onVerDeudor(c, deudaExpandida);
+    }
+  }, React.createElement("span", {
+    style: { fontSize: 13, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }
+  }, c.nombre), React.createElement("span", {
+    style: { fontSize: 13, fontWeight: 600, color: "var(--color-text-danger)", flexShrink: 0 }
+  }, fmt(Math.abs(c.saldo)))))),
+
+  notifItems.length > 0 && React.createElement("div", {
+    style: { display: "flex", gap: 8, padding: "14px 16px 0" }
+  }, notifItems),
+
+  mostrarRecordatorios && recordatoriosActivos && recordatoriosActivos.length > 0 && React.createElement("div", {
+    style: { padding: "8px 16px 0", display: "flex", flexDirection: "column", gap: 6 }
+  }, recordatoriosActivos.slice(0, 5).map(r => React.createElement("div", {
     key: r.id,
     style: {
       ...s.card,
-      margin: "0 0 6px",
-      background: "#1e2e4a",
-      border: "0.5px solid #5daaff",
+      margin: 0,
+      background: "var(--color-background-info)",
+      border: "0.5px solid var(--color-border-info)",
       display: "flex",
       gap: 8,
       alignItems: "flex-start"
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1,
-      cursor: "pointer"
-    },
+  }, React.createElement("div", {
+    style: { flex: 1, cursor: "pointer" },
     onClick: () => onAgenda && onAgenda()
-  }, /*#__PURE__*/React.createElement("div", {
+  }, React.createElement("div", {
+    style: { fontSize: 12, fontWeight: 500, color: "var(--color-text-info)" }
+  }, r.clienteNombre, " · ", r.dia, " ", React.createElement("span", {
+    style: { fontSize: 10, opacity: 0.7 }
+  }, "→ tocá para ver")), React.createElement("div", {
+    style: { fontSize: 12, color: "var(--color-text-primary)", marginTop: 2 }
+  }, r.tipo === "cobro" ? "💰" : "🏠", " ", r.motivo), React.createElement("div", {
+    style: { fontSize: 10, color: "var(--color-text-tertiary)", marginTop: 2 }
+  }, r.fecha, r.hora ? ` · ${r.hora}` : "")), React.createElement("button", {
     style: {
-      fontSize: 12,
-      fontWeight: 500,
-      color: "#5daaff"
-    }
-  }, r.clienteNombre, " · ", r.dia, " ", /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 10,
-      opacity: 0.7
-    }
-  }, "→ tocá para ver")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "var(--color-text-primary)",
-      marginTop: 2
-    }
-  }, r.tipo === "cobro" ? "💰" : "🏠", " ", r.motivo), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: "var(--color-text-tertiary)",
-      marginTop: 2
-    }
-  }, r.fecha, r.hora ? ` · ${r.hora}` : "")), /*#__PURE__*/React.createElement("button", {
-    style: {
-      background: "#4dd9a0",
-      color: "#0a2e1f",
+      background: "var(--color-background-success)",
+      color: "var(--color-text-success)",
       border: "none",
       borderRadius: 6,
       padding: "4px 8px",
@@ -242,54 +417,20 @@ function MenuDias({
       marginTop: 2
     },
     onClick: () => onConfirmarRecordatorio && onConfirmarRecordatorio(r.id)
-  }, "✓"))), mostrarRecordatorios && recordatoriosActivos.length > 5 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "var(--color-text-tertiary)",
-      textAlign: "center"
-    }
-  }, "+", recordatoriosActivos.length - 5, " más")), transferenciasPendientes && transferenciasPendientes.length > 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      margin: "8px 14px 4px"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      fontWeight: 500,
-      color: "#f5b942",
-      marginBottom: 6,
-      textTransform: "uppercase",
-      letterSpacing: "0.05em",
-      cursor: "pointer",
-      display: "flex",
-      alignItems: "center",
-      gap: 4,
-      background: "#1e3a5f",
-      border: "1px solid #f5b942",
-      borderRadius: 8,
-      padding: "8px 10px"
-    },
-    onClick: () => setMostrarTransferencias(v => !v)
-  }, mostrarTransferencias ? "▼" : "▶", " 🔴 Transf. pendientes (D:", transDiasCount, " · C:", transClientesCount, ") · ", /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 14,
-      fontWeight: 700,
-      letterSpacing: 0
-    }
-  }, fmt(transMontoNeto))), mostrarTransferencias && transferenciasPendientes.map(({
-    dia,
-    fecha,
-    count,
-    monto,
-    ventas: vts
-  }) => /*#__PURE__*/React.createElement("button", {
+  }, "✓"))), recordatoriosActivos.length > 5 && React.createElement("div", {
+    style: { fontSize: 11, color: "var(--color-text-tertiary)", textAlign: "center" }
+  }, "+", recordatoriosActivos.length - 5, " más")),
+
+  mostrarTransferencias && transferenciasPendientes && transferenciasPendientes.length > 0 && React.createElement("div", {
+    style: { padding: "8px 16px 0", display: "flex", flexDirection: "column", gap: 6 }
+  }, transferenciasPendientes.map(({ dia, fecha, count, monto, ventas: vts }) => React.createElement("button", {
     key: dia + fecha,
     style: {
       ...s.card,
       width: "100%",
-      margin: "0 0 6px",
-      background: "#1e3a5f",
-      border: "1px solid #f5b942",
+      margin: 0,
+      background: "var(--color-background-danger)",
+      border: "1px solid var(--color-border-danger)",
       display: "flex",
       alignItems: "center",
       gap: 10,
@@ -297,335 +438,24 @@ function MenuDias({
       textAlign: "left"
     },
     onClick: () => onVerConfirmaciones && onVerConfirmaciones(dia)
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 18
-    }
-  }, "🔴"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      fontWeight: 500,
-      color: "#f5b942"
-    }
-  }, dia, " · ", count, " transfer. sin confirmar"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "var(--color-text-secondary)",
-      marginTop: 2
-    }
-  }, vts.slice(0, 3).map(v => v.cliente).join(", "), vts.length > 3 ? ` +${vts.length - 3} más` : "")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      textAlign: "right",
-      flexShrink: 0
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      fontWeight: 500,
-      color: "#f5b942"
-    }
-  }, fmt(monto)), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: "var(--color-text-tertiary)"
-    }
-  }, fecha))))), /*#__PURE__*/React.createElement("span", {
-    style: s.sectionTitle
-  }, "Días de reparto"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "0 16px",
-      display: "flex",
-      flexDirection: "column",
-      gap: 8
-    }
-  }, dias.map((d, idx) => {
-    const deudas = (clientes || []).filter(c => c.dia === d && c.saldo < 0);
-    const totalDeuda = deudas.reduce((a, c) => a + Math.abs(c.saldo), 0);
-    const totalClientes = (clientes || []).filter(c => c.dia === d).length;
-    const zona = (zonasReparto || {})[d] || "";
-    return /*#__PURE__*/React.createElement(React.Fragment, {
-      key: d
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 6,
-        alignItems: "stretch"
-      }
-    }, /*#__PURE__*/React.createElement("button", {
-      style: {
-        ...s.card,
-        margin: 0,
-        flex: 1,
-        textAlign: "left",
-        cursor: "pointer",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: "14px 16px"
-      },
-      onClick: () => onIrPlanillaDia(d)
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        flex: 1,
-        minWidth: 0
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        marginBottom: 5
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 15,
-        fontWeight: 500,
-        color: "var(--color-text-primary)"
-      }
-    }, d), zona && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 15,
-        fontWeight: 500,
-        color: "var(--color-text-primary)"
-      }
-    }, "·"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 15,
-        fontWeight: 500,
-        color: "var(--color-text-primary)",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap",
-        cursor: "pointer",
-        // Subrayado punteado tenue: la única señal de que se puede tocar para
-        // editar (reemplaza al cartelito "editar zona" que estaba abajo).
-        borderBottom: "1px dotted var(--color-text-tertiary)"
-      },
-      title: "Tocá para editar la zona",
-      onClick: e => {
-        e.stopPropagation();
-        setEditandoZona(d);
-      }
-    }, zona)), !zona && /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 12,
-        color: "var(--color-text-tertiary)",
-        fontStyle: "italic",
-        cursor: "pointer"
-      },
-      onClick: e => {
-        e.stopPropagation();
-        setEditandoZona(d);
-      }
-    }, "+ zona")), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center"
-      }
-    }, totalDeuda > 0 ? /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 12,
-        color: "var(--color-text-danger)",
-        cursor: "pointer",
-        textDecoration: "underline",
-        textDecorationStyle: "dotted"
-      },
-      title: "Tocá para ver quién debe",
-      onClick: e => {
-        e.stopPropagation();
-        setDeudaExpandida(deudaExpandida === d ? null : d);
-      }
-    }, "⚠ ", deudas.length, " cliente", deudas.length > 1 ? "s" : "", " ", deudas.length > 1 ? "deben" : "debe", " ", fmt(totalDeuda), " ", deudaExpandida === d ? "▲" : "▼") : /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 12,
-        color: "var(--color-text-success)"
-      }
-    }, "✓ Sin deudas"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 12,
-        color: "var(--color-text-tertiary)"
-      }
-    }, totalClientes, " cliente", totalClientes !== 1 ? "s" : ""))), /*#__PURE__*/React.createElement("span", {
-      style: {
-        color: "var(--color-text-tertiary)",
-        fontSize: 18,
-        marginLeft: 10
-      }
-    }, "→")), estadoPorDia[d] && onDiaHoy && (() => {
-      const info = estadoPorDia[d];
-      const cfg = {
-        listo: {
-          bg: "#0a5c3a",
-          border: "1.5px solid #4dd9a0",
-          icon: "✅",
-          txt: "Listo",
-          txtCol: "#4dd9a0",
-          subCol: "#9FE1CB"
-        },
-        rojo: {
-          bg: "#b91c1c",
-          border: "1.5px solid #fca5a5",
-          icon: "🔴",
-          txt: "Pendiente",
-          txtCol: "#ffe4e4",
-          subCol: "#ffc9c9"
-        },
-        naranja: {
-          bg: "#b45309",
-          border: "1.5px solid #fcd34d",
-          icon: "⏰",
-          txt: "Hoy",
-          txtCol: "#fff4e0",
-          subCol: "#ffe0b5"
-        },
-        normal: {
-          bg: "#185FA5",
-          border: "none",
-          icon: "📅",
-          txt: "Hoy",
-          txtCol: "#e2eaf4",
-          subCol: "#b5d4f4"
-        }
-      }[info.estado];
-      const sub = info.completoD ? "Listo" : `${info.visitadosD.length}/${info.clientesD.length}`;
-      return /*#__PURE__*/React.createElement("button", {
-        style: {
-          background: cfg.bg,
-          borderRadius: 12,
-          padding: "8px 10px",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 2,
-          minWidth: 56,
-          border: cfg.border,
-          cursor: "pointer",
-          flexShrink: 0
-        },
-        onClick: () => info.completoD ? onDiaResumen && onDiaResumen(d, info.fechaSesion) : onDiaHoy(d, info.fechaSesion)
-      }, /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: 16
-        }
-      }, cfg.icon), /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: 9,
-          color: cfg.txtCol,
-          fontWeight: 500,
-          textAlign: "center",
-          lineHeight: 1.3
-        }
-      }, cfg.txt), /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: 9,
-          color: cfg.subCol,
-          lineHeight: 1
-        }
-      }, sub));
-    })()), editandoZona === d && /*#__PURE__*/React.createElement("div", {
-      style: {
-        background: "var(--color-background-secondary)",
-        border: "0.5px solid var(--color-border-secondary)",
-        borderRadius: 10,
-        padding: "10px 14px",
-        marginTop: 2
-      },
-      onClick: e => e.stopPropagation()
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 12,
-        color: "var(--color-text-secondary)",
-        marginBottom: 6
-      }
-    }, "Zona de reparto del ", d), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 8
-      }
-    }, /*#__PURE__*/React.createElement("input", {
-      id: `zona-${d}`,
-      style: s.input,
-      defaultValue: zona,
-      placeholder: "Ej: Lomas de Tafí",
-      autoFocus: true
-    }), /*#__PURE__*/React.createElement("button", {
-      style: {
-        ...s.btnPrimary,
-        padding: "6px 14px",
-        fontSize: 13,
-        whiteSpace: "nowrap"
-      },
-      onClick: () => {
-        const v = document.getElementById(`zona-${d}`).value.trim();
-        onSetZona(d, v);
-        setEditandoZona(null);
-      }
-    }, "OK"), /*#__PURE__*/React.createElement("button", {
-      style: {
-        ...s.btn,
-        padding: "6px 10px",
-        fontSize: 13
-      },
-      onClick: () => setEditandoZona(null)
-    }, "✕"))), deudaExpandida === d && /*#__PURE__*/React.createElement("div", {
-      style: {
-        background: "var(--color-background-secondary)",
-        border: "0.5px solid var(--color-border-secondary)",
-        borderRadius: 10,
-        padding: "8px 10px",
-        marginTop: 2,
-        display: "flex",
-        flexDirection: "column",
-        gap: 4
-      },
-      onClick: e => e.stopPropagation()
-    }, [...deudas].sort((a, b) => a.saldo - b.saldo).map(c => /*#__PURE__*/React.createElement("button", {
-      key: c.id,
-      style: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        gap: 8,
-        background: "none",
-        border: "none",
-        borderBottom: "0.5px solid var(--color-border-tertiary)",
-        padding: "8px 4px",
-        cursor: "pointer",
-        textAlign: "left"
-      },
-      onClick: () => {
-        setDeudaExpandida(null);
-        onVerDeudor && onVerDeudor(c, d);
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 13,
-        color: "var(--color-text-primary)",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap"
-      }
-    }, c.nombre), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 13,
-        fontWeight: 600,
-        color: "var(--color-text-danger)",
-        flexShrink: 0
-      }
-    }, fmt(Math.abs(c.saldo)))))));
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr 1fr",
-      gap: 6,
-      padding: "4px 0 8px"
-    }
+  }, React.createElement("span", {
+    style: { fontSize: 18 }
+  }, "🔴"), React.createElement("div", {
+    style: { flex: 1 }
+  }, React.createElement("div", {
+    style: { fontSize: 13, fontWeight: 500, color: "var(--color-text-danger)" }
+  }, dia, " · ", count, " transfer. sin confirmar"), React.createElement("div", {
+    style: { fontSize: 11, color: "var(--color-text-secondary)", marginTop: 2 }
+  }, vts.slice(0, 3).map(v => v.cliente).join(", "), vts.length > 3 ? ` +${vts.length - 3} más` : "")), React.createElement("div", {
+    style: { textAlign: "right", flexShrink: 0 }
+  }, React.createElement("div", {
+    style: { fontSize: 13, fontWeight: 500, color: "var(--color-text-danger)" }
+  }, fmt(monto)), React.createElement("div", {
+    style: { fontSize: 10, color: "var(--color-text-tertiary)" }
+  }, fecha))))),
+
+  React.createElement("div", {
+    style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, padding: "16px 16px 8px" }
   }, [{
     ico: "📅",
     lbl: "Agenda",
@@ -638,11 +468,7 @@ function MenuDias({
     ico: "➕",
     lbl: "Nuevo cliente",
     fn: () => onNuevoCliente && onNuevoCliente()
-  }].map(({
-    ico,
-    lbl,
-    fn
-  }) => /*#__PURE__*/React.createElement("button", {
+  }].map(({ ico, lbl, fn }) => React.createElement("button", {
     key: lbl,
     onClick: fn,
     style: {
@@ -657,24 +483,20 @@ function MenuDias({
       background: "var(--color-background-tertiary)",
       color: "var(--color-text-secondary)"
     }
-  }, /*#__PURE__*/React.createElement("span", {
+  }, React.createElement("span", {
+    style: { fontSize: 19 }
+  }, ico), React.createElement("span", {
+    style: { fontSize: 9, fontWeight: 500, color: "var(--color-text-tertiary)" }
+  }, lbl)))),
+
+  React.createElement("div", { style: s.divider }),
+
+  React.createElement("div", {
     style: {
-      fontSize: 19
-    }
-  }, ico), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 9,
-      fontWeight: 500,
-      color: "var(--color-text-tertiary)"
-    }
-  }, lbl)))), /*#__PURE__*/React.createElement("div", {
-    style: s.divider
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "grid",
-      gridTemplateColumns: "repeat(3,1fr)",
-      gap: 8,
-      paddingBottom: 8
+      padding: "4px 20px 10px",
+      borderTop: "0.5px solid var(--color-border-tertiary)",
+      display: "flex",
+      justifyContent: "space-around"
     }
   }, [{
     ico: "👥",
@@ -688,39 +510,26 @@ function MenuDias({
     ico: "⚙️",
     lbl: "Config",
     fn: onConfig
-  }].map(({
-    ico,
-    lbl,
-    fn
-  }) => /*#__PURE__*/React.createElement("button", {
+  }].map(({ ico, lbl, fn }) => React.createElement("button", {
     key: lbl,
     onClick: fn,
     style: {
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
-      justifyContent: "center",
-      gap: 4,
-      padding: "16px 6px",
-      borderRadius: 12,
-      cursor: "pointer",
-      border: "2px solid transparent",
-      background: "var(--color-background-tertiary)",
-      boxShadow: "0 3px 6px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.06) inset",
-      color: "var(--color-text-secondary)"
+      gap: 5,
+      paddingTop: 10,
+      border: "none",
+      background: "none",
+      cursor: "pointer"
     }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 26
-    }
-  }, ico), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      fontWeight: 500,
-      color: "var(--color-text-primary)",
-      textAlign: "center"
-    }
-  }, lbl))))));
+  }, React.createElement("span", {
+    style: { fontSize: 20 }
+  }, ico), React.createElement("span", {
+    style: { fontSize: 11, fontWeight: 600, color: "var(--color-text-secondary)" }
+  }, lbl))))
+
+);
 }
 function DetalleTransferencias({
   ventas,
