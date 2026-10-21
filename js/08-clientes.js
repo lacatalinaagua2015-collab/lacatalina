@@ -363,38 +363,6 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
       }
     }, /*#__PURE__*/React.createElement("button", {
       style: {
-        flex: 1,
-        background: "var(--color-background-warning)",
-        color: "var(--color-text-warning)",
-        border: "1px solid var(--color-border-warning)",
-        borderRadius: 10,
-        padding: "10px 0",
-        fontSize: 13,
-        cursor: "pointer",
-        fontWeight: 500
-      },
-      onClick: () => {
-        marcarNoVisita(c.id, est === "noesta" ? "noesta2" : "noesta");
-        irAlSiguientePendiente();
-      }
-    }, est === "noesta" ? "2ª vez" : "🔄 No está"), /*#__PURE__*/React.createElement("button", {
-      style: {
-        flex: 1,
-        background: "var(--color-background-danger)",
-        color: "var(--color-text-danger)",
-        border: "1px solid var(--color-border-danger)",
-        borderRadius: 10,
-        padding: "10px 0",
-        fontSize: 13,
-        cursor: "pointer",
-        fontWeight: 500
-      },
-      onClick: () => {
-        marcarNoVisita(c.id, "noquiso");
-        irAlSiguientePendiente();
-      }
-    }, "No quiere"), /*#__PURE__*/React.createElement("button", {
-      style: {
         ...s.btn,
         flex: "0 0 38px",
         width: 38,
