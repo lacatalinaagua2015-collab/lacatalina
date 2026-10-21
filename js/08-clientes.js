@@ -1461,7 +1461,7 @@ function DetalleCliente({
       setMostrarCambio(false);
     },
     onCancelar: () => setMostrarCambio(false)
-  }), ventaHoy ? /*#__PURE__*/React.createElement("div", {
+  }), ventaHoy && /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
       margin: "0 0 12px",
@@ -1488,7 +1488,7 @@ function DetalleCliente({
       color: "var(--color-text-secondary)",
       marginTop: 4
     }
-  }, ventaHoy.detalle.map(d => `${d.nombre} ×${d.cantidad}`).join(" · "), " · ", (Number(ventaHoy.montoTrans) || 0) > 0 && (Number(ventaHoy.montoEfec) || 0) > 0 ? `Mixto · ef ${fmt(ventaHoy.montoEfec)} + tr ${fmt(ventaHoy.montoTrans)}` : ventaHoy.pago)) : /*#__PURE__*/React.createElement("div", {
+  }, ventaHoy.detalle.map(d => `${d.nombre} ×${d.cantidad}`).join(" · "), " · ", (Number(ventaHoy.montoTrans) || 0) > 0 && (Number(ventaHoy.montoEfec) || 0) > 0 ? `Mixto · ef ${fmt(ventaHoy.montoEfec)} + tr ${fmt(ventaHoy.montoTrans)}` : ventaHoy.pago)), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
@@ -1503,7 +1503,7 @@ function DetalleCliente({
       borderRadius: 10
     },
     onClick: onVenta
-  }, "📦 Registrar venta")), cliente.saldo < 0 && !ventaHoy && /*#__PURE__*/React.createElement("button", {
+  }, ventaHoy ? "📦 Registrar otra venta" : "📦 Registrar venta")), cliente.saldo < 0 && /*#__PURE__*/React.createElement("button", {
     style: {
       width: "100%",
       background: "#0a2e1f",
