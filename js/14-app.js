@@ -3468,9 +3468,15 @@ function App() {
       _upd: Date.now()
     } : r)),
     onVerConfirmaciones: dia => {
-      // Mismo criterio que onVerDeudor/ClientesDormidos — no pisar una ruta
-      // activa con el día de esta lista.
-      if (dia && !diaActual) setDiaActual(dia);
+      // BUG REPORTADO: al tocar "Martes · 2 transfer. sin confirmar" desde
+      // el menú mientras había una ruta activa en OTRO día (ej: Miércoles),
+      // la pantalla de Transferencias quedaba mostrando el día viejo
+      // (diaActual) en vez del día que se tocó — se veía "0 pendientes"
+      // aunque el cartel decaía que había. El único lugar que llama a esto
+      // (07-menu.js) SIEMPRE manda un día explícito al tocar una fila
+      // puntual, así que acá no hay riesgo de "pisar" nada — el día tocado
+      // tiene que ganar siempre.
+      if (dia) setDiaActual(dia);
       irA("confirmacionesDia");
     },
     transferenciasPendientes: DIAS.map(dia => {
