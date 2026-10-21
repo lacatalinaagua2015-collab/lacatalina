@@ -548,7 +548,7 @@ function NuevoRecordatorioForm({
 function ConfigAparienciaLC() {
   const [temaActual, setTemaActual] = React.useState(getTemaLC);
   const [modoVista, setModoVista] = React.useState(() => TEMAS_LC[getTemaLC()]?.modo || "oscuro");
-  const [estiloVista, setEstiloVista] = React.useState(() => TEMAS_LC[getTemaLC()]?.relieve ? "metalico" : "clasico");
+  const [estiloVista, setEstiloVista] = React.useState(() => TEMAS_LC[getTemaLC()]?.relieve ? "metalico" : TEMAS_LC[getTemaLC()]?.cuadrado ? "cuadrado" : "clasico");
   const [guardado, setGuardado] = React.useState(false);
   const aplicar = id => {
     // Guardar PRIMERO — así la elección queda guardada pase lo que pase
@@ -564,7 +564,7 @@ function ConfigAparienciaLC() {
     setGuardado(true);
     setTimeout(() => setGuardado(false), 2000);
   };
-  const temasFiltrados = Object.entries(TEMAS_LC).filter(([, t]) => t.modo === modoVista && !!t.relieve === (estiloVista === "metalico"));
+  const temasFiltrados = Object.entries(TEMAS_LC).filter(([, t]) => t.modo === modoVista && (estiloVista === "metalico" ? !!t.relieve : estiloVista === "cuadrado" ? !!t.cuadrado : !t.relieve && !t.cuadrado));
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
@@ -578,13 +578,13 @@ function ConfigAparienciaLC() {
       color: "var(--color-text-primary)",
       marginBottom: 10
     }
-  }, "🎨 Paleta de colores"), /*#__PURE__*/React.createElement("div", {
+  }, "🎨 Tema"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
-      marginBottom: 8
+      marginBottom: 16
     }
-  }, [["clasico", "Clásico"], ["metalico", "⚙️ Metálico"]].map(([e, l]) => /*#__PURE__*/React.createElement("button", {
+  }, [["clasico", "Clásico"], ["metalico", "⚙️ Metálico"], ["cuadrado", "⬜ Cuadrado"]].map(([e, l]) => /*#__PURE__*/React.createElement("button", {
     key: e,
     style: {
       flex: 1,
@@ -600,9 +600,16 @@ function ConfigAparienciaLC() {
     onClick: () => setEstiloVista(e)
   }, l))), /*#__PURE__*/React.createElement("div", {
     style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: "var(--color-text-primary)",
+      marginBottom: 10
+    }
+  }, "Tono"), /*#__PURE__*/React.createElement("div", {
+    style: {
       display: "flex",
       gap: 8,
-      marginBottom: 12
+      marginBottom: 16
     }
   }, [["oscuro", "🌙 Oscuro"], ["claro", "☀️ Claro"]].map(([m, l]) => /*#__PURE__*/React.createElement("button", {
     key: m,
@@ -619,6 +626,13 @@ function ConfigAparienciaLC() {
     },
     onClick: () => setModoVista(m)
   }, l))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: "var(--color-text-primary)",
+      marginBottom: 10
+    }
+  }, "Colores"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
