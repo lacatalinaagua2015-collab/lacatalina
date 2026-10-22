@@ -2735,6 +2735,12 @@ function App() {
   const ajustarStockFijoCliente = (antes, despues) => {
     const a = antes || {};
     const d = despues || {};
+    // Pedido del usuario (2026-10-22): separar "alta real de cliente"
+    // (antes === null, cliente recién creado) de "corrección manual" a un
+    // cliente que ya existía (ej. ✏️ Envases → Fijos) — antes las dos
+    // compartían la misma nota y la Planilla no podía distinguirlas
+    // ("Cliente nuevo" contaba cualquiera de las dos).
+    const esAlta = !antes;
     const delta = {
       sifon: (Number(d.sifon) || 0) - (Number(a.sifon) || 0),
       bidon10: (Number(d.bidon10) || 0) - (Number(a.bidon10) || 0),
@@ -2817,9 +2823,11 @@ function App() {
         // anónimas (no decían de qué cliente era el ajuste). Ahora llevan
         // el nombre al final, así la Planilla puede armar el detalle por
         // cliente (ver 07-menu.js, tarjeta "Movimiento de envases de hoy").
-        const nombreCli = a.nombre || "Cliente";
-        if (Object.keys(detSoderia).length) window._lcRegistrarMovimientoStock("ajuste", detSoderia, `Envases fijos de cliente (alta/edición) — ${nombreCli}`);
-        if (Object.keys(detDeposito).length) window._lcRegistrarMovimientoStock("ajuste", detDeposito, `Envases fijos de cliente — faltó en sodería, se completó desde Depósito — ${nombreCli}`);
+        const nombreCli = (esAlta ? d.nombre : a.nombre) || "Cliente";
+        const notaFijo = esAlta ? `Envases fijos de cliente nuevo — ${nombreCli}` : `Envases fijos de cliente (corrección manual) — ${nombreCli}`;
+        const notaFijoDeposito = esAlta ? `Envases fijos de cliente nuevo — faltó en sodería, se completó desde Depósito — ${nombreCli}` : `Envases fijos de cliente (corrección manual) — faltó en sodería, se completó desde Depósito — ${nombreCli}`;
+        if (Object.keys(detSoderia).length) window._lcRegistrarMovimientoStock("ajuste", detSoderia, notaFijo);
+        if (Object.keys(detDeposito).length) window._lcRegistrarMovimientoStock("ajuste", detDeposito, notaFijoDeposito);
         if (Object.keys(detSoderiaPrest).length) window._lcRegistrarMovimientoStock("ajuste", detSoderiaPrest, `Envases prestados de cliente (corrección manual) — ${nombreCli}`);
         if (Object.keys(detDepositoPrest).length) window._lcRegistrarMovimientoStock("ajuste", detDepositoPrest, `Envases prestados de cliente — faltó en sodería, se completó desde Depósito — ${nombreCli}`);
         if (Object.keys(detSoderiaVaciosPrest).length) window._lcRegistrarMovimientoStock("ajuste", detSoderiaVaciosPrest, `Envases prestados de cliente — devolución registrada manualmente — ${nombreCli}`);
