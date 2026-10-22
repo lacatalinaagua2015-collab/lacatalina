@@ -1983,6 +1983,64 @@ function PlanillaDelDia({
   // desplegable (arranca cerrado) para no mostrar de entrada las ventas
   // de otro día que solo sirven para reconciliar caja.
   const [mostrarExtraDia, setMostrarExtraDia] = useState(false);
+  // Pedido del usuario (2026-10-22): la tabla "Movimiento de envases de
+  // hoy" se calcula sola a partir de ventas/movStock/perdidas, pero ese
+  // cálculo puede terminar registrando algo que no es (ver bug reportado
+  // con clientes de Jueves). Por eso cada celda se puede tocar y corregir
+  // a mano — la corrección se guarda en la propia planilla
+  // (datos.envMovOverride) y sólo cambia lo que se MUESTRA ese día; no
+  // vuelve a tocar stock de sodería/depósito ni el prestado/fijo real del
+  // cliente, que ya quedaron aplicados cuando pasó el movimiento real.
+  const [editandoCeldaEnv, setEditandoCeldaEnv] = useState(null);
+  const envOverride = datos.envMovOverride || {};
+  const envVal = (pk, campo, calc) => {
+    const ov = envOverride[pk];
+    return ov && ov[campo] !== undefined ? ov[campo] : calc;
+  };
+  const guardarOverrideEnv = (pk, campo, valorStr) => {
+    const limpio = (valorStr || "").trim();
+    const val = limpio === "" ? undefined : Math.max(0, Math.round(Number(limpio) || 0));
+    const nuevo = { ...envOverride };
+    const porPk = { ...(nuevo[pk] || {}) };
+    if (val === undefined) delete porPk[campo];else porPk[campo] = val;
+    if (Object.keys(porPk).length) nuevo[pk] = porPk;else delete nuevo[pk];
+    const d2 = { ...datos, envMovOverride: nuevo };
+    setDatos(d2);
+    onAutoGuardar && onAutoGuardar(d2);
+  };
+  const COLOR_ENV = {
+    prestado: "var(--color-text-warning)",
+    devuelto: "var(--color-text-success)",
+    rotos: "#ff6b6b",
+    fugados: "#e8936a",
+    clienteNuevo: "#5daaff",
+    fijoNuevo: "#7ab8ff"
+  };
+  const celdaEnv = (pk, campo, valor) => {
+    const key = `${pk}_${campo}`;
+    if (editandoCeldaEnv === key) {
+      return /*#__PURE__*/React.createElement("input", {
+        key,
+        autoFocus: true,
+        type: "number",
+        inputMode: "numeric",
+        defaultValue: valor || "",
+        onBlur: e => {
+          guardarOverrideEnv(pk, campo, e.target.value);
+          setEditandoCeldaEnv(null);
+        },
+        onKeyDown: e => {
+          if (e.key === "Enter") e.target.blur();
+        },
+        style: { width: 28, textAlign: "center", fontSize: 12, background: "var(--color-background-tertiary)", border: "1px solid var(--color-border-info)", borderRadius: 6, color: "var(--color-text-primary)", padding: "2px 0" }
+      });
+    }
+    return /*#__PURE__*/React.createElement("span", {
+      key,
+      onClick: () => setEditandoCeldaEnv(key),
+      style: { textAlign: "center", fontSize: 12, color: valor ? COLOR_ENV[campo] : "var(--color-text-tertiary)", cursor: "pointer" }
+    }, valor || "—");
+  };
 
   // ── Cálculo de stock para el cierre del día ──────────────────
   const CAJON = 6;
@@ -2055,16 +2113,28 @@ function PlanillaDelDia({
     bidon20: "b20",
     dispenser: "disp"
   };
-  const perdidosDia = {
+  const rotosDia = {
     soda: 0,
     b10: 0,
     b20: 0,
     disp: 0
   };
+  const fugadosDia = {
+    soda: 0,
+    b10: 0,
+    b20: 0,
+    disp: 0
+  };
+  // Pedido del usuario (2026-10-22): separar "Rotos" (roto/perdido suelto)
+  // de "Fugados" (cliente que se fue y no devolvió) — antes las dos eran
+  // una sola columna "Perdido". retirarCliente/eliminarCliente dejan
+  // "sin recuperar" en el motivo cuando es por abandono del cliente; todo
+  // lo demás (rotura en el reparto, pérdida suelta desde Stock) es Rotos.
   (perdidas || []).forEach(p => {
     if ((p.fecha || "").slice(0, 10) !== fecha) return;
+    const destino = (p.motivo || "").includes("sin recuperar") ? fugadosDia : rotosDia;
     Object.keys(skToPl).forEach(sk => {
-      perdidosDia[skToPl[sk]] += Number(p[sk]) || 0;
+      destino[skToPl[sk]] += Number(p[sk]) || 0;
     });
   });
   const retiradosDia = {
@@ -2082,7 +2152,13 @@ function PlanillaDelDia({
   // Envases que hoy se le dejaron a un cliente nuevo o al editarle el fijo
   // (ver ajustarStockFijoCliente en 14-app.js) — salen de sodería al toque,
   // sin esperar el cierre, y el usuario también los quiere ver acá.
-  const clientesNuevosDia = {
+  const altaClienteDia = {
+    soda: 0,
+    b10: 0,
+    b20: 0,
+    disp: 0
+  };
+  const fijoCorregidoDia = {
     soda: 0,
     b10: 0,
     b20: 0,
@@ -2112,11 +2188,18 @@ function PlanillaDelDia({
     // entraran acá, cada corrección de Prestados se contaba DOBLE: una vez
     // en Prestado/Devuelto y otra vez en Cliente nuevo/Devuelto.
     if (m.tipo !== "ajuste" || !(m.nota || "").startsWith("Envases fijos de cliente") || (m.fecha || "").slice(0, 10) !== fecha) return;
+    // Pedido del usuario (2026-10-22): "Cliente nuevo" (alta real) separado
+    // de "Fijo nuevo" (corrección manual a un cliente existente) — antes
+    // las dos compartían la misma nota genérica. Ver ajustarStockFijoCliente
+    // en 14-app.js, que ahora deja escrito cuál de las dos fue.
+    const esAltaMov = (m.nota || "").startsWith("Envases fijos de cliente nuevo");
     Object.keys(skToPl).forEach(sk => {
       const d = Number(m.detalle?.[sk]) || 0;
       // detalle viene negativo (sale de sodería) — acá se muestra en positivo,
       // como cantidad entregada. Si es positivo, es lo opuesto: volvió.
-      if (d < 0) clientesNuevosDia[skToPl[sk]] += -d;else if (d > 0) devueltosFijoDia[skToPl[sk]] += d;
+      if (d < 0) {
+        if (esAltaMov) altaClienteDia[skToPl[sk]] += -d;else fijoCorregidoDia[skToPl[sk]] += -d;
+      } else if (d > 0) devueltosFijoDia[skToPl[sk]] += d;
     });
   });
   // FÓRMULA CORRECTA:
@@ -3530,8 +3613,8 @@ function PlanillaDelDia({
     // (gateado por mostrarCierre, con un return temprano), así que una
     // vez cerrado el día (o si autoCierre no la disparaba) no se veía
     // en ningún lado. Reusa los mismos datos ya calculados más arriba
-    // (prestadosDia/devueltosDia/perdidosDia/retiradosDia/
-    // clientesNuevosDia/devueltosFijoDia), filtrados por "fecha" (la de
+    // (prestadosDia/devueltosDia/rotosDia/fugadosDia/retiradosDia/
+    // altaClienteDia/fijoCorregidoDia/devueltosFijoDia), filtrados por "fecha" (la de
     // esta planilla), para que coincida con la tarjeta del cierre.
     const movLabels = [["Sifón", "soda"], ["Bidón 10L", "b10"], ["Bidón 20L", "b20"], ["Dispenser", "disp"]];
     // OJO: acá se muestra en UNIDADES para los 4 productos (antes el Sifón
