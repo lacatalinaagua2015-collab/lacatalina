@@ -26,7 +26,7 @@ BASE_TEMAS_LC_KEYS.forEach(id=>{
 // esquinas en 0 en vez de redondeadas. Se arma solo para cada paleta base.
 BASE_TEMAS_LC_KEYS.forEach(id=>{
   const base = TEMAS_LC[id];
-  TEMAS_LC[id+"-cuadrado"] = { nombre:base.nombre, modo:base.modo, emoji:"⬜", cuadrado:true, vars:base.vars };
+  TEMAS_LC[id+"-cuadrado"] = { nombre:base.nombre, modo:base.modo, emoji:"🧊", cuadrado:true, vars:base.vars };
 });
 function _ajustarColorLC(hex, amt) {
   hex = (hex||"").replace("#","");
@@ -111,7 +111,7 @@ function _aplicarSombraGlobalLC(tema) {
 function _aplicarCuadradoGlobalLC(tema) {
   let tag = document.getElementById("cuadrado-global-lc");
   if(!tag){ tag = document.createElement("style"); tag.id = "cuadrado-global-lc"; document.head.appendChild(tag); }
-  tag.textContent = tema.cuadrado ? `*, *::before, *::after { border-radius:0 !important; }` : "";
+  tag.textContent = tema.cuadrado ? `*, *::before, *::after { border-radius:0 !important; } .lc-dia-box { border-radius:16px !important; } .lc-dia-badge { border-radius:8px !important; }` : "";
 }
 // ── FIBRA DE CARBONO — propiedades separadas, no todo en una variable ─────
 // El contenedor de toda la app pinta con background:"var(--color-background-

@@ -747,6 +747,7 @@ function MenuDias({
     const sub = info ? (info.completoD ? cfg.txt : `${cfg.txt} ${info.visitadosD.length}/${info.clientesD.length}`) : null;
     return React.createElement("button", {
       key: d,
+      className: "lc-dia-box",
       style: {
         ...s.card,
         margin: 0,
@@ -794,6 +795,7 @@ function MenuDias({
     }, "✓ Sin deudas"), React.createElement("div", {
       style: { fontSize: 10, color: "var(--color-text-tertiary)", marginTop: 3 }
     }, totalClientes, " cliente", totalClientes !== 1 ? "s" : ""), cfg && React.createElement("div", {
+      className: "lc-dia-badge",
       onClick: e => {
         e.stopPropagation();
         info.completoD ? (onDiaResumen && onDiaResumen(d, info.fechaSesion)) : onDiaHoy(d, info.fechaSesion);

@@ -584,7 +584,7 @@ function ConfigAparienciaLC() {
       gap: 8,
       marginBottom: 16
     }
-  }, [["clasico", "Clásico"], ["metalico", "⚙️ Metálico"], ["cuadrado", "⬜ Cuadrado"]].map(([e, l]) => /*#__PURE__*/React.createElement("button", {
+  }, [["clasico", "Clásico"], ["metalico", "⚙️ Metálico"], ["cuadrado", "🧊 Cubo"]].map(([e, l]) => /*#__PURE__*/React.createElement("button", {
     key: e,
     style: {
       flex: 1,
