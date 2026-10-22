@@ -361,6 +361,13 @@ function PieEnvases({
     "Dispenser": "dispenser"
   };
   const [draft, setDraft] = React.useState(null); // null = panel cerrado
+  // Guard anti doble-tap (mismo patrón que registrarVenta/eliminarVenta/
+  // editarVenta en 14-app.js): sin esto, tocar "Confirmar" dos veces
+  // seguidas -- común mientras se espera el diálogo de confirmación --
+  // corregía los envases una vez pero movía el stock y dejaba el
+  // registro de "Envases fijos de cliente" DOS veces (se veía duplicado
+  // en "Movimiento de envases de hoy" de la Planilla).
+  const [confirmando, setConfirmando] = React.useState(false);
   const [mostrarPerdida, setMostrarPerdida] = React.useState(false);
   const [prodPerdida, setProdPerdida] = React.useState("sifon");
   const [cantPerdida, setCantPerdida] = React.useState("");
@@ -399,6 +406,8 @@ function PieEnvases({
   // saber qué se había tocado ni cuándo (pedido del usuario, a raíz de
   // encontrar clientes con envases "de más" sin explicación).
   const confirmar = async () => {
+    if (confirmando) return;
+    setConfirmando(true);
     const NOMBRES = {
       sifon: "Sifón 1.5L",
       bidon10: "Bidón 10L",
@@ -426,6 +435,7 @@ function PieEnvases({
     });
     if (!cambios.length) {
       setDraft(null);
+      setConfirmando(false);
       return;
     }
     const detalle = cambios.map(x => `· ${x.producto} (${x.campo}): ${x.antes} → ${x.despues}`).join("\n");
@@ -433,7 +443,10 @@ function PieEnvases({
       okText: "Sí, corregir",
       cancelText: "Cancelar"
     });
-    if (!ok) return;
+    if (!ok) {
+      setConfirmando(false);
+      return;
+    }
     // Los 4 productos (incluido dispenser) se guardan directo en c.prestado
     // — es un campo estable que se mantiene solo, sumando/restando en cada
     // venta (ver aplicarMovimientoEnvases en 14-app.js). Antes dispenser
@@ -454,6 +467,7 @@ function PieEnvases({
     // las 6 pantallas que usan PieEnvases.
     window._lcRegistrarAjusteEnvases && window._lcRegistrarAjusteEnvases(c.id, c.nombre, cambios);
     setDraft(null);
+    setConfirmando(false);
   };
   const abierto = !!draft;
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
@@ -686,11 +700,12 @@ function PieEnvases({
       fontWeight: 600,
       cursor: "pointer"
     },
+    disabled: confirmando,
     onClick: e => {
       e.stopPropagation();
       confirmar();
     }
-  }, "✓ Confirmar"))));
+  }, confirmando ? "..." : "✓ Confirmar"))));
 }
 
 // ════════════════════════════════════════════════════════════════════

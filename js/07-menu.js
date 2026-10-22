@@ -2548,9 +2548,9 @@ function PlanillaDelDia({
         style: { fontSize: 14, fontWeight: 500, color: "var(--color-text-primary)", marginBottom: 4 }
       }, "📋 Movimiento de envases de hoy"), /*#__PURE__*/React.createElement("p", {
         style: { fontSize: 11, color: "var(--color-text-tertiary)", margin: "0 0 8px" }
-      }, "Préstamos, devoluciones, pérdidas, retiros y altas nuevas registrados en el día."), /*#__PURE__*/React.createElement("div", {
+      }, "Préstamos, devoluciones, pérdidas, retiros y envases que pasaron a ser fijos (altas o correcciones) en el día."), /*#__PURE__*/React.createElement("div", {
         style: { display: "grid", gridTemplateColumns: "1.1fr 1fr 1fr 1fr 1fr 1fr", gap: 4, fontSize: 10, color: "var(--color-text-tertiary)", marginBottom: 4 }
-      }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Prestado"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Devuelto"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Perdido"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Retirado"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Cliente nuevo")), movLabels.map(([label, pk]) => {
+      }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Prestado"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Devuelto"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Perdido"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Retirado"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Fijo nuevo")), movLabels.map(([label, pk]) => {
         const devueltoTotal = (devueltosDia[pk] || 0) + (devueltosFijoDia[pk] || 0);
         return /*#__PURE__*/React.createElement("div", {
           key: pk,
@@ -3600,9 +3600,9 @@ function PlanillaDelDia({
       style: { fontSize: 14, fontWeight: 500, color: "var(--color-text-primary)", marginBottom: 4 }
     }, "📋 Movimiento de envases de hoy"), /*#__PURE__*/React.createElement("p", {
       style: { fontSize: 11, color: "var(--color-text-tertiary)", margin: "0 0 8px" }
-    }, "Préstamos, devoluciones, pérdidas, retiros y altas nuevas registrados en el día."), /*#__PURE__*/React.createElement("div", {
+    }, "Préstamos, devoluciones, pérdidas, retiros y envases que pasaron a ser fijos (altas o correcciones) en el día."), /*#__PURE__*/React.createElement("div", {
       style: { display: "grid", gridTemplateColumns: "1.1fr 1fr 1fr 1fr 1fr 1fr", gap: 4, fontSize: 10, color: "var(--color-text-tertiary)", marginBottom: 4 }
-    }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Prestado"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Devuelto"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Perdido"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Retirado"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Cliente nuevo")), movLabels.map(([label, pk]) => {
+    }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Prestado"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Devuelto"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Perdido"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Retirado"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Fijo nuevo")), movLabels.map(([label, pk]) => {
       const devueltoTotal = (devueltosDia[pk] || 0) + (devueltosFijoDia[pk] || 0);
       return /*#__PURE__*/React.createElement("div", {
         key: pk,
