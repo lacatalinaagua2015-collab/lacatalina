@@ -1926,6 +1926,14 @@ function PlanillaDelDia({
   const cobEfectivoConExtra = cobEfectivo + extraEfectivo;
   const cobTransBrutoConExtra = cobTransBruto + extraTrans;
   const cobTransNetoConExtra = cobTransNeto + extraTransNeto;
+  // Cantidad de cobros por transferencia — "de hoy" vs "de otro día" (clientes
+  // fuera de clientesDia), para mostrar el desglose arriba en la tarjeta de
+  // Transferencias. Mismo criterio que mixtoTransDia/mixtoTransExtraDia más
+  // abajo (DetalleTransferencias), pero contando acá para el resumen.
+  const mixtoTransDiaCount = ventas.filter(v => v._esMixtoTrans && v.fechaKey === fecha && clientesDia.has(v.clienteId)).length;
+  const mixtoTransExtraDiaCount = ventas.filter(v => v._esMixtoTrans && v.fechaKey === fecha && !clientesDia.has(v.clienteId)).length;
+  const transHoyCount = todasVentasDia.filter(v => v.pago === "transferencia").length + mixtoTransDiaCount;
+  const transOtroDiaCount = ventasExtraDia.filter(v => v.pago === "transferencia").length + mixtoTransExtraDiaCount;
   const ventasPendTrans = ventas.filter(v => (v.pago === "transferencia" || v.pago === "mixto" && Number(v.montoTrans) > 0) && !v.transConfirmada);
   const cobFiado = todasVentasDia.filter(v => v.pago === "fiado").reduce((a, v) => a + (v.neto || 0), 0);
   const cobSaldosEfec = todasVentasDia.filter(v => v.pago === "contado").reduce((a, v) => {
@@ -3589,16 +3597,52 @@ function PlanillaDelDia({
       fontSize: 13,
       color: "var(--color-text-secondary)"
     }
-  }, "Monto total"), /*#__PURE__*/React.createElement("span", {
+  }, "Cobro de hoy ", /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 11, color: "var(--color-text-tertiary)" }
+  }, `(${transHoyCount} cobro${transHoyCount === 1 ? "" : "s"})`)), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 13,
       color: "var(--color-text-primary)"
     }
-  }, fmt(cobTransBrutoConExtra))), extraTrans > 0 && /*#__PURE__*/React.createElement("div", {
-    style: { textAlign: "right", padding: "0 0 4px" }
+  }, fmt(cobTransBruto))), extraTrans > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      padding: "4px 0",
+      borderBottom: "0.5px solid var(--color-border-tertiary)"
+    }
   }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "var(--color-text-secondary)"
+    }
+  }, "Cobro de otro día ", /*#__PURE__*/React.createElement("span", {
     style: { fontSize: 11, color: "var(--color-text-tertiary)" }
-  }, "incluye ", fmt(extraTrans), " de otro día")), /*#__PURE__*/React.createElement("div", {
+  }, `(${transOtroDiaCount} cobro${transOtroDiaCount === 1 ? "" : "s"})`)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "var(--color-text-primary)"
+    }
+  }, fmt(extraTrans))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      padding: "6px 0 2px",
+      borderBottom: "0.5px solid var(--color-border-tertiary)"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 14,
+      fontWeight: 500,
+      color: "var(--color-text-primary)"
+    }
+  }, "Monto total"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 15,
+      fontWeight: 500,
+      color: "var(--color-text-primary)"
+    }
+  }, fmt(cobTransBrutoConExtra))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
