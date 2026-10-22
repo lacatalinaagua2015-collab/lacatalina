@@ -1007,6 +1007,8 @@ function MenuDias({
     style: { fontSize: 11, color: "var(--color-text-tertiary)", textAlign: "center" }
   }, "+", recordatoriosActivos.length - 5, " más")),
 
+  // Mismo pedido de "Opción C" (2026-10-22): estas tarjetas desplegadas
+  // también pasan de rojo a azul/cian, junto con el banner de arriba.
   mostrarTransferencias && transferenciasPendientes && transferenciasPendientes.length > 0 && React.createElement("div", {
     style: { padding: "8px 16px 0", display: "flex", flexDirection: "column", gap: 6 }
   }, transferenciasPendientes.map(({ dia, fecha, count, monto, ventas: vts }) => React.createElement("button", {
@@ -1015,8 +1017,8 @@ function MenuDias({
       ...s.card,
       width: "100%",
       margin: 0,
-      background: "var(--color-background-danger)",
-      border: "1px solid var(--color-border-danger)",
+      background: "#0a1821",
+      border: "1px solid #3f93c4",
       display: "flex",
       alignItems: "center",
       gap: 10,
@@ -1026,16 +1028,16 @@ function MenuDias({
     onClick: () => onVerConfirmaciones && onVerConfirmaciones(dia)
   }, React.createElement("span", {
     style: { fontSize: 18 }
-  }, "🔴"), React.createElement("div", {
+  }, "🔵"), React.createElement("div", {
     style: { flex: 1 }
   }, React.createElement("div", {
-    style: { fontSize: 13, fontWeight: 500, color: "var(--color-text-danger)" }
+    style: { fontSize: 13, fontWeight: 500, color: "#5bc3f0" }
   }, dia, " · ", count, " transfer. sin confirmar"), React.createElement("div", {
     style: { fontSize: 11, color: "var(--color-text-secondary)", marginTop: 2 }
   }, vts.slice(0, 3).map(v => v.cliente).join(", "), vts.length > 3 ? ` +${vts.length - 3} más` : "")), React.createElement("div", {
     style: { textAlign: "right", flexShrink: 0 }
   }, React.createElement("div", {
-    style: { fontSize: 13, fontWeight: 500, color: "var(--color-text-danger)" }
+    style: { fontSize: 13, fontWeight: 500, color: "#a3ddf7" }
   }, fmt(monto)), React.createElement("div", {
     style: { fontSize: 10, color: "var(--color-text-tertiary)" }
   }, fecha))))),
