@@ -1912,6 +1912,20 @@ function PlanillaDelDia({
   const cobSaldoUsado = todasVentasDia.filter(v => v.pago === "contado" || v.pago === "transferencia").reduce((a, v) => a + (Number(v.saldoAplicado) || 0), 0);
   const cobTransDesc = Math.round(cobTransBruto * 0.025);
   const cobTransNeto = cobTransBruto - cobTransDesc;
+  // Pedido del usuario (2026-10-22): los totales que se VEN en pantalla
+  // (Total cobrado, Efectivo en mano, Transferencias) tienen que sumar
+  // también lo cobrado hoy a un cliente de OTRO día (ventasExtraDia) — ya
+  // no se queda afuera en silencio, con una línea aparte que avisa cuánto
+  // de ese total es "de otro día". Lo que NO cambia son
+  // efectivo/cobEfectivo/cobTransBruto/cobTransNeto "puros" (sin extra):
+  // esos siguen siendo solo de este día, porque se usan para guardar la
+  // planilla, el costo de llenado de envases y la ganancia neta, que son
+  // cálculos propios de la ruta de hoy.
+  const extraTransDesc = Math.round(extraTrans * 0.025);
+  const extraTransNeto = extraTrans - extraTransDesc;
+  const cobEfectivoConExtra = cobEfectivo + extraEfectivo;
+  const cobTransBrutoConExtra = cobTransBruto + extraTrans;
+  const cobTransNetoConExtra = cobTransNeto + extraTransNeto;
   const ventasPendTrans = ventas.filter(v => (v.pago === "transferencia" || v.pago === "mixto" && Number(v.montoTrans) > 0) && !v.transConfirmada);
   const cobFiado = todasVentasDia.filter(v => v.pago === "fiado").reduce((a, v) => a + (v.neto || 0), 0);
   const cobSaldosEfec = todasVentasDia.filter(v => v.pago === "contado").reduce((a, v) => {
@@ -3277,7 +3291,11 @@ function PlanillaDelDia({
       fontWeight: 500,
       color: "var(--color-text-primary)"
     }
-  }, fmt(cobEfectivo + cobTransBruto)))), ventasExtraDia.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, fmt(cobEfectivoConExtra + cobTransBrutoConExtra))), (extraEfectivo + extraTrans) > 0 && /*#__PURE__*/React.createElement("div", {
+    style: { textAlign: "right", padding: "0 0 6px" }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 11, color: "var(--color-text-tertiary)" }
+  }, "incluye ", fmt(extraEfectivo + extraTrans), " de otro día"))), ventasExtraDia.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
       margin: "0 0 8px",
@@ -3446,7 +3464,11 @@ function PlanillaDelDia({
       fontSize: 13,
       color: "var(--color-text-primary)"
     }
-  }, fmt(cobEfectivo))), /*#__PURE__*/React.createElement("div", {
+  }, fmt(cobEfectivoConExtra))), extraEfectivo > 0 && /*#__PURE__*/React.createElement("div", {
+    style: { textAlign: "right", padding: "0 0 4px" }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 11, color: "var(--color-text-tertiary)" }
+  }, "incluye ", fmt(extraEfectivo), " de otro día")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
@@ -3496,9 +3518,9 @@ function PlanillaDelDia({
     style: {
       fontSize: 18,
       fontWeight: 500,
-      color: cobEfectivo - totalVentaLlenar - totalGastos >= 0 ? "var(--color-text-success)" : "var(--color-text-danger)"
+      color: cobEfectivoConExtra - totalVentaLlenar - totalGastos >= 0 ? "var(--color-text-success)" : "var(--color-text-danger)"
     }
-  }, fmt(cobEfectivo - totalVentaLlenar - totalGastos)))), cobTransBruto > 0 && /*#__PURE__*/React.createElement("div", {
+  }, fmt(cobEfectivoConExtra - totalVentaLlenar - totalGastos)))), cobTransBrutoConExtra > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
       margin: "0 0 8px",
@@ -3530,7 +3552,11 @@ function PlanillaDelDia({
       fontSize: 13,
       color: "var(--color-text-primary)"
     }
-  }, fmt(cobTransBruto))), /*#__PURE__*/React.createElement("div", {
+  }, fmt(cobTransBrutoConExtra))), extraTrans > 0 && /*#__PURE__*/React.createElement("div", {
+    style: { textAlign: "right", padding: "0 0 4px" }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 11, color: "var(--color-text-tertiary)" }
+  }, "incluye ", fmt(extraTrans), " de otro día")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
@@ -3547,7 +3573,7 @@ function PlanillaDelDia({
       fontSize: 12,
       color: "var(--color-text-danger)"
     }
-  }, "−", fmt(cobTransDesc))), /*#__PURE__*/React.createElement("div", {
+  }, "−", fmt(cobTransDesc + extraTransDesc))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
@@ -3565,7 +3591,7 @@ function PlanillaDelDia({
       fontWeight: 500,
       color: "var(--color-text-info)"
     }
-  }, fmt(cobTransNeto))), (() => {
+  }, fmt(cobTransNetoConExtra))), (() => {
     // Transferencias puras del día + parte transferencia de pagos mixtos
     // (mismo fix de raíz: solo clientes propios de este día, nunca de otro)
     const mixtoTransDia = ventas.filter(v => v._esMixtoTrans && v.fechaKey === fecha && clientesDia.has(v.clienteId));
@@ -3829,15 +3855,11 @@ function PlanillaDelDia({
       // van como DOS registros separados, cada uno con su método, para que Emma
       // Control impute bien cada forma de cobro.
       if (ecToken && (window._lcEncolarEC || window.enviarAEmmaControl)) {
-        // Pedido del usuario (2026-10-22): un cobro (efectivo o
-        // transferencia) de un cliente de OTRO día, registrado hoy, no se
-        // mandaba a Emma Control porque efectivoNeto/transferenciaNeta
-        // salían solo de todasVentasDia (clientes propios de este día). Se
-        // suma acá aparte — el "Efectivo en mano"/"Monto total" que se ven
-        // en esta pantalla siguen sin incluirlo, a propósito.
-        const extraTransNeto = Math.round(extraTrans - Math.round(extraTrans * 0.025));
-        const efectivoNeto = Math.round(cobEfectivo - totalVentaLlenar + extraEfectivo);
-        const transferenciaNeta = Math.round(cobTransNeto + extraTransNeto);
+        // Mismo total "con extra" que ya se ve en pantalla (Total
+        // cobrado/Efectivo en mano/Transferencias) — ver cobEfectivoConExtra
+        // / cobTransNetoConExtra más arriba.
+        const efectivoNeto = Math.round(cobEfectivoConExtra - totalVentaLlenar);
+        const transferenciaNeta = Math.round(cobTransNetoConExtra);
         const gastosData = (datos.gastos || []).filter(g => g.confirmado && Number(g.monto) > 0).map(g => ({
           desc: g.desc || 'Gasto reparto',
           monto: Number(g.monto),
