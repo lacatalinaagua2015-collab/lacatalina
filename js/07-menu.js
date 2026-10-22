@@ -2008,6 +2008,10 @@ function PlanillaDelDia({
   // vuelve a tocar stock de sodería/depósito ni el prestado/fijo real del
   // cliente, que ya quedaron aplicados cuando pasó el movimiento real.
   const [editandoCeldaEnv, setEditandoCeldaEnv] = useState(null);
+  // Pedido del usuario (2026-10-22): "Agregar cliente" en el Detalle por
+  // cliente tiene que buscar en la lista real de clientes de la app (no
+  // texto libre, para no desalinearse del nombre real del cliente).
+  const [agregarClienteUI, setAgregarClienteUI] = useState(null);
   const envOverride = datos.envMovOverride || {};
   const envVal = (pk, campo, calc) => {
     const ov = envOverride[pk];
@@ -2114,6 +2118,59 @@ function PlanillaDelDia({
     };
   };
   const nombresConMovDe = porClienteEnv => Array.from(new Set([...Object.keys(porClienteEnv), ...Object.keys(detalleOverride)])).sort((a, b) => a.localeCompare(b, "es"));
+  // Botón + panel "Agregar cliente" del Detalle por cliente — busca en la
+  // lista real de clientes de la app (clientes, prop ya disponible acá) en
+  // vez de pedir el nombre por texto libre, para no desalinearse del
+  // nombre real guardado en el perfil del cliente.
+  const renderAgregarCliente = porClienteEnv => {
+    if (!agregarClienteUI) {
+      return /*#__PURE__*/React.createElement("button", {
+        key: "agregar-cliente",
+        onClick: () => setAgregarClienteUI({ tipo: "prestado", query: "" }),
+        style: { marginTop: 6, width: "100%", fontSize: 11.5, fontWeight: 700, color: "var(--color-text-info)", background: "none", border: "1px dashed var(--color-border-info)", borderRadius: 8, padding: "7px 0", cursor: "pointer" }
+      }, "+ Agregar cliente");
+    }
+    const q = (agregarClienteUI.query || "").trim().toLowerCase();
+    const resultados = q ? (clientes || []).filter(c => (c.nombre || "").toLowerCase().includes(q)).slice(0, 8) : [];
+    const elegirCliente = c => {
+      const texto = window.prompt(agregarClienteUI.tipo === "prestado" ? "¿Qué prestó? (ej: 1 Bidón 10L)" : "¿Qué devolvió? (ej: 1 Sifón 1.5L)", "");
+      if (!texto || !texto.trim()) return;
+      const actual = movForCliente(porClienteEnv, c.nombre)[agregarClienteUI.tipo] || [];
+      guardarDetalleCliente(c.nombre, agregarClienteUI.tipo, [...actual, texto.trim()]);
+      setAgregarClienteUI(null);
+    };
+    return /*#__PURE__*/React.createElement("div", {
+      key: "agregar-cliente",
+      style: { marginTop: 6, background: "var(--color-background-secondary)", border: "0.5px solid var(--color-border-secondary)", borderRadius: 10, padding: "10px 12px" }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", gap: 6, marginBottom: 8 }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => setAgregarClienteUI(u => ({ ...u, tipo: "prestado" })),
+      style: { flex: 1, padding: "6px 0", borderRadius: 8, border: "none", fontSize: 12, fontWeight: 700, cursor: "pointer", background: agregarClienteUI.tipo === "prestado" ? "rgba(245,185,66,0.25)" : "var(--color-background-tertiary)", color: agregarClienteUI.tipo === "prestado" ? "#f5b942" : "var(--color-text-tertiary)" }
+    }, "📦 Prestó"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setAgregarClienteUI(u => ({ ...u, tipo: "devuelto" })),
+      style: { flex: 1, padding: "6px 0", borderRadius: 8, border: "none", fontSize: 12, fontWeight: 700, cursor: "pointer", background: agregarClienteUI.tipo === "devuelto" ? "rgba(29,158,117,0.25)" : "var(--color-background-tertiary)", color: agregarClienteUI.tipo === "devuelto" ? "#1D9E75" : "var(--color-text-tertiary)" }
+    }, "↩️ Devolvió"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setAgregarClienteUI(null),
+      style: { padding: "6px 10px", borderRadius: 8, border: "none", fontSize: 12, color: "var(--color-text-tertiary)", background: "var(--color-background-tertiary)", cursor: "pointer" }
+    }, "✕")), /*#__PURE__*/React.createElement("input", {
+      autoFocus: true,
+      value: agregarClienteUI.query,
+      onChange: e => setAgregarClienteUI(u => ({ ...u, query: e.target.value })),
+      placeholder: "Buscar cliente...",
+      style: { ...s.input, marginBottom: 6 }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: { maxHeight: 160, overflowY: "auto" }
+    }, resultados.map(c => /*#__PURE__*/React.createElement("button", {
+      key: c.id,
+      onClick: () => elegirCliente(c),
+      style: { display: "block", width: "100%", textAlign: "left", padding: "6px 8px", background: "none", border: "none", borderBottom: "0.5px solid var(--color-border-tertiary)", fontSize: 12.5, color: "var(--color-text-primary)", cursor: "pointer" }
+    }, c.nombre, " ", /*#__PURE__*/React.createElement("span", {
+      style: { color: "var(--color-text-tertiary)", fontSize: 10.5 }
+    }, "· ", c.dia))), q && resultados.length === 0 && /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 11.5, color: "var(--color-text-tertiary)", padding: "4px 2px" }
+    }, "Sin coincidencias")));
+  };
 
   // ── Cálculo de stock para el cierre del día ──────────────────
   const CAJON = 6;
@@ -2739,22 +2796,7 @@ function PlanillaDelDia({
         }, nombre), /*#__PURE__*/React.createElement("div", {
           style: { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }
         }, ...chipsListaEnv(nombre, "prestado", mov.prestado), ...chipsListaEnv(nombre, "devuelto", mov.devuelto)));
-      }).concat([/*#__PURE__*/React.createElement("button", {
-        key: "agregar-cliente",
-        onClick: () => {
-          const nombreNuevo = window.prompt("Nombre del cliente:", "");
-          if (!nombreNuevo || !nombreNuevo.trim()) return;
-          const tipoResp = (window.prompt("¿Prestó (P) o devolvió (D)?", "D") || "").trim().toLowerCase();
-          if (!tipoResp) return;
-          const tipoNuevo = tipoResp[0] === "p" ? "prestado" : "devuelto";
-          const texto = window.prompt(tipoNuevo === "prestado" ? "¿Qué prestó? (ej: 1 Bidón 10L)" : "¿Qué devolvió? (ej: 1 Sifón 1.5L)", "");
-          if (!texto || !texto.trim()) return;
-          const nombreLimpio = nombreNuevo.trim();
-          const actual = movForCliente(porClienteEnv, nombreLimpio)[tipoNuevo] || [];
-          guardarDetalleCliente(nombreLimpio, tipoNuevo, [...actual, texto.trim()]);
-        },
-        style: { marginTop: 6, width: "100%", fontSize: 11.5, fontWeight: 700, color: "var(--color-text-info)", background: "none", border: "1px dashed var(--color-border-info)", borderRadius: 8, padding: "7px 0", cursor: "pointer" }
-      }, "+ Agregar cliente")]))));
+      }).concat([renderAgregarCliente(porClienteEnv)])))));
     })(), /*#__PURE__*/React.createElement("button", {
       style: {
         width: "100%",
@@ -3824,22 +3866,7 @@ function PlanillaDelDia({
       }, nombre), /*#__PURE__*/React.createElement("div", {
         style: { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }
       }, ...chipsListaEnv(nombre, "prestado", mov.prestado), ...chipsListaEnv(nombre, "devuelto", mov.devuelto)));
-    }).concat([/*#__PURE__*/React.createElement("button", {
-      key: "agregar-cliente",
-        onClick: () => {
-        const nombreNuevo = window.prompt("Nombre del cliente:", "");
-        if (!nombreNuevo || !nombreNuevo.trim()) return;
-        const tipoResp = (window.prompt("¿Prestó (P) o devolvió (D)?", "D") || "").trim().toLowerCase();
-        if (!tipoResp) return;
-        const tipoNuevo = tipoResp[0] === "p" ? "prestado" : "devuelto";
-        const texto = window.prompt(tipoNuevo === "prestado" ? "¿Qué prestó? (ej: 1 Bidón 10L)" : "¿Qué devolvió? (ej: 1 Sifón 1.5L)", "");
-        if (!texto || !texto.trim()) return;
-        const nombreLimpio = nombreNuevo.trim();
-        const actual = movForCliente(porClienteEnv, nombreLimpio)[tipoNuevo] || [];
-        guardarDetalleCliente(nombreLimpio, tipoNuevo, [...actual, texto.trim()]);
-      },
-        style: { marginTop: 6, width: "100%", fontSize: 11.5, fontWeight: 700, color: "var(--color-text-info)", background: "none", border: "1px dashed var(--color-border-info)", borderRadius: 8, padding: "7px 0", cursor: "pointer" }
-    }, "+ Agregar cliente")]))));
+    }).concat([renderAgregarCliente(porClienteEnv)])))));
   })(), /*#__PURE__*/React.createElement("button", {
     style: s.btnPrimary,
     onClick: () => {
