@@ -2796,7 +2796,7 @@ function PlanillaDelDia({
         }, nombre), /*#__PURE__*/React.createElement("div", {
           style: { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }
         }, ...chipsListaEnv(nombre, "prestado", mov.prestado), ...chipsListaEnv(nombre, "devuelto", mov.devuelto)));
-      }).concat([renderAgregarCliente(porClienteEnv)])))));
+      }).concat([renderAgregarCliente(porClienteEnv)]))));
     })(), /*#__PURE__*/React.createElement("button", {
       style: {
         width: "100%",
@@ -3866,7 +3866,7 @@ function PlanillaDelDia({
       }, nombre), /*#__PURE__*/React.createElement("div", {
         style: { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }
       }, ...chipsListaEnv(nombre, "prestado", mov.prestado), ...chipsListaEnv(nombre, "devuelto", mov.devuelto)));
-    }).concat([renderAgregarCliente(porClienteEnv)])))));
+    }).concat([renderAgregarCliente(porClienteEnv)]))));
   })(), /*#__PURE__*/React.createElement("button", {
     style: s.btnPrimary,
     onClick: () => {
