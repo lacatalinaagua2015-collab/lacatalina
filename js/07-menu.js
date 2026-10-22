@@ -768,7 +768,13 @@ function MenuDias({
         alignItems: "center",
         justifyContent: "center",
         textAlign: "center",
-        cursor: "pointer"
+        cursor: "pointer",
+        // Pedido del usuario (2026-10-22): relieve tipo "botón" — gradiente
+        // sutil + sombra de base abajo (efecto tecla) + brillo fino arriba.
+        background: "linear-gradient(180deg, #1c2d40 0%, #141f2d 100%)",
+        border: "1px solid rgba(255,255,255,0.05)",
+        borderRadius: 16,
+        boxShadow: "0 3px 0 0 rgba(0,0,0,0.4), 0 6px 14px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.09)"
       },
       onClick: () => onIrPlanillaDia(d)
     }, React.createElement("div", {
@@ -826,24 +832,27 @@ function MenuDias({
     }, sub)));
   };
   const notifItems = [];
+  // Pedido del usuario (2026-10-22): "Opción C" del preview — paleta
+  // azul/cian en vez de naranja/rojo, para no confundir "pendiente de
+  // confirmar" con un error real.
   if (transferenciasPendientes && transferenciasPendientes.length > 0) notifItems.push(React.createElement("button", {
     key: "trans",
     onClick: () => setMostrarTransferencias(v => !v),
     style: {
       flex: 1,
       textAlign: "left",
-      background: "var(--color-background-warning)",
-      border: "1px solid var(--color-border-warning)",
+      background: "#0c1e29",
+      border: "1px solid #3f93c4",
       borderRadius: 13,
       padding: "11px 12px",
       cursor: "pointer"
     }
   }, React.createElement("div", {
-    style: { fontSize: 10, fontWeight: 800, color: "var(--color-text-warning)", textTransform: "uppercase", letterSpacing: "0.04em" }
-  }, "🟠 Transferencias"), React.createElement("div", {
-    style: { fontSize: 14, fontWeight: 800, color: "var(--color-text-warning)", marginTop: 3 }
+    style: { fontSize: 10, fontWeight: 800, color: "#5bc3f0", textTransform: "uppercase", letterSpacing: "0.04em" }
+  }, "🔵 Transferencias"), React.createElement("div", {
+    style: { fontSize: 14, fontWeight: 800, color: "#a3ddf7", marginTop: 3 }
   }, fmt(transMontoNeto)), React.createElement("div", {
-    style: { fontSize: 10.5, color: "var(--color-text-warning)", opacity: 0.8, marginTop: 1 }
+    style: { fontSize: 10.5, color: "#5bc3f0", opacity: 0.8, marginTop: 1 }
   }, transClientesCount, " sin confirmar")));
   if (recordatoriosActivos && recordatoriosActivos.length > 0) notifItems.push(React.createElement("button", {
     key: "rec",
