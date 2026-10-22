@@ -2041,6 +2041,63 @@ function PlanillaDelDia({
       style: { textAlign: "center", fontSize: 12, color: valor ? COLOR_ENV[campo] : "var(--color-text-tertiary)", cursor: "pointer" }
     }, valor || "—");
   };
+  // Pedido del usuario (2026-10-22): el "Detalle por cliente" de la misma
+  // tarjeta también se puede corregir a mano — borrar una etiqueta que no
+  // corresponde (ej. un "(fijo)" duplicado, como pasó con Leiva/Soria),
+  // corregir la cantidad de una, o agregar una que faltó. Igual que la
+  // tabla de arriba: la corrección queda guardada en esta planilla
+  // (datos.detalleClienteOverride) y no vuelve a tocar stock ni el
+  // prestado real del cliente — esa parte ya se corrige desde "♻️ Envases"
+  // en el perfil del cliente.
+  const detalleOverride = datos.detalleClienteOverride || {};
+  const guardarDetalleCliente = (nombre, tipo, lista) => {
+    const nuevo = { ...(datos.detalleClienteOverride || {}) };
+    const porNombre = { ...(nuevo[nombre] || {}) };
+    porNombre[tipo] = lista;
+    nuevo[nombre] = porNombre;
+    const d2 = { ...datos, detalleClienteOverride: nuevo };
+    setDatos(d2);
+    onAutoGuardar && onAutoGuardar(d2);
+  };
+  const COLOR_TIPO_ENV = { prestado: "#f5b942", devuelto: "#1D9E75" };
+  const chipsListaEnv = (nombre, tipo, lista) => {
+    const chips = (lista || []).map((texto, i) => /*#__PURE__*/React.createElement("span", {
+      key: i,
+      style: { fontSize: 10.5, fontWeight: 600, color: COLOR_TIPO_ENV[tipo], background: "rgba(255,255,255,0.08)", padding: "2px 5px 2px 7px", borderRadius: 6, display: "inline-flex", alignItems: "center", gap: 5 }
+    }, /*#__PURE__*/React.createElement("span", {
+      onClick: () => {
+        const actual = window.prompt("Corregir (dejalo vacío para borrar):", texto);
+        if (actual === null) return;
+        const t = actual.trim();
+        const nueva = [...lista];
+        if (t) nueva[i] = t;else nueva.splice(i, 1);
+        guardarDetalleCliente(nombre, tipo, nueva);
+      },
+      style: { cursor: "pointer" }
+    }, texto), /*#__PURE__*/React.createElement("span", {
+      onClick: () => guardarDetalleCliente(nombre, tipo, lista.filter((_, j) => j !== i)),
+      style: { cursor: "pointer", color: "#ff6b6b", fontWeight: 800, fontSize: 11 }
+    }, "✕")));
+    chips.push(/*#__PURE__*/React.createElement("span", {
+      key: "add",
+      onClick: () => {
+        const texto = window.prompt(tipo === "prestado" ? "Agregar prestado (ej: 1 Bidón 10L):" : "Agregar devuelto (ej: 1 Sifón 1.5L):", "");
+        if (!texto || !texto.trim()) return;
+        guardarDetalleCliente(nombre, tipo, [...(lista || []), texto.trim()]);
+      },
+      style: { fontSize: 10.5, fontWeight: 700, color: "var(--color-text-tertiary)", border: "1px dashed var(--color-border-tertiary)", padding: "2px 7px", borderRadius: 6, cursor: "pointer" }
+    }, "+ ", tipo === "prestado" ? "prestado" : "devuelto"));
+    return chips;
+  };
+  const movForCliente = (porClienteEnv, nombre) => {
+    const calc = porClienteEnv[nombre] || { prestado: [], devuelto: [] };
+    const ov = detalleOverride[nombre];
+    return {
+      prestado: ov && ov.prestado ? ov.prestado : calc.prestado,
+      devuelto: ov && ov.devuelto ? ov.devuelto : calc.devuelto
+    };
+  };
+  const nombresConMovDe = porClienteEnv => Array.from(new Set([...Object.keys(porClienteEnv), ...Object.keys(detalleOverride)])).sort((a, b) => a.localeCompare(b, "es"));
 
   // ── Cálculo de stock para el cierre del día ──────────────────
   const CAJON = 6;
@@ -2624,7 +2681,7 @@ function PlanillaDelDia({
         }).filter(Boolean);
         if (partes.length) addMovCliente(nombre, "devuelto", `${partes.join(", ")} (baja de cliente)`);
       });
-      const nombresConMovEnv = Object.keys(porClienteEnv).sort((a, b) => a.localeCompare(b, "es"));
+      const nombresConMovEnv = nombresConMovDe(porClienteEnv);
       return /*#__PURE__*/React.createElement("div", {
         style: { ...s.card, margin: "0 0 12px", padding: "14px 16px" }
       }, /*#__PURE__*/React.createElement("div", {
@@ -2657,19 +2714,15 @@ function PlanillaDelDia({
       }, "▾")), mostrarDetalleClientesEnv && /*#__PURE__*/React.createElement("div", {
         style: { padding: "0 16px 12px" }
       }, nombresConMovEnv.map(nombre => {
-        const mov = porClienteEnv[nombre];
+        const mov = movForCliente(porClienteEnv, nombre);
         return /*#__PURE__*/React.createElement("div", {
           key: nombre,
           style: { padding: "6px 0", borderTop: "0.5px solid var(--color-border-tertiary)" }
         }, /*#__PURE__*/React.createElement("div", {
           style: { fontSize: 12, fontWeight: 500, color: "var(--color-text-primary)", marginBottom: 2 }
         }, nombre), /*#__PURE__*/React.createElement("div", {
-          style: { display: "flex", flexWrap: "wrap", gap: 6 }
-        }, mov.prestado.length > 0 && /*#__PURE__*/React.createElement("span", {
-          style: { fontSize: 11, fontWeight: 600, color: "#f5b942", background: "rgba(245,185,66,0.15)", padding: "2px 7px", borderRadius: 6 }
-        }, "📦 Prestó: ", mov.prestado.join(", ")), mov.devuelto.length > 0 && /*#__PURE__*/React.createElement("span", {
-          style: { fontSize: 11, fontWeight: 600, color: "#1D9E75", background: "rgba(29,158,117,0.15)", padding: "2px 7px", borderRadius: 6 }
-        }, "↩️ Devolvió: ", mov.devuelto.join(", "))));
+          style: { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }
+        }, ...chipsListaEnv(nombre, "prestado", mov.prestado), ...chipsListaEnv(nombre, "devuelto", mov.devuelto)));
       }))));
     })(), /*#__PURE__*/React.createElement("button", {
       style: {
@@ -3676,7 +3729,7 @@ function PlanillaDelDia({
       }).filter(Boolean);
       if (partes.length) addMovCliente(nombre, "devuelto", `${partes.join(", ")} (baja de cliente)`);
     });
-    const nombresConMovEnv = Object.keys(porClienteEnv).sort((a, b) => a.localeCompare(b, "es"));
+    const nombresConMovEnv = nombresConMovDe(porClienteEnv);
     return /*#__PURE__*/React.createElement("div", {
       style: { ...s.card, margin: "0 0 16px", padding: "14px 16px" }
     }, /*#__PURE__*/React.createElement("div", {
@@ -3709,19 +3762,15 @@ function PlanillaDelDia({
     }, "▾")), mostrarDetalleClientesEnv && /*#__PURE__*/React.createElement("div", {
       style: { padding: "0 16px 12px" }
     }, nombresConMovEnv.map(nombre => {
-      const mov = porClienteEnv[nombre];
+      const mov = movForCliente(porClienteEnv, nombre);
       return /*#__PURE__*/React.createElement("div", {
         key: nombre,
         style: { padding: "6px 0", borderTop: "0.5px solid var(--color-border-tertiary)" }
       }, /*#__PURE__*/React.createElement("div", {
         style: { fontSize: 12, fontWeight: 500, color: "var(--color-text-primary)", marginBottom: 2 }
       }, nombre), /*#__PURE__*/React.createElement("div", {
-        style: { display: "flex", flexWrap: "wrap", gap: 6 }
-      }, mov.prestado.length > 0 && /*#__PURE__*/React.createElement("span", {
-        style: { fontSize: 11, fontWeight: 600, color: "#f5b942", background: "rgba(245,185,66,0.15)", padding: "2px 7px", borderRadius: 6 }
-      }, "📦 Prestó: ", mov.prestado.join(", ")), mov.devuelto.length > 0 && /*#__PURE__*/React.createElement("span", {
-        style: { fontSize: 11, fontWeight: 600, color: "#1D9E75", background: "rgba(29,158,117,0.15)", padding: "2px 7px", borderRadius: 6 }
-      }, "↩️ Devolvió: ", mov.devuelto.join(", "))));
+        style: { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }
+      }, ...chipsListaEnv(nombre, "prestado", mov.prestado), ...chipsListaEnv(nombre, "devuelto", mov.devuelto)));
     }))));
   })(), /*#__PURE__*/React.createElement("button", {
     style: s.btnPrimary,
