@@ -831,18 +831,18 @@ function MenuDias({
     style: {
       flex: 1,
       textAlign: "left",
-      background: "var(--color-background-danger)",
-      border: "1px solid var(--color-border-danger)",
+      background: "var(--color-background-warning)",
+      border: "1px solid var(--color-border-warning)",
       borderRadius: 13,
       padding: "11px 12px",
       cursor: "pointer"
     }
   }, React.createElement("div", {
-    style: { fontSize: 10, fontWeight: 800, color: "var(--color-text-danger)", textTransform: "uppercase", letterSpacing: "0.04em" }
-  }, "🔴 Transferencias"), React.createElement("div", {
-    style: { fontSize: 14, fontWeight: 800, color: "var(--color-text-danger)", marginTop: 3 }
+    style: { fontSize: 10, fontWeight: 800, color: "var(--color-text-warning)", textTransform: "uppercase", letterSpacing: "0.04em" }
+  }, "🟠 Transferencias"), React.createElement("div", {
+    style: { fontSize: 14, fontWeight: 800, color: "var(--color-text-warning)", marginTop: 3 }
   }, fmt(transMontoNeto)), React.createElement("div", {
-    style: { fontSize: 10.5, color: "var(--color-text-danger)", opacity: 0.8, marginTop: 1 }
+    style: { fontSize: 10.5, color: "var(--color-text-warning)", opacity: 0.8, marginTop: 1 }
   }, transClientesCount, " sin confirmar")));
   if (recordatoriosActivos && recordatoriosActivos.length > 0) notifItems.push(React.createElement("button", {
     key: "rec",
