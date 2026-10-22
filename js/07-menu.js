@@ -2062,7 +2062,7 @@ function PlanillaDelDia({
   const COLOR_TIPO_ENV = { prestado: "#f5b942", devuelto: "#1D9E75" };
   const chipsListaEnv = (nombre, tipo, lista) => {
     const chips = (lista || []).map((texto, i) => /*#__PURE__*/React.createElement("span", {
-      key: i,
+      key: `${tipo}-${i}`,
       style: { fontSize: 10.5, fontWeight: 600, color: COLOR_TIPO_ENV[tipo], background: "rgba(255,255,255,0.08)", padding: "2px 5px 2px 7px", borderRadius: 6, display: "inline-flex", alignItems: "center", gap: 5 }
     }, /*#__PURE__*/React.createElement("span", {
       onClick: () => {
@@ -2079,7 +2079,7 @@ function PlanillaDelDia({
       style: { cursor: "pointer", color: "#ff6b6b", fontWeight: 800, fontSize: 11 }
     }, "✕")));
     chips.push(/*#__PURE__*/React.createElement("span", {
-      key: "add",
+      key: `${tipo}-add`,
       onClick: () => {
         const texto = window.prompt(tipo === "prestado" ? "Agregar prestado (ej: 1 Bidón 10L):" : "Agregar devuelto (ej: 1 Sifón 1.5L):", "");
         if (!texto || !texto.trim()) return;
@@ -2723,7 +2723,22 @@ function PlanillaDelDia({
         }, nombre), /*#__PURE__*/React.createElement("div", {
           style: { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }
         }, ...chipsListaEnv(nombre, "prestado", mov.prestado), ...chipsListaEnv(nombre, "devuelto", mov.devuelto)));
-      }))));
+      }).concat([/*#__PURE__*/React.createElement("button", {
+        key: "agregar-cliente",
+        onClick: () => {
+          const nombreNuevo = window.prompt("Nombre del cliente:", "");
+          if (!nombreNuevo || !nombreNuevo.trim()) return;
+          const tipoResp = (window.prompt("¿Prestó (P) o devolvió (D)?", "D") || "").trim().toLowerCase();
+          if (!tipoResp) return;
+          const tipoNuevo = tipoResp[0] === "p" ? "prestado" : "devuelto";
+          const texto = window.prompt(tipoNuevo === "prestado" ? "¿Qué prestó? (ej: 1 Bidón 10L)" : "¿Qué devolvió? (ej: 1 Sifón 1.5L)", "");
+          if (!texto || !texto.trim()) return;
+          const nombreLimpio = nombreNuevo.trim();
+          const actual = movForCliente(porClienteEnv, nombreLimpio)[tipoNuevo] || [];
+          guardarDetalleCliente(nombreLimpio, tipoNuevo, [...actual, texto.trim()]);
+        },
+        style: { marginTop: 6, width: "100%", fontSize: 11.5, fontWeight: 700, color: "var(--color-text-info)", background: "none", border: "1px dashed var(--color-border-info)", borderRadius: 8, padding: "7px 0", cursor: "pointer" }
+      }, "+ Agregar cliente")]))));
     })(), /*#__PURE__*/React.createElement("button", {
       style: {
         width: "100%",
@@ -3771,7 +3786,22 @@ function PlanillaDelDia({
       }, nombre), /*#__PURE__*/React.createElement("div", {
         style: { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }
       }, ...chipsListaEnv(nombre, "prestado", mov.prestado), ...chipsListaEnv(nombre, "devuelto", mov.devuelto)));
-    }))));
+    }).concat([/*#__PURE__*/React.createElement("button", {
+      key: "agregar-cliente",
+        onClick: () => {
+        const nombreNuevo = window.prompt("Nombre del cliente:", "");
+        if (!nombreNuevo || !nombreNuevo.trim()) return;
+        const tipoResp = (window.prompt("¿Prestó (P) o devolvió (D)?", "D") || "").trim().toLowerCase();
+        if (!tipoResp) return;
+        const tipoNuevo = tipoResp[0] === "p" ? "prestado" : "devuelto";
+        const texto = window.prompt(tipoNuevo === "prestado" ? "¿Qué prestó? (ej: 1 Bidón 10L)" : "¿Qué devolvió? (ej: 1 Sifón 1.5L)", "");
+        if (!texto || !texto.trim()) return;
+        const nombreLimpio = nombreNuevo.trim();
+        const actual = movForCliente(porClienteEnv, nombreLimpio)[tipoNuevo] || [];
+        guardarDetalleCliente(nombreLimpio, tipoNuevo, [...actual, texto.trim()]);
+      },
+        style: { marginTop: 6, width: "100%", fontSize: 11.5, fontWeight: 700, color: "var(--color-text-info)", background: "none", border: "1px dashed var(--color-border-info)", borderRadius: 8, padding: "7px 0", cursor: "pointer" }
+    }, "+ Agregar cliente")]))));
   })(), /*#__PURE__*/React.createElement("button", {
     style: s.btnPrimary,
     onClick: () => {
