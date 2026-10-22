@@ -111,7 +111,10 @@ function _aplicarSombraGlobalLC(tema) {
 function _aplicarCuadradoGlobalLC(tema) {
   let tag = document.getElementById("cuadrado-global-lc");
   if(!tag){ tag = document.createElement("style"); tag.id = "cuadrado-global-lc"; document.head.appendChild(tag); }
-  tag.textContent = tema.cuadrado ? `*, *::before, *::after { border-radius:0 !important; } .lc-dia-box { border-radius:16px !important; } .lc-dia-badge { border-radius:8px !important; }` : "";
+  // Guillermo pidió que, pase lo que pase, en el tema Cubo todo quede
+  // redondeado igual que Clásico/Metálico — así que esta regla queda
+  // intencionalmente inerte (no aplica border-radius:0 en ningún caso).
+  tag.textContent = "";
 }
 // ── FIBRA DE CARBONO — propiedades separadas, no todo en una variable ─────
 // El contenedor de toda la app pinta con background:"var(--color-background-
