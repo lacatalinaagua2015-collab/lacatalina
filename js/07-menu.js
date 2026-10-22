@@ -756,10 +756,16 @@ function MenuDias({
         // y los cuadros no quedaban iguales.
         flex: "0 0 calc((100% - 20px) / 3)",
         minWidth: 0,
+        // Altura fija también — un día sin el badge de abajo (solo lo tiene
+        // "hoy") quedaba más bajo que sus vecinos, porque el stretch de
+        // flexbox solo iguala alturas DENTRO de la misma fila, no entre la
+        // fila de 3 y la fila de 2 de abajo.
+        minHeight: 118,
         padding: "14px 8px",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
+        justifyContent: "center",
         textAlign: "center",
         cursor: "pointer"
       },
