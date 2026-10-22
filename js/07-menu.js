@@ -751,7 +751,10 @@ function MenuDias({
       style: {
         ...s.card,
         margin: 0,
-        flex: centered ? "0 0 31%" : "1 1 0",
+        // Mismo tamaño siempre, tenga la fila 3 días o 2 — antes la última
+        // fila (centrada) usaba un ancho fijo distinto al de las filas de 3,
+        // y los cuadros no quedaban iguales.
+        flex: "0 0 calc((100% - 20px) / 3)",
         minWidth: 0,
         padding: "14px 8px",
         display: "flex",
