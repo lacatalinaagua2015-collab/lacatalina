@@ -1208,7 +1208,9 @@ function DetalleTransferencias({
         color: "var(--color-text-primary)",
         fontWeight: 500
       }
-    }, v.cliente), /*#__PURE__*/React.createElement("button", {
+    }, v.cliente, v._otroDia && /*#__PURE__*/React.createElement("span", {
+      style: { marginLeft: 4, fontSize: 10, fontWeight: 600, color: "var(--color-text-tertiary)" }
+    }, "· otro día", cli?.dia ? ` (${cli.dia})` : "")), /*#__PURE__*/React.createElement("button", {
       style: {
         marginLeft: 6,
         fontSize: 10,
@@ -3567,7 +3569,17 @@ function PlanillaDelDia({
     // Transferencias puras del día + parte transferencia de pagos mixtos
     // (mismo fix de raíz: solo clientes propios de este día, nunca de otro)
     const mixtoTransDia = ventas.filter(v => v._esMixtoTrans && v.fechaKey === fecha && clientesDia.has(v.clienteId));
-    const transDelDia = [...todasVentasDia.filter(v => v.pago === "transferencia"), ...mixtoTransDia];
+    // Pedido del usuario (2026-10-22): un cobro por transferencia de un
+    // cliente de OTRO día (ventasExtraDia) no aparecía acá — no había forma
+    // de confirmarlo ni se mandaba a Emma Control. Se agrega a la lista,
+    // marcado como "otro día" (ver _otroDia en DetalleTransferencias). El
+    // MONTO TOTAL de arriba (cobTransBruto/cobTransNeto) sigue sin sumarlo
+    // — eso sigue siendo a propósito (ver ventasExtraDia más arriba), para
+    // no duplicar plata entre días. El envío a Emma Control sí lo suma
+    // aparte, más abajo en "Guardar planilla".
+    const transExtraDia = ventasExtraDia.filter(v => v.pago === "transferencia").map(v => ({ ...v, _otroDia: true }));
+    const mixtoTransExtraDia = ventas.filter(v => v._esMixtoTrans && v.fechaKey === fecha && !clientesDia.has(v.clienteId)).map(v => ({ ...v, _otroDia: true }));
+    const transDelDia = [...todasVentasDia.filter(v => v.pago === "transferencia"), ...mixtoTransDia, ...transExtraDia, ...mixtoTransExtraDia];
     if (!transDelDia.length) return null;
     return /*#__PURE__*/React.createElement(DetalleTransferencias, {
       ventas: transDelDia,
@@ -3817,8 +3829,15 @@ function PlanillaDelDia({
       // van como DOS registros separados, cada uno con su método, para que Emma
       // Control impute bien cada forma de cobro.
       if (ecToken && (window._lcEncolarEC || window.enviarAEmmaControl)) {
-        const efectivoNeto = Math.round(cobEfectivo - totalVentaLlenar);
-        const transferenciaNeta = Math.round(cobTransNeto);
+        // Pedido del usuario (2026-10-22): un cobro (efectivo o
+        // transferencia) de un cliente de OTRO día, registrado hoy, no se
+        // mandaba a Emma Control porque efectivoNeto/transferenciaNeta
+        // salían solo de todasVentasDia (clientes propios de este día). Se
+        // suma acá aparte — el "Efectivo en mano"/"Monto total" que se ven
+        // en esta pantalla siguen sin incluirlo, a propósito.
+        const extraTransNeto = Math.round(extraTrans - Math.round(extraTrans * 0.025));
+        const efectivoNeto = Math.round(cobEfectivo - totalVentaLlenar + extraEfectivo);
+        const transferenciaNeta = Math.round(cobTransNeto + extraTransNeto);
         const gastosData = (datos.gastos || []).filter(g => g.confirmado && Number(g.monto) > 0).map(g => ({
           desc: g.desc || 'Gasto reparto',
           monto: Number(g.monto),
