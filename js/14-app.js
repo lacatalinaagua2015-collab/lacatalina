@@ -2485,8 +2485,22 @@ function App() {
         bidon10: "Bidón 10L",
         bidon20: "Bidón 20L"
       };
+      // BUG REPORTADO 2026-10-23 (caso real: "Villa" con 16 sifones
+      // prestados cuando tenía 2 fijos + 2 agregados): esto comparaba la
+      // cantidad comprada contra el FIJO nomás (c.sifon), sin contar lo que
+      // el cliente YA tenía prestado de visitas anteriores. Entonces, si el
+      // cliente tiene 2 de fijo y ya 2 prestados (4 envases en su poder) y
+      // en la próxima compra vuelve a llevarse 4 (los mismos de siempre,
+      // solo recargados), "extra" daba 4-2=2 y se le sumaban 2 prestados
+      // MÁS — cada visita volvía a contar los mismos envases como si fueran
+      // nuevos, acumulando sin límite. Ahora se compara contra fijo +
+      // prestado actual (lo que YA tiene en su poder); sólo lo que supere
+      // eso es préstamo nuevo de verdad.
       detalle.forEach(d => {
-        const asignado = d.nombre === "Sifón 1.5L" ? c.sifon || 0 : d.nombre === "Bidón 10L" ? c.bidon10 || 0 : d.nombre === "Bidón 20L" ? c.bidon20 || 0 : 0;
+        const k = KEY_PROD_ENV[d.nombre];
+        const fijo = d.nombre === "Sifón 1.5L" ? c.sifon || 0 : d.nombre === "Bidón 10L" ? c.bidon10 || 0 : d.nombre === "Bidón 20L" ? c.bidon20 || 0 : 0;
+        const yaPrestado = k ? prestadoClienteDe(c, k, ventas) : 0;
+        const asignado = fijo + yaPrestado;
         const extra = d.cantidad - asignado;
         if (extra > 0) envAutoDetect.push({
           prod: d.nombre,
