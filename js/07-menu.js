@@ -1873,6 +1873,21 @@ function PlanillaDelDia({
       totalesPorProd[k].plata += d.total;
     });
   });
+  // Pedido del usuario (2026-10-23, caso real: 2 Bidones 20L vendidos hoy a
+  // un cliente del Martes no aparecían acá): "Vacíos"/"Llenar" son
+  // cantidades FÍSICAS de envases (cuántos volvieron hoy, cuánto cuesta
+  // llenarlos) — a diferencia de "Plata" (dinero, que se mantiene puro de
+  // ESTE día por el fix de duplicación del 2026-10-17, ver nota arriba), un
+  // envase vendido hoy a un cliente de OTRO día hay que lavarlo y llenarlo
+  // igual que cualquier otro — el gasto de llenado es real. Se suma acá
+  // aparte (solo vacíos, nunca plata) para no tocar esa pureza del dinero.
+  ventasExtraDia.forEach(v => {
+    v.detalle.forEach(d => {
+      const k = prodKey[d.nombre];
+      if (!k) return;
+      totalesPorProd[k].vacios += d.cantidad;
+    });
+  });
   // Cajones: resto ≤ 3 no suma, resto ≥ 4 suma un cajón más
   const calcCajones = sifones => {
     const full = Math.floor(sifones / CAJON_SODA);
