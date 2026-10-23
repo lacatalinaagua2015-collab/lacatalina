@@ -2151,6 +2151,62 @@ function PlanillaDelDia({
       devuelto: ov && ov.devuelto ? ov.devuelto : calc.devuelto
     };
   };
+  // Pedido del usuario (2026-10-23): corregir en "Detalle por cliente"
+  // (borrar/corregir/agregar un badge) tiene que actualizar también el
+  // número de la tabla "Movimiento de envases de hoy" de arriba — antes
+  // eran dos capas independientes (la tabla se calculaba directo de
+  // ventas/movStock, sin mirar las correcciones por cliente), y corregir
+  // abajo no cambiaba nada arriba. Esto NO toca prestadosDia/devueltosDia
+  // (los reales, que siguen alimentando vaciosRec/calcularMovimientoDeposito
+  // para el movimiento de stock al cerrar) — es solo para lo que se
+  // MUESTRA en la tabla: se suma lo mismo que ya se ve en "Detalle por
+  // cliente" (con sus correcciones aplicadas), parseando el texto de cada
+  // badge ("2 Sifón 1.5L", "1 Bidón 10L (fijo)", "2 Sifón 1.5L, 1 Bidón 10L
+  // (baja de cliente)") para saber cuánto es de cada producto.
+  const PROD_A_PK_ENV = { "Sifón 1.5L": "soda", "Bidón 10L": "b10", "Bidón 20L": "b20", "Dispenser": "disp" };
+  const parseTextoEnv = texto => {
+    const sinAnotacion = (texto || "").replace(/\s*\([^)]*\)\s*$/, "");
+    const partes = {};
+    sinAnotacion.split(",").forEach(parte => {
+      const m = parte.trim().match(/^(\d+)\s+(.+)$/);
+      if (!m) return;
+      const cant = Number(m[1]) || 0;
+      if (!cant) return;
+      const prodTexto = m[2].trim();
+      const sinAcentos = prodTexto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      let pk = PROD_A_PK_ENV[prodTexto] || null;
+      if (!pk) {
+        if (/disp/.test(sinAcentos)) pk = "disp";else if (/sif/.test(sinAcentos)) pk = "soda";else if (/bid/.test(sinAcentos) && /20/.test(sinAcentos)) pk = "b20";else if (/bid/.test(sinAcentos) && /10/.test(sinAcentos)) pk = "b10";
+      }
+      if (!pk) return;
+      partes[pk] = (partes[pk] || 0) + cant;
+    });
+    return partes;
+  };
+  const sumarPorProductoDesdeTextos = lista => {
+    const tot = { soda: 0, b10: 0, b20: 0, disp: 0 };
+    (lista || []).forEach(texto => {
+      const partes = parseTextoEnv(texto);
+      Object.keys(partes).forEach(pk => {
+        tot[pk] += partes[pk];
+      });
+    });
+    return tot;
+  };
+  const sumarMostradoPorCliente = (porClienteEnv, nombresConMovEnv) => {
+    const prestadoMostrado = { soda: 0, b10: 0, b20: 0, disp: 0 };
+    const devueltoMostrado = { soda: 0, b10: 0, b20: 0, disp: 0 };
+    nombresConMovEnv.forEach(nombre => {
+      const mov = movForCliente(porClienteEnv, nombre);
+      const p = sumarPorProductoDesdeTextos(mov.prestado);
+      const d = sumarPorProductoDesdeTextos(mov.devuelto);
+      Object.keys(prestadoMostrado).forEach(pk => {
+        prestadoMostrado[pk] += p[pk] || 0;
+        devueltoMostrado[pk] += d[pk] || 0;
+      });
+    });
+    return { prestadoMostrado, devueltoMostrado };
+  };
   const nombresConMovDe = porClienteEnv => Array.from(new Set([...Object.keys(porClienteEnv), ...Object.keys(detalleOverride)])).sort((a, b) => a.localeCompare(b, "es"));
   // Botón + panel "Agregar cliente" del Detalle por cliente — busca en la
   // lista real de clientes de la app (clientes, prop ya disponible acá) en
@@ -2789,6 +2845,7 @@ function PlanillaDelDia({
         if (partes.length) addMovCliente(nombre, "devuelto", `${partes.join(", ")} (baja de cliente)`);
       });
       const nombresConMovEnv = nombresConMovDe(porClienteEnv);
+      const { prestadoMostrado, devueltoMostrado } = sumarMostradoPorCliente(porClienteEnv, nombresConMovEnv);
       return /*#__PURE__*/React.createElement("div", {
         style: { ...s.card, margin: "0 0 12px", padding: "14px 16px" }
       }, /*#__PURE__*/React.createElement("div", {
@@ -2798,11 +2855,10 @@ function PlanillaDelDia({
       }, "Prestado, devuelto (incluye retiros con envases), rotos, fugados, altas y correcciones de fijo del día — tocá cualquier número para corregirlo."), /*#__PURE__*/React.createElement("div", {
         style: { display: "grid", gridTemplateColumns: "1.05fr 0.85fr 0.85fr 0.7fr 0.75fr 0.85fr 0.8fr", gap: 3, fontSize: 9, color: "var(--color-text-tertiary)", marginBottom: 4 }
       }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Prestado"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Devuelto"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Rotos"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Fugados"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Cliente nuevo"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Fijo nuevo")), movLabels.map(([label, pk]) => {
-        const devueltoCalc = (devueltosDia[pk] || 0) + (devueltosFijoDia[pk] || 0) + (retiradosDia[pk] || 0);
         return /*#__PURE__*/React.createElement("div", {
           key: pk,
           style: { display: "grid", gridTemplateColumns: "1.05fr 0.85fr 0.85fr 0.7fr 0.75fr 0.85fr 0.8fr", gap: 3, alignItems: "center", padding: "5px 0", borderTop: "0.5px solid var(--color-border-tertiary)" }
-        }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: "var(--color-text-primary)" } }, label), celdaEnv(pk, "prestado", envVal(pk, "prestado", prestadosDia[pk])), celdaEnv(pk, "devuelto", envVal(pk, "devuelto", devueltoCalc)), celdaEnv(pk, "rotos", envVal(pk, "rotos", rotosDia[pk])), celdaEnv(pk, "fugados", envVal(pk, "fugados", fugadosDia[pk])), celdaEnv(pk, "clienteNuevo", envVal(pk, "clienteNuevo", altaClienteDia[pk])), celdaEnv(pk, "fijoNuevo", envVal(pk, "fijoNuevo", fijoCorregidoDia[pk])));
+        }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: "var(--color-text-primary)" } }, label), celdaEnv(pk, "prestado", envVal(pk, "prestado", prestadoMostrado[pk])), celdaEnv(pk, "devuelto", envVal(pk, "devuelto", devueltoMostrado[pk])), celdaEnv(pk, "rotos", envVal(pk, "rotos", rotosDia[pk])), celdaEnv(pk, "fugados", envVal(pk, "fugados", fugadosDia[pk])), celdaEnv(pk, "clienteNuevo", envVal(pk, "clienteNuevo", altaClienteDia[pk])), celdaEnv(pk, "fijoNuevo", envVal(pk, "fijoNuevo", fijoCorregidoDia[pk])));
       }), nombresConMovEnv.length > 0 && /*#__PURE__*/React.createElement("div", {
         style: { margin: "10px 0 0", borderRadius: 12, overflow: "hidden", border: "1.5px solid #185FA5", background: "var(--color-background-info)" }
       }, /*#__PURE__*/React.createElement("button", {
@@ -3895,6 +3951,7 @@ function PlanillaDelDia({
       if (partes.length) addMovCliente(nombre, "devuelto", `${partes.join(", ")} (baja de cliente)`);
     });
     const nombresConMovEnv = nombresConMovDe(porClienteEnv);
+    const { prestadoMostrado, devueltoMostrado } = sumarMostradoPorCliente(porClienteEnv, nombresConMovEnv);
     return /*#__PURE__*/React.createElement("div", {
       style: { ...s.card, margin: "0 0 16px", padding: "14px 16px" }
     }, /*#__PURE__*/React.createElement("div", {
@@ -3904,11 +3961,10 @@ function PlanillaDelDia({
     }, "Prestado, devuelto (incluye retiros con envases), rotos, fugados, altas y correcciones de fijo del día — tocá cualquier número para corregirlo."), /*#__PURE__*/React.createElement("div", {
       style: { display: "grid", gridTemplateColumns: "1.05fr 0.85fr 0.85fr 0.7fr 0.75fr 0.85fr 0.8fr", gap: 3, fontSize: 9, color: "var(--color-text-tertiary)", marginBottom: 4 }
     }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Prestado"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Devuelto"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Rotos"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Fugados"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Cliente nuevo"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "center" } }, "Fijo nuevo")), movLabels.map(([label, pk]) => {
-      const devueltoCalc = (devueltosDia[pk] || 0) + (devueltosFijoDia[pk] || 0) + (retiradosDia[pk] || 0);
       return /*#__PURE__*/React.createElement("div", {
         key: pk,
         style: { display: "grid", gridTemplateColumns: "1.05fr 0.85fr 0.85fr 0.7fr 0.75fr 0.85fr 0.8fr", gap: 3, alignItems: "center", padding: "5px 0", borderTop: "0.5px solid var(--color-border-tertiary)" }
-      }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: "var(--color-text-primary)" } }, label), celdaEnv(pk, "prestado", envVal(pk, "prestado", prestadosDia[pk])), celdaEnv(pk, "devuelto", envVal(pk, "devuelto", devueltoCalc)), celdaEnv(pk, "rotos", envVal(pk, "rotos", rotosDia[pk])), celdaEnv(pk, "fugados", envVal(pk, "fugados", fugadosDia[pk])), celdaEnv(pk, "clienteNuevo", envVal(pk, "clienteNuevo", altaClienteDia[pk])), celdaEnv(pk, "fijoNuevo", envVal(pk, "fijoNuevo", fijoCorregidoDia[pk])));
+      }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: "var(--color-text-primary)" } }, label), celdaEnv(pk, "prestado", envVal(pk, "prestado", prestadoMostrado[pk])), celdaEnv(pk, "devuelto", envVal(pk, "devuelto", devueltoMostrado[pk])), celdaEnv(pk, "rotos", envVal(pk, "rotos", rotosDia[pk])), celdaEnv(pk, "fugados", envVal(pk, "fugados", fugadosDia[pk])), celdaEnv(pk, "clienteNuevo", envVal(pk, "clienteNuevo", altaClienteDia[pk])), celdaEnv(pk, "fijoNuevo", envVal(pk, "fijoNuevo", fijoCorregidoDia[pk])));
     }), nombresConMovEnv.length > 0 && /*#__PURE__*/React.createElement("div", {
       style: { margin: "10px 0 0", borderRadius: 12, overflow: "hidden", border: "1.5px solid #185FA5", background: "var(--color-background-info)" }
     }, /*#__PURE__*/React.createElement("button", {
