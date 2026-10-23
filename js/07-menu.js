@@ -842,7 +842,7 @@ function MenuDias({
       flex: 1,
       textAlign: "left",
       background: "#0c1e29",
-      border: "1px solid #3f93c4",
+      border: "2px solid #e5484d",
       borderRadius: 13,
       padding: "11px 12px",
       cursor: "pointer"
