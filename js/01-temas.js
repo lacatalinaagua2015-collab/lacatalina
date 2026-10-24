@@ -256,6 +256,10 @@ function aplicarTemaLC(temaId) {
   _aplicarRedondoGlobalLC(tema);
 }
 function getTemaLC() { try { return JSON.parse(localStorage.getItem("lc_tema")||'"oscuro-azul"'); } catch { return "oscuro-azul"; } }
+// Helper global (cualquier archivo puede usarlo): true si el tema activo es
+// Metalico ("redondo"). Pedido del usuario (2026-10-24): extender el
+// estilo redondo a toda la app, pantalla por pantalla.
+function esMetalicoLC() { try { const t = TEMAS_LC[getTemaLC()]; return !!(t && t.redondo); } catch { return false; } }
 (()=>{
   try { aplicarTemaLC(getTemaLC()); } catch{}
   // El contenedor de la app todavía no existe acá (React recién lo crea
