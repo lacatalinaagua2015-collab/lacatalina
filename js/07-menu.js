@@ -831,6 +831,77 @@ function MenuDias({
       style: { fontSize: 9, fontWeight: 700, color: cfg.subCol }
     }, sub)));
   };
+  // Pedido del usuario (2026-10-24): Metalico tiene que ser completamente
+  // distinto a Clasico y a Cubo -- los dias van en circulo (lista, no
+  // grilla), con un aro de color segun si el dia tiene deuda o no. Usa los
+  // mismos datos y los mismos handlers que renderDia, solo cambia la forma.
+  const renderDiaRedondo = (d) => {
+    const deudas = (clientes || []).filter(c => c.dia === d && c.saldo < 0);
+    const totalDeuda = deudas.reduce((a, c) => a + Math.abs(c.saldo), 0);
+    const totalClientes = (clientes || []).filter(c => c.dia === d).length;
+    const zona = (zonasReparto || {})[d] || "";
+    const info = estadoPorDia[d];
+    const cfg = info ? cfgEstado[info.estado] : null;
+    const sub = info ? (info.completoD ? cfg.txt : `${cfg.txt} ${info.visitadosD.length}/${info.clientesD.length}`) : null;
+    const aroColor = totalDeuda > 0 ? "var(--color-text-danger)" : "var(--color-text-success)";
+    return React.createElement("div", {
+      key: d,
+      style: { display: "flex", alignItems: "center", gap: 12 }
+    }, React.createElement("button", {
+      className: "no-relieve",
+      onClick: () => onIrPlanillaDia(d),
+      style: {
+        flex: "0 0 auto",
+        width: 56,
+        height: 56,
+        borderRadius: "50%",
+        padding: 0,
+        cursor: "pointer",
+        background: "var(--color-background-tertiary)",
+        border: "1px solid var(--color-border-tertiary)",
+        boxShadow: `inset 0 1px 2px rgba(255,255,255,0.15), inset 0 -2px 4px rgba(0,0,0,0.3), 0 2px 5px rgba(0,0,0,0.25), 0 0 0 2px ${aroColor}`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 12,
+        fontWeight: 800,
+        color: "var(--color-text-primary)"
+      }
+    }, d.slice(0, 3).toUpperCase()), React.createElement("div", {
+      style: { flex: "0 0 auto", width: 44, fontSize: 11, color: "var(--color-text-tertiary)", textAlign: "left" }
+    }, totalClientes, React.createElement("br"), "cliente", totalClientes !== 1 ? "s" : ""), React.createElement("div", {
+      style: { flex: "1 1 auto", minWidth: 0, textAlign: "right" }
+    }, React.createElement("div", {
+      style: { fontSize: 13, fontWeight: 700, color: "var(--color-text-primary)", cursor: "pointer" },
+      onClick: () => onIrPlanillaDia(d)
+    }, d, " ", zona ? React.createElement("span", {
+      style: { fontSize: 10, fontWeight: 400, color: "var(--color-text-tertiary)", borderBottom: "1px dotted var(--color-text-tertiary)" },
+      onClick: e => { e.stopPropagation(); setEditandoZona(d); }
+    }, zona) : React.createElement("span", {
+      style: { fontSize: 10, fontWeight: 400, color: "var(--color-text-tertiary)", fontStyle: "italic" },
+      onClick: e => { e.stopPropagation(); setEditandoZona(d); }
+    }, "+ zona")), totalDeuda > 0 ? React.createElement("div", {
+      style: { fontSize: 10.5, fontWeight: 700, color: "var(--color-text-danger)", marginTop: 1, cursor: "pointer" },
+      onClick: () => setDeudaExpandida(deudaExpandida === d ? null : d)
+    }, "⚠ ", fmt(totalDeuda)) : React.createElement("div", {
+      style: { fontSize: 10.5, fontWeight: 700, color: "var(--color-text-success)", marginTop: 1 }
+    }, "✓ Sin deudas"), cfg && React.createElement("div", {
+      onClick: () => { info.completoD ? (onDiaResumen && onDiaResumen(d, info.fechaSesion)) : onDiaHoy(d, info.fechaSesion); },
+      style: {
+        marginTop: 4,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        background: cfg.bg,
+        border: cfg.border,
+        borderRadius: 999,
+        padding: "2px 8px",
+        cursor: "pointer"
+      }
+    }, React.createElement("span", { style: { fontSize: 10 } }, cfg.icon), React.createElement("span", {
+      style: { fontSize: 8, fontWeight: 700, color: cfg.subCol }
+    }, sub))));
+  };
   const notifItems = [];
   // Pedido del usuario (2026-10-22): "Opción C" del preview — paleta
   // azul/cian en vez de naranja/rojo, para no confundir "pendiente de
@@ -890,11 +961,13 @@ function MenuDias({
   }, "Días de reparto"),
 
   React.createElement("div", {
-    style: { padding: "0 16px", display: "flex", flexDirection: "column", gap: 10 }
-  }, diasRows.map((row, ri) => React.createElement("div", {
-    key: ri,
-    style: { display: "flex", gap: 10, justifyContent: row.length < 3 ? "center" : "flex-start" }
-  }, row.map((d, ci) => renderDia(d, ri * 3 + ci, row.length < 3))))),
+    style: { padding: "0 16px", display: "flex", flexDirection: "column", gap: estiloActual === "metalico" ? 9 : 10 }
+  }, estiloActual === "metalico"
+    ? (dias || []).map(d => renderDiaRedondo(d))
+    : diasRows.map((row, ri) => React.createElement("div", {
+        key: ri,
+        style: { display: "flex", gap: 10, justifyContent: row.length < 3 ? "center" : "flex-start" }
+      }, row.map((d, ci) => renderDia(d, ri * 3 + ci, row.length < 3))))),
 
   editandoZona && React.createElement("div", {
     style: {
