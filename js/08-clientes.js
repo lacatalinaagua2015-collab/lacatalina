@@ -38,6 +38,7 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
       bidon10: prestadoClienteDe(c, "bidon10", todasVentas || ventas),
       bidon20: prestadoClienteDe(c, "bidon20", todasVentas || ventas)
     };
+    const esMetalico = esMetalicoLC();
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: {
         ...s.card,
@@ -45,6 +46,7 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         // cliente fijo (5 compras en su día) — para distinguirlos de un
         // vistazo en la lista.
         border: c.esProspecto ? "1.5px dashed #b794f6" : "1px solid var(--color-border-secondary)",
+        borderRadius: esMetalico ? 20 : undefined,
         boxShadow: "0 2px 10px rgba(0,0,0,0.35)",
         background: c.esProspecto ? "rgba(183,148,246,0.06)" : undefined,
         borderLeft: `3px solid ${bc}`,
@@ -72,7 +74,7 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
       style: {
         width: 34,
         height: 34,
-        borderRadius: 8,
+        borderRadius: esMetalico ? "50%" : 8,
         background: clienteMoviendo === c.id ? "#185FA5" : clienteMoviendo && !atendido ? "var(--color-background-warning)" : "var(--color-background-secondary)",
         display: "flex",
         alignItems: "center",
@@ -81,7 +83,8 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         fontWeight: 600,
         color: clienteMoviendo === c.id ? "#fff" : clienteMoviendo && !atendido ? "var(--color-text-warning)" : "var(--color-text-secondary)",
         cursor: atendido ? "default" : "pointer",
-        border: clienteMoviendo === c.id ? "1.5px solid #5daaff" : "0.5px solid var(--color-border-tertiary)"
+        border: clienteMoviendo === c.id ? "1.5px solid #5daaff" : "0.5px solid var(--color-border-tertiary)",
+        boxShadow: esMetalico ? "inset 0 1px 2px rgba(255,255,255,0.18), inset 0 -2px 4px rgba(0,0,0,0.3)" : undefined
       }
     }, clienteMoviendo === c.id ? "✓" : c.orden || "#")), /*#__PURE__*/React.createElement("div", {
       style: {
@@ -176,11 +179,12 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         }
       }, "💬"));
     })(), c.saldo < 0 && /*#__PURE__*/React.createElement("button", {
+      className: "no-relieve",
       style: {
         fontSize: 12.5,
         fontWeight: 800,
         padding: "5px 11px",
-        borderRadius: 20,
+        borderRadius: esMetalico ? 999 : 20,
         background: "var(--color-background-danger)",
         color: "var(--color-text-danger)",
         border: "1px solid var(--color-border-danger)",
@@ -224,7 +228,7 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
           fontSize: 12,
           fontWeight: 600,
           padding: "4px 10px",
-          borderRadius: 20,
+          borderRadius: esMetalico ? 999 : 20,
           background: "var(--color-background-info)",
           color: "var(--color-text-primary)"
         }
