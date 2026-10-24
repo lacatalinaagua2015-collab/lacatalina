@@ -903,28 +903,68 @@ function MenuDias({
     }, sub))));
   };
   const notifItems = [];
-  // Pedido del usuario (2026-10-22): "Opción C" del preview — paleta
+  const esMetalico = estiloActual === "metalico";
+  // Pedido del usuario (2026-10-22): "Opcion C" del preview - paleta
   // azul/cian en vez de naranja/rojo, para no confundir "pendiente de
   // confirmar" con un error real.
-  if (transferenciasPendientes && transferenciasPendientes.length > 0) notifItems.push(React.createElement("button", {
-    key: "trans",
-    onClick: () => setMostrarTransferencias(v => !v),
-    style: {
-      flex: 1,
-      textAlign: "left",
-      background: "#0c1e29",
-      border: "2px solid #e5484d",
-      borderRadius: 13,
-      padding: "11px 12px",
-      cursor: "pointer"
-    }
-  }, React.createElement("div", {
-    style: { fontSize: 10, fontWeight: 800, color: "#5bc3f0", textTransform: "uppercase", letterSpacing: "0.04em" }
-  }, "🔵 Transferencias"), React.createElement("div", {
-    style: { fontSize: 14, fontWeight: 800, color: "#a3ddf7", marginTop: 3 }
-  }, fmt(transMontoNeto)), React.createElement("div", {
-    style: { fontSize: 10.5, color: "#5bc3f0", opacity: 0.8, marginTop: 1 }
-  }, transClientesCount, " sin confirmar")));
+  // Acento de color (2026-10-24): en Metalico la tarjeta pasa a pildora
+  // con icono circular con brillo cian, en vez del badge rectangular.
+  if (transferenciasPendientes && transferenciasPendientes.length > 0) notifItems.push(
+    esMetalico
+      ? React.createElement("button", {
+          key: "trans",
+          onClick: () => setMostrarTransferencias(v => !v),
+          className: "no-relieve",
+          style: {
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            textAlign: "left",
+            background: "#101b27",
+            border: "1px solid rgba(79,211,240,0.35)",
+            borderRadius: 999,
+            padding: "10px 16px 10px 10px",
+            cursor: "pointer"
+          }
+        }, React.createElement("div", {
+          style: {
+            flex: "0 0 auto",
+            width: 40,
+            height: 40,
+            borderRadius: "50%",
+            background: "radial-gradient(circle at 35% 30%, #7fe9ff 0%, #2aa0c9 50%, #0b4a63 100%)",
+            boxShadow: "0 0 14px rgba(79,211,240,0.55), inset 0 1px 2px rgba(255,255,255,0.4)"
+          }
+        }), React.createElement("div", {
+          style: { flex: 1 }
+        }, React.createElement("div", {
+          style: { fontSize: 10.5, fontWeight: 700, color: "#5ccdf5", letterSpacing: "0.02em", textTransform: "uppercase" }
+        }, "Transferencias"), React.createElement("div", {
+          style: { fontSize: 16, fontWeight: 800, color: "#fff", marginTop: 1 }
+        }, fmt(transMontoNeto)), React.createElement("div", {
+          style: { fontSize: 9.5, color: "#7fb8d6", marginTop: 1 }
+        }, transClientesCount, " sin confirmar")))
+      : React.createElement("button", {
+          key: "trans",
+          onClick: () => setMostrarTransferencias(v => !v),
+          style: {
+            flex: 1,
+            textAlign: "left",
+            background: "#0c1e29",
+            border: "2px solid #e5484d",
+            borderRadius: 13,
+            padding: "11px 12px",
+            cursor: "pointer"
+          }
+        }, React.createElement("div", {
+          style: { fontSize: 10, fontWeight: 800, color: "#5bc3f0", textTransform: "uppercase", letterSpacing: "0.04em" }
+        }, "🔵 Transferencias"), React.createElement("div", {
+          style: { fontSize: 14, fontWeight: 800, color: "#a3ddf7", marginTop: 3 }
+        }, fmt(transMontoNeto)), React.createElement("div", {
+          style: { fontSize: 10.5, color: "#5bc3f0", opacity: 0.8, marginTop: 1 }
+        }, transClientesCount, " sin confirmar"))
+  );
   if (recordatoriosActivos && recordatoriosActivos.length > 0) notifItems.push(React.createElement("button", {
     key: "rec",
     onClick: () => setMostrarRecordatorios(v => !v),
@@ -1116,23 +1156,29 @@ function MenuDias({
   }, fecha))))),
 
   React.createElement("div", {
-    style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, padding: "16px 16px 8px" }
+    style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: esMetalico ? 9 : 6, padding: "16px 16px 8px" }
   }, [{
     ico: "📅",
     lbl: "Agenda",
-    fn: () => onAgenda && onAgenda()
+    fn: () => onAgenda && onAgenda(),
+    accent: "#5ccdf5",
+    accentBorder: "rgba(92,205,245,0.3)"
   }, {
     ico: "📋",
     lbl: "Planilla",
-    fn: () => onPlanillaAtajo && onPlanillaAtajo()
+    fn: () => onPlanillaAtajo && onPlanillaAtajo(),
+    accent: "#ec6fc4",
+    accentBorder: "rgba(236,111,196,0.3)"
   }, {
     ico: "➕",
     lbl: "Nuevo cliente",
-    fn: () => onNuevoCliente && onNuevoCliente()
-  }].map(({ ico, lbl, fn }) => React.createElement("button", {
+    fn: () => onNuevoCliente && onNuevoCliente(),
+    primary: true
+  }].map(({ ico, lbl, fn, accent, accentBorder, primary }) => React.createElement("button", {
     key: lbl,
     onClick: fn,
-    style: {
+    className: esMetalico ? "no-relieve" : undefined,
+    style: !esMetalico ? {
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
@@ -1143,11 +1189,34 @@ function MenuDias({
       border: "none",
       background: "var(--color-background-tertiary)",
       color: "var(--color-text-secondary)"
+    } : primary ? {
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 4,
+      padding: "11px 4px",
+      borderRadius: 999,
+      cursor: "pointer",
+      border: "1px solid rgba(90,170,255,0.4)",
+      background: "radial-gradient(circle at 32% 20%, #3f9ded 0%, #185FA5 55%, #0d3a66 100%)",
+      color: "#fff",
+      boxShadow: "0 3px 10px rgba(24,95,165,0.4)"
+    } : {
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 4,
+      padding: "11px 4px",
+      borderRadius: 999,
+      cursor: "pointer",
+      border: `1px solid ${accentBorder}`,
+      background: "#101b27",
+      color: accent
     }
   }, React.createElement("span", {
-    style: { fontSize: 19 }
+    style: { fontSize: esMetalico ? 16 : 19 }
   }, ico), React.createElement("span", {
-    style: { fontSize: 9, fontWeight: 500, color: "var(--color-text-tertiary)" }
+    style: { fontSize: esMetalico ? 10 : 9, fontWeight: esMetalico ? 700 : 500, color: esMetalico ? (primary ? "#fff" : accent) : "var(--color-text-tertiary)" }
   }, lbl)))),
 
   React.createElement("div", { style: s.divider }),
@@ -1162,32 +1231,54 @@ function MenuDias({
   }, [{
     ico: "👥",
     lbl: "Clientes",
-    fn: onGestionClientes
+    fn: onGestionClientes,
+    grad: "radial-gradient(circle at 35% 30%, #f8b8e6 0%, #c843a3 50%, #5c1a4a 100%)",
+    glow: "rgba(232,121,201,0.5)",
+    accent: "#ec6fc4"
   }, {
     ico: "📦",
     lbl: "Stock",
-    fn: onStock
+    fn: onStock,
+    grad: "radial-gradient(circle at 35% 30%, #ffd199 0%, #e08a2e 50%, #6b3c0f 100%)",
+    glow: "rgba(240,168,87,0.5)",
+    accent: "#f0a857"
   }, {
     ico: "⚙️",
     lbl: "Config",
-    fn: onConfig
-  }].map(({ ico, lbl, fn }) => React.createElement("button", {
+    fn: onConfig,
+    grad: "radial-gradient(circle at 35% 30%, #7fe9ff 0%, #2aa0c9 50%, #0b4a63 100%)",
+    glow: "rgba(79,211,240,0.5)",
+    accent: "#5ccdf5"
+  }].map(({ ico, lbl, fn, grad, glow, accent }) => React.createElement("button", {
     key: lbl,
     onClick: fn,
+    className: esMetalico ? "no-relieve" : undefined,
     style: {
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
-      gap: 5,
+      gap: esMetalico ? 6 : 5,
       paddingTop: 10,
       border: "none",
       background: "none",
       cursor: "pointer"
     }
-  }, React.createElement("span", {
+  }, esMetalico ? React.createElement("div", {
+    style: {
+      width: 46,
+      height: 46,
+      borderRadius: "50%",
+      background: grad,
+      boxShadow: `0 0 12px ${glow}`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 17
+    }
+  }, ico) : React.createElement("span", {
     style: { fontSize: 20 }
   }, ico), React.createElement("span", {
-    style: { fontSize: 11, fontWeight: 600, color: "var(--color-text-secondary)" }
+    style: { fontSize: esMetalico ? 9.5 : 11, fontWeight: 600, color: esMetalico ? accent : "var(--color-text-secondary)" }
   }, lbl))))
 
 );
