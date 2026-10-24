@@ -111,10 +111,34 @@ function _aplicarSombraGlobalLC(tema) {
 function _aplicarCuadradoGlobalLC(tema) {
   let tag = document.getElementById("cuadrado-global-lc");
   if(!tag){ tag = document.createElement("style"); tag.id = "cuadrado-global-lc"; document.head.appendChild(tag); }
-  // Guillermo pidió que, pase lo que pase, en el tema Cubo todo quede
-  // redondeado igual que Clásico/Metálico — así que esta regla queda
-  // intencionalmente inerte (no aplica border-radius:0 en ningún caso).
-  tag.textContent = "";
+  if(!tema.cuadrado){ tag.textContent = ""; return; }
+  // Identidad propia del tema Cubo: esquinas más cerradas (nunca 0 — eso
+  // ya se descartó antes), bordes marcados y sombra "offset" dura en vez
+  // de la sombra difusa de Clásico/Metálico. Sigue el mismo patrón que
+  // _aplicarSombraGlobalLC: una sola regla global con !important.
+  const oscuro = tema.modo === "oscuro";
+  const borde = oscuro ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.22)";
+  const sombraDura = oscuro ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.25)";
+  tag.textContent = `
+    div[style*="border-radius: 12px"], div[style*="border-radius:12px"]{
+      border-radius: 6px !important;
+    }
+    button:not(.no-relieve){
+      border-radius: 6px !important;
+      border: 2px solid ${borde} !important;
+      font-weight: 700 !important;
+      box-shadow: 3px 3px 0 ${sombraDura} !important;
+      transition: box-shadow .08s, transform .08s;
+    }
+    button:not(.no-relieve):active{
+      box-shadow: 1px 1px 0 ${sombraDura} !important;
+      transform: translate(2px, 2px);
+    }
+    input:not(.no-relieve), select:not(.no-relieve), textarea:not(.no-relieve){
+      border-radius: 6px !important;
+      border: 2px solid ${borde} !important;
+    }
+  `;
 }
 // ── FIBRA DE CARBONO — propiedades separadas, no todo en una variable ─────
 // El contenedor de toda la app pinta con background:"var(--color-background-
