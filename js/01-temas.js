@@ -142,6 +142,17 @@ function _capasFibraCarbonoLC(bg, oscuro) {
     position: "0 0, 0 0, 10px 10px, 10px 10px, 0 0, 0 0, 10px 10px, 10px 10px",
   };
 }
+// ── VIÑETA — reemplazo de la fibra de carbono (pedido del usuario
+// 2026-10-24: la trama rayada quedaba "empapelada"/cargada) ───────────────
+// Mismo lugar (fondo de #root y de <body>/<html>) pero con un degradado
+// radial suave en vez de la trama cruzada — más prolijo, sin textura que
+// compita con el contenido. Se queda la función de fibra de carbono arriba
+// sin usar, por si en algún momento se quiere volver atrás.
+function _capasVignetteLC(bg, oscuro) {
+  const claro = _ajustarColorLC(bg, oscuro ? 22 : 14);
+  const profundo = _ajustarColorLC(bg, oscuro ? -16 : -10);
+  return `radial-gradient(ellipse at 50% 0%, ${claro} 0%, ${bg} 55%, ${profundo} 100%)`;
+}
 // Encuentra el div raíz de la app buscando por un estilo que sabemos que
 // tiene siempre (min-height:100vh, de s.app en 03-utils.js) — más seguro
 // que adivinar un selector CSS que puede no coincidir con el HTML real.
@@ -178,21 +189,21 @@ function aplicarTemaLC(temaId) {
     const rel = _generarRelieveVarsLC(tema.vars, tema.modo);
     Object.entries(rel).forEach(([k,v])=>root.style.setProperty(k,v));
     const oscuro = tema.modo==="oscuro";
-    const capasApp  = _capasFibraCarbonoLC(tema.vars["--color-background-primary"], oscuro);
-    const capasBody = _capasFibraCarbonoLC(tema.vars["body-bg"], oscuro);
+    const vignetteApp  = _capasVignetteLC(tema.vars["--color-background-primary"], oscuro);
+    const vignetteBody = _capasVignetteLC(tema.vars["body-bg"], oscuro);
     if(cont){
       cont.style.backgroundColor = tema.vars["--color-background-primary"];
-      cont.style.backgroundImage = capasApp.image;
-      cont.style.backgroundSize = "20px 20px";
-      cont.style.backgroundPosition = capasApp.position;
+      cont.style.backgroundImage = vignetteApp;
+      cont.style.backgroundSize = "";
+      cont.style.backgroundPosition = "";
     }
     // <html> también, no solo <body> — así no queda un hueco blanco abajo
     // si el documento termina siendo más alto que lo que <body> cubre.
     [document.body, root].forEach(el=>{
       el.style.backgroundColor = tema.vars["body-bg"];
-      el.style.backgroundImage = capasBody.image;
-      el.style.backgroundSize = "20px 20px";
-      el.style.backgroundPosition = capasBody.position;
+      el.style.backgroundImage = vignetteBody;
+      el.style.backgroundSize = "";
+      el.style.backgroundPosition = "";
     });
   } else {
     // Clásico: sin textura, todo vuelve a ser liso.
