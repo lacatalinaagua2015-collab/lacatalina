@@ -260,9 +260,10 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        borderRadius: 9,
+        borderRadius: esMetalico ? "50%" : 9,
         background: "var(--color-background-tertiary)",
-        border: "0.5px solid var(--color-border-secondary)"
+        border: "0.5px solid var(--color-border-secondary)",
+        boxShadow: esMetalico ? "inset 0 1px 2px rgba(255,255,255,0.15), inset 0 -2px 4px rgba(0,0,0,0.3)" : undefined
       }
     }, "📍"), c.telefono && /*#__PURE__*/React.createElement("a", {
       href: `https://wa.me/54${c.telefono}`,
@@ -276,9 +277,10 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        borderRadius: 9,
+        borderRadius: esMetalico ? "50%" : 9,
         background: "var(--color-background-tertiary)",
-        border: "0.5px solid var(--color-border-secondary)"
+        border: "0.5px solid var(--color-border-secondary)",
+        boxShadow: esMetalico ? "inset 0 1px 2px rgba(255,255,255,0.15), inset 0 -2px 4px rgba(0,0,0,0.3)" : undefined
       }
     }, "💬"), /*#__PURE__*/React.createElement("span", {
       style: {
@@ -289,9 +291,10 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        borderRadius: 9,
+        borderRadius: esMetalico ? "50%" : 9,
         background: "var(--color-background-tertiary)",
-        border: "0.5px solid var(--color-border-secondary)"
+        border: "0.5px solid var(--color-border-secondary)",
+        boxShadow: esMetalico ? "inset 0 1px 2px rgba(255,255,255,0.15), inset 0 -2px 4px rgba(0,0,0,0.3)" : undefined
       },
       title: "Foto domicilio",
       onClick: e => {
