@@ -163,7 +163,7 @@ function MenuDias({
 
   const temaIdActual = (typeof getTemaLC === "function") ? getTemaLC() : "oscuro-azul";
   const temaInfoActual = (typeof TEMAS_LC !== "undefined" && TEMAS_LC[temaIdActual]) || {};
-  const estiloActual = temaInfoActual.cuadrado ? "cuadrado" : (temaInfoActual.relieve ? "metalico" : "clasico");
+  const estiloActual = temaInfoActual.redondo ? "metalico" : (temaInfoActual.relieve ? "cuadrado" : "clasico");
 
   if (estiloActual === "clasico") {
   return /*#__PURE__*/React.createElement("div", {

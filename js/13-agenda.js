@@ -548,7 +548,7 @@ function NuevoRecordatorioForm({
 function ConfigAparienciaLC() {
   const [temaActual, setTemaActual] = React.useState(getTemaLC);
   const [modoVista, setModoVista] = React.useState(() => TEMAS_LC[getTemaLC()]?.modo || "oscuro");
-  const [estiloVista, setEstiloVista] = React.useState(() => TEMAS_LC[getTemaLC()]?.relieve ? "metalico" : TEMAS_LC[getTemaLC()]?.cuadrado ? "cuadrado" : "clasico");
+  const [estiloVista, setEstiloVista] = React.useState(() => TEMAS_LC[getTemaLC()]?.redondo ? "metalico" : TEMAS_LC[getTemaLC()]?.relieve ? "cuadrado" : "clasico");
   const [guardado, setGuardado] = React.useState(false);
   const aplicar = id => {
     // Guardar PRIMERO — así la elección queda guardada pase lo que pase
@@ -564,7 +564,7 @@ function ConfigAparienciaLC() {
     setGuardado(true);
     setTimeout(() => setGuardado(false), 2000);
   };
-  const temasFiltrados = Object.entries(TEMAS_LC).filter(([, t]) => t.modo === modoVista && (estiloVista === "metalico" ? !!t.relieve : estiloVista === "cuadrado" ? !!t.cuadrado : !t.relieve && !t.cuadrado));
+  const temasFiltrados = Object.entries(TEMAS_LC).filter(([, t]) => t.modo === modoVista && (estiloVista === "metalico" ? !!t.redondo : estiloVista === "cuadrado" ? !!t.relieve : !t.relieve && !t.redondo));
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,

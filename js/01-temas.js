@@ -19,14 +19,14 @@ const TEMAS_LC = {
 const BASE_TEMAS_LC_KEYS = Object.keys(TEMAS_LC);
 BASE_TEMAS_LC_KEYS.forEach(id=>{
   const base = TEMAS_LC[id];
-  TEMAS_LC[id+"-metal"] = { nombre:base.nombre, modo:base.modo, emoji:"⚙️", relieve:true, vars:base.vars };
+  TEMAS_LC[id+"-metal"] = { nombre:base.nombre, modo:base.modo, emoji:"⚙️", redondo:true, vars:base.vars };
 });
 // ── ESTILO CUADRADO ─ esquinas rectas, sin relieve, mismos colores ───
 // Igual que Metálico: no es una paleta nueva, es la MISMA paleta con las
 // esquinas en 0 en vez de redondeadas. Se arma solo para cada paleta base.
 BASE_TEMAS_LC_KEYS.forEach(id=>{
   const base = TEMAS_LC[id];
-  TEMAS_LC[id+"-cuadrado"] = { nombre:base.nombre, modo:base.modo, emoji:"🧊", cuadrado:true, vars:base.vars };
+  TEMAS_LC[id+"-cuadrado"] = { nombre:base.nombre, modo:base.modo, emoji:"🧊", relieve:true, vars:base.vars };
 });
 function _ajustarColorLC(hex, amt) {
   hex = (hex||"").replace("#","");
@@ -104,39 +104,47 @@ function _aplicarSombraGlobalLC(tema) {
     }
   `;
 }
-// ── CUADRADO ─ todas las esquinas a 0, sin tocar colores ni sombras ──
-// Misma idea que _aplicarSombraGlobalLC: una sola regla global con
-// !important, así no hay que tocar cada pantalla para sacarle el
-// redondeado a tarjetas, botones, chips y avatares.
-function _aplicarCuadradoGlobalLC(tema) {
+// ── REDONDO ─ identidad propia de Metálico: todo circular/píldora ──
+// Pedido del usuario (2026-10-24): tiene que ser completamente distinto a
+// Clásico (tarjetas rectas) y a Cubo (esquinas chicas + sombra dura). Acá
+// la forma cambia del todo — botones en píldora/círculo, con un brillo
+// "perilla metálica" calculado a partir del color de fondo de CADA paleta
+// (no un color fijo), así se ve bien sea cual sea la paleta elegida.
+// Los días en círculo (lista en vez de grilla) se arman aparte, en
+// 07-menu.js, porque esa parte cambia de estructura y no solo de estilo.
+function _aplicarRedondoGlobalLC(tema) {
   let tag = document.getElementById("cuadrado-global-lc");
   if(!tag){ tag = document.createElement("style"); tag.id = "cuadrado-global-lc"; document.head.appendChild(tag); }
-  if(!tema.cuadrado){ tag.textContent = ""; return; }
-  // Identidad propia del tema Cubo: esquinas más cerradas (nunca 0 — eso
-  // ya se descartó antes), bordes marcados y sombra "offset" dura en vez
-  // de la sombra difusa de Clásico/Metálico. Sigue el mismo patrón que
-  // _aplicarSombraGlobalLC: una sola regla global con !important.
+  if(!tema.redondo){ tag.textContent = ""; return; }
   const oscuro = tema.modo === "oscuro";
-  const borde = oscuro ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.22)";
-  const sombraDura = oscuro ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.25)";
+  const bgTer = tema.vars["--color-background-tertiary"];
+  const claro = _ajustarColorLC(bgTer, oscuro ? 40 : 30);
+  const oscuroFondo = _ajustarColorLC(bgTer, oscuro ? -28 : -20);
+  const metal = `radial-gradient(circle at 32% 26%, ${claro} 0%, ${bgTer} 50%, ${oscuroFondo} 100%)`;
+  const borde = oscuro ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.16)";
+  const brilloInset = oscuro ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.65)";
+  const sombraInset = oscuro ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0.12)";
+  const sombraFuera = oscuro ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.14)";
   tag.textContent = `
-    div[style*="border-radius: 12px"], div[style*="border-radius:12px"]{
-      border-radius: 6px !important;
-    }
     button:not(.no-relieve){
-      border-radius: 6px !important;
-      border: 2px solid ${borde} !important;
-      font-weight: 700 !important;
-      box-shadow: 3px 3px 0 ${sombraDura} !important;
-      transition: box-shadow .08s, transform .08s;
+      border-radius: 999px !important;
+      border: 1px solid ${borde} !important;
+      background: ${metal} !important;
+      box-shadow: inset 0 1px 2px ${brilloInset}, inset 0 -2px 4px ${sombraInset}, 0 2px 5px ${sombraFuera} !important;
+      font-weight: 600 !important;
+      transition: box-shadow .1s, transform .05s;
     }
     button:not(.no-relieve):active{
-      box-shadow: 1px 1px 0 ${sombraDura} !important;
-      transform: translate(2px, 2px);
+      transform: translateY(1px);
+      box-shadow: inset 0 2px 4px ${sombraInset} !important;
     }
     input:not(.no-relieve), select:not(.no-relieve), textarea:not(.no-relieve){
-      border-radius: 6px !important;
-      border: 2px solid ${borde} !important;
+      border-radius: 999px !important;
+      border: 1px solid ${borde} !important;
+    }
+    span[style*="border-radius: 50%"], span[style*="border-radius:50%"]{
+      background: ${metal} !important;
+      box-shadow: inset 0 1px 2px ${brilloInset}, inset 0 -2px 4px ${sombraInset} !important;
     }
   `;
 }
@@ -245,7 +253,7 @@ function aplicarTemaLC(temaId) {
     });
   }
   _aplicarSombraGlobalLC(tema);
-  _aplicarCuadradoGlobalLC(tema);
+  _aplicarRedondoGlobalLC(tema);
 }
 function getTemaLC() { try { return JSON.parse(localStorage.getItem("lc_tema")||'"oscuro-azul"'); } catch { return "oscuro-azul"; } }
 (()=>{
