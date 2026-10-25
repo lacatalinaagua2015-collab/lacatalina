@@ -37,6 +37,9 @@ function MenuDias({
   onVerDeudor
 }) {
   const [editandoZona, setEditandoZona] = React.useState(null);
+  // Pedido del usuario (2026-10-25): en Cubo, Clientes/Stock/Config llevan
+  // un recuadro con el acento de la paleta elegida en vez del gris plano.
+  const esCubo = esCuboLC();
   // Qué día tiene desplegada la lista de clientes en deuda (uno solo a la
   // vez, igual que editandoZona).
   const [deudaExpandida, setDeudaExpandida] = React.useState(null);
@@ -711,9 +714,9 @@ function MenuDias({
       borderRadius: 12,
       cursor: "pointer",
       border: "2px solid transparent",
-      background: "var(--color-background-tertiary)",
+      background: esCubo ? "var(--color-accent)" : "var(--color-background-tertiary)",
       boxShadow: "0 3px 6px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.06) inset",
-      color: "var(--color-text-secondary)"
+      color: esCubo ? "#fff" : "var(--color-text-secondary)"
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
@@ -723,7 +726,7 @@ function MenuDias({
     style: {
       fontSize: 12,
       fontWeight: 500,
-      color: "var(--color-text-primary)",
+      color: esCubo ? "#fff" : "var(--color-text-primary)",
       textAlign: "center"
     }
   }, lbl))))));
