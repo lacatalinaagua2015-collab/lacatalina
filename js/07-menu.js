@@ -763,6 +763,7 @@ function MenuDias({
         // recuadros miden exactamente lo mismo, tengan o no el badge.
         height: 132,
         padding: "14px 8px",
+        paddingLeft: esCubo ? 7 : 8,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -773,6 +774,9 @@ function MenuDias({
         // sutil + sombra de base abajo (efecto tecla) + brillo fino arriba.
         background: "linear-gradient(180deg, #1c2d40 0%, #141f2d 100%)",
         border: "1px solid rgba(255,255,255,0.05)",
+        // Pedido del usuario (2026-10-25): en Cubo, linea de color a la
+        // izquierda segun si el dia tiene deuda (rojo) o no (verde).
+        borderLeft: esCubo ? `4px solid ${totalDeuda > 0 ? "var(--color-text-danger)" : "var(--color-text-success)"}` : undefined,
         borderRadius: 16,
         boxShadow: "0 3px 0 0 rgba(0,0,0,0.4), 0 6px 14px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.09)"
       },
