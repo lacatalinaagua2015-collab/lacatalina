@@ -959,18 +959,18 @@ function MenuDias({
           style: {
             flex: 1,
             textAlign: "left",
-            background: "#0c1e29",
-            border: "2px solid #e5484d",
+            background: "var(--color-accent)",
+            border: "none",
             borderRadius: 13,
             padding: "11px 12px",
             cursor: "pointer"
           }
         }, React.createElement("div", {
-          style: { fontSize: 10, fontWeight: 800, color: "#5bc3f0", textTransform: "uppercase", letterSpacing: "0.04em" }
+          style: { fontSize: 10, fontWeight: 800, color: "#fff", textTransform: "uppercase", letterSpacing: "0.04em" }
         }, "🔵 Transferencias"), React.createElement("div", {
-          style: { fontSize: 14, fontWeight: 800, color: "#a3ddf7", marginTop: 3 }
+          style: { fontSize: 14, fontWeight: 800, color: "#fff", marginTop: 3 }
         }, fmt(transMontoNeto)), React.createElement("div", {
-          style: { fontSize: 10.5, color: "#5bc3f0", opacity: 0.8, marginTop: 1 }
+          style: { fontSize: 10.5, color: "#fff", opacity: 0.85, marginTop: 1 }
         }, transClientesCount, " sin confirmar"))
   );
   if (recordatoriosActivos && recordatoriosActivos.length > 0) notifItems.push(React.createElement("button", {
@@ -979,18 +979,18 @@ function MenuDias({
     style: {
       flex: 1,
       textAlign: "left",
-      background: "var(--color-background-info)",
-      border: "1px solid var(--color-border-info)",
+      background: esCubo ? "var(--color-accent)" : "var(--color-background-info)",
+      border: esCubo ? "none" : "1px solid var(--color-border-info)",
       borderRadius: 13,
       padding: "11px 12px",
       cursor: "pointer"
     }
   }, React.createElement("div", {
-    style: { fontSize: 10, fontWeight: 800, color: "var(--color-text-info)", textTransform: "uppercase", letterSpacing: "0.04em" }
+    style: { fontSize: 10, fontWeight: 800, color: esCubo ? "#fff" : "var(--color-text-info)", textTransform: "uppercase", letterSpacing: "0.04em" }
   }, "🔔 Recordatorios"), React.createElement("div", {
-    style: { fontSize: 14, fontWeight: 800, color: "var(--color-text-info)", marginTop: 3 }
+    style: { fontSize: 14, fontWeight: 800, color: esCubo ? "#fff" : "var(--color-text-info)", marginTop: 3 }
   }, recClientesCount, " pendientes"), React.createElement("div", {
-    style: { fontSize: 10.5, color: "var(--color-text-info)", opacity: 0.8, marginTop: 1 }
+    style: { fontSize: 10.5, color: esCubo ? "#fff" : "var(--color-text-info)", opacity: 0.8, marginTop: 1 }
   }, recDiasCount, " día", recDiasCount !== 1 ? "s" : "")));
 
   return React.createElement("div", { style: s.screen },
@@ -1168,7 +1168,8 @@ function MenuDias({
   }, [{
     ico: "📅",
     lbl: "Agenda",
-    fn: () => onAgenda && onAgenda()
+    fn: () => onAgenda && onAgenda(),
+    agenda: true
   }, {
     ico: "📋",
     lbl: "Planilla",
@@ -1178,7 +1179,7 @@ function MenuDias({
     lbl: esMetalico ? "Nuevo" : "Nuevo cliente",
     fn: () => onNuevoCliente && onNuevoCliente(),
     primary: true
-  }].map(({ ico, lbl, fn, primary }) => React.createElement("button", {
+  }].map(({ ico, lbl, fn, primary, agenda }) => React.createElement("button", {
     key: ico,
     onClick: fn,
     className: esMetalico && primary ? "no-relieve" : undefined,
@@ -1192,14 +1193,14 @@ function MenuDias({
       borderRadius: 11,
       cursor: "pointer",
       border: "none",
-      background: esMetalico && primary ? "radial-gradient(circle at 32% 20%, #3f9ded 0%, #185FA5 55%, #0d3a66 100%)" : "var(--color-background-tertiary)",
-      color: esMetalico && primary ? "#fff" : "var(--color-text-secondary)",
+      background: esMetalico && primary ? "radial-gradient(circle at 32% 20%, #3f9ded 0%, #185FA5 55%, #0d3a66 100%)" : (esCubo && agenda ? "var(--color-accent)" : "var(--color-background-tertiary)"),
+      color: esMetalico && primary ? "#fff" : (esCubo && agenda ? "#fff" : "var(--color-text-secondary)"),
       boxShadow: esMetalico && primary ? "0 3px 8px rgba(24,95,165,0.35)" : undefined
     }
   }, React.createElement("span", {
     style: { fontSize: esMetalico ? 14 : 19 }
   }, ico), React.createElement("span", {
-    style: { fontSize: esMetalico ? 10 : 9, fontWeight: esMetalico ? 600 : 500, color: esMetalico ? (primary ? "#fff" : "var(--color-text-secondary)") : "var(--color-text-tertiary)" }
+    style: { fontSize: esMetalico ? 10 : 9, fontWeight: esMetalico ? 600 : 500, color: esMetalico ? (primary ? "#fff" : "var(--color-text-secondary)") : (esCubo && agenda ? "#fff" : "var(--color-text-tertiary)") }
   }, lbl)))),
 
   React.createElement("div", { style: s.divider }),
