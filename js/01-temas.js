@@ -34,6 +34,20 @@ function _ajustarColorLC(hex, amt) {
   const canal = (i) => Math.max(0,Math.min(255, parseInt(hex.substring(i,i+2),16)+amt)).toString(16).padStart(2,"0");
   return "#"+canal(0)+canal(2)+canal(4);
 }
+// Mezcla dos colores hex, pct = 0..1 de cuánto de hexB se mete en hexA.
+// Pedido del usuario (2026-10-25): usado para teñir el gris metálico con
+// el acento de cada paleta (ver _aplicarRedondoGlobalLC más abajo).
+function _mezclarColorLC(hexA, hexB, pct) {
+  hexA = (hexA||"").replace("#","");
+  hexB = (hexB||"").replace("#","");
+  if(hexA.length!==6 || hexB.length!==6) return "#"+hexA;
+  const canal = (i) => {
+    const a = parseInt(hexA.substring(i,i+2),16);
+    const b = parseInt(hexB.substring(i,i+2),16);
+    return Math.max(0,Math.min(255, Math.round(a + (b-a)*pct))).toString(16).padStart(2,"0");
+  };
+  return "#"+canal(0)+canal(2)+canal(4);
+}
 // Los temas "Metálico" (relieve/fibra de carbono) se sacaron para
 // simplificar — eran 10 variantes extra (el doble de superficie para
 // mantener) que complicaban probar cualquier cambio visual sin revisar las
@@ -118,9 +132,17 @@ function _aplicarRedondoGlobalLC(tema) {
   if(!tema.redondo){ tag.textContent = ""; return; }
   const oscuro = tema.modo === "oscuro";
   const bgTer = tema.vars["--color-background-tertiary"];
-  const claro = _ajustarColorLC(bgTer, oscuro ? 40 : 30);
-  const oscuroFondo = _ajustarColorLC(bgTer, oscuro ? -28 : -20);
-  const metal = `radial-gradient(circle at 32% 26%, ${claro} 0%, ${bgTer} 50%, ${oscuroFondo} 100%)`;
+  // Pedido del usuario (2026-10-25): Aguamarina y Océano Oscuro se veían
+  // casi iguales en Metálico porque el metal salía solo del gris de
+  // fondo, sin tocar el acento de cada paleta. Se tiñe ese gris con un
+  // toque del acento (verde en Aguamarina, azul en Océano Oscuro, etc.)
+  // antes de armar el degradado — sigue siendo "metal", pero ya no todas
+  // las paletas quedan iguales.
+  const accent = tema.vars["--color-accent"];
+  const bgTerTenido = _mezclarColorLC(bgTer, accent, 0.18);
+  const claro = _ajustarColorLC(bgTerTenido, oscuro ? 40 : 30);
+  const oscuroFondo = _ajustarColorLC(bgTerTenido, oscuro ? -28 : -20);
+  const metal = `radial-gradient(circle at 32% 26%, ${claro} 0%, ${bgTerTenido} 50%, ${oscuroFondo} 100%)`;
   const borde = oscuro ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.16)";
   const brilloInset = oscuro ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.65)";
   const sombraInset = oscuro ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0.12)";
@@ -260,6 +282,10 @@ function getTemaLC() { try { return JSON.parse(localStorage.getItem("lc_tema")||
 // Metalico ("redondo"). Pedido del usuario (2026-10-24): extender el
 // estilo redondo a toda la app, pantalla por pantalla.
 function esMetalicoLC() { try { const t = TEMAS_LC[getTemaLC()]; return !!(t && t.redondo); } catch { return false; } }
+// Helper global análogo: true si el tema activo es Cubo ("relieve").
+// Pedido del usuario (2026-10-25): recuadro con el acento de la paleta
+// atrás de los íconos de Home, solo en Cubo.
+function esCuboLC() { try { const t = TEMAS_LC[getTemaLC()]; return !!(t && t.relieve); } catch { return false; } }
 (()=>{
   try { aplicarTemaLC(getTemaLC()); } catch{}
   // El contenedor de la app todavía no existe acá (React recién lo crea
