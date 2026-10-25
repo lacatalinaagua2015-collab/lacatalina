@@ -340,7 +340,7 @@ var firebaseConfig = {
         if(opts && opts.sinBorrar) window._lcLastSaved = null;
         else window._lcLastSaved = JSON.parse(JSON.stringify(data));
         return true;
-      }).catch(function(e){ console.error('cloudSave err', e); return false; });
+      }).catch(function(e){ console.error('cloudSave err', e); window._lcUltimoErrorCloud = (e && e.code) || 'desconocido'; return false; });
     }
 
     function cloudLoad(){

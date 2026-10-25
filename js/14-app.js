@@ -1857,35 +1857,67 @@ function App() {
 
   // ── MODO OFFLINE ──────────────────────────────────────────────────
   React.useEffect(() => {
-    const goOnline = () => {
-      setIsOnline(true);
+    const BASE_REINTENTO = 45000; // 45s -- ritmo normal
+    const BASE_REINTENTO_CUOTA = 5 * 60 * 1000; // 5 min si el último fallo fue por cuota
+    const MAX_REINTENTO = 20 * 60 * 1000; // techo: no pasar de 20 min entre intentos
+    let demora = BASE_REINTENTO;
+    let timerId = null;
+    const programar = ms => {
+      if (timerId) clearTimeout(timerId);
+      timerId = setTimeout(intentarGuardar, ms);
+    };
+    // Intenta el guardado pendiente (si hay) y reprograma el próximo intento
+    // según el resultado. Reemplaza el viejo setInterval fijo de 45s: ese
+    // reintentaba para siempre al mismo ritmo pasara lo que pasara, y si el
+    // motivo era "cuota excedida" ESE mismo reintento era lo que mantenía la
+    // cuota agotada en vez de dejarla recuperarse (2026-10-25).
+    const intentarGuardar = () => {
       const pending = localStorage.getItem("sr_offline_pending");
-      if (pending) {
-        setSyncStatus("saving");
-        // Reintentar con el estado ACTUAL (estadoRef.current, vía
-        // syncData({})) — no con una foto vieja guardada en localStorage.
-        // syncData ya se encarga de limpiar la bandera sr_offline_pending
-        // si el guardado sale bien, y de re-marcarla si vuelve a fallar.
-        try {
-          cloudSave(estadoRef.current).then(ok => {
-            if (ok) {
-              localStorage.removeItem("sr_offline_pending");
-              setPendingOfflineSync(false);
-              setSyncStatus("saved");
-              setTimeout(() => setSyncStatus("idle"), 2500);
-            } else {
-              setSyncStatus("error");
-              setTimeout(() => setSyncStatus("offline_pending"), 3000);
-            }
-          }).catch(() => {
+      if (!(navigator.onLine && pending)) {
+        demora = BASE_REINTENTO;
+        programar(demora);
+        return;
+      }
+      setIsOnline(true);
+      setSyncStatus("saving");
+      // Reintentar con el estado ACTUAL (estadoRef.current, vía
+      // syncData({})) — no con una foto vieja guardada en localStorage.
+      // syncData ya se encarga de limpiar la bandera sr_offline_pending
+      // si el guardado sale bien, y de re-marcarla si vuelve a fallar.
+      try {
+        cloudSave(estadoRef.current).then(ok => {
+          if (ok) {
+            localStorage.removeItem("sr_offline_pending");
+            setPendingOfflineSync(false);
+            setSyncStatus("saved");
+            setTimeout(() => setSyncStatus("idle"), 2500);
+            demora = BASE_REINTENTO;
+          } else {
             setSyncStatus("error");
             setTimeout(() => setSyncStatus("offline_pending"), 3000);
-          });
-        } catch {
-          localStorage.removeItem("sr_offline_pending");
-          setPendingOfflineSync(false);
-        }
+            const fueCuota = window._lcUltimoErrorCloud === "resource-exhausted";
+            demora = Math.min(MAX_REINTENTO, Math.max(demora * 2, fueCuota ? BASE_REINTENTO_CUOTA : BASE_REINTENTO));
+          }
+          programar(demora);
+        }).catch(() => {
+          setSyncStatus("error");
+          setTimeout(() => setSyncStatus("offline_pending"), 3000);
+          demora = Math.min(MAX_REINTENTO, demora * 2);
+          programar(demora);
+        });
+      } catch {
+        localStorage.removeItem("sr_offline_pending");
+        setPendingOfflineSync(false);
+        demora = BASE_REINTENTO;
+        programar(demora);
       }
+    };
+    const goOnline = () => {
+      setIsOnline(true);
+      // Señal real de reconexión -- vale la pena intentar ya, sin esperar el
+      // backoff en curso.
+      demora = BASE_REINTENTO;
+      intentarGuardar();
     };
     const goOffline = () => {
       setIsOnline(false);
@@ -1893,17 +1925,11 @@ function App() {
     };
     window.addEventListener("online", goOnline);
     window.addEventListener("offline", goOffline);
-    // Reintento periódico: cubre el caso de un guardado que falló ESTANDO
-    // online (permisos, cuota momentánea) — sin esto, solo se reintentaba
-    // al pasar de sin señal a con señal, y ese cambio puede no pasar nunca
-    // en una sesión donde la conexión nunca se corta.
-    const reintentoPeriodico = setInterval(() => {
-      if (navigator.onLine && localStorage.getItem("sr_offline_pending")) goOnline();
-    }, 45000);
+    programar(demora);
     return () => {
       window.removeEventListener("online", goOnline);
       window.removeEventListener("offline", goOffline);
-      clearInterval(reintentoPeriodico);
+      if (timerId) clearTimeout(timerId);
     };
   }, []);
 
