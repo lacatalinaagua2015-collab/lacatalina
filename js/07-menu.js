@@ -37,9 +37,6 @@ function MenuDias({
   onVerDeudor
 }) {
   const [editandoZona, setEditandoZona] = React.useState(null);
-  // Pedido del usuario (2026-10-25): en Cubo, Clientes/Stock/Config llevan
-  // un recuadro con el acento de la paleta elegida en vez del gris plano.
-  const esCubo = esCuboLC();
   // Qué día tiene desplegada la lista de clientes en deuda (uno solo a la
   // vez, igual que editandoZona).
   const [deudaExpandida, setDeudaExpandida] = React.useState(null);
@@ -714,9 +711,9 @@ function MenuDias({
       borderRadius: 12,
       cursor: "pointer",
       border: "2px solid transparent",
-      background: esCubo ? "var(--color-accent)" : "var(--color-background-tertiary)",
+      background: "var(--color-background-tertiary)",
       boxShadow: "0 3px 6px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.06) inset",
-      color: esCubo ? "#fff" : "var(--color-text-secondary)"
+      color: "var(--color-text-secondary)"
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
@@ -726,7 +723,7 @@ function MenuDias({
     style: {
       fontSize: 12,
       fontWeight: 500,
-      color: esCubo ? "#fff" : "var(--color-text-primary)",
+      color: "var(--color-text-primary)",
       textAlign: "center"
     }
   }, lbl))))));
@@ -907,6 +904,9 @@ function MenuDias({
   };
   const notifItems = [];
   const esMetalico = estiloActual === "metalico";
+  // Pedido del usuario (2026-10-25): en Cubo, Clientes/Stock/Config llevan
+  // un recuadro con el acento de la paleta en vez del gris/transparente.
+  const esCubo = estiloActual === "cuadrado";
   // Pedido del usuario (2026-10-22): "Opcion C" del preview - paleta
   // azul/cian en vez de naranja/rojo, para no confundir "pendiente de
   // confirmar" con un error real.
@@ -1231,15 +1231,16 @@ function MenuDias({
       flexDirection: "column",
       alignItems: "center",
       gap: 5,
-      paddingTop: 10,
+      padding: esCubo ? "10px 14px" : "10px 0 0",
+      borderRadius: esCubo ? 12 : undefined,
       border: "none",
-      background: "none",
+      background: esCubo ? "var(--color-accent)" : "none",
       cursor: "pointer"
     }
   }, React.createElement("span", {
     style: { fontSize: 20 }
   }, ico), React.createElement("span", {
-    style: { fontSize: 11, fontWeight: 600, color: "var(--color-text-secondary)" }
+    style: { fontSize: 11, fontWeight: 600, color: esCubo ? "#fff" : "var(--color-text-secondary)" }
   }, lbl))))
 
 );
