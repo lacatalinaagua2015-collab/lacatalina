@@ -776,7 +776,7 @@ function MenuDias({
         border: "1px solid rgba(255,255,255,0.05)",
         // Pedido del usuario (2026-10-25): en Cubo, linea de color a la
         // izquierda segun si el dia tiene deuda (rojo) o no (verde).
-        borderLeft: esCubo ? `4px solid ${totalDeuda > 0 ? "var(--color-text-danger)" : "var(--color-text-success)"}` : undefined,
+        borderLeft: esCubo ? `4px solid ${totalDeuda > 0 ? "var(--color-text-danger)" : "var(--color-text-success)"} !important` : undefined,
         borderRadius: 16,
         boxShadow: "0 3px 0 0 rgba(0,0,0,0.4), 0 6px 14px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.09)"
       },
@@ -964,7 +964,7 @@ function MenuDias({
             flex: 1,
             textAlign: "left",
             background: "var(--color-background-tertiary)",
-            border: "2px solid var(--color-accent-solid)",
+            border: "2px solid var(--color-accent-solid) !important",
             borderRadius: 13,
             padding: "11px 12px",
             cursor: "pointer"
@@ -1195,7 +1195,7 @@ function MenuDias({
       padding: esMetalico ? "11px 6px" : "10px 4px",
       borderRadius: 11,
       cursor: "pointer",
-      border: esCubo && primary ? "2px solid var(--color-accent-solid)" : "none",
+      border: esCubo && primary ? "2px solid var(--color-accent-solid) !important" : "none",
       background: esMetalico && primary ? "radial-gradient(circle at 32% 20%, #3f9ded 0%, #185FA5 55%, #0d3a66 100%)" : "var(--color-background-tertiary)",
       color: esMetalico && primary ? "#fff" : "var(--color-text-secondary)",
       boxShadow: esMetalico && primary ? "0 3px 8px rgba(24,95,165,0.35)" : undefined
