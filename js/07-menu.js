@@ -848,6 +848,11 @@ function MenuDias({
     const cfg = info ? cfgEstado[info.estado] : null;
     const sub = info ? (info.completoD ? cfg.txt : `${cfg.txt} ${info.visitadosD.length}/${info.clientesD.length}`) : null;
     const aroColor = totalDeuda > 0 ? "var(--color-text-danger)" : "var(--color-text-success)";
+    // Pedido del usuario (2026-10-25): en vez del aro completo, un arco de
+    // un tercio del circulo, abajo a la izquierda -- box-shadow no puede
+    // dibujar un aro parcial, asi que va un <svg><circle> superpuesto con
+    // stroke-dasharray (y rotate para que arranque en ese punto).
+    const R_ARO = 28, C_ARO = 2 * Math.PI * R_ARO, ARCO_ARO = C_ARO / 3;
     return React.createElement("div", {
       key: d,
       style: { display: "flex", alignItems: "center", gap: 12 }
@@ -855,6 +860,7 @@ function MenuDias({
       className: "no-relieve",
       onClick: () => onIrPlanillaDia(d),
       style: {
+        position: "relative",
         flex: "0 0 auto",
         width: 56,
         height: 56,
@@ -863,7 +869,7 @@ function MenuDias({
         cursor: "pointer",
         background: "var(--color-background-tertiary)",
         border: "1px solid var(--color-border-tertiary)",
-        boxShadow: `inset 0 1px 2px rgba(255,255,255,0.15), inset 0 -2px 4px rgba(0,0,0,0.3), 0 2px 5px rgba(0,0,0,0.25), 0 0 0 2px ${aroColor}`,
+        boxShadow: `inset 0 1px 2px rgba(255,255,255,0.15), inset 0 -2px 4px rgba(0,0,0,0.3), 0 2px 5px rgba(0,0,0,0.25)`,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -871,7 +877,22 @@ function MenuDias({
         fontWeight: 800,
         color: "var(--color-text-primary)"
       }
-    }, d.slice(0, 3).toUpperCase()), React.createElement("div", {
+    }, d.slice(0, 3).toUpperCase(), React.createElement("svg", {
+      width: 60,
+      height: 60,
+      viewBox: "0 0 60 60",
+      style: { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", pointerEvents: "none" }
+    }, React.createElement("circle", {
+      cx: 30,
+      cy: 30,
+      r: R_ARO,
+      fill: "none",
+      stroke: aroColor,
+      strokeWidth: 3,
+      strokeLinecap: "round",
+      strokeDasharray: `${ARCO_ARO} ${C_ARO}`,
+      transform: "rotate(75 30 30)"
+    }))), React.createElement("div", {
       style: { flex: "0 0 auto", width: 44, fontSize: 11, color: "var(--color-text-tertiary)", textAlign: "left" }
     }, totalClientes, React.createElement("br"), "cliente", totalClientes !== 1 ? "s" : ""), React.createElement("div", {
       style: { flex: "1 1 auto", minWidth: 0, textAlign: "right" }
