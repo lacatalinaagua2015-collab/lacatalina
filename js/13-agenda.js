@@ -597,7 +597,19 @@ function ConfigAparienciaLC() {
       color: estiloVista === e ? "#fff" : "var(--color-text-secondary)",
       border: `1px solid ${estiloVista === e ? "transparent" : "var(--color-border-secondary)"}`
     },
-    onClick: () => setEstiloVista(e)
+    onClick: () => {
+      // Pedido del usuario (2026-10-25): al cambiar de Tema (Clásico/
+      // Metálico/Cubo) se perdía la referencia de qué color seguía activo
+      // -- ninguna tarjeta de Colores quedaba marcada "Activo" hasta
+      // tocar una. El mismo color existe en los 3 Temas (mismo id, otro
+      // sufijo), así que acá se arma el id equivalente en el Tema nuevo y
+      // se aplica directo: el color sigue siendo el mismo, solo cambia la
+      // forma, y la marca "✓ Activo" queda visible al toque.
+      setEstiloVista(e);
+      const base = temaActual.replace(/-metal$|-cuadrado$/, "");
+      const nuevoId = e === "metalico" ? base + "-metal" : e === "cuadrado" ? base + "-cuadrado" : base;
+      if (TEMAS_LC[nuevoId]) aplicar(nuevoId);
+    }
   }, l))), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 13,
