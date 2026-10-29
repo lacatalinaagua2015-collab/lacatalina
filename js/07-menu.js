@@ -1929,6 +1929,7 @@ function DetalleVentasDia({
         onClick: () => {
           onQuitarNoVisita && onQuitarNoVisita(n.clienteId);
           setEditandoNVId(null);
+          onCargarVenta && onCargarVenta(n.clienteId);
         }
       }, "🗑️ Quitar marca")));
     }));
