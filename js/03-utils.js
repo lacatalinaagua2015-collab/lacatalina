@@ -430,6 +430,19 @@ function buscarCliente(c, q) {
 //    un mismo producto si viene repartido en más de una venta) y devuelve
 //    el texto ya codificado, listo para el href de wa.me.
 // ════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════
+// ◆  Mensaje de WhatsApp para preguntarle a un cliente si necesita que le
+//    lleven algo — usado desde el botón 💬 de Clientes del día. Según lo
+//    que el cliente tenga cargado como fijo (sifón = soda; bidón 10L/20L
+//    o dispenser = agua) arma la pregunta con lo que corresponde.
+// ════════════════════════════════════════════════════════════════════
+function armarMsjPedidoWA(c) {
+  const tieneAgua = Number(c?.bidon10) > 0 || Number(c?.bidon20) > 0 || Number(c?.dispenser) > 0;
+  const tieneSoda = Number(c?.sifon) > 0;
+  const que = tieneAgua && tieneSoda ? "que te lleve agua y soda esta semana" : tieneAgua ? "que te lleve agua esta semana" : tieneSoda ? "que te lleve soda esta semana" : "que te pase a dejar algo esta semana";
+  const texto = `Buen día, estimado cliente de La Catalina! ¿Necesitás ${que}?`;
+  return encodeURIComponent(texto);
+}
 function armarMsjTransferWA(ventas) {
   const lista = ventas || [];
   const porNombre = {};

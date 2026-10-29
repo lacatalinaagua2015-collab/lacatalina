@@ -270,7 +270,7 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         boxShadow: esMetalico ? "inset 0 1px 2px rgba(255,255,255,0.15), inset 0 -2px 4px rgba(0,0,0,0.3)" : undefined
       }
     }, "📍"), c.telefono && /*#__PURE__*/React.createElement("a", {
-      href: `https://wa.me/54${c.telefono}`,
+      href: `https://wa.me/54${c.telefono}?text=${armarMsjPedidoWA(c)}`,
       target: "_blank",
       rel: "noreferrer",
       style: {
