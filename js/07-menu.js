@@ -1425,7 +1425,8 @@ function DetalleVentasDia({
   onPerdidaCliente,
   onConfirmarTransfer,
   onRegistrarNoVisita,
-  onQuitarNoVisita
+  onQuitarNoVisita,
+  onCargarVenta
 }) {
   const [abierto, setAbierto] = React.useState(false);
   // Fila de "No compraron" cuyo menú de edición está desplegado (clienteId o null) —
@@ -1958,6 +1959,7 @@ function PlanillaDelDia({
   onPerdidaCliente,
   onConfirmarTransfer,
   onEditarCarga,
+  onCargarVenta,
   onRegistrarNoVisita,
   onQuitarNoVisita,
   perdidas,
@@ -3454,7 +3456,8 @@ function PlanillaDelDia({
     onPerdidaCliente: onPerdidaCliente,
     onConfirmarTransfer: onConfirmarTransfer,
     onRegistrarNoVisita: onRegistrarNoVisita,
-    onQuitarNoVisita: onQuitarNoVisita
+    onQuitarNoVisita: onQuitarNoVisita,
+    onCargarVenta: onCargarVenta
   }) : /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,

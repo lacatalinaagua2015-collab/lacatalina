@@ -3735,6 +3735,18 @@ function App() {
     onQuitarNoVisita: clienteId => {
       registrarTombstoneNoVisita(clienteId, diaActual, fechaActual);
       saveNoVisitas(prev => (prev || []).filter(v => !(v.clienteId === clienteId && v.dia === diaActual && v.fecha === fechaActual)));
+    },
+    // Pedido del usuario (2026-10-29): en "No compraron" de la Planilla, al
+    // tocar "Quitar marca" en un cliente que en realidad SÍ compró (se
+    // había olvidado de cargar la venta), además de sacarle el "No quiso"
+    // lo manda directo al formulario de venta de ese cliente -- antes había
+    // que ir hasta Clientes a buscarlo a mano. Vuelve acá mismo (Planilla)
+    // al guardar o cancelar la venta.
+    onCargarVenta: clienteId => {
+      setClienteId(clienteId);
+      setVolverVentaA("planilla");
+      setRutaDiariaVenta(false);
+      irA("venta");
     }
   }), pantalla === "selectorFechaClientes" && /*#__PURE__*/React.createElement(SelectorFecha, {
     dia: diaActual,
