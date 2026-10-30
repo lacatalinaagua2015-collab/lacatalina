@@ -34,14 +34,15 @@ function MenuDias({
   onDormidos,
   onPlanillaAtajo,
   onIrPlanillaDia,
-  onVerDeudor
+  onVerDeudor,
+  mostrarTransferencias,
+  setMostrarTransferencias
 }) {
   const [editandoZona, setEditandoZona] = React.useState(null);
   // Qué día tiene desplegada la lista de clientes en deuda (uno solo a la
   // vez, igual que editandoZona).
   const [deudaExpandida, setDeudaExpandida] = React.useState(null);
   const [mostrarRecordatorios, setMostrarRecordatorios] = React.useState(false);
-  const [mostrarTransferencias, setMostrarTransferencias] = React.useState(false);
   const hoyDiaNombre = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"][new Date().getDay()];
   // Usar hora LOCAL para evitar bug de zona horaria (Argentina UTC-3)
   const hoyFechaKey = (() => {

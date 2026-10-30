@@ -256,6 +256,10 @@ function App() {
     return h;
   });
   const [diaActual, setDiaActual] = useLS("cat_dia_actual", "");
+  // Pedido del usuario (2026-10-30): se sube acá (antes vivía local en
+  // MenuDias) para poder forzarlo abierto al volver de "Confirmaciones" —
+  // ver onVolver de pantalla "confirmacionesDia" más abajo.
+  const [mostrarTransferencias, setMostrarTransferencias] = React.useState(false);
   // Reset diaActual when it's invalid
   React.useEffect(() => {
     if (diaActual && !DIAS.includes(diaActual)) setDiaActual("");
@@ -3481,6 +3485,8 @@ function App() {
     onIngresar: () => irA("menu")
   }), pantalla === "menu" && /*#__PURE__*/React.createElement(MenuDias, {
     dias: DIAS,
+    mostrarTransferencias: mostrarTransferencias,
+    setMostrarTransferencias: setMostrarTransferencias,
     onDia: d => {
       setDiaActual(d);
       irA("selectorFechaPlanilla");
@@ -3619,7 +3625,10 @@ function App() {
         _upd: Date.now()
       } : v));
     },
-    onVolver: () => irA("menu")
+    onVolver: () => {
+      setMostrarTransferencias(true);
+      irA("menu");
+    }
   }), pantalla === "atajoPlanillaSemana" && /*#__PURE__*/React.createElement(AtajoPlanillaSemana, {
     planillas: planillas,
     ventas: ventas,
