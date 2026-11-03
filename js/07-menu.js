@@ -1966,6 +1966,7 @@ function PlanillaDelDia({
   onQuitarNoVisita,
   perdidas,
   movStock,
+  promociones,
   ecToken
 }) {
   // Separar ventas del día propio vs ventas de clientes de otro día
@@ -2188,6 +2189,10 @@ function PlanillaDelDia({
   // desplegable (arranca cerrado) para no mostrar de entrada las ventas
   // de otro día que solo sirven para reconciliar caja.
   const [mostrarExtraDia, setMostrarExtraDia] = useState(false);
+  // Pedido del usuario (2026-11-03): desplegable "Promociones" en el
+  // Resumen del día, debajo de "Ganancia neta del día" — arranca cerrado,
+  // mismo criterio que el resto de los desplegables de esta pantalla.
+  const [mostrarPromociones, setMostrarPromociones] = useState(false);
   // Pedido del usuario (2026-10-22): la tabla "Movimiento de envases de
   // hoy" se calcula sola a partir de ventas/movStock/perdidas, pero ese
   // cálculo puede terminar registrando algo que no es (ver bug reportado
@@ -2900,6 +2905,18 @@ function PlanillaDelDia({
     retenciones = num(datos.retenciones);
   const sobrante = efectivo - (totalVentaPlata - fiado); // retenciones es informativo, no afecta el sobrante
   const ganancia = cobEfectivo - totalVentaLlenar - totalGastos + cobTransNeto;
+  // Pedido del usuario (2026-11-03): promociones (envases que se dejan a
+  // un cliente NUEVO con un cobro aparte, ej. 2 sifones + 1 bidón 10L por
+  // $2000) — NO es venta, por eso vive en su propia lista ("promociones",
+  // ver registrarPromocion en 14-app.js) y no toca ganancia/efectivo en
+  // mano/ningún total de arriba. Se filtra por fecha, igual criterio que
+  // perdidas/movStock más abajo.
+  const promocionesDia = (promociones || []).filter(p => (p.fecha || "").slice(0, 10) === fecha);
+  const promoEfectivoDia = promocionesDia.filter(p => p.formaPago !== "transferencia");
+  const promoTransfDia = promocionesDia.filter(p => p.formaPago === "transferencia");
+  const promoEfectivoTotal = promoEfectivoDia.reduce((a, p) => a + (Number(p.monto) || 0), 0);
+  const promoTransfTotal = promoTransfDia.reduce((a, p) => a + (Number(p.monto) || 0), 0);
+  const promoTotalDia = promoEfectivoTotal + promoTransfTotal;
   // Antes sumaba unidades sueltas de los 3 productos (bidones + sifones)
   // sin más — mezclaba "39 bidones" con "90 sifones" en un solo número que
   // no significaba nada real. Todo en este negocio se piensa en bultos
@@ -4035,7 +4052,61 @@ function PlanillaDelDia({
       fontWeight: 500,
       color: ganancia >= 0 ? "var(--color-text-success)" : "var(--color-text-danger)"
     }
-  }, fmt(ganancia)))), (() => {
+  }, fmt(ganancia)))), promocionesDia.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      margin: "0 0 16px",
+      padding: "14px 16px",
+      background: "var(--color-background-secondary)",
+      cursor: "pointer"
+    },
+    onClick: () => setMostrarPromociones(v => !v)
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      fontWeight: 500,
+      color: "var(--color-text-primary)"
+    }
+  }, mostrarPromociones ? "▼" : "▶", " 🎁 Promociones (", promocionesDia.length, ")"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--color-text-tertiary)",
+      marginTop: 2
+    }
+  }, "No suma a la ganancia ni al efectivo en mano")), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 18,
+      fontWeight: 500,
+      color: "var(--color-text-secondary)"
+    }
+  }, fmt(promoTotalDia))), mostrarPromociones && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10,
+      paddingTop: 10,
+      borderTop: "0.5px solid var(--color-border-tertiary)",
+      display: "flex",
+      flexDirection: "column",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", justifyContent: "space-between" }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 13, color: "var(--color-text-secondary)" }
+  }, "💵 Efectivo · ", promoEfectivoDia.length, promoEfectivoDia.length === 1 ? " cliente" : " clientes"), /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 13, fontWeight: 500, color: "var(--color-text-primary)" }
+  }, fmt(promoEfectivoTotal))), /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", justifyContent: "space-between" }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 13, color: "var(--color-text-secondary)" }
+  }, "🔵 Transferencia · ", promoTransfDia.length, promoTransfDia.length === 1 ? " cliente" : " clientes"), /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 13, fontWeight: 500, color: "var(--color-text-primary)" }
+  }, fmt(promoTransfTotal))))), (() => {
     // Pedido del usuario: ver el movimiento de envases del día (prestado,
     // devuelto, perdido, retirado, cliente nuevo) directamente en la
     // planilla de siempre, SIN tener que entrar al flujo de "Cerrar el

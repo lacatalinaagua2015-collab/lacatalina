@@ -467,6 +467,36 @@ function App() {
       return next;
     });
   };
+  // Pedido del usuario (2026-11-03): cobro de promoción (envases que se
+  // dejan a un cliente nuevo, ej. 2 sifones + 1 bidón 10L por $2000) —
+  // lista aparte, NO es una venta, no suma a efectivo en mano ni a
+  // ganancia; solo se muestra como su propio total en el Resumen del día
+  // (ver "Promociones" en PlanillaDelDia, 07-menu.js).
+  const [promociones, setPromociones] = useLS("cat_promociones_v1", []);
+  const savePromociones = r => {
+    setPromociones(prev => {
+      const base = typeof r === "function" ? r(prev) : r;
+      const _t = Date.now();
+      const next = _soloUpdCambiados(prev, base, _t);
+      syncData({
+        promociones: next
+      });
+      return next;
+    });
+  };
+  const registrarPromocion = (clienteId, nombre, monto, formaPago) => {
+    const m = Math.round(Number(monto) || 0);
+    if (m <= 0) return;
+    savePromociones(prev => [...(prev || []), {
+      id: nuevoIdCat(),
+      clienteId,
+      nombre: nombre || "Cliente",
+      monto: m,
+      formaPago: formaPago === "transferencia" ? "transferencia" : "efectivo",
+      fecha: new Date().toISOString(),
+      dia: diaActual || null
+    }]);
+  };
   // Migración única de la lista vieja de Prospectos (separada) al modelo
   // nuevo: prospectos pendientes (no convertidos todavía) pasan a ser
   // clientes normales con esProspecto:true, para que aparezcan integrados
@@ -1283,6 +1313,7 @@ function App() {
       _mergeSimple(data.movStock, "cat_movstock_v1", setMovStock, "movStock", "movimientos de stock");
       _mergeSimple(data.auditoria, "cat_auditoria_v1", setAuditoria, "auditoria", "auditoría de cambios");
       _mergeSimple(data.prospectos, "cat_prospectos_v1", setProspectos, "prospectos", "prospectos");
+      _mergeSimple(data.promociones, "cat_promociones_v1", setPromociones, "promociones", "promociones");
       // ── noVisitas: MERGEAR en vez de sobreescribir (mismo problema que clientes/planillas) ──
       // Acá vive "No está" / "No quiere" / "Saltar". Sin esto, una marca recién
       // hecha podía desaparecer si llegaba un refetch antes de terminar de sincronizar
@@ -1522,7 +1553,8 @@ function App() {
     recordatorios,
     cargasDia,
     dispMovs,
-    prospectos
+    prospectos,
+    promociones
   });
   React.useEffect(() => {
     estadoRef.current = {
@@ -1539,7 +1571,8 @@ function App() {
       // Faltaban acá: por eso no entraban ni al respaldo manual descargable
       // ni a lo que "Restaurar" vuelve a subir a la nube.
       dispMovs,
-      prospectos
+      prospectos,
+      promociones
     };
   });
 
@@ -2115,6 +2148,7 @@ function App() {
         if (data.movStock !== undefined) setMovStock(data.movStock || []);
         if (data.auditoria !== undefined) setAuditoria(data.auditoria || []);
         if (data.prospectos !== undefined) setProspectos(data.prospectos || []);
+        if (data.promociones !== undefined) setPromociones(data.promociones || []);
         // Subir lo restaurado a la nube, SIN BORRAR.
         //
         // Antes esto era un cloudSave común, y el guardado es diferencial:
@@ -3695,6 +3729,7 @@ function App() {
     cargasDia: cargasDia,
     perdidas: perdidas,
     movStock: movStock,
+    promociones: promociones,
     onGuardar: d => {
       savePlanilla(`${diaActual}_${fechaActual}`, d);
       if (!d._diaCerrado) irA(origenFecha === "atajo" ? "atajoPlanillaSemana" : origenFecha === "menu" ? "menu" : "selectorFechaPlanilla");
@@ -4258,6 +4293,7 @@ function App() {
         }
       }
       const orden = datos.orden;
+      const nuevoIdCliente = nuevoIdCat();
       saveClientes(prevC => {
         let base = prevC;
         if (orden && prevC.some(c => c.dia === datos.dia && (c.orden || 0) === Number(orden))) {
@@ -4268,13 +4304,18 @@ function App() {
         }
         return [...base, {
           ...datos,
-          id: nuevoIdCat(),
+          id: nuevoIdCliente,
           saldo: 0,
           dispenser: datos.dispenser || 0,
           creadoFecha: new Date().toLocaleDateString("en-CA")
         }].sort((a, b) => DIAS.indexOf(a.dia) - DIAS.indexOf(b.dia) || (a.orden || 9999) - (b.orden || 9999));
       });
       ajustarStockFijoCliente(null, datos);
+      // Pedido del usuario (2026-11-03): cobro de promoción cargado en el
+      // propio formulario de alta — se registra aparte, no como venta.
+      if (Number(datos.promoMonto) > 0) {
+        registrarPromocion(nuevoIdCliente, datos.nombre, datos.promoMonto, datos.promoFormaPago);
+      }
       // Si venía de "Convertir en cliente" desde un prospecto, lo marcamos
       // como convertido (no se borra, queda el historial) y volvemos a la
       // lista de prospectos en vez de a la lista de clientes.

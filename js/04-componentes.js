@@ -1229,7 +1229,49 @@ function FormCliente({
     placeholder: "ej: -2500 o 1800",
     value: datos._saldoDirecto ?? "",
     onChange: e => set("_saldoDirecto", e.target.value)
-  }))), datos.foto && /*#__PURE__*/React.createElement("img", {
+  }))), !datos.id && /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      margin: "4px 0",
+      background: "rgba(245,185,66,0.08)",
+      border: "1px dashed #f5b942",
+      padding: "10px 12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: "#f5b942",
+      marginBottom: 8
+    }
+  }, "🎁 Cobro de promoción (opcional)"), /*#__PURE__*/React.createElement("div", {
+    style: s.grid2
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: s.label
+  }, "Monto cobrado"), /*#__PURE__*/React.createElement("input", {
+    style: s.input,
+    type: "number",
+    min: 0,
+    placeholder: "ej: 2000",
+    value: datos.promoMonto ?? "",
+    onChange: e => set("promoMonto", e.target.value)
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: s.label
+  }, "Forma de pago"), /*#__PURE__*/React.createElement("select", {
+    style: s.select,
+    value: datos.promoFormaPago || "efectivo",
+    onChange: e => set("promoFormaPago", e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "efectivo"
+  }, "Efectivo"), /*#__PURE__*/React.createElement("option", {
+    value: "transferencia"
+  }, "Transferencia")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--color-text-tertiary)",
+      marginTop: 6
+    }
+  }, "No se cuenta como venta — queda aparte, en \"Promociones\" dentro del Resumen del día.")), datos.foto && /*#__PURE__*/React.createElement("img", {
     src: datos.foto,
     alt: "Domicilio",
     style: {
