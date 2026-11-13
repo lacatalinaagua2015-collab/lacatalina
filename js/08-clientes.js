@@ -795,6 +795,7 @@ function DetalleCliente({
   onEditar,
   onEliminarVenta,
   onEditarVenta,
+  onEditarMontoCobro,
   onEliminarCliente,
   onEliminarNoVisita,
   onNoEstaCliente,
@@ -1677,7 +1678,22 @@ function DetalleCliente({
         onClick: () => {
           if (window.confirm("¿Eliminar este cobro?")) onEliminarVenta(v.id);
         }
-      }, "Eliminar")));
+      }, "Eliminar"), !v.transConfirmada && onEditarMontoCobro && /*#__PURE__*/React.createElement("button", {
+        style: {
+          fontSize: 10,
+          color: "var(--color-accent)",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          marginTop: 4,
+          display: "block"
+        },
+        onClick: () => {
+          const nuevo = window.prompt("Nuevo monto del cobro:", v.pagadoNum);
+          if (nuevo === null) return;
+          onEditarMontoCobro(v.id, nuevo);
+        }
+      }, "✏️ Editar monto")));
       if (esAjuste) return /*#__PURE__*/React.createElement("div", {
         key: v.id,
         style: {
