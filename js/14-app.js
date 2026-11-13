@@ -3539,6 +3539,23 @@ function App() {
       saldo: (Number(x.saldo) || 0) + netDeltaCambio
     } : x));
   };
+
+  // Atajo para corregir rápido el monto de una venta normal (no-cobro)
+  // pendiente de confirmar transferencia: el cliente dijo que iba a pagar
+  // el total pero transfirió menos (o más). Reusa editarVenta tal cual
+  // (misma lógica que ya recalcula saldo correctamente), solo cambiando
+  // pagadoNum/montoPagado y dejando detalle/pago/saldoAplicado/obs iguales.
+  const editarMontoVenta = (ventaId, nuevoMonto) => {
+    const vE = ventas.find(v => v.id === ventaId);
+    if (!vE || vE._esCobro) return;
+    const nm = Math.round(Number(nuevoMonto) || 0);
+    if (nm <= 0) {
+      lcAlert("El monto tiene que ser mayor a $0.");
+      return;
+    }
+    const detalleArr = Array.isArray(vE.detalle) ? vE.detalle : Object.values(vE.detalle || {});
+    editarVenta(ventaId, detalleArr, vE.pago, String(nm), vE.saldoAplicado, vE.obs, vE.montoTrans);
+  };
   // Acceso biométrico: solo se interpone si está activado en Config. Si no, la
   // app abre directo. Al confirmar la huella se saltea la portada y entra
   // derecho al menú: la huella ya cumple la función del botón "Ingresar".
@@ -3742,6 +3759,7 @@ function App() {
       } : v));
     },
     onEditarMontoCobro: editarMontoCobro,
+    onEditarMontoVenta: editarMontoVenta,
     onVolver: () => {
       setMostrarTransferencias(true);
       irA("menu");
@@ -4066,6 +4084,7 @@ function App() {
       } : v));
     },
     onEditarMontoCobro: editarMontoCobro,
+    onEditarMontoVenta: editarMontoVenta,
     onAbrirMapa: () => irA("mapaClientes"),
     onPlanilla: () => irA("planilla")
   }), pantalla === "detalleCliente" && cliente && /*#__PURE__*/React.createElement(DetalleCliente, {
@@ -4116,6 +4135,7 @@ function App() {
     onEliminarVenta: eliminarVenta,
     onEditarVenta: editarVenta,
     onEditarMontoCobro: editarMontoCobro,
+    onEditarMontoVenta: editarMontoVenta,
     onEliminarCliente: () => {
       eliminarCliente(cliente.id);
       irA(pantallaOrigenDetalle());

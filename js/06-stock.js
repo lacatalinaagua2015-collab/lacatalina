@@ -1552,6 +1552,7 @@ function ConfirmacionesDia({
   clientes,
   onConfirmar,
   onEditarMontoCobro,
+  onEditarMontoVenta,
   onVolver
 }) {
   const [abiertos, setAbiertos] = React.useState({});
@@ -1759,7 +1760,28 @@ function ConfirmacionesDia({
       if (!nuevo || nuevo <= 0) return;
       onEditarMontoCobro(v.id, nuevo);
     }
-  }, "✏️ Editar monto del cobro"))))), fechasConf.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "✏️ Editar monto del cobro"), !v._esCobro && onEditarMontoVenta && /*#__PURE__*/React.createElement("button", {
+    style: {
+      width: "100%",
+      padding: "7px",
+      marginTop: 6,
+      borderRadius: 8,
+      border: "1px solid var(--color-border-tertiary)",
+      background: "none",
+      color: "var(--color-text-secondary)",
+      fontSize: 12,
+      fontWeight: 500,
+      cursor: "pointer"
+    },
+    onClick: () => {
+      const actual = (v.pagadoNum != null ? v.pagadoNum : v.neto) || 0;
+      const resp = window.prompt(`Monto realmente transferido (facturado: ${fmt(actual)}):`, String(actual));
+      if (resp == null) return;
+      const nuevo = Number(String(resp).replace(",", "."));
+      if (!nuevo || nuevo <= 0) return;
+      onEditarMontoVenta(v.id, nuevo);
+    }
+  }, "✏️ Editar monto transferido"))))), fechasConf.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 8
     }
