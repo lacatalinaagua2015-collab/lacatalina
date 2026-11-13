@@ -9,6 +9,12 @@ function aplicarCobroAVentasFiado(ventasPrev, clienteId, monto) {
   let restante = Number(monto) || 0;
   const idsAfectados = [];
   const cambios = {};
+  // montosAplicados: cuánto de ESTE cobro puntual se aplicó a cada venta —
+  // se guarda en el registro del cobro (_montosAplicados) para poder
+  // revertir exactamente esto (y nada más) si después se edita el monto
+  // del cobro. Sin esto, revertir a ciegas podía pisar el pago parcial de
+  // OTRO cobro anterior sobre la misma venta.
+  const montosAplicados = {};
   const pendientes = ventasPrev.filter(v => v.clienteId === clienteId && v.pago === "fiado" && !v._esCobro && !v._esAjuste && !v._esCambio && !v._pagada).sort((a, b) => (a.id || 0) - (b.id || 0));
   for (const v of pendientes) {
     if (restante <= 0) break;
@@ -21,6 +27,7 @@ function aplicarCobroAVentasFiado(ventasPrev, clienteId, monto) {
         _montoPagadoAcum: Number(v.neto) || 0,
         _upd: Date.now()
       };
+      montosAplicados[v.id] = debe;
       restante -= debe;
     } else {
       cambios[v.id] = {
@@ -28,6 +35,7 @@ function aplicarCobroAVentasFiado(ventasPrev, clienteId, monto) {
         _montoPagadoAcum: yaPagado + restante,
         _upd: Date.now()
       };
+      montosAplicados[v.id] = restante;
       restante = 0;
     }
     idsAfectados.push(v.id);
@@ -38,8 +46,28 @@ function aplicarCobroAVentasFiado(ventasPrev, clienteId, monto) {
   } : v);
   return {
     ventasActualizadas,
-    idsAfectados
+    idsAfectados,
+    montosAplicados
   };
+}
+
+// Revierte exactamente lo que una aplicación de aplicarCobroAVentasFiado le
+// hizo a cada venta fiado afectada (restando montosAplicados[id] de
+// _montoPagadoAcum y recalculando _pagada) — usado al editar o borrar un
+// cobro para no dejar ventas marcadas como pagadas de más.
+function revertirAplicacionCobro(ventasPrev, montosAplicados) {
+  if (!montosAplicados) return ventasPrev;
+  return ventasPrev.map(v => {
+    const aplicado = Number(montosAplicados[v.id]) || 0;
+    if (aplicado <= 0) return v;
+    const nuevoAcum = Math.max(0, (Number(v._montoPagadoAcum) || 0) - aplicado);
+    return {
+      ...v,
+      _montoPagadoAcum: nuevoAcum,
+      _pagada: nuevoAcum >= (Number(v.neto) || 0) && nuevoAcum > 0,
+      _upd: Date.now()
+    };
+  });
 }
 
 // KEY_PROD_ENV está definido en 03-utils.js (se comparte, mismo alcance global).
@@ -3192,6 +3220,60 @@ function App() {
     } : c));
     irA("clientes");
   };
+  // Pedido del usuario (2026-11-13): un cobro de deuda (pago "transferencia",
+  // puede venir de la ficha del cliente o de "Fiados pendientes") queda
+  // marcado como pagadas/parcialmente pagadas las ventas fiado más viejas
+  // apenas se crea, SIN esperar a confirmar la transferencia. Si el cliente
+  // termina transfiriendo de menos (o de más) hay que poder corregir el
+  // monto del cobro ANTES de confirmarlo, sin dejar ventas fiado mal
+  // marcadas. Revierte con revertirAplicacionCobro (exacto, usando
+  // _montosAplicados) y vuelve a aplicar con el monto correcto.
+  const editarMontoCobro = (ventaId, nuevoMonto) => {
+    const vC = ventas.find(v => v.id === ventaId);
+    if (!vC || !vC._esCobro) return;
+    const nm = Math.round(Number(nuevoMonto) || 0);
+    if (nm <= 0) {
+      lcAlert("El monto tiene que ser mayor a $0. Si querés anularlo del todo, eliminá el cobro.");
+      return;
+    }
+    const montoAnterior = Number(vC.pagadoNum) || 0;
+    if (nm === montoAnterior) return;
+    registrarAuditoria("editada", {
+      clienteId: vC.clienteId,
+      cliente: vC.cliente || "",
+      fechaVenta: vC.fecha || "",
+      pagoAntes: "Cobro de deuda",
+      pagoDespues: "Cobro de deuda (editado)",
+      montoAntes: montoAnterior,
+      montoDespues: nm
+    });
+    saveVentas(prev => {
+      // 1) Revertir exactamente lo que este cobro había marcado en las
+      // ventas fiado afectadas (deja esas ventas como estaban ANTES de
+      // este cobro, sin tocar pagos parciales de otros cobros).
+      const revertidas = revertirAplicacionCobro(prev, vC._montosAplicados);
+      // 2) Volver a aplicar, ahora con el monto correcto.
+      const { ventasActualizadas, idsAfectados, montosAplicados } = aplicarCobroAVentasFiado(revertidas, vC.clienteId, nm);
+      return ventasActualizadas.map(v => v.id === ventaId ? {
+        ...v,
+        pagadoNum: nm,
+        saldoDelta: nm,
+        saldoDespues: (v.saldoAntes || 0) + nm,
+        obs: `Cobro de deuda ${fmt(nm)} (${v.pago}) · editado de ${fmt(montoAnterior)}`,
+        _ventasSaldadas: idsAfectados,
+        _montosAplicados: montosAplicados,
+        _upd: Date.now()
+      } : v);
+    });
+    // El saldo del cliente ya tenía sumado el monto viejo del cobro: se le
+    // resta ese y se le suma el nuevo (delta puro, seguro aplicar sobre el
+    // saldo más reciente).
+    const deltaSaldo = nm - montoAnterior;
+    saveClientes(prev => prev.map(c => c.id === vC.clienteId ? {
+      ...c,
+      saldo: (Number(c.saldo) || 0) + deltaSaldo
+    } : c));
+  };
   const eliminarVenta = ventaId => {
     // Guard anti doble-tap: ignora un segundo borrado del MISMO id dentro de 2s
     // (el diálogo de confirmación puede tardar en cerrarse y volver a tocarse
@@ -3659,6 +3741,7 @@ function App() {
         _upd: Date.now()
       } : v));
     },
+    onEditarMontoCobro: editarMontoCobro,
     onVolver: () => {
       setMostrarTransferencias(true);
       irA("menu");
@@ -3982,6 +4065,7 @@ function App() {
         _upd: Date.now()
       } : v));
     },
+    onEditarMontoCobro: editarMontoCobro,
     onAbrirMapa: () => irA("mapaClientes"),
     onPlanilla: () => irA("planilla")
   }), pantalla === "detalleCliente" && cliente && /*#__PURE__*/React.createElement(DetalleCliente, {
@@ -4031,6 +4115,7 @@ function App() {
     onEditar: cambios => updateCliente(cliente.id, cambios),
     onEliminarVenta: eliminarVenta,
     onEditarVenta: editarVenta,
+    onEditarMontoCobro: editarMontoCobro,
     onEliminarCliente: () => {
       eliminarCliente(cliente.id);
       irA(pantallaOrigenDetalle());
@@ -4130,8 +4215,8 @@ function App() {
         _upd: Date.now()
       };
       saveVentas(prev => {
-        const { ventasActualizadas, idsAfectados } = aplicarCobroAVentasFiado(prev, cl.id, monto);
-        return [...ventasActualizadas, { ...vt, _ventasSaldadas: idsAfectados }];
+        const { ventasActualizadas, idsAfectados, montosAplicados } = aplicarCobroAVentasFiado(prev, cl.id, monto);
+        return [...ventasActualizadas, { ...vt, _ventasSaldadas: idsAfectados, _montosAplicados: montosAplicados }];
       });
       saveClientes(prev => prev.map(x => x.id === cl.id ? {
         ...x,
@@ -4539,8 +4624,8 @@ function App() {
         _upd: Date.now()
       };
       saveVentas(prev => {
-        const { ventasActualizadas, idsAfectados } = aplicarCobroAVentasFiado(prev, clienteId, monto);
-        return [...ventasActualizadas, { ...vt, _ventasSaldadas: idsAfectados }];
+        const { ventasActualizadas, idsAfectados, montosAplicados } = aplicarCobroAVentasFiado(prev, clienteId, monto);
+        return [...ventasActualizadas, { ...vt, _ventasSaldadas: idsAfectados, _montosAplicados: montosAplicados }];
       });
       saveClientes(prev => prev.map(c => c.id === clienteId ? {
         ...c,

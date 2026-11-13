@@ -1275,7 +1275,8 @@ function DetalleTransferencias({
   ventas,
   ventasPendTrans,
   clientes,
-  onConfirmarTransfer
+  onConfirmarTransfer,
+  onEditarMontoCobro
 }) {
   const [abierto, setAbierto] = React.useState(false);
   const pendientes = (ventasPendTrans || []).length;
@@ -1390,7 +1391,29 @@ function DetalleTransferencias({
         e.stopPropagation();
         onConfirmarTransfer && onConfirmarTransfer(v.clienteId, v.id);
       }
-    }, confirmada ? "✅ Confirmada" : "🔴 Pendiente"), !confirmada && tel && /*#__PURE__*/React.createElement("a", {
+    }, confirmada ? "✅ Confirmada" : "🔴 Pendiente"), !confirmada && v._esCobro && onEditarMontoCobro && /*#__PURE__*/React.createElement("button", {
+      style: {
+        marginLeft: 6,
+        fontSize: 10,
+        padding: "1px 6px",
+        borderRadius: 4,
+        background: "var(--color-background-tertiary)",
+        color: "var(--color-text-secondary)",
+        fontWeight: 600,
+        border: "none",
+        cursor: "pointer"
+      },
+      title: "Corregir el monto de este cobro antes de confirmarlo",
+      onClick: e => {
+        e.stopPropagation();
+        const actual = (v.pagadoNum != null ? v.pagadoNum : v.neto) || 0;
+        const resp = window.prompt(`Monto real transferido para "${v.cliente}" (antes: ${fmt(actual)}):`, String(actual));
+        if (resp == null) return;
+        const nuevo = Number(String(resp).replace(",", "."));
+        if (!nuevo || nuevo <= 0) return;
+        onEditarMontoCobro(v.id, nuevo);
+      }
+    }, "✏️ Editar monto"), !confirmada && tel && /*#__PURE__*/React.createElement("a", {
       href: `https://wa.me/54${tel}?text=${msjWA}`,
       target: "_blank",
       rel: "noreferrer",
@@ -1427,7 +1450,8 @@ function DetalleVentasDia({
   onConfirmarTransfer,
   onRegistrarNoVisita,
   onQuitarNoVisita,
-  onCargarVenta
+  onCargarVenta,
+  onEditarMontoCobro
 }) {
   const [abierto, setAbierto] = React.useState(false);
   // Fila de "No compraron" cuyo menú de edición está desplegado (clienteId o null) —
@@ -1645,7 +1669,29 @@ function DetalleVentasDia({
         color: pagoBadge.color,
         fontWeight: 600
       }
-    }, pagoBadge.txt), !v.transConfirmada && (v.pago === "transferencia" || esMixto) && cli && cli.telefono && /*#__PURE__*/React.createElement("a", {
+    }, pagoBadge.txt), !v.transConfirmada && esCobro && onEditarMontoCobro && /*#__PURE__*/React.createElement("button", {
+      style: {
+        marginLeft: 6,
+        fontSize: 10,
+        padding: "1px 6px",
+        borderRadius: 4,
+        background: "var(--color-background-tertiary)",
+        color: "var(--color-text-secondary)",
+        fontWeight: 600,
+        border: "none",
+        cursor: "pointer"
+      },
+      title: "Corregir el monto de este cobro antes de confirmarlo",
+      onClick: e => {
+        e.stopPropagation();
+        const actual = (v.pagadoNum != null ? v.pagadoNum : v.neto) || 0;
+        const resp = window.prompt(`Monto real transferido para "${v.cliente}" (antes: ${fmt(actual)}):`, String(actual));
+        if (resp == null) return;
+        const nuevo = Number(String(resp).replace(",", "."));
+        if (!nuevo || nuevo <= 0) return;
+        onEditarMontoCobro(v.id, nuevo);
+      }
+    }, "✏️ Editar monto"), !v.transConfirmada && (v.pago === "transferencia" || esMixto) && cli && cli.telefono && /*#__PURE__*/React.createElement("a", {
       href: `https://wa.me/54${cli.telefono}?text=${armarMsjTransferWA([v])}`,
       target: "_blank",
       rel: "noreferrer",
@@ -1960,6 +2006,7 @@ function PlanillaDelDia({
   onEditarCliente,
   onPerdidaCliente,
   onConfirmarTransfer,
+  onEditarMontoCobro,
   onEditarCarga,
   onCargarVenta,
   onRegistrarNoVisita,
@@ -3474,6 +3521,7 @@ function PlanillaDelDia({
     onEditarCliente: onEditarCliente,
     onPerdidaCliente: onPerdidaCliente,
     onConfirmarTransfer: onConfirmarTransfer,
+    onEditarMontoCobro: onEditarMontoCobro,
     onRegistrarNoVisita: onRegistrarNoVisita,
     onQuitarNoVisita: onQuitarNoVisita,
     onCargarVenta: onCargarVenta
@@ -3952,7 +4000,8 @@ function PlanillaDelDia({
       ventas: transDelDia,
       ventasPendTrans: ventasPendTrans,
       clientes: clientes,
-      onConfirmarTransfer: onConfirmarTransfer
+      onConfirmarTransfer: onConfirmarTransfer,
+      onEditarMontoCobro: onEditarMontoCobro
     });
   })()), /*#__PURE__*/React.createElement("div", {
     style: {
