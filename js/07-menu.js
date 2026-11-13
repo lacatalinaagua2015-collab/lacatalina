@@ -1474,7 +1474,8 @@ function DetalleVentasDia({
   onRegistrarNoVisita,
   onQuitarNoVisita,
   onCargarVenta,
-  onEditarMontoCobro
+  onEditarMontoCobro,
+  onEditarMontoVenta
 }) {
   const [abierto, setAbierto] = React.useState(false);
   // Fila de "No compraron" cuyo menú de edición está desplegado (clienteId o null) —
@@ -1713,6 +1714,28 @@ function DetalleVentasDia({
         const nuevo = Number(String(resp).replace(",", "."));
         if (!nuevo || nuevo <= 0) return;
         onEditarMontoCobro(v.id, nuevo);
+      }
+    }, "✏️ Editar monto"), !v.transConfirmada && !esCobro && (v.pago === "transferencia" || esMixto) && onEditarMontoVenta && /*#__PURE__*/React.createElement("button", {
+      style: {
+        marginLeft: 6,
+        fontSize: 10,
+        padding: "1px 6px",
+        borderRadius: 4,
+        background: "var(--color-background-tertiary)",
+        color: "var(--color-text-secondary)",
+        fontWeight: 600,
+        border: "none",
+        cursor: "pointer"
+      },
+      title: "Corregir el monto realmente transferido antes de confirmar",
+      onClick: e => {
+        e.stopPropagation();
+        const actual = (v.pagadoNum != null ? v.pagadoNum : v.neto) || 0;
+        const resp = window.prompt(`Monto realmente transferido por "${v.cliente}" (facturado: ${fmt(actual)}):`, String(actual));
+        if (resp == null) return;
+        const nuevo = Number(String(resp).replace(",", "."));
+        if (!nuevo || nuevo <= 0) return;
+        onEditarMontoVenta(v.id, nuevo);
       }
     }, "✏️ Editar monto"), !v.transConfirmada && (v.pago === "transferencia" || esMixto) && cli && cli.telefono && /*#__PURE__*/React.createElement("a", {
       href: `https://wa.me/54${cli.telefono}?text=${armarMsjTransferWA([v])}`,
