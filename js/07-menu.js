@@ -2053,6 +2053,7 @@ function PlanillaDelDia({
   onPerdidaCliente,
   onConfirmarTransfer,
   onEditarMontoCobro,
+  onEditarMontoVenta,
   onEditarCarga,
   onCargarVenta,
   onRegistrarNoVisita,
@@ -3568,6 +3569,7 @@ function PlanillaDelDia({
     onPerdidaCliente: onPerdidaCliente,
     onConfirmarTransfer: onConfirmarTransfer,
     onEditarMontoCobro: onEditarMontoCobro,
+    onEditarMontoVenta: onEditarMontoVenta,
     onRegistrarNoVisita: onRegistrarNoVisita,
     onQuitarNoVisita: onQuitarNoVisita,
     onCargarVenta: onCargarVenta
@@ -4047,7 +4049,8 @@ function PlanillaDelDia({
       ventasPendTrans: ventasPendTrans,
       clientes: clientes,
       onConfirmarTransfer: onConfirmarTransfer,
-      onEditarMontoCobro: onEditarMontoCobro
+      onEditarMontoCobro: onEditarMontoCobro,
+      onEditarMontoVenta: onEditarMontoVenta
     });
   })()), /*#__PURE__*/React.createElement("div", {
     style: {
