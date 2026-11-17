@@ -20,7 +20,19 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
       est = noVMap[c.id];
     const bc = atendido ? "#1D9E75" : est === "noesta" ? "#EF9F27" : est === "noesta2" || est === "noquiso" ? "#E24B4A" : "var(--color-border-tertiary)";
     const pausadoActivo = !!(c.pausadoHasta && c.pausadoHasta >= fecha);
-    const puedeEntregar = (!visitados.has(c.id) || est === "noesta") && !atendido && !pausadoActivo;
+    // Cliente quincenal: mismo cálculo que en ListaClientes (ver comentario
+    // ahí) — si hace menos de ~10 días que compró de verdad, no le toca esta
+    // semana. Se recalcula acá porque ClienteCard también se usa fuera de
+    // esa lista (ej. "Agregados hoy").
+    const noLeTocaQuincenal = (() => {
+      if (c.frecuencia !== "quincenal") return false;
+      const reales = (todasVentas || ventas).filter(v => v.clienteId === c.id && !v._esCobro && !v._esAjuste && !v._esAjusteEnvases && !v._esCambio && !v._esMixtoTrans && v.fechaKey);
+      if (!reales.length) return false;
+      const ultimaFk = reales.reduce((a, v) => v.fechaKey > a ? v.fechaKey : a, reales[0].fechaKey);
+      const dias = Math.floor((new Date(fecha + "T12:00:00") - new Date(ultimaFk + "T12:00:00")) / 86400000);
+      return dias < 10;
+    })();
+    const puedeEntregar = (!visitados.has(c.id) || est === "noesta") && !atendido && !pausadoActivo && !noLeTocaQuincenal;
     const expandido = clienteExpandidoId === c.id;
     // Al terminar con este cliente (venta registrada, "no está" o "no
     // quiere") saltar directo al siguiente pendiente de la lista en vez de
@@ -143,7 +155,18 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
     }, "⏸ Pausado hasta ", (() => {
       const [y, m, d] = String(c.pausadoHasta).split("-");
       return d && m ? `${d}/${m}` : c.pausadoHasta;
-    })()), (recordatorios || []).some(r => r.clienteId === c.id && !r.confirmado) && /*#__PURE__*/React.createElement("span", {
+    })()), c.frecuencia === "quincenal" && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        fontWeight: 600,
+        padding: "2px 8px",
+        borderRadius: 20,
+        color: "#5daaff",
+        border: "0.5px solid #5daaff",
+        flexShrink: 0
+      },
+      title: "Cliente quincenal: compra, saltea la próxima, y vuelve a comprar a la otra"
+    }, noLeTocaQuincenal ? "📅 No le toca esta semana" : "📅 Quincenal"), (recordatorios || []).some(r => r.clienteId === c.id && !r.confirmado) && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 13,
         flexShrink: 0
@@ -629,6 +652,7 @@ function ListaClientes({
     sinEntrega,
     listos,
     pausados,
+    quincenalesSinTurno,
     agregadosHoy,
     clientesParaHoy,
     todosListos
@@ -655,12 +679,36 @@ function ListaClientes({
     // futuro no cuenta como pendiente de HOY ni exige visita para cerrar la
     // ronda; tiene su propia sección para seguir visible.
     const esPausado = c => !!(c.pausadoHasta && c.pausadoHasta >= fecha);
-    const pendientesNormales = filtrados.filter(c => !visitados.has(c.id) && noVMap[c.id] !== "noesta" && c.creadoFecha !== fecha && !esPausado(c));
-    const volverAlFinal = filtrados.filter(c => noVMap[c.id] === "noesta" && !atendidos.has(c.id) && !esPausado(c));
+    // Clientes "quincenales": compran, saltean la visita siguiente, y recién
+    // vuelven a comprar a la otra — pedido de Guillermo 2026-11-17. A
+    // diferencia de la pausa (fecha fija elegida a mano), esto se marca UNA
+    // SOLA VEZ (cliente.frecuencia === "quincenal") y el sistema calcula
+    // solo, cada semana, si le toca o no: mira la fecha de su última compra
+    // REAL (ignora cobros/ajustes/cambios) y si todavía no pasaron ~10 días
+    // no le toca esta semana. Sin historial de compras reales, se lo trata
+    // como si le tocara (no hay con qué calcular todavía).
+    const ultimaCompraReal = {};
+    (todasVentas || ventas).forEach(v => {
+      if (v._esCobro || v._esAjuste || v._esAjusteEnvases || v._esCambio || v._esMixtoTrans) return;
+      const fk = v.fechaKey;
+      if (!fk) return;
+      if (!ultimaCompraReal[v.clienteId] || fk > ultimaCompraReal[v.clienteId]) ultimaCompraReal[v.clienteId] = fk;
+    });
+    const hoyDate = new Date(fecha + "T12:00:00");
+    const noLeTocaQuincenal = c => {
+      if (c.frecuencia !== "quincenal") return false;
+      const fk = ultimaCompraReal[c.id];
+      if (!fk) return false;
+      const dias = Math.floor((hoyDate - new Date(fk + "T12:00:00")) / 86400000);
+      return dias < 10;
+    };
+    const pendientesNormales = filtrados.filter(c => !visitados.has(c.id) && noVMap[c.id] !== "noesta" && c.creadoFecha !== fecha && !esPausado(c) && !noLeTocaQuincenal(c));
+    const volverAlFinal = filtrados.filter(c => noVMap[c.id] === "noesta" && !atendidos.has(c.id) && !esPausado(c) && !noLeTocaQuincenal(c));
     const pendientes = [...pendientesNormales, ...volverAlFinal];
     const sinEntrega = filtrados.filter(c => visitadosSinVenta.has(c.id));
     const listos = filtrados.filter(c => atendidos.has(c.id));
     const pausados = filtrados.filter(c => esPausado(c) && !visitados.has(c.id));
+    const quincenalesSinTurno = filtrados.filter(c => !esPausado(c) && noLeTocaQuincenal(c) && !visitados.has(c.id));
     // BUG REPORTADO: un cliente cargado hoy mismo (creadoFecha === fecha), sin
     // venta ni "no está"/"no quiere" todavía, quedaba afuera de las 4
     // secciones de arriba — no aparecía en NINGÚN lado de la lista, ni
@@ -669,7 +717,7 @@ function ListaClientes({
     const agregadosHoy = filtrados.filter(c => c.creadoFecha === fecha && !visitados.has(c.id) && noVMap[c.id] !== "noesta");
     // Mismo criterio: los recién cargados hoy no cuentan para el total de
     // "todos listos" — si no, la ronda nunca se marcaría como terminada.
-    const clientesParaHoy = clientes.filter(c => c.creadoFecha !== fecha && !esPausado(c));
+    const clientesParaHoy = clientes.filter(c => c.creadoFecha !== fecha && !esPausado(c) && !noLeTocaQuincenal(c));
     const todosListos = clientesParaHoy.length > 0 && clientesParaHoy.filter(c => visitados.has(c.id)).length >= clientesParaHoy.length;
     return {
       atendidos,
@@ -684,6 +732,7 @@ function ListaClientes({
       sinEntrega,
       listos,
       pausados,
+      quincenalesSinTurno,
       agregadosHoy,
       clientesParaHoy,
       todosListos
@@ -973,6 +1022,14 @@ function ListaClientes({
   }, "⏸ Pausados (", pausados.length, ")"), pausados.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
     key: c.id,
     ...cardProps(c)
+  }))), quincenalesSinTurno.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      ...s.sectionTitle,
+      color: "#5daaff"
+    }
+  }, "📅 Quincenales — no les toca esta semana (", quincenalesSinTurno.length, ")"), quincenalesSinTurno.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
+    key: c.id,
+    ...cardProps(c)
   }))), listos.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
     style: s.sectionTitle
   }, "Entregado (", listos.length, ")"), listos.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
@@ -1157,6 +1214,14 @@ function DetalleCliente({
   const [razonAjuste, setRazonAjuste] = useState("");
   const [mostrarCambio, setMostrarCambio] = useState(false);
   const pausadoActivo = !!(cliente.pausadoHasta && cliente.pausadoHasta >= fecha);
+  const noLeTocaQuincenalFicha = (() => {
+    if (cliente.frecuencia !== "quincenal") return false;
+    const reales = (ventas || []).filter(v => !v._esCobro && !v._esAjuste && !v._esAjusteEnvases && !v._esCambio && !v._esMixtoTrans && v.fechaKey);
+    if (!reales.length) return false;
+    const ultimaFk = reales.reduce((a, v) => v.fechaKey > a ? v.fechaKey : a, reales[0].fechaKey);
+    const dias = Math.floor((new Date(fecha + "T12:00:00") - new Date(ultimaFk + "T12:00:00")) / 86400000);
+    return dias < 10;
+  })();
   const recActivos = (recordatorios || []).filter(r => r.clienteId === cliente.id && !r.confirmado);
   // Las partes-transferencia de pagos mixtos NO son ventas: no se listan ni se cuentan acá
   // (la venta principal ya muestra el desglose [Mixto: ef + tr]; la transferencia se confirma en el panel del día)
@@ -1296,6 +1361,27 @@ function DetalleCliente({
   }, pausadoActivo ? "⏸ Pausado" : "⏸ Pausar"), /*#__PURE__*/React.createElement("button", {
     style: {
       ...s.btn,
+      fontSize: 12,
+      padding: "5px 10px",
+      border: cliente.frecuencia === "quincenal" ? "1px solid #5daaff" : undefined,
+      color: cliente.frecuencia === "quincenal" ? "#5daaff" : undefined,
+      background: cliente.frecuencia === "quincenal" ? "transparent" : undefined
+    },
+    title: "Compra, saltea la próxima visita y vuelve a comprar a la otra — marcalo una vez y el sistema calcula solo cada semana si le toca",
+    onClick: () => {
+      if (cliente.frecuencia === "quincenal") {
+        if (window.confirm("¿Volver a frecuencia semanal normal para este cliente?")) onEditar({
+          frecuencia: null
+        });
+        return;
+      }
+      if (window.confirm("¿Marcar a este cliente como quincenal? El sistema va a calcular solo, según su última compra real, si le toca o no cada semana.")) onEditar({
+        frecuencia: "quincenal"
+      });
+    }
+  }, cliente.frecuencia === "quincenal" ? "📅 Quincenal" : "📅 Semanal"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
       padding: "4px 8px",
       fontSize: 18,
       lineHeight: 1,
@@ -1431,7 +1517,21 @@ function DetalleCliente({
         pausadoMotivo: null
       });
     }
-  }, "Quitar")), recActivos.length > 0 && !editandoCliente && /*#__PURE__*/React.createElement("div", {
+  }, "Quitar")), noLeTocaQuincenalFicha && !editandoCliente && /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      margin: "0 0 10px",
+      background: "#0d2238",
+      border: "1px solid #5daaff",
+      display: "flex",
+      gap: 10,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 18, flexShrink: 0 }
+  }, "📅"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 13, color: "#5daaff", fontWeight: 600 }
+  }, "Cliente quincenal — no le toca esta semana")), recActivos.length > 0 && !editandoCliente && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 10
     }
