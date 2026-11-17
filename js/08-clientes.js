@@ -19,7 +19,8 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
     const atendido = atendidos.has(c.id),
       est = noVMap[c.id];
     const bc = atendido ? "#1D9E75" : est === "noesta" ? "#EF9F27" : est === "noesta2" || est === "noquiso" ? "#E24B4A" : "var(--color-border-tertiary)";
-    const puedeEntregar = (!visitados.has(c.id) || est === "noesta") && !atendido;
+    const pausadoActivo = !!(c.pausadoHasta && c.pausadoHasta >= fecha);
+    const puedeEntregar = (!visitados.has(c.id) || est === "noesta") && !atendido && !pausadoActivo;
     const expandido = clienteExpandidoId === c.id;
     // Al terminar con este cliente (venta registrada, "no está" o "no
     // quiere") saltar directo al siguiente pendiente de la lista en vez de
@@ -128,7 +129,21 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         border: "0.5px solid #b794f6",
         flexShrink: 0
       }
-    }, "🔸 Prospecto"), (recordatorios || []).some(r => r.clienteId === c.id && !r.confirmado) && /*#__PURE__*/React.createElement("span", {
+    }, "🔸 Prospecto"), pausadoActivo && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        fontWeight: 600,
+        padding: "2px 8px",
+        borderRadius: 20,
+        color: "#EF9F27",
+        border: "0.5px solid #EF9F27",
+        flexShrink: 0
+      },
+      title: c.pausadoMotivo || ""
+    }, "⏸ Pausado hasta ", (() => {
+      const [y, m, d] = String(c.pausadoHasta).split("-");
+      return d && m ? `${d}/${m}` : c.pausadoHasta;
+    })()), (recordatorios || []).some(r => r.clienteId === c.id && !r.confirmado) && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 13,
         flexShrink: 0
@@ -613,6 +628,7 @@ function ListaClientes({
     pendientes,
     sinEntrega,
     listos,
+    pausados,
     agregadosHoy,
     clientesParaHoy,
     todosListos
@@ -633,11 +649,18 @@ function ListaClientes({
     // "pendiente de atender" en la ronda de hoy — cargarlo YA fue la visita de
     // hoy. Recién debería volver a aparecer en su próxima visita (la semana
     // que viene, cuando "fecha" cambie y ya no coincida con creadoFecha).
-    const pendientesNormales = filtrados.filter(c => !visitados.has(c.id) && noVMap[c.id] !== "noesta" && c.creadoFecha !== fecha);
-    const volverAlFinal = filtrados.filter(c => noVMap[c.id] === "noesta" && !atendidos.has(c.id));
+    // Pausa manual: el cliente avisó que no va a estar X días — evita ir en
+    // vano (pedido de Guillermo 2026-11-17, tras ir 3 veces el mismo día a
+    // alguien que ya le había avisado). Mientras pausadoHasta sea hoy o
+    // futuro no cuenta como pendiente de HOY ni exige visita para cerrar la
+    // ronda; tiene su propia sección para seguir visible.
+    const esPausado = c => !!(c.pausadoHasta && c.pausadoHasta >= fecha);
+    const pendientesNormales = filtrados.filter(c => !visitados.has(c.id) && noVMap[c.id] !== "noesta" && c.creadoFecha !== fecha && !esPausado(c));
+    const volverAlFinal = filtrados.filter(c => noVMap[c.id] === "noesta" && !atendidos.has(c.id) && !esPausado(c));
     const pendientes = [...pendientesNormales, ...volverAlFinal];
     const sinEntrega = filtrados.filter(c => visitadosSinVenta.has(c.id));
     const listos = filtrados.filter(c => atendidos.has(c.id));
+    const pausados = filtrados.filter(c => esPausado(c) && !visitados.has(c.id));
     // BUG REPORTADO: un cliente cargado hoy mismo (creadoFecha === fecha), sin
     // venta ni "no está"/"no quiere" todavía, quedaba afuera de las 4
     // secciones de arriba — no aparecía en NINGÚN lado de la lista, ni
@@ -646,7 +669,7 @@ function ListaClientes({
     const agregadosHoy = filtrados.filter(c => c.creadoFecha === fecha && !visitados.has(c.id) && noVMap[c.id] !== "noesta");
     // Mismo criterio: los recién cargados hoy no cuentan para el total de
     // "todos listos" — si no, la ronda nunca se marcaría como terminada.
-    const clientesParaHoy = clientes.filter(c => c.creadoFecha !== fecha);
+    const clientesParaHoy = clientes.filter(c => c.creadoFecha !== fecha && !esPausado(c));
     const todosListos = clientesParaHoy.length > 0 && clientesParaHoy.filter(c => visitados.has(c.id)).length >= clientesParaHoy.length;
     return {
       atendidos,
@@ -660,6 +683,7 @@ function ListaClientes({
       pendientes,
       sinEntrega,
       listos,
+      pausados,
       agregadosHoy,
       clientesParaHoy,
       todosListos
@@ -941,6 +965,14 @@ function ListaClientes({
   }, "🔄 Volver a visitar (", volverAlFinal.length, ")"), volverAlFinal.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
     key: c.id,
     ...cardProps(c)
+  }))), pausados.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      ...s.sectionTitle,
+      color: "#EF9F27"
+    }
+  }, "⏸ Pausados (", pausados.length, ")"), pausados.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
+    key: c.id,
+    ...cardProps(c)
   }))), listos.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
     style: s.sectionTitle
   }, "Entregado (", listos.length, ")"), listos.map(c => /*#__PURE__*/React.createElement(ClienteCard, {
@@ -1016,6 +1048,7 @@ function DetalleCliente({
   const [mostrarFotoComodato, setMostrarFotoComodato] = useState(false);
   const [razonAjuste, setRazonAjuste] = useState("");
   const [mostrarCambio, setMostrarCambio] = useState(false);
+  const pausadoActivo = !!(cliente.pausadoHasta && cliente.pausadoHasta >= fecha);
   const recActivos = (recordatorios || []).filter(r => r.clienteId === cliente.id && !r.confirmado);
   // Las partes-transferencia de pagos mixtos NO son ventas: no se listan ni se cuentan acá
   // (la venta principal ya muestra el desglose [Mixto: ef + tr]; la transferencia se confirma en el panel del día)
@@ -1133,6 +1166,36 @@ function DetalleCliente({
     title: "El prospecto no sigue — retira el envase de promoción y lo da de baja",
     onClick: () => onRetirarCliente()
   }, "Retirado"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      fontSize: 12,
+      padding: "5px 10px",
+      border: pausadoActivo ? "1px solid #EF9F27" : undefined,
+      color: pausadoActivo ? "#EF9F27" : undefined,
+      background: pausadoActivo ? "transparent" : undefined
+    },
+    title: "El cliente avisó que no va a estar — pausa el reparto para que no cuente como pendiente",
+    onClick: () => {
+      if (pausadoActivo) {
+        if (window.confirm("¿Quitar la pausa de este cliente? Vuelve a aparecer como pendiente.")) onEditar({
+          pausadoHasta: null,
+          pausadoMotivo: null
+        });
+        return;
+      }
+      const d = window.prompt("¿Cuántos días no hay que visitarlo?", "15");
+      if (d == null) return;
+      const dias = Math.max(1, Math.round(Number(d)) || 15);
+      const motivo = window.prompt("Motivo (opcional):", "");
+      if (motivo == null) return;
+      const hasta = new Date();
+      hasta.setDate(hasta.getDate() + dias);
+      onEditar({
+        pausadoHasta: hasta.toLocaleDateString("en-CA"),
+        pausadoMotivo: motivo || ""
+      });
+    }
+  }, pausadoActivo ? "⏸ Pausado" : "⏸ Pausar"), /*#__PURE__*/React.createElement("button", {
     style: {
       ...s.btn,
       padding: "4px 8px",
