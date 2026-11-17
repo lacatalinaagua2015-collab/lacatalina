@@ -2723,18 +2723,26 @@ function App() {
       }
       return base;
     });
-    // Prospecto → cliente fijo automático: a la 5ta compra real en su día
+    // Prospecto → cliente fijo automático: a la 4ta compra real en su día
     // (esta cuenta si no es un cobro de deuda ni un cambio de envase) se
-    // confirma solo, sin botón — pedido explícito del usuario.
+    // confirma solo, sin botón — pedido explícito del usuario (bajado de 5
+    // a 4 el 17/11/2026, y se le asigna posición al pasar a fijo: antes
+    // quedaba sin "orden" asignado).
     const esVentaReal = opcionSaldo !== "cobro_deuda" && opcionSaldo !== "cambio_envase" && opcionSaldo !== "devolucion_envase";
     const comprasPrevias = ventas.filter(v => v.clienteId === c.id && !v._esCobro && !v._esAjuste && !v._esAjusteEnvases && !v._esCambio && !v._esMixtoTrans).length;
     const totalComprasConEsta = comprasPrevias + (esVentaReal ? 1 : 0);
-    const confirmarProspecto = c.esProspecto && totalComprasConEsta >= 5;
-    saveClientes(prev => aplicarMovimientoEnvases(prev, ventas, c.id, nuevaVenta.envPrest, nuevaVenta.envDev).map(c2 => c2.id === c.id ? {
-      ...c2,
-      saldo: (Number(c2.saldo) || 0) + saldoExtra,
-      ...(confirmarProspecto ? { esProspecto: false } : {})
-    } : c2));
+    const confirmarProspecto = c.esProspecto && totalComprasConEsta >= 4;
+    saveClientes(prev => {
+      const movidos = aplicarMovimientoEnvases(prev, ventas, c.id, nuevaVenta.envPrest, nuevaVenta.envDev);
+      // Posición: al final de la lista del día (siguiente orden disponible),
+      // sin preguntar — se calcula sobre los demás clientes de ESE día.
+      const ordenNuevo = confirmarProspecto ? Math.max(0, ...movidos.filter(c2 => c2.dia === c.dia && c2.id !== c.id).map(c2 => Number(c2.orden) || 0)) + 1 : null;
+      return movidos.map(c2 => c2.id === c.id ? {
+        ...c2,
+        saldo: (Number(c2.saldo) || 0) + saldoExtra,
+        ...(confirmarProspecto ? { esProspecto: false, orden: ordenNuevo } : {})
+      } : c2);
+    });
     // Si el cliente tenía recordatorios pendientes en Agenda, se resuelven
     // solos al registrarle una venta — no hace falta ir a Agenda a tocar "✓".
     saveRecordatorios(prev => (prev || []).map(r => r.clienteId === c.id && !r.confirmado ? {
