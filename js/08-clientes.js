@@ -1287,7 +1287,46 @@ function DetalleCliente({
     style: {
       padding: 16
     }
-  }, recActivos.length > 0 && !editandoCliente && /*#__PURE__*/React.createElement("div", {
+  }, pausadoActivo && !editandoCliente && /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      margin: "0 0 10px",
+      background: "#3a1500",
+      border: "1px solid #EF9F27",
+      display: "flex",
+      gap: 10,
+      alignItems: "flex-start"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 18, flexShrink: 0 }
+  }, "⏸"), /*#__PURE__*/React.createElement("div", {
+    style: { flex: 1 }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 13, fontWeight: 600, color: "#EF9F27" }
+  }, "No visitar hasta el ", (() => {
+    const [y, m, d] = String(cliente.pausadoHasta).split("-");
+    return d && m ? `${d}/${m}/${y}` : cliente.pausadoHasta;
+  })()), cliente.pausadoMotivo && /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 13, color: "var(--color-text-primary)", marginTop: 2 }
+  }, cliente.pausadoMotivo)), /*#__PURE__*/React.createElement("button", {
+    style: {
+      background: "none",
+      color: "#EF9F27",
+      border: "1px solid #EF9F27",
+      borderRadius: 6,
+      padding: "4px 10px",
+      fontSize: 11,
+      fontWeight: 600,
+      cursor: "pointer",
+      flexShrink: 0
+    },
+    onClick: () => {
+      if (window.confirm("¿Quitar la pausa de este cliente? Vuelve a aparecer como pendiente.")) onEditar({
+        pausadoHasta: null,
+        pausadoMotivo: null
+      });
+    }
+  }, "Quitar")), recActivos.length > 0 && !editandoCliente && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 10
     }
