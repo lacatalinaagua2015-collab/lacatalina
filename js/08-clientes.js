@@ -1184,9 +1184,9 @@ function PausaClienteModal({ cliente, onGuardar, onCerrar }) {
 function DispenserConfigModal({ cliente, productos, onGuardar, onCerrar }) {
   const opciones = (productos || []).filter(p => !p.esDispenser);
   const [producto, setProducto] = React.useState(cliente.dispenserProducto || (opciones[0] && opciones[0].nombre) || "");
-  const [minimo, setMinimo] = React.useState(cliente.dispenserMinimoMensualPesos || "");
+  const [minimo, setMinimo] = React.useState(cliente.dispenserMinimoMensual || "");
   const precioSel = (opciones.find(p => p.nombre === producto) || {}).precio || 0;
-  const unidadesEq = precioSel && Number(minimo) ? (Number(minimo) / precioSel).toFixed(1) : null;
+  const pesosEq = precioSel && Number(minimo) ? Math.round(Number(minimo) * precioSel) : null;
   return /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
@@ -1230,12 +1230,12 @@ function DispenserConfigModal({ cliente, productos, onGuardar, onCerrar }) {
     value: p.nombre
   }, p.nombre))), /*#__PURE__*/React.createElement("label", {
     style: { fontSize: 12, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }
-  }, "Mínimo por mes ($)"), /*#__PURE__*/React.createElement("input", {
+  }, "Mínimo por mes (unidades)"), /*#__PURE__*/React.createElement("input", {
     type: "number",
     inputMode: "numeric",
     value: minimo,
     onChange: e => setMinimo(e.target.value),
-    placeholder: "Ej: 72000",
+    placeholder: "Ej: 12",
     style: {
       width: "100%",
       padding: "10px 12px",
@@ -1247,10 +1247,10 @@ function DispenserConfigModal({ cliente, productos, onGuardar, onCerrar }) {
       marginBottom: 4,
       boxSizing: "border-box"
     }
-  }), unidadesEq && /*#__PURE__*/React.createElement("div", {
+  }), pesosEq && /*#__PURE__*/React.createElement("div", {
     style: { fontSize: 11.5, color: "var(--color-text-tertiary)", marginBottom: 12 }
-  }, "≈ ", unidadesEq, " ", producto, " al precio actual ($", precioSel.toLocaleString("es-AR"), " c/u)"), /*#__PURE__*/React.createElement("div", {
-    style: { display: "flex", gap: 10, marginTop: unidadesEq ? 0 : 16 }
+  }, "≈ $", pesosEq.toLocaleString("es-AR"), " al precio actual de ", producto, " ($", precioSel.toLocaleString("es-AR"), " c/u) — si el precio cambia, se recalcula solo"), /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", gap: 10, marginTop: pesosEq ? 0 : 16 }
   }, /*#__PURE__*/React.createElement("button", {
     style: {
       flex: 1,
@@ -1278,7 +1278,7 @@ function DispenserConfigModal({ cliente, productos, onGuardar, onCerrar }) {
     onClick: () => {
       const n = Math.max(0, Math.round(Number(minimo)) || 0);
       if (!producto || n <= 0) return;
-      onGuardar({ dispenserProducto: producto, dispenserMinimoMensualPesos: n });
+      onGuardar({ dispenserProducto: producto, dispenserMinimoMensual: n });
     }
   }, "Guardar"))));
 }
@@ -1492,13 +1492,13 @@ function DetalleCliente({
       ...s.btn,
       fontSize: 12,
       padding: "5px 10px",
-      border: cliente.dispenserMinimoMensualPesos ? "1px solid #5daaff" : undefined,
-      color: cliente.dispenserMinimoMensualPesos ? "#5daaff" : undefined,
-      background: cliente.dispenserMinimoMensualPesos ? "transparent" : undefined
+      border: cliente.dispenserMinimoMensual ? "1px solid #5daaff" : undefined,
+      color: cliente.dispenserMinimoMensual ? "#5daaff" : undefined,
+      background: cliente.dispenserMinimoMensual ? "transparent" : undefined
     },
-    title: "Mínimo de consumo mensual pactado (en pesos) por el dispenser de frío/calor prestado",
+    title: "Mínimo de consumo mensual pactado (en unidades) por el dispenser de frío/calor prestado",
     onClick: () => setMostrarDispenserConfig(true)
-  }, cliente.dispenserMinimoMensualPesos ? `🌡 $${Number(cliente.dispenserMinimoMensualPesos).toLocaleString("es-AR")}/mes` : "🌡 Configurar mínimo"), /*#__PURE__*/React.createElement("button", {
+  }, cliente.dispenserMinimoMensual ? `🌡 ${cliente.dispenserMinimoMensual}/mes` : "🌡 Configurar mínimo"), /*#__PURE__*/React.createElement("button", {
     style: {
       ...s.btn,
       padding: "4px 8px",
@@ -3198,17 +3198,17 @@ function DispensersFrioCalor({
     const [y, m] = mesSel.split("-").map(Number);
     return new Date(y, m - 1, 1).toLocaleDateString("es-AR", { month: "long", year: "numeric" });
   })();
-  const conDispenser = (clientes || []).filter(c => !c._retirado && (Number(c.dispenser) || 0) > 0 && c.dispenserProducto && Number(c.dispenserMinimoMensualPesos) > 0);
+  const conDispenser = (clientes || []).filter(c => !c._retirado && (Number(c.dispenser) || 0) > 0 && c.dispenserProducto && Number(c.dispenserMinimoMensual) > 0);
   const filas = conDispenser.map(c => {
     const consumido = (ventas || []).filter(v => v.clienteId === c.id && v.fechaKey && v.fechaKey.slice(0, 7) === mesSel && !v._esCobro && !v._esAjuste && !v._esAjusteEnvases && !v._esCambio && !v._esMixtoTrans).reduce((a, v) => a + (v.detalle || []).filter(d => d.nombre === c.dispenserProducto).reduce((b, d) => b + (Number(d.cantidad) || 0), 0), 0);
-    const minimo = Number(c.dispenserMinimoMensualPesos) || 0;
+    const minimo = Number(c.dispenserMinimoMensual) || 0;
+    const faltante = Math.max(0, minimo - consumido);
+    // el precio se toma siempre al momento del cálculo (si el producto aumentó, se cobra al precio actual)
     const producto = (productos || []).find(p => p.nombre === c.dispenserProducto);
     const precio = producto ? Number(producto.precio) || 0 : 0;
-    const consumidoPesos = consumido * precio;
-    const faltante = Math.max(0, minimo - consumidoPesos);
-    const monto = faltante;
+    const monto = faltante * precio;
     const yaCobrado = (ventas || []).some(v => v.clienteId === c.id && v._esAjusteDispenser && v._mesDispenser === mesSel);
-    return { c, consumido, consumidoPesos, minimo, faltante, monto, precio, yaCobrado };
+    return { c, consumido, minimo, faltante, monto, precio, yaCobrado };
   });
   return /*#__PURE__*/React.createElement("div", {
     style: s.screen
@@ -3235,7 +3235,7 @@ function DispensersFrioCalor({
     onClick: () => cambiarMes(1)
   }, "▶")), filas.length === 0 && /*#__PURE__*/React.createElement("div", {
     style: { padding: 40, textAlign: "center", color: "var(--color-text-tertiary)", fontSize: 14 }
-  }, "Todavía no marcaste ningún cliente con dispenser + mínimo mensual. Entrá a la ficha del cliente (tiene que tener un dispenser prestado) y tocá \"🌡 Configurar mínimo\"."), filas.map(({ c, consumido, consumidoPesos, minimo, faltante, monto, precio, yaCobrado }) => /*#__PURE__*/React.createElement("div", {
+  }, "Todavía no marcaste ningún cliente con dispenser + mínimo mensual. Entrá a la ficha del cliente (tiene que tener un dispenser prestado) y tocá \"🌡 Configurar mínimo\"."), filas.map(({ c, consumido, minimo, faltante, monto, precio, yaCobrado }) => /*#__PURE__*/React.createElement("div", {
     key: c.id,
     style: { ...s.card, margin: "6px 14px" }
   }, /*#__PURE__*/React.createElement("div", {
@@ -3243,16 +3243,16 @@ function DispensersFrioCalor({
     onClick: () => onSeleccionar(c)
   }, c.nombre), /*#__PURE__*/React.createElement("div", {
     style: { fontSize: 13, color: "var(--color-text-secondary)", marginTop: 3 }
-  }, "Consumió $", consumidoPesos.toLocaleString("es-AR"), " de $", minimo.toLocaleString("es-AR"), " · ", consumido, " ", c.dispenserProducto), faltante > 0 ? /*#__PURE__*/React.createElement("div", {
+  }, "Consumió ", consumido, " / ", minimo, " · ", c.dispenserProducto), faltante > 0 ? /*#__PURE__*/React.createElement("div", {
     style: { marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }
   }, /*#__PURE__*/React.createElement("div", {
     style: { fontSize: 13, fontWeight: 600, color: "#E24B4A" }
-  }, "Faltan $", monto.toLocaleString("es-AR")), yaCobrado ? /*#__PURE__*/React.createElement("span", {
+  }, "Faltan ", faltante, " · $", monto.toLocaleString("es-AR")), yaCobrado ? /*#__PURE__*/React.createElement("span", {
     style: { fontSize: 12, fontWeight: 600, color: "var(--color-text-success)" }
   }, "✓ Cobrado") : /*#__PURE__*/React.createElement("button", {
     style: { ...s.btnPrimary, fontSize: 12, padding: "7px 12px" },
     onClick: () => {
-      if (!window.confirm(`¿Cobrarle a ${c.nombre} $${monto.toLocaleString("es-AR")} por no llegar al mínimo pactado este mes?`)) return;
+      if (!window.confirm(`¿Cobrarle a ${c.nombre} $${monto.toLocaleString("es-AR")} por faltarle ${faltante} ${c.dispenserProducto} este mes?`)) return;
       const saldoAntes = c.saldo || 0;
       const saldoNuevo = saldoAntes - monto;
       const vt = {
@@ -3263,9 +3263,9 @@ function DispensersFrioCalor({
         fechaKey: new Date().toLocaleDateString("en-CA"),
         fecha: new Date().toLocaleString("es-AR"),
         hora: new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
-        detalle: [{ nombre: `${c.dispenserProducto} (diferencia mínimo pactado)`, cantidad: 1, precio: monto, total: monto }],
+        detalle: [{ nombre: c.dispenserProducto, cantidad: faltante, precio, total: monto }],
         pago: "manual",
-        obs: `Dispenser frío/calor — mes ${nombreMes}: consumió $${consumidoPesos.toLocaleString("es-AR")} de $${minimo.toLocaleString("es-AR")} pactados, faltan $${faltante.toLocaleString("es-AR")}`,
+        obs: `Dispenser frío/calor — mes ${nombreMes}: consumió ${consumido}/${minimo}, faltan ${faltante} (a $${precio.toLocaleString("es-AR")} c/u)`,
         neto: 0,
         bruto: 0,
         desc: 0,
