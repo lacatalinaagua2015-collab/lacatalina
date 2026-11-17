@@ -1011,6 +1011,113 @@ function ListaClientes({
     onAplicar: aplicarRutaSugerida
   }));
 }
+// Modal para pausar el reparto a un cliente: elige la fecha de vuelta con el
+// selector nativo de fecha del celular (pedido de Guillermo 2026-11-17: antes
+// pedía "cuántos días" y era menos práctico que elegir la fecha directo).
+function PausaClienteModal({ cliente, onGuardar, onCerrar }) {
+  const sugerida = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 15);
+    return d.toLocaleDateString("en-CA");
+  })();
+  const [fecha, setFecha] = React.useState(cliente.pausadoHasta || sugerida);
+  const [motivo, setMotivo] = React.useState(cliente.pausadoMotivo || "");
+  const hoy = new Date().toLocaleDateString("en-CA");
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "rgba(0,0,0,0.75)",
+      zIndex: 2000,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16
+    },
+    onClick: onCerrar
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.card,
+      width: "100%",
+      maxWidth: 380,
+      background: "#101b24"
+    },
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 2 }
+  }, "⏸ Pausar reparto"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 12.5, color: "var(--color-text-secondary)", marginBottom: 14 }
+  }, cliente.nombre), /*#__PURE__*/React.createElement("label", {
+    style: { fontSize: 12, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }
+  }, "¿Qué día volvés a su casa?"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: fecha,
+    min: hoy,
+    onChange: e => setFecha(e.target.value),
+    style: {
+      width: "100%",
+      padding: "10px 12px",
+      borderRadius: 10,
+      border: "1px solid var(--color-border-tertiary)",
+      background: "var(--color-background-secondary)",
+      color: "var(--color-text-primary)",
+      fontSize: 15,
+      marginBottom: 12,
+      boxSizing: "border-box"
+    }
+  }), /*#__PURE__*/React.createElement("label", {
+    style: { fontSize: 12, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }
+  }, "Motivo (opcional)"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: motivo,
+    onChange: e => setMotivo(e.target.value),
+    placeholder: "Ej: dijo que no va a estar",
+    style: {
+      width: "100%",
+      padding: "10px 12px",
+      borderRadius: 10,
+      border: "1px solid var(--color-border-tertiary)",
+      background: "var(--color-background-secondary)",
+      color: "var(--color-text-primary)",
+      fontSize: 14,
+      marginBottom: 16,
+      boxSizing: "border-box"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", gap: 10 }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      flex: 1,
+      padding: "12px 0",
+      borderRadius: 10,
+      border: "1px solid var(--color-border-tertiary)",
+      background: "none",
+      color: "var(--color-text-secondary)",
+      fontSize: 14,
+      cursor: "pointer"
+    },
+    onClick: onCerrar
+  }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      flex: 1,
+      padding: "12px 0",
+      borderRadius: 10,
+      border: "none",
+      background: "#EF9F27",
+      color: "#1a1206",
+      fontSize: 14,
+      fontWeight: 700,
+      cursor: "pointer"
+    },
+    onClick: () => {
+      if (!fecha) return;
+      onGuardar({ pausadoHasta: fecha, pausadoMotivo: motivo || "" });
+    }
+  }, "Guardar"))));
+}
 function DetalleCliente({
   cliente,
   ventas,
@@ -1043,6 +1150,7 @@ function DetalleCliente({
   const [tipoSaldoEdit, setTipoSaldoEdit] = useState("");
   const [montoSaldoEdit, setMontoSaldoEdit] = useState("");
   const [mostrarRecordatorio, setMostrarRecordatorio] = useState(false);
+  const [mostrarPausa, setMostrarPausa] = useState(false);
   const [mostrarPagoSaldo, setMostrarPagoSaldo] = useState(false);
   const [mostrarFotoGrande, setMostrarFotoGrande] = useState(false);
   const [mostrarFotoComodato, setMostrarFotoComodato] = useState(false);
@@ -1183,17 +1291,7 @@ function DetalleCliente({
         });
         return;
       }
-      const d = window.prompt("¿Cuántos días no hay que visitarlo?", "15");
-      if (d == null) return;
-      const dias = Math.max(1, Math.round(Number(d)) || 15);
-      const motivo = window.prompt("Motivo (opcional):", "");
-      if (motivo == null) return;
-      const hasta = new Date();
-      hasta.setDate(hasta.getDate() + dias);
-      onEditar({
-        pausadoHasta: hasta.toLocaleDateString("en-CA"),
-        pausadoMotivo: motivo || ""
-      });
+      setMostrarPausa(true);
     }
   }, pausadoActivo ? "⏸ Pausado" : "⏸ Pausar"), /*#__PURE__*/React.createElement("button", {
     style: {
@@ -1282,6 +1380,13 @@ function DetalleCliente({
       onEditar({
         fotoComodato: b64
       });
+    }
+  }), mostrarPausa && /*#__PURE__*/React.createElement(PausaClienteModal, {
+    cliente: cliente,
+    onCerrar: () => setMostrarPausa(false),
+    onGuardar: cambios => {
+      onEditar(cambios);
+      setMostrarPausa(false);
     }
   }), /*#__PURE__*/React.createElement("div", {
     style: {
