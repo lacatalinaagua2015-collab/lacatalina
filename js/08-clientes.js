@@ -908,13 +908,35 @@ function DetalleCliente({
       fontWeight: 600,
       color: "var(--color-text-primary)"
     }
-  }, cliente.nombre), /*#__PURE__*/React.createElement("div", {
+  }, cliente.nombre, cliente.esProspecto && /*#__PURE__*/React.createElement("span", {
+    style: {
+      marginLeft: 6,
+      fontSize: 11,
+      fontWeight: 600,
+      padding: "2px 8px",
+      borderRadius: 20,
+      color: "#b794f6",
+      border: "0.5px solid #b794f6",
+      flexShrink: 0
+    }
+  }, "🔸 Prospecto")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 6,
       flexShrink: 0
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, cliente.esProspecto && onRetirarCliente && /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      fontSize: 12,
+      padding: "5px 10px",
+      border: "1px solid #E24B4A",
+      color: "#E24B4A",
+      background: "transparent"
+    },
+    title: "El prospecto no sigue — retira el envase de promoción y lo da de baja",
+    onClick: () => onRetirarCliente()
+  }, "Retirado"), /*#__PURE__*/React.createElement("button", {
     style: {
       ...s.btn,
       padding: "4px 8px",
