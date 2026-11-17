@@ -4094,7 +4094,8 @@ function App() {
     onEditarMontoCobro: editarMontoCobro,
     onEditarMontoVenta: editarMontoVenta,
     onAbrirMapa: () => irA("mapaClientes"),
-    onPlanilla: () => irA("planilla")
+    onPlanilla: () => irA("planilla"),
+    onRetirarCliente: id => retirarCliente(id)
   }), pantalla === "detalleCliente" && cliente && /*#__PURE__*/React.createElement(DetalleCliente, {
     // Antes esta pantalla estaba duplicada (una copia para cuando entrabas
     // desde Clientes del día, otra —"detalleDesdeGestion"— para Gestión,

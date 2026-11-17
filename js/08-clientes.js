@@ -11,7 +11,7 @@
 // del cierre de ListaClientes ahora llega explícito por props (mismos
 // nombres, así el cuerpo de abajo no tuvo que tocarse).
 const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
-  c, atendidos, noVMap, visitados, clienteExpandidoId, setClienteExpandidoId, pendientes, clienteMoviendo, setClienteMoviendo, moverCliente, onSeleccionar, recordatorios, ventas, fecha, onConfirmarTransfer, todasVentas, marcarNoVisita, onGuardarVenta, productos, onNoQuiereConEnvases, onCambiarDispenserCliente, onQuitarNoVisita, clientes, onReordenar
+  c, atendidos, noVMap, visitados, clienteExpandidoId, setClienteExpandidoId, pendientes, clienteMoviendo, setClienteMoviendo, moverCliente, onSeleccionar, recordatorios, ventas, fecha, onConfirmarTransfer, todasVentas, marcarNoVisita, onGuardarVenta, productos, onNoQuiereConEnvases, onCambiarDispenserCliente, onQuitarNoVisita, clientes, onReordenar, onRetirarCliente
 }) {
     const [fotoOpen, setFotoOpen] = React.useState(false);
     const [mostrarMas, setMostrarMas] = React.useState(false);
@@ -305,7 +305,27 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         e.stopPropagation();
         setFotoOpen(true);
       }
-    }, "📷"))), puedeEntregar && !expandido && /*#__PURE__*/React.createElement("div", {
+    }, "📷"), c.esProspecto && onRetirarCliente && /*#__PURE__*/React.createElement("button", {
+      style: {
+        fontSize: 15,
+        cursor: "pointer",
+        width: 34,
+        height: 34,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: esMetalico ? "50%" : 9,
+        background: "rgba(226,75,74,0.08)",
+        border: "0.5px solid #E24B4A",
+        color: "#E24B4A",
+        padding: 0
+      },
+      title: "El prospecto no sigue — retira el envase de promoción y lo da de baja",
+      onClick: e => {
+        e.stopPropagation();
+        onRetirarCliente(c.id);
+      }
+    }, "\u{1F6AB}"))), puedeEntregar && !expandido && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 8,
@@ -471,7 +491,8 @@ function ListaClientes({
   onConfirmarTransfer,
   onAbrirMapa,
   onPlanilla,
-  onPerdida
+  onPerdida,
+  onRetirarCliente
 }) {
   const [busqueda, setBusqueda] = useState("");
   const [clienteMoviendo, setClienteMoviendo] = useState(null); // id del cliente "levantado", esperando destino
@@ -638,7 +659,7 @@ function ListaClientes({
   // Props estables para ClienteCard (ver comentario arriba de su definición) —
   // spreadeadas en cada React.createElement(ClienteCard, {key, ...cardProps(c)}).
   const cardProps = c => ({
-    c, atendidos, noVMap, visitados, clienteExpandidoId, setClienteExpandidoId, pendientes, clienteMoviendo, setClienteMoviendo, moverCliente, onSeleccionar, recordatorios, ventas, fecha, onConfirmarTransfer, todasVentas, marcarNoVisita, onGuardarVenta, productos, onNoQuiereConEnvases, onCambiarDispenserCliente, onQuitarNoVisita, clientes, onReordenar
+    c, atendidos, noVMap, visitados, clienteExpandidoId, setClienteExpandidoId, pendientes, clienteMoviendo, setClienteMoviendo, moverCliente, onSeleccionar, recordatorios, ventas, fecha, onConfirmarTransfer, todasVentas, marcarNoVisita, onGuardarVenta, productos, onNoQuiereConEnvases, onCambiarDispenserCliente, onQuitarNoVisita, clientes, onReordenar, onRetirarCliente
   });
   return /*#__PURE__*/React.createElement("div", {
     style: s.screen
