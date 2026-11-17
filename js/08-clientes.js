@@ -3044,3 +3044,118 @@ function ClientesDormidos({
     }, "🗑️ Eliminar")
   }))));
 }
+
+// ─── Dispensers de frío/calor ───────────────────────────────────────────
+// Pedido de Guillermo 2026-11-17: a los clientes a los que se les presta un
+// dispenser de frío/calor se les pacta un mínimo de compra mensual de un
+// producto (ej. 12 Bidones 20L/mes); si no llegan, a fin de mes se les cobra
+// la diferencia al precio normal de ese producto (asunción: no hay un
+// precio especial de "alquiler" separado, se avisó al pedirlo). NUNCA se
+// cobra solo — esta pantalla solo muestra el cálculo, y el cobro se aplica
+// recién cuando Guillermo toca "Cobrar faltante" en cada cliente.
+function DispensersFrioCalor({
+  clientes,
+  ventas,
+  productos,
+  onVolver,
+  onSeleccionar,
+  onCobrarFaltante
+}) {
+  const [mesSel, setMesSel] = React.useState(() => new Date().toLocaleDateString("en-CA").slice(0, 7));
+  const cambiarMes = delta => {
+    const [y, m] = mesSel.split("-").map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setMesSel(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  };
+  const nombreMes = (() => {
+    const [y, m] = mesSel.split("-").map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+  })();
+  const conDispenser = (clientes || []).filter(c => !c._retirado && (Number(c.dispenser) || 0) > 0 && c.dispenserProducto && Number(c.dispenserMinimoMensual) > 0);
+  const filas = conDispenser.map(c => {
+    const consumido = (ventas || []).filter(v => v.clienteId === c.id && v.fechaKey && v.fechaKey.slice(0, 7) === mesSel && !v._esCobro && !v._esAjuste && !v._esAjusteEnvases && !v._esCambio && !v._esMixtoTrans).reduce((a, v) => a + (v.detalle || []).filter(d => d.nombre === c.dispenserProducto).reduce((b, d) => b + (Number(d.cantidad) || 0), 0), 0);
+    const minimo = Number(c.dispenserMinimoMensual) || 0;
+    const faltante = Math.max(0, minimo - consumido);
+    const producto = (productos || []).find(p => p.nombre === c.dispenserProducto);
+    const precio = producto ? Number(producto.precio) || 0 : 0;
+    const monto = faltante * precio;
+    const yaCobrado = (ventas || []).some(v => v.clienteId === c.id && v._esAjusteDispenser && v._mesDispenser === mesSel);
+    return { c, consumido, minimo, faltante, monto, yaCobrado };
+  });
+  return /*#__PURE__*/React.createElement("div", {
+    style: s.screen
+  }, /*#__PURE__*/React.createElement("div", {
+    style: s.header
+  }, /*#__PURE__*/React.createElement("button", {
+    style: s.backBtn,
+    onClick: onVolver
+  }, "← Volver"), /*#__PURE__*/React.createElement("div", {
+    style: { flex: 1 }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: s.headerTitle
+  }, "🌡 Dispensers frío/calor"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 11, color: "var(--color-text-tertiary)" }
+  }, conDispenser.length, " con mínimo pactado"))), /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 14, padding: "10px 14px" }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: { ...s.btn, padding: "4px 10px" },
+    onClick: () => cambiarMes(-1)
+  }, "◀"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 14, fontWeight: 600, color: "var(--color-text-primary)", textTransform: "capitalize" }
+  }, nombreMes), /*#__PURE__*/React.createElement("button", {
+    style: { ...s.btn, padding: "4px 10px" },
+    onClick: () => cambiarMes(1)
+  }, "▶")), filas.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: { padding: 40, textAlign: "center", color: "var(--color-text-tertiary)", fontSize: 14 }
+  }, "Todavía no marcaste ningún cliente con dispenser + mínimo mensual. Entrá a la ficha del cliente (tiene que tener un dispenser prestado) y tocá \"🌡 Configurar mínimo\"."), filas.map(({ c, consumido, minimo, faltante, monto, yaCobrado }) => /*#__PURE__*/React.createElement("div", {
+    key: c.id,
+    style: { ...s.card, margin: "6px 14px" }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontWeight: 700, fontSize: 15, color: "var(--color-text-primary)", cursor: "pointer" },
+    onClick: () => onSeleccionar(c)
+  }, c.nombre), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 13, color: "var(--color-text-secondary)", marginTop: 3 }
+  }, "Consumió ", consumido, " / ", minimo, " · ", c.dispenserProducto), faltante > 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 13, fontWeight: 600, color: "#E24B4A" }
+  }, "Faltan ", faltante, " · $", monto.toLocaleString("es-AR")), yaCobrado ? /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 12, fontWeight: 600, color: "var(--color-text-success)" }
+  }, "✓ Cobrado") : /*#__PURE__*/React.createElement("button", {
+    style: { ...s.btnPrimary, fontSize: 12, padding: "7px 12px" },
+    onClick: () => {
+      if (!window.confirm(`¿Cobrarle a ${c.nombre} $${monto.toLocaleString("es-AR")} por faltarle ${faltante} ${c.dispenserProducto} este mes?`)) return;
+      const saldoAntes = c.saldo || 0;
+      const saldoNuevo = saldoAntes - monto;
+      const vt = {
+        id: Date.now(),
+        clienteId: c.id,
+        cliente: c.nombre,
+        dia: c.dia,
+        fechaKey: new Date().toLocaleDateString("en-CA"),
+        fecha: new Date().toLocaleString("es-AR"),
+        hora: new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
+        detalle: [{ nombre: c.dispenserProducto, cantidad: faltante, precio, total: monto }],
+        pago: "manual",
+        obs: `Dispenser frío/calor — mes ${nombreMes}: consumió ${consumido}/${minimo}, faltan ${faltante}`,
+        neto: 0,
+        bruto: 0,
+        desc: 0,
+        costo: 0,
+        ganancia: 0,
+        pagadoNum: 0,
+        saldoDelta: -monto,
+        envPrest: [],
+        envDev: [],
+        saldoAntes,
+        saldoDespues: saldoNuevo,
+        _esAjuste: true,
+        _esAjusteDispenser: true,
+        _mesDispenser: mesSel
+      };
+      onCobrarFaltante(c.id, saldoNuevo, vt);
+    }
+  }, "Cobrar faltante")) : /*#__PURE__*/React.createElement("div", {
+    style: { marginTop: 6, fontSize: 12.5, fontWeight: 600, color: "var(--color-text-success)" }
+  }, "✓ Cumplió el mínimo"))));
+}
