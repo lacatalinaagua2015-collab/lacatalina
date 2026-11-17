@@ -461,6 +461,91 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
   }));
 });
 
+// Vista previa de la "ruta sugerida" (ver sugerirRuta en ListaClientes más
+// abajo) — solo muestra, nunca aplica sola; Guillermo decide si la usa.
+function RutaSugeridaModal({ rutaSugerida, onCerrar, onAplicar }) {
+  if (!rutaSugerida) return null;
+  const { orden, horaPorId, sinUbicarIds } = rutaSugerida;
+  const minAHora = min => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "rgba(0,0,0,0.75)",
+      zIndex: 2000,
+      display: "flex",
+      alignItems: "flex-end",
+      justifyContent: "center"
+    },
+    onClick: onCerrar
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#101b24",
+      borderRadius: "16px 16px 0 0",
+      padding: 16,
+      width: "100%",
+      maxWidth: 480,
+      maxHeight: "82vh",
+      overflowY: "auto",
+      border: "1px solid var(--color-border-secondary)",
+      borderBottom: "none"
+    },
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 4 }
+  }, "✨ Ruta sugerida"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 12.5, color: "var(--color-text-secondary)", marginBottom: 12, lineHeight: 1.4 }
+  }, "Orden según el horario en que solés atender a cada uno (de tu historial) y, a los que no tienen suficiente historial, la ubicación más cercana. Revisá y aplicá solo si tiene sentido."), orden.map((c, i) => /*#__PURE__*/React.createElement("div", {
+    key: c.id,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "7px 0",
+      borderBottom: i < orden.length - 1 ? "1px solid var(--color-border-tertiary)" : "none"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { width: 22, fontSize: 13, fontWeight: 700, color: "var(--color-text-secondary)", flexShrink: 0 }
+  }, i + 1), /*#__PURE__*/React.createElement("span", {
+    style: { flex: 1, fontSize: 14, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }
+  }, c.nombre), horaPorId[c.id] != null ? /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 11.5, fontWeight: 600, color: "#4dd9a0", flexShrink: 0 }
+  }, "\uD83D\uDD50 ~", minAHora(horaPorId[c.id])) : sinUbicarIds.has(c.id) ? /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 11, color: "#E24B4A", flexShrink: 0 }
+  }, "sin datos") : /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 11, color: "var(--color-text-tertiary)", flexShrink: 0 }
+  }, "sin historial"))), /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", gap: 10, marginTop: 16 }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      flex: 1,
+      padding: "12px 0",
+      borderRadius: 10,
+      border: "1px solid var(--color-border-tertiary)",
+      background: "none",
+      color: "var(--color-text-secondary)",
+      fontSize: 14,
+      cursor: "pointer"
+    },
+    onClick: onCerrar
+  }, "Cerrar"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      flex: 1,
+      padding: "12px 0",
+      borderRadius: 10,
+      border: "none",
+      background: "#0a5c3a",
+      color: "#e2eaf4",
+      fontSize: 14,
+      fontWeight: 600,
+      cursor: "pointer"
+    },
+    onClick: onAplicar
+  }, "Aplicar este orden"))));
+}
 function ListaClientes({
   clientes,
   // Clientes pendientes de un día hábil anterior de esta misma semana que
