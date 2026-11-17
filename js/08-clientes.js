@@ -1175,6 +1175,109 @@ function PausaClienteModal({ cliente, onGuardar, onCerrar }) {
     }
   }, "Guardar"))));
 }
+// Modal para pactar el mínimo de consumo mensual de un cliente con
+// dispenser de frío/calor prestado (pedido de Guillermo 2026-11-17: el
+// dispenser se presta gratis mientras el cliente mantenga un consumo
+// mensual razonable de un producto pactado; si no llega, a fin de mes se
+// le cobra la diferencia — ver DispensersFrioCalor más abajo, que hace el
+// cálculo real y el cobro, esto solo pacta el mínimo).
+function DispenserConfigModal({ cliente, productos, onGuardar, onCerrar }) {
+  const opciones = (productos || []).filter(p => !p.esDispenser);
+  const [producto, setProducto] = React.useState(cliente.dispenserProducto || (opciones[0] && opciones[0].nombre) || "");
+  const [minimo, setMinimo] = React.useState(cliente.dispenserMinimoMensual || "");
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "rgba(0,0,0,0.75)",
+      zIndex: 2000,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16
+    },
+    onClick: onCerrar
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { ...s.card, width: "100%", maxWidth: 380, background: "#101b24" },
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 2 }
+  }, "🌡 Mínimo del dispenser"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 12.5, color: "var(--color-text-secondary)", marginBottom: 14 }
+  }, cliente.nombre), /*#__PURE__*/React.createElement("label", {
+    style: { fontSize: 12, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }
+  }, "Producto pactado"), /*#__PURE__*/React.createElement("select", {
+    value: producto,
+    onChange: e => setProducto(e.target.value),
+    style: {
+      width: "100%",
+      padding: "10px 12px",
+      borderRadius: 10,
+      border: "1px solid var(--color-border-tertiary)",
+      background: "var(--color-background-secondary)",
+      color: "var(--color-text-primary)",
+      fontSize: 15,
+      marginBottom: 12,
+      boxSizing: "border-box"
+    }
+  }, opciones.map(p => /*#__PURE__*/React.createElement("option", {
+    key: p.id,
+    value: p.nombre
+  }, p.nombre))), /*#__PURE__*/React.createElement("label", {
+    style: { fontSize: 12, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }
+  }, "Mínimo por mes (unidades)"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    inputMode: "numeric",
+    value: minimo,
+    onChange: e => setMinimo(e.target.value),
+    placeholder: "Ej: 12",
+    style: {
+      width: "100%",
+      padding: "10px 12px",
+      borderRadius: 10,
+      border: "1px solid var(--color-border-tertiary)",
+      background: "var(--color-background-secondary)",
+      color: "var(--color-text-primary)",
+      fontSize: 15,
+      marginBottom: 16,
+      boxSizing: "border-box"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", gap: 10 }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      flex: 1,
+      padding: "12px 0",
+      borderRadius: 10,
+      border: "1px solid var(--color-border-tertiary)",
+      background: "none",
+      color: "var(--color-text-secondary)",
+      fontSize: 14,
+      cursor: "pointer"
+    },
+    onClick: onCerrar
+  }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      flex: 1,
+      padding: "12px 0",
+      borderRadius: 10,
+      border: "none",
+      background: "#5daaff",
+      color: "#07131f",
+      fontSize: 14,
+      fontWeight: 700,
+      cursor: "pointer"
+    },
+    onClick: () => {
+      const n = Math.max(0, Math.round(Number(minimo)) || 0);
+      if (!producto || n <= 0) return;
+      onGuardar({ dispenserProducto: producto, dispenserMinimoMensual: n });
+    }
+  }, "Guardar"))));
+}
 function DetalleCliente({
   cliente,
   ventas,
@@ -1208,6 +1311,7 @@ function DetalleCliente({
   const [montoSaldoEdit, setMontoSaldoEdit] = useState("");
   const [mostrarRecordatorio, setMostrarRecordatorio] = useState(false);
   const [mostrarPausa, setMostrarPausa] = useState(false);
+  const [mostrarDispenserConfig, setMostrarDispenserConfig] = useState(false);
   const [mostrarPagoSaldo, setMostrarPagoSaldo] = useState(false);
   const [mostrarFotoGrande, setMostrarFotoGrande] = useState(false);
   const [mostrarFotoComodato, setMostrarFotoComodato] = useState(false);
@@ -1379,7 +1483,18 @@ function DetalleCliente({
         frecuencia: "quincenal"
       });
     }
-  }, cliente.frecuencia === "quincenal" ? "📅 Quincenal" : "📅 Semanal"), /*#__PURE__*/React.createElement("button", {
+  }, cliente.frecuencia === "quincenal" ? "📅 Quincenal" : "📅 Semanal"), (Number(cliente.dispenser) || 0) > 0 && /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      fontSize: 12,
+      padding: "5px 10px",
+      border: cliente.dispenserMinimoMensual ? "1px solid #5daaff" : undefined,
+      color: cliente.dispenserMinimoMensual ? "#5daaff" : undefined,
+      background: cliente.dispenserMinimoMensual ? "transparent" : undefined
+    },
+    title: "Mínimo de consumo mensual pactado por el dispenser de frío/calor prestado",
+    onClick: () => setMostrarDispenserConfig(true)
+  }, cliente.dispenserMinimoMensual ? `🌡 ${cliente.dispenserMinimoMensual}/mes` : "🌡 Configurar mínimo"), /*#__PURE__*/React.createElement("button", {
     style: {
       ...s.btn,
       padding: "4px 8px",
@@ -1473,6 +1588,14 @@ function DetalleCliente({
     onGuardar: cambios => {
       onEditar(cambios);
       setMostrarPausa(false);
+    }
+  }), mostrarDispenserConfig && /*#__PURE__*/React.createElement(DispenserConfigModal, {
+    cliente: cliente,
+    productos: productos,
+    onCerrar: () => setMostrarDispenserConfig(false),
+    onGuardar: cambios => {
+      onEditar(cambios);
+      setMostrarDispenserConfig(false);
     }
   }), /*#__PURE__*/React.createElement("div", {
     style: {

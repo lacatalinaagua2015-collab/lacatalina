@@ -166,7 +166,7 @@ function ClientesTabs({
   activo,
   onIr
 }) {
-  const tabs = [["todos", "👥", "Todos", "gestionClientes"], ["fiados", "💰", "Fiados", "fiadosPendientes"], ["dormidos", "😴", "Dormidos", "clientesDormidos"], ["mapa", "🗺", "Mapa", "mapaClientes"]];
+  const tabs = [["todos", "👥", "Todos", "gestionClientes"], ["fiados", "💰", "Fiados", "fiadosPendientes"], ["dormidos", "😴", "Dormidos", "clientesDormidos"], ["dispenser", "🌡", "Dispenser", "dispensersFrioCalor"], ["mapa", "🗺", "Mapa", "mapaClientes"]];
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -2295,6 +2295,7 @@ function App() {
     gestion: "gestionClientes",
     agenda: "agenda",
     dormidos: "clientesDormidos",
+    dispenser: "dispensersFrioCalor",
     mapa: "mapaClientes",
     resumen: "resumen",
     // Entrada desde el cartel de deuda en el Menú (onVerDeudor) — "Volver"
@@ -4697,6 +4698,27 @@ function App() {
       if (antes) ajustarStockFijoCliente(antes, { ...antes, ...cambios });
     },
     onEliminar: eliminarCliente
+  })), pantalla === "dispensersFrioCalor" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(ClientesTabs, {
+    activo: "dispenser",
+    onIr: irA
+  }), /*#__PURE__*/React.createElement(DispensersFrioCalor, {
+    clientes: clientes,
+    ventas: ventas,
+    productos: productos,
+    onVolver: () => irA("menu"),
+    onSeleccionar: c => {
+      setClienteId(c.id);
+      if (!diaActual) setDiaActual(c.dia);
+      setOrigenDetalle("dispenser");
+      irA("detalleCliente");
+    },
+    onCobrarFaltante: (clienteId, saldoNuevo, vt) => {
+      saveClientes(prev => prev.map(c => c.id === clienteId ? {
+        ...c,
+        saldo: saldoNuevo
+      } : c));
+      saveVentas(prev => [...prev, vt]);
+    }
   })), modalResumenDia && (() => {
     const {
       dia,
