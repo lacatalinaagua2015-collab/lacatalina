@@ -2118,10 +2118,74 @@ function Config({
       textDecoration: "none"
     }
   }, "💬 Soporte por WhatsApp")), tab === "vehiculo" && /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: 16
-    }
-  }, /*#__PURE__*/React.createElement("div", {
+    style: { padding: 16 }
+  },
+    /*#__PURE__*/React.createElement("div", { style: { ...s.card, margin: "0 0 14px" } },
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 15, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 2 } }, "📍 Ubicación de casa / depósito"),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: "var(--color-text-tertiary)", marginBottom: 10 } }, "Punto de partida y llegada de cada reparto — se usa para estimar los km recorridos en Ganancia neta."),
+      casaUbicacion && casaUbicacion.lat != null && /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, color: "#4dd9a0", marginBottom: 10 } }, "✓ Guardada: ", casaUbicacion.lat.toFixed(5), ", ", casaUbicacion.lng.toFixed(5)),
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 8 } },
+        /*#__PURE__*/React.createElement("input", {
+          style: { ...s.input, flex: 1 },
+          placeholder: "Link de Google Maps o 'lat, lng'",
+          value: casaInput,
+          onChange: e => setCasaInput(e.target.value)
+        }),
+        /*#__PURE__*/React.createElement("button", {
+          style: { ...s.btn, fontSize: 12 },
+          onClick: () => {
+            const co = extraerCoordsDeURL(casaInput);
+            if (!co) { alert("No pude leer coordenadas de ese texto. Probá con un link de Google Maps o 'lat, lng' (ej: -26.8659, -65.2178)."); return; }
+            saveCasaUbicacion({ lat: co.lat, lng: co.lng, nombre: "Casa" });
+            setCasaInput("");
+          }
+        }, "Guardar")
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        style: { ...s.btn, fontSize: 12, marginTop: 8, width: "100%" },
+        onClick: () => {
+          if (!navigator.geolocation) { alert("Tu navegador no soporta ubicación."); return; }
+          setGpsEstadoCasa("Buscando...");
+          navigator.geolocation.getCurrentPosition(
+            pos => { saveCasaUbicacion({ lat: pos.coords.latitude, lng: pos.coords.longitude, nombre: "Casa" }); setGpsEstadoCasa("✓ Ubicación guardada"); },
+            () => setGpsEstadoCasa("No se pudo obtener la ubicación")
+          );
+        }
+      }, "📍 Usar mi ubicación actual"),
+      gpsEstadoCasa && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11.5, color: "var(--color-text-tertiary)", marginTop: 4 } }, gpsEstadoCasa)
+    ),
+    /*#__PURE__*/React.createElement("div", { style: { ...s.card, margin: "0 0 14px" } },
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 15, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 2 } }, "🚚 Costos de la camioneta"),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: "var(--color-text-tertiary)", marginBottom: 10 } }, "Para calcular la Ganancia neta. Cada costo es un monto fijo (por km, semana, mes o año) o un % sobre el total de los demás."),
+      costosVehiculo.map(item => /*#__PURE__*/React.createElement("div", {
+        key: item.id,
+        style: { border: "0.5px solid var(--color-border-tertiary)", borderRadius: 10, padding: 10, marginBottom: 8 }
+      },
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 6 } },
+          /*#__PURE__*/React.createElement("input", { style: { ...s.input, flex: 1 }, value: item.nombre, onChange: e => editarCostoVehiculo(item.id, "nombre", e.target.value) }),
+          /*#__PURE__*/React.createElement("button", { style: s.btnDanger, onClick: () => eliminarCostoVehiculo(item.id) }, "✕")
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 6 } },
+          /*#__PURE__*/React.createElement("select", {
+            style: { ...s.select, flex: 1 }, value: item.tipo,
+            onChange: e => editarCostoVehiculo(item.id, "tipo", e.target.value)
+          },
+            /*#__PURE__*/React.createElement("option", { value: "monto" }, "Monto fijo"),
+            /*#__PURE__*/React.createElement("option", { value: "porcentaje" }, "% sobre el total")
+          )
+        ),
+        item.tipo === "monto" ? /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6 } },
+          /*#__PURE__*/React.createElement("input", { type: "number", style: { ...s.inputNum, flex: 1 }, placeholder: "Monto $", value: item.monto, onChange: e => editarCostoVehiculo(item.id, "monto", Number(e.target.value) || 0) }),
+          /*#__PURE__*/React.createElement("select", {
+            style: { ...s.select, flex: 1 }, value: item.frecuencia,
+            onChange: e => editarCostoVehiculo(item.id, "frecuencia", e.target.value)
+          }, FRECUENCIAS_COSTO_VEHICULO.map(f => /*#__PURE__*/React.createElement("option", { key: f, value: f }, "por ", f))),
+          item.frecuencia !== "km" && /*#__PURE__*/React.createElement("input", { type: "number", style: { ...s.inputNum, width: 70 }, placeholder: "cada", value: item.repiteCada || 1, onChange: e => editarCostoVehiculo(item.id, "repiteCada", Math.max(1, Number(e.target.value) || 1)) })
+        ) : /*#__PURE__*/React.createElement("input", { type: "number", style: s.inputNum, placeholder: "%", value: item.porcentaje, onChange: e => editarCostoVehiculo(item.id, "porcentaje", Number(e.target.value) || 0) })
+      )),
+      /*#__PURE__*/React.createElement("button", { style: { ...s.btn, width: "100%", fontSize: 12.5 }, onClick: agregarCostoVehiculo }, "+ Agregar costo")
+    ),
+    /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
