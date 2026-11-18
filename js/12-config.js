@@ -970,6 +970,33 @@ function Config({
     }
   });
   const [mostrarNuevoMant, setMostrarNuevoMant] = React.useState(false);
+  // Ganancia neta (17-18/11/2026): lista configurable de costos de la
+  // camioneta + ubicación de casa/depósito, para estimar km y gasto real.
+  const [costosVehiculo, setCostosVehiculoState] = React.useState(() => {
+    try { return JSON.parse(localStorage.getItem("cat_costos_vehiculo_v1")) || COSTOS_VEHICULO_DEFAULT; } catch { return COSTOS_VEHICULO_DEFAULT; }
+  });
+  const [casaUbicacion, setCasaUbicacionState] = React.useState(() => {
+    try { return JSON.parse(localStorage.getItem("cat_casa_ubicacion_v1")) || CASA_UBICACION_DEFAULT; } catch { return CASA_UBICACION_DEFAULT; }
+  });
+  const [casaInput, setCasaInput] = React.useState("");
+  const [gpsEstadoCasa, setGpsEstadoCasa] = React.useState("");
+  const saveCostosVehiculo = lista => {
+    setCostosVehiculoState(lista);
+    localStorage.setItem("cat_costos_vehiculo_v1", JSON.stringify(lista));
+    if (syncData) syncData({ costosVehiculo: lista });
+  };
+  const saveCasaUbicacion = obj => {
+    setCasaUbicacionState(obj);
+    localStorage.setItem("cat_casa_ubicacion_v1", JSON.stringify(obj));
+    if (syncData) syncData({ casaUbicacion: obj });
+  };
+  const editarCostoVehiculo = (id, campo, valor) => {
+    saveCostosVehiculo(costosVehiculo.map(it => it.id === id ? { ...it, [campo]: valor } : it));
+  };
+  const eliminarCostoVehiculo = id => saveCostosVehiculo(costosVehiculo.filter(it => it.id !== id));
+  const agregarCostoVehiculo = () => saveCostosVehiculo([...costosVehiculo, {
+    id: Date.now(), nombre: "Nuevo costo", tipo: "monto", monto: 0, frecuencia: "mes", repiteCada: 1
+  }]);
   // Pedido del usuario: cada "tipo" de mantenimiento (aceite, VTV, etc.) se
   // agrupa en una sola tarjeta con su fecha/próximo más reciente, y se abre
   // para ver el historial completo de ESE tipo — antes era una lista plana
