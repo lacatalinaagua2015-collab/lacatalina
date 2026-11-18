@@ -973,7 +973,11 @@ function Config({
   // Ganancia neta (17-18/11/2026): lista configurable de costos de la
   // camioneta + ubicación de casa/depósito, para estimar km y gasto real.
   const [costosVehiculo, setCostosVehiculoState] = React.useState(() => {
-    try { return JSON.parse(localStorage.getItem("cat_costos_vehiculo_v1")) || COSTOS_VEHICULO_DEFAULT; } catch { return COSTOS_VEHICULO_DEFAULT; }
+    // Corrección de nombre (18/11/2026): "Cambio de olla" era un error, es
+    // "Cambio de oblea" de GNC. Solo renombra el texto, no toca montos.
+    let lista;
+    try { lista = JSON.parse(localStorage.getItem("cat_costos_vehiculo_v1")) || COSTOS_VEHICULO_DEFAULT; } catch { lista = COSTOS_VEHICULO_DEFAULT; }
+    return (lista || []).map(it => it.nombre === "Cambio de olla (GNC)" ? { ...it, nombre: "Cambio de oblea (GNC)" } : it);
   });
   const [casaUbicacion, setCasaUbicacionState] = React.useState(() => {
     try { return JSON.parse(localStorage.getItem("cat_casa_ubicacion_v1")) || CASA_UBICACION_DEFAULT; } catch { return CASA_UBICACION_DEFAULT; }

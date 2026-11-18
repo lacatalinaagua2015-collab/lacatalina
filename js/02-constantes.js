@@ -48,7 +48,7 @@ const COSTOS_VEHICULO_DEFAULT = [
   { id: 2, nombre: "Aceite",                 tipo: "monto", monto: 16000,   frecuencia: "semana",repiteCada: 1 },
   { id: 3, nombre: "Seguro",                 tipo: "monto", monto: 47000,   frecuencia: "mes",   repiteCada: 1 },
   { id: 4, nombre: "Revisación técnica",     tipo: "monto", monto: 90000,   frecuencia: "año",   repiteCada: 1 },
-  { id: 5, nombre: "Cambio de olla (GNC)",   tipo: "monto", monto: 35000,   frecuencia: "año",   repiteCada: 1 },
+  { id: 5, nombre: "Cambio de oblea (GNC)",  tipo: "monto", monto: 35000,   frecuencia: "año",   repiteCada: 1 },
   { id: 6, nombre: "Cubiertas (4)",          tipo: "monto", monto: 1200000, frecuencia: "año",   repiteCada: 4 },
   { id: 7, nombre: "Repuestos imprevistos",  tipo: "porcentaje", porcentaje: 8, base: "gastoVehiculoTotal" },
 ];

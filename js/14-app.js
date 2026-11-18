@@ -4620,7 +4620,13 @@ function App() {
     ventas: ventas,
     clientes: clientes,
     zonasReparto: zonasReparto,
-    costosVehiculo: (() => { try { return JSON.parse(localStorage.getItem("cat_costos_vehiculo_v1")) || COSTOS_VEHICULO_DEFAULT; } catch { return COSTOS_VEHICULO_DEFAULT; } })(),
+    costosVehiculo: (() => {
+      // Corrección de nombre (18/11/2026): "Cambio de olla" estaba mal, es
+      // "Cambio de oblea" de GNC. Solo renombra el texto, no toca montos.
+      let lista;
+      try { lista = JSON.parse(localStorage.getItem("cat_costos_vehiculo_v1")) || COSTOS_VEHICULO_DEFAULT; } catch { lista = COSTOS_VEHICULO_DEFAULT; }
+      return (lista || []).map(it => it.nombre === "Cambio de olla (GNC)" ? { ...it, nombre: "Cambio de oblea (GNC)" } : it);
+    })(),
     casaUbicacion: (() => { try { return JSON.parse(localStorage.getItem("cat_casa_ubicacion_v1")) || CASA_UBICACION_DEFAULT; } catch { return CASA_UBICACION_DEFAULT; } })(),
     onVolver: () => irA("menu"),
     onConfigurar: () => { setTabConfig("vehiculo"); irA("config"); }
