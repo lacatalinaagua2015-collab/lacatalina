@@ -77,18 +77,44 @@ function calcularGastoVehiculoDelDia(costosVehiculo, kmDelDia) {
   return { detalle, total };
 }
 
+// ── "Bulto" para la Ganancia neta — definición de Guillermo (18/11/2026):
+//    6 sifones = 1 bulto, bidón 10L = 1 bulto, bidón 20L = 1,5 bultos.
+//    Es DISTINTO del "bulto" que ya existe en la planilla de carga
+//    (07-menu.js, bultosAuto), que es para otra cosa (peso/espacio en la
+//    camioneta) — no se tocan entre sí, viven cada uno en lo suyo.
+function factorBultoPorNombre(nombre) {
+  if (!nombre) return 0;
+  const n = String(nombre).toLowerCase();
+  if (n.includes("20")) return 1.5;
+  if (n.includes("10")) return 1;
+  if (n.includes("sif") || n.includes("soda")) return 1 / 6;
+  return 0;
+}
+function bultosDeDetalle(detalle) {
+  const det = Array.isArray(detalle) ? detalle : Object.values(detalle || {});
+  return det.reduce((a, d) => a + (Number(d.cantidad) || 0) * factorBultoPorNombre(d.nombre), 0);
+}
+
+// ── Día de la semana (capitalizado igual que DIAS/zonasReparto) ─────────
+const DIAS_SEMANA_TODAS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+function diaSemanaDeFecha(fechaKey) {
+  const [y, m, d] = fechaKey.split("-").map(Number);
+  return DIAS_SEMANA_TODAS[new Date(y, m - 1, d).getDay()];
+}
+
 // ── Todo lo de un día: ventas, ganancia bruta, km, gasto vehículo, neta ──
 function calcularDatosDelDia(fechaKey, ventas, clientes, costosVehiculo, casaUbicacion) {
   const ventasReales = (ventas || []).filter(v => v.fechaKey === fechaKey && !v._esCobro && !v._esAjuste && !v._esAjusteEnvases && !v._esCambio && !v._esMixtoTrans);
   const totalVendido = ventasReales.reduce((a, v) => a + (v.neto || 0), 0);
   const totalCostoLlenado = ventasReales.reduce((a, v) => a + (v.costo || 0), 0);
   const gananciaBruta = ventasReales.reduce((a, v) => a + (v.ganancia || 0), 0);
+  const totalBultos = ventasReales.reduce((a, v) => a + bultosDeDetalle(v.detalle), 0);
   const { km, clientesContados, clientesSinUbicacion, visitas } = calcularKmDelDia(fechaKey, ventas, clientes, casaUbicacion);
   const { detalle, total: gastoVehiculo } = calcularGastoVehiculoDelDia(costosVehiculo, km);
   const gananciaNeta = gananciaBruta - gastoVehiculo;
   return {
     fechaKey, totalVendido, totalCostoLlenado, gananciaBruta, km, clientesContados, clientesSinUbicacion, visitas,
-    detalleCostos: detalle, gastoVehiculo, gananciaNeta,
+    detalleCostos: detalle, gastoVehiculo, gananciaNeta, totalBultos,
     pctBruto: totalVendido > 0 ? Math.round(gananciaBruta / totalVendido * 100) : 0,
     pctNeto: totalVendido > 0 ? Math.round(gananciaNeta / totalVendido * 100) : 0,
     kmPorCliente: visitas > 0 ? km / visitas : 0,
@@ -127,11 +153,15 @@ function nombreMesLegible(mesKey) {
 }
 
 // ── Pantalla principal ────────────────────────────────────────────────
-function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, onVolver, onConfigurar }) {
+function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, zonasReparto, onVolver, onConfigurar }) {
   const hoy = hoyKey();
-  const [vista, setVista] = React.useState("dia"); // "dia" | "mes"
+  const [vista, setVista] = React.useState("dia"); // "dia" | "mes" | "zona" | "objetivo"
   const [diaSel, setDiaSel] = React.useState(hoy);
   const [mesSel, setMesSel] = React.useState(diaSel.slice(0, 7));
+  const [mesZona, setMesZona] = React.useState(diaSel.slice(0, 7));
+  const [objetivoInput, setObjetivoInput] = React.useState(() => {
+    try { return localStorage.getItem("cat_objetivo_neto_v1") || ""; } catch { return ""; }
+  });
 
   const sinConfigurar = !costosVehiculo || !costosVehiculo.length;
 
