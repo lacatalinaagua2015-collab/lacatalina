@@ -1461,6 +1461,8 @@ function App() {
         console.log("✓ Código de Emma Control recibido de otro dispositivo");
       }
       if (data.mantVeh?.length) localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(_lcDedupMantVeh(data.mantVeh)));
+      if (data.costosVehiculo?.length) localStorage.setItem("cat_costos_vehiculo_v1", JSON.stringify(data.costosVehiculo));
+      if (data.casaUbicacion) localStorage.setItem("cat_casa_ubicacion_v1", JSON.stringify(data.casaUbicacion));
       if (data.horaAvisoCierre) localStorage.setItem("lc_hora_notif_cierre", data.horaAvisoCierre);
       if (data.horasAvisoTrans) localStorage.setItem("lc_horas_notif_trans", JSON.stringify(data.horasAvisoTrans));
       if (data.diasAvisoMant) localStorage.setItem("lc_dias_notif_mant", data.diasAvisoMant.join(','));
@@ -2169,6 +2171,8 @@ function App() {
         if (data.perdidas !== undefined) setPerdidas(data.perdidas || []);
         if (data.recordatorios !== undefined) setRecordatorios(data.recordatorios || []);
         if (data.mantVeh !== undefined) localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(_lcDedupMantVeh(data.mantVeh || [])));
+        if (data.costosVehiculo !== undefined) localStorage.setItem("cat_costos_vehiculo_v1", JSON.stringify(data.costosVehiculo || []));
+        if (data.casaUbicacion !== undefined) localStorage.setItem("cat_casa_ubicacion_v1", JSON.stringify(data.casaUbicacion || null));
         if (data.histPrecios !== undefined) localStorage.setItem("lc_hist_precios", JSON.stringify(data.histPrecios || []));
         if (data.zonasReparto !== undefined) setZonasReparto(data.zonasReparto || {});
         if (data.cargasDia && Object.keys(data.cargasDia).length) setCargasDia(data.cargasDia);
