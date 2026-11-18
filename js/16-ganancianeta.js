@@ -195,21 +195,19 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
     /*#__PURE__*/React.createElement("button", { style: { ...s.btn, padding: "4px 10px" }, onClick: () => irADia(sumarDiasKey(diaSel, 1)) }, "▶")
   );
 
+  const tabBtn = (key, label, onClick) => /*#__PURE__*/React.createElement("button", {
+    onClick: onClick || (() => setVista(key)),
+    style: { flex: 1, textAlign: "center", fontSize: 11.5, padding: "8px 2px", background: "none", border: "none", cursor: "pointer",
+      color: vista === key ? "#4dd9a0" : "var(--color-text-tertiary)",
+      borderBottom: vista === key ? "2px solid #4dd9a0" : "2px solid transparent", fontWeight: vista === key ? 700 : 400 }
+  }, label);
   const tabs = /*#__PURE__*/React.createElement("div", {
-    style: { display: "flex", gap: 4, margin: "6px 14px 10px", borderBottom: "1px solid var(--color-border-tertiary)" }
+    style: { display: "flex", gap: 3, margin: "6px 14px 10px", borderBottom: "1px solid var(--color-border-tertiary)" }
   },
-    /*#__PURE__*/React.createElement("button", {
-      onClick: () => setVista("dia"),
-      style: { flex: 1, textAlign: "center", fontSize: 12.5, padding: "8px 2px", background: "none", border: "none", cursor: "pointer",
-        color: vista === "dia" ? "#4dd9a0" : "var(--color-text-tertiary)",
-        borderBottom: vista === "dia" ? "2px solid #4dd9a0" : "2px solid transparent", fontWeight: vista === "dia" ? 700 : 400 }
-    }, "📅 Por día"),
-    /*#__PURE__*/React.createElement("button", {
-      onClick: abrirCompararMes,
-      style: { flex: 1, textAlign: "center", fontSize: 12.5, padding: "8px 2px", background: "none", border: "none", cursor: "pointer",
-        color: vista === "mes" ? "#4dd9a0" : "var(--color-text-tertiary)",
-        borderBottom: vista === "mes" ? "2px solid #4dd9a0" : "2px solid transparent", fontWeight: vista === "mes" ? 700 : 400 }
-    }, "📊 Comparar el mes")
+    tabBtn("dia", "📅 Día", null),
+    tabBtn("mes", "📊 Mes", abrirCompararMes),
+    tabBtn("zona", "🗺 Zona", () => { setMesZona(diaSel.slice(0, 7)); setVista("zona"); }),
+    tabBtn("objetivo", "🎯 Objetivo", null)
   );
 
   const vistaDia = () => /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -305,12 +303,148 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
     )
   );
 
+  // ── Vista "🗺 Zona": compara las zonas asignadas por día de reparto (Lunes
+  //    a Viernes), usando los días de ese día-de-semana dentro del mes
+  //    elegido con mesZona. — pedido de Guillermo, 18/11/2026. ──────────────
+  const mesNavZona = /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 14, padding: "10px 14px 2px" }
+  },
+    /*#__PURE__*/React.createElement("button", { style: { ...s.btn, padding: "4px 10px" }, onClick: () => setMesZona(m => { const [y, mm] = m.split("-").map(Number); const d = new Date(y, mm - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }) }, "◀"),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: "var(--color-text-primary)", textTransform: "capitalize" } }, nombreMesLegible(mesZona)),
+    /*#__PURE__*/React.createElement("button", { style: { ...s.btn, padding: "4px 10px" }, onClick: () => setMesZona(m => { const [y, mm] = m.split("-").map(Number); const d = new Date(y, mm, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }) }, "▶")
+  );
+
+  const topeZona = mesZona === hoy.slice(0, 7) ? hoy : `${mesZona}-31`;
+  const diasDelMesZona = diasDelMesHasta(mesZona, topeZona);
+
+  const filasZona = DIAS.map(dia => {
+    const diasDeEseDiaSemana = diasDelMesZona.filter(k => diaSemanaDeFecha(k) === dia);
+    const datosDias = diasDeEseDiaSemana.map(k => calcularDatosDelDia(k, ventas, clientes, costosVehiculo, casaUbicacion)).filter(d => d.totalVendido > 0);
+    const totalVendido = datosDias.reduce((a, d) => a + d.totalVendido, 0);
+    const gananciaNetaZona = datosDias.reduce((a, d) => a + d.gananciaNeta, 0);
+    const totalBultos = datosDias.reduce((a, d) => a + d.totalBultos, 0);
+    const clientesZona = datosDias.reduce((a, d) => a + d.visitas, 0);
+    const km = datosDias.reduce((a, d) => a + d.km, 0);
+    return {
+      dia, zona: (zonasReparto || {})[dia] || "",
+      diasConDatos: datosDias.length, totalVendido, gananciaNeta: gananciaNetaZona, totalBultos, clientes: clientesZona, km,
+      pctNeto: totalVendido > 0 ? Math.round(gananciaNetaZona / totalVendido * 100) : 0,
+      bultosPorCliente: clientesZona > 0 ? totalBultos / clientesZona : 0,
+      kmPromedioDia: datosDias.length > 0 ? km / datosDias.length : 0,
+      kmPorCliente: clientesZona > 0 ? km / clientesZona : 0,
+    };
+  }).filter(f => f.zona && f.diasConDatos > 0);
+
+  const sinZona = DIAS.filter(dia => !(zonasReparto || {})[dia]);
+  const mejorZona = filasZona.length ? filasZona.reduce((a, f) => f.pctNeto > a.pctNeto ? f : a, filasZona[0]) : null;
+  const peorZona = filasZona.length ? filasZona.reduce((a, f) => f.pctNeto < a.pctNeto ? f : a, filasZona[0]) : null;
+
+  const vistaZona = () => /*#__PURE__*/React.createElement(React.Fragment, null,
+    mesNavZona, tabs,
+    filasZona.length === 0 && /*#__PURE__*/React.createElement("div", { style: { padding: 30, textAlign: "center", color: "var(--color-text-tertiary)", fontSize: 13 } }, "No hay zonas con ventas registradas ese mes."),
+    filasZona.map(f => {
+      const esMejor = mejorZona && f.dia === mejorZona.dia;
+      const esPeor = peorZona && f.dia === peorZona.dia && filasZona.length > 1 && !esMejor;
+      return /*#__PURE__*/React.createElement("div", {
+        key: f.dia,
+        style: { ...s.card, position: "relative", ...(esMejor ? { border: "1px solid #4dd9a0" } : esPeor ? { border: "1px solid #E24B4A" } : {}) }
+      },
+        esMejor && /*#__PURE__*/React.createElement("div", { style: { position: "absolute", top: -10, right: 12, fontSize: 10.5, fontWeight: 800, padding: "2px 9px", borderRadius: 12, background: "#0d2318", color: "#4dd9a0", border: "1px solid #4dd9a0" } }, "🏆 MEJOR ZONA"),
+        esPeor && /*#__PURE__*/React.createElement("div", { style: { position: "absolute", top: -10, right: 12, fontSize: 10.5, fontWeight: 800, padding: "2px 9px", borderRadius: 12, background: "#2a0f0f", color: "#E24B4A", border: "1px solid #E24B4A" } }, "⚠ LA MÁS COSTOSA"),
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 } },
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 15, fontWeight: 700 } }, f.zona),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--color-text-tertiary)" } }, f.dia)),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 22, fontWeight: 800, color: f.pctNeto >= 0 ? "#4dd9a0" : "#E24B4A" } }, f.pctNeto, "%")),
+        /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, fontSize: 11, color: "var(--color-text-tertiary)", borderTop: "1px solid var(--color-border-tertiary)", paddingTop: 8 } },
+          /*#__PURE__*/React.createElement("div", null, "Clientes", /*#__PURE__*/React.createElement("b", { style: { display: "block", color: "var(--color-text-primary)", fontSize: 13 } }, f.clientes)),
+          /*#__PURE__*/React.createElement("div", null, "Bultos/cliente", /*#__PURE__*/React.createElement("b", { style: { display: "block", color: "var(--color-text-primary)", fontSize: 13 } }, f.bultosPorCliente.toFixed(1))),
+          /*#__PURE__*/React.createElement("div", null, "Ventas (mes)", /*#__PURE__*/React.createElement("b", { style: { display: "block", color: "var(--color-text-primary)", fontSize: 13 } }, fmt(f.totalVendido))),
+          /*#__PURE__*/React.createElement("div", null, "Neto (mes)", /*#__PURE__*/React.createElement("b", { style: { display: "block", color: "var(--color-text-primary)", fontSize: 13 } }, fmt(f.gananciaNeta))),
+          /*#__PURE__*/React.createElement("div", null, "Km prom./día", /*#__PURE__*/React.createElement("b", { style: { display: "block", color: "var(--color-text-primary)", fontSize: 13 } }, f.kmPromedioDia.toFixed(0), " km")),
+          /*#__PURE__*/React.createElement("div", null, "Km/cliente", /*#__PURE__*/React.createElement("b", { style: { display: "block", color: "var(--color-text-primary)", fontSize: 13 } }, f.kmPorCliente.toFixed(1)))));
+    }),
+    sinZona.length > 0 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11.5, color: "var(--color-text-tertiary)", textAlign: "center", marginTop: 6 } },
+      "(", sinZona.join(", "), " ", sinZona.length === 1 ? "no tiene" : "no tienen", " zona asignada todavía)")
+  );
+
+  // ── Vista "🎯 Objetivo": con tu promedio real de los últimos 60 días,
+  //    cuánto necesitás vender/atender por día para llegar a la ganancia neta
+  //    mensual que escribas. — pedido de Guillermo, 18/11/2026. ───────────
+  const diasVentanaObjetivo = 60;
+  const diasObjetivoKeys = [];
+  for (let i = 0; i < diasVentanaObjetivo; i++) diasObjetivoKeys.push(sumarDiasKey(hoy, -i));
+  const datosVentanaObjetivo = diasObjetivoKeys.map(k => calcularDatosDelDia(k, ventas, clientes, costosVehiculo, casaUbicacion)).filter(d => d.totalVendido > 0);
+  const totalVendidoVentana = datosVentanaObjetivo.reduce((a, d) => a + d.totalVendido, 0);
+  const totalNetoVentana = datosVentanaObjetivo.reduce((a, d) => a + d.gananciaNeta, 0);
+  const totalBultosVentana = datosVentanaObjetivo.reduce((a, d) => a + d.totalBultos, 0);
+  const totalClientesVentana = datosVentanaObjetivo.reduce((a, d) => a + d.visitas, 0);
+  const hayDatosObjetivo = totalVendidoVentana > 0 && totalClientesVentana > 0 && totalBultosVentana > 0;
+  const pctNetoProm = hayDatosObjetivo ? totalNetoVentana / totalVendidoVentana : 0;
+  const ventaPorClienteProm = hayDatosObjetivo ? totalVendidoVentana / totalClientesVentana : 0;
+  const precioPorBultoProm = hayDatosObjetivo ? totalVendidoVentana / totalBultosVentana : 0;
+  const bultosPorClienteProm = hayDatosObjetivo ? totalBultosVentana / totalClientesVentana : 0;
+  const diasRepartoSemana = DIAS.length;
+  const diasRepartoMes = diasRepartoSemana * (30.44 / 7);
+
+  const objetivoNum = Number(String(objetivoInput).replace(/[^\d]/g, "")) || 0;
+  const guardarObjetivo = valor => {
+    setObjetivoInput(valor);
+    try { localStorage.setItem("cat_objetivo_neto_v1", valor); } catch {}
+  };
+
+  const gananciaNetaDiaNecesaria = objetivoNum > 0 && hayDatosObjetivo ? objetivoNum / diasRepartoMes : 0;
+  const ventaDiaNecesaria = pctNetoProm > 0 ? gananciaNetaDiaNecesaria / pctNetoProm : 0;
+  const clientesDiaNecesarios = ventaPorClienteProm > 0 ? ventaDiaNecesaria / ventaPorClienteProm : 0;
+  const bultosDiaNecesarios = precioPorBultoProm > 0 ? ventaDiaNecesaria / precioPorBultoProm : 0;
+
+  const vistaObjetivo = () => /*#__PURE__*/React.createElement(React.Fragment, null,
+    tabs,
+    !hayDatosObjetivo && /*#__PURE__*/React.createElement("div", { style: { padding: 30, textAlign: "center", color: "var(--color-text-tertiary)", fontSize: 13 } },
+      "No hay suficientes ventas en los últimos ", diasVentanaObjetivo, " días para calcular tu promedio real."),
+    hayDatosObjetivo && /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement("div", { style: s.card },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 8 } }, "Tu promedio real (últimos ", diasVentanaObjetivo, " días)"),
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0" } }, /*#__PURE__*/React.createElement("span", null, "Ganancia neta promedio"), /*#__PURE__*/React.createElement("b", null, Math.round(pctNetoProm * 100), "%")),
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0" } }, /*#__PURE__*/React.createElement("span", null, "Venta promedio por cliente"), /*#__PURE__*/React.createElement("b", null, fmt(ventaPorClienteProm))),
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0" } }, /*#__PURE__*/React.createElement("span", null, "Precio promedio por bulto"), /*#__PURE__*/React.createElement("b", null, fmt(precioPorBultoProm))),
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0" } }, /*#__PURE__*/React.createElement("span", null, "Bultos por cliente"), /*#__PURE__*/React.createElement("b", null, bultosPorClienteProm.toFixed(1))),
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0" } }, /*#__PURE__*/React.createElement("span", null, "Días de reparto por semana"), /*#__PURE__*/React.createElement("b", null, diasRepartoSemana))
+      ),
+      /*#__PURE__*/React.createElement("div", { style: s.card },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 8 } }, "¿Cuánto querés ganar NETO por mes?"),
+        /*#__PURE__*/React.createElement("input", {
+          type: "text", inputMode: "numeric",
+          value: objetivoInput,
+          onChange: e => guardarObjetivo(e.target.value),
+          placeholder: "Ej: 4.000.000",
+          style: { width: "100%", padding: "11px 12px", borderRadius: 10, border: "1px solid var(--color-border-secondary)", background: "var(--color-background-tertiary)", color: "var(--color-text-primary)", fontSize: 17, fontWeight: 700, boxSizing: "border-box" }
+        })
+      ),
+      objetivoNum > 0 && /*#__PURE__*/React.createElement("div", { style: { ...s.card, border: "1px solid #4dd9a0", background: "rgba(77,217,160,0.06)" } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--color-text-tertiary)", marginBottom: 10 } },
+          "PARA LLEGAR A ", fmt(objetivoNum), " NETOS/MES, NECESITÁS POR CADA DÍA DE REPARTO (≈", diasRepartoMes.toFixed(1), " días/mes):"),
+        [
+          ["Ganancia neta por día", fmt(gananciaNetaDiaNecesaria)],
+          ["Venta por día (a tu " + Math.round(pctNetoProm * 100) + "%)", fmt(ventaDiaNecesaria)],
+          ["Clientes por día (a " + fmt(ventaPorClienteProm) + " c/u)", "≈" + Math.round(clientesDiaNecesarios)],
+          ["Bultos por día (a " + fmt(precioPorBultoProm) + " c/u)", "≈" + Math.round(bultosDiaNecesarios)],
+        ].map(([label, val], i) => /*#__PURE__*/React.createElement("div", {
+          key: i,
+          style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "8px 0", borderBottom: i < 3 ? "1px solid var(--color-border-tertiary)" : "none" }
+        },
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, color: "var(--color-text-secondary)" } }, label),
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: 19, fontWeight: 800, color: "#4dd9a0" } }, val)))
+      )
+    )
+  );
+
   return /*#__PURE__*/React.createElement("div", { style: s.screen },
     /*#__PURE__*/React.createElement("div", { style: s.header },
       /*#__PURE__*/React.createElement("button", { style: s.backBtn, onClick: onVolver }, "← Volver"),
       /*#__PURE__*/React.createElement("div", { style: s.headerTitle }, "📊 Ganancia neta"),
       /*#__PURE__*/React.createElement("button", { style: { ...s.btn, fontSize: 16, padding: "4px 8px" }, title: "Configurar costos de la camioneta", onClick: onConfigurar }, "⚙️")
     ),
-    vista === "dia" ? vistaDia() : vistaMes()
+    vista === "dia" ? vistaDia() : vista === "mes" ? vistaMes() : vista === "zona" ? vistaZona() : vistaObjetivo()
   );
 }

@@ -4619,6 +4619,7 @@ function App() {
   }), pantalla === "gananciaNeta" && /*#__PURE__*/React.createElement(GananciaNetaScreen, {
     ventas: ventas,
     clientes: clientes,
+    zonasReparto: zonasReparto,
     costosVehiculo: (() => { try { return JSON.parse(localStorage.getItem("cat_costos_vehiculo_v1")) || COSTOS_VEHICULO_DEFAULT; } catch { return COSTOS_VEHICULO_DEFAULT; } })(),
     casaUbicacion: (() => { try { return JSON.parse(localStorage.getItem("cat_casa_ubicacion_v1")) || CASA_UBICACION_DEFAULT; } catch { return CASA_UBICACION_DEFAULT; } })(),
     onVolver: () => irA("menu"),
