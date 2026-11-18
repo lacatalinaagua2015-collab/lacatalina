@@ -3639,6 +3639,7 @@ function App() {
     },
     onPlanillaAtajo: () => irA("atajoPlanillaSemana"),
     onResumen: () => irA("resumen"),
+    onGananciaNeta: () => irA("gananciaNeta"),
     onConfig: tab => {
       setTabConfig(tab || "stock");
       irA("config");
@@ -4615,6 +4616,13 @@ function App() {
       setOrigenDetalle("resumen");
       irA("detalleCliente");
     }
+  }), pantalla === "gananciaNeta" && /*#__PURE__*/React.createElement(GananciaNetaScreen, {
+    ventas: ventas,
+    clientes: clientes,
+    costosVehiculo: (() => { try { return JSON.parse(localStorage.getItem("cat_costos_vehiculo_v1")) || COSTOS_VEHICULO_DEFAULT; } catch { return COSTOS_VEHICULO_DEFAULT; } })(),
+    casaUbicacion: (() => { try { return JSON.parse(localStorage.getItem("cat_casa_ubicacion_v1")) || CASA_UBICACION_DEFAULT; } catch { return CASA_UBICACION_DEFAULT; } })(),
+    onVolver: () => irA("menu"),
+    onConfigurar: () => { setTabConfig("vehiculo"); irA("config"); }
   }), pantalla === "fiadosPendientes" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(ClientesTabs, {
     activo: "fiados",
     onIr: irA
