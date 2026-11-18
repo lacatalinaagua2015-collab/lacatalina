@@ -162,6 +162,12 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
   const [objetivoInput, setObjetivoInput] = React.useState(() => {
     try { return localStorage.getItem("cat_objetivo_neto_v1") || ""; } catch { return ""; }
   });
+  // Días de reparto por semana para el cálculo del Objetivo — editable, no
+  // depende de DIAS (que es otra cosa, los días con zona asignada). Pedido
+  // de Guillermo, 18/11/2026: hoy reparte 4 días, no 5.
+  const [diasRepartoInput, setDiasRepartoInput] = React.useState(() => {
+    try { return localStorage.getItem("cat_objetivo_dias_semana_v1") || ""; } catch { return ""; }
+  });
 
   const sinConfigurar = !costosVehiculo || !costosVehiculo.length;
 
@@ -384,7 +390,11 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
   const ventaPorClienteProm = hayDatosObjetivo ? totalVendidoVentana / totalClientesVentana : 0;
   const precioPorBultoProm = hayDatosObjetivo ? totalVendidoVentana / totalBultosVentana : 0;
   const bultosPorClienteProm = hayDatosObjetivo ? totalBultosVentana / totalClientesVentana : 0;
-  const diasRepartoSemana = DIAS.length;
+  const diasRepartoSemana = Number(diasRepartoInput) > 0 ? Number(diasRepartoInput) : DIAS.length;
+  const guardarDiasReparto = valor => {
+    setDiasRepartoInput(valor);
+    try { localStorage.setItem("cat_objetivo_dias_semana_v1", valor); } catch {}
+  };
   const diasRepartoMes = diasRepartoSemana * (30.44 / 7);
 
   const objetivoNum = Number(String(objetivoInput).replace(/[^\d]/g, "")) || 0;
@@ -409,7 +419,14 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
         /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0", color: "var(--color-text-secondary)" } }, /*#__PURE__*/React.createElement("span", null, "Venta promedio por cliente"), /*#__PURE__*/React.createElement("b", { style: { color: "var(--color-text-primary)" } }, fmt(ventaPorClienteProm))),
         /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0", color: "var(--color-text-secondary)" } }, /*#__PURE__*/React.createElement("span", null, "Precio promedio por bulto"), /*#__PURE__*/React.createElement("b", { style: { color: "var(--color-text-primary)" } }, fmt(precioPorBultoProm))),
         /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0", color: "var(--color-text-secondary)" } }, /*#__PURE__*/React.createElement("span", null, "Bultos por cliente"), /*#__PURE__*/React.createElement("b", { style: { color: "var(--color-text-primary)" } }, bultosPorClienteProm.toFixed(1))),
-        /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0", color: "var(--color-text-secondary)" } }, /*#__PURE__*/React.createElement("span", null, "Días de reparto por semana"), /*#__PURE__*/React.createElement("b", { style: { color: "var(--color-text-primary)" } }, diasRepartoSemana))
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, padding: "4px 0", color: "var(--color-text-secondary)" } },
+          /*#__PURE__*/React.createElement("span", null, "Días de reparto por semana"),
+          /*#__PURE__*/React.createElement("input", {
+            type: "number", min: 1, max: 7, inputMode: "numeric",
+            value: diasRepartoInput || String(DIAS.length),
+            onChange: e => guardarDiasReparto(e.target.value),
+            style: { width: 44, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--color-border-secondary)", background: "var(--color-background-tertiary)", color: "var(--color-text-primary)", fontSize: 14, fontWeight: 700, textAlign: "center", boxSizing: "border-box" }
+          }))
       ),
       /*#__PURE__*/React.createElement("div", { style: s.card },
         /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 8 } }, "¿Cuánto querés ganar NETO por mes?"),
