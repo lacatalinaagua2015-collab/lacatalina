@@ -5,6 +5,7 @@
 function MenuDias({
   dias,
   onResumen,
+  onGananciaNeta,
   onConfig,
   onGestionClientes,
   onStock,
@@ -679,8 +680,8 @@ function MenuDias({
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
-      gridTemplateColumns: "repeat(3,1fr)",
-      gap: 8,
+      gridTemplateColumns: "repeat(4,1fr)",
+      gap: 6,
       paddingBottom: 8
     }
   }, [{
@@ -691,6 +692,10 @@ function MenuDias({
     ico: "📦",
     lbl: "Stock",
     fn: onStock
+  }, {
+    ico: "📊",
+    lbl: "Ganancia neta",
+    fn: onGananciaNeta
   }, {
     ico: "⚙️",
     lbl: "Config",
@@ -1245,6 +1250,10 @@ function MenuDias({
     ico: "📦",
     lbl: "Stock",
     fn: onStock
+  }, {
+    ico: "📊",
+    lbl: "Ganancia neta",
+    fn: onGananciaNeta
   }, {
     ico: "⚙️",
     lbl: "Config",
