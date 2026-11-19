@@ -793,11 +793,13 @@ function StockGeneral({
   }, d === "todos" ? "Todos" : d.slice(0, 3)))), null, clientesReales.filter(c => diaArqueo === "todos" || c.dia === diaArqueo).filter(c => buscarCliente(c, buscaArqueo) > 0).sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "")).map(c => /*#__PURE__*/React.createElement("div", {
     key: c.id,
     style: {
-      display: "grid",
-      gridTemplateColumns: "1fr 42px 42px 42px 42px",
-      gap: 4,
-      alignItems: "center",
-      marginBottom: 4
+      display: "flex",
+      flexDirection: "column",
+      gap: 5,
+      background: "var(--color-background-tertiary)",
+      borderRadius: 8,
+      padding: "7px 9px",
+      marginBottom: 5
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
@@ -813,32 +815,62 @@ function StockGeneral({
       fontSize: 11,
       color: "var(--color-text-tertiary)"
     }
-  }, c.dia)), modoArqueo === "fijos" ? ["sifon", "bidon10", "bidon20", "dispenser"].map(k => /*#__PURE__*/React.createElement("input", {
+  }, c.dia)), /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, modoArqueo === "fijos" ? [["sifon", "Sifón"], ["bidon10", "10L"], ["bidon20", "20L"], ["dispenser", "Disp"]].map(([k, lbl]) => /*#__PURE__*/React.createElement("label", {
     key: k,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 4,
+      background: "var(--color-background-secondary)",
+      borderRadius: 6,
+      padding: "3px 5px 3px 7px"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--color-text-tertiary)"
+    }
+  }, lbl), /*#__PURE__*/React.createElement("input", {
     type: "number",
     value: c[k] || 0,
     onChange: e => setClienteEnv(c.id, k, e.target.value),
     style: {
       ...inNum,
-      padding: "4px 2px",
+      width: 36,
+      padding: "3px 2px",
       fontSize: 12
     }
-  })) : ["sifon", "bidon10", "bidon20", "dispenser"].map(k => {
+  }))) : PRODS.map(([k, lbl]) => {
     const val = prestadoDe(c, k);
-    return /*#__PURE__*/React.createElement("input", {
+    return /*#__PURE__*/React.createElement("label", {
       key: k,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        background: "var(--color-background-secondary)",
+        borderRadius: 6,
+        padding: "3px 5px 3px 7px"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "var(--color-text-tertiary)"
+      }
+    }, lbl.replace(" 1.5L", "")), /*#__PURE__*/React.createElement("input", {
       type: "number",
       value: val,
       onChange: e => setClientePrestado(c.id, k, e.target.value),
       style: {
         ...inNum,
-        padding: "4px 2px",
+        width: 36,
+        padding: "3px 2px",
         fontSize: 12,
         fontWeight: val !== 0 ? 600 : 400,
         color: val > 0 ? "var(--color-text-warning)" : val < 0 ? "var(--color-text-success)" : "var(--color-text-tertiary)"
       }
-    });
-  })))))), /*#__PURE__*/React.createElement("div", {
+    }));
+  }))))))), /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
       margin: "0 0 10px"
