@@ -790,80 +790,105 @@ function StockGeneral({
       color: diaArqueo === d ? "#e2eaf4" : "var(--color-text-secondary)",
       fontWeight: diaArqueo === d ? 600 : 400
     }
-  }, d === "todos" ? "Todos" : d.slice(0, 3)))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "grid",
-      gridTemplateColumns: "1fr 42px 42px 42px 42px",
-      gap: 4,
-      fontSize: 12,
-      color: "var(--color-text-tertiary)",
-      marginBottom: 5
-    }
-  }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", {
-    style: {
-      textAlign: "center"
-    }
-  }, "Sif"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      textAlign: "center"
-    }
-  }, "10L"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      textAlign: "center"
-    }
-  }, "20L"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      textAlign: "center"
-    }
-  }, "Disp")), clientesReales.filter(c => diaArqueo === "todos" || c.dia === diaArqueo).filter(c => buscarCliente(c, buscaArqueo) > 0).sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "")).map(c => /*#__PURE__*/React.createElement("div", {
-    key: c.id,
-    style: {
-      display: "grid",
-      gridTemplateColumns: "1fr 42px 42px 42px 42px",
-      gap: 4,
-      alignItems: "center",
-      marginBottom: 4
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: "var(--color-text-primary)",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap"
-    }
-  }, c.nombre, /*#__PURE__*/React.createElement("span", {
-    style: {
-      display: "block",
-      fontSize: 11,
-      color: "var(--color-text-tertiary)"
-    }
-  }, c.dia)), modoArqueo === "fijos" ? ["sifon", "bidon10", "bidon20", "dispenser"].map(k => /*#__PURE__*/React.createElement("input", {
-    key: k,
-    type: "number",
-    value: c[k] || 0,
-    onChange: e => setClienteEnv(c.id, k, e.target.value),
-    style: {
-      ...inNum,
-      padding: "4px 2px",
-      fontSize: 12
-    }
-  })) : ["sifon", "bidon10", "bidon20", "dispenser"].map(k => {
-    const val = prestadoDe(c, k);
-    return /*#__PURE__*/React.createElement("input", {
+  }, d === "todos" ? "Todos" : d.slice(0, 3)))), (() => {
+    // Pedido de Guillermo (19/11/2026): esto antes era una grilla de 4
+    // columnas fijas (Sif/10L/20L/Disp). Ahora cada cliente es una
+    // tarjetita con chips que se acomodan solos — entra cualquier
+    // cantidad de productos sin apretarse. "Fijos" sigue siendo los 4
+    // campos de siempre del cliente (eso queda para más adelante);
+    // "Prestados" ya usa la lista real de productos.
+    const FIJOS_KEYS = [["sifon", "Sifón"], ["bidon10", "10L"], ["bidon20", "20L"], ["dispenser", "Disp"]];
+    return clientesReales.filter(c => diaArqueo === "todos" || c.dia === diaArqueo).filter(c => buscarCliente(c, buscaArqueo) > 0).sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "")).map(c => /*#__PURE__*/React.createElement("div", {
+      key: c.id,
+      style: {
+        background: "var(--color-background-tertiary)",
+        borderRadius: 8,
+        padding: "7px 9px",
+        marginBottom: 5
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "baseline",
+        marginBottom: 6
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12.5,
+        color: "var(--color-text-primary)",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, c.nombre), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "var(--color-text-tertiary)"
+      }
+    }, c.dia)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 6
+      }
+    }, modoArqueo === "fijos" ? FIJOS_KEYS.map(([k, lbl]) => /*#__PURE__*/React.createElement("label", {
       key: k,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        background: "var(--color-background-secondary)",
+        borderRadius: 6,
+        padding: "3px 5px 3px 7px"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "var(--color-text-tertiary)"
+      }
+    }, lbl), /*#__PURE__*/React.createElement("input", {
       type: "number",
-      value: val,
-      onChange: e => setClientePrestado(c.id, k, e.target.value),
+      value: c[k] || 0,
+      onChange: e => setClienteEnv(c.id, k, e.target.value),
       style: {
         ...inNum,
-        padding: "4px 2px",
-        fontSize: 12,
-        fontWeight: val !== 0 ? 600 : 400,
-        color: val > 0 ? "var(--color-text-warning)" : val < 0 ? "var(--color-text-success)" : "var(--color-text-tertiary)"
+        width: 36,
+        padding: "3px 2px",
+        fontSize: 12
       }
-    });
-  })))))), /*#__PURE__*/React.createElement("div", {
+    }))) : PRODS.map(([k, lbl]) => {
+      const val = prestadoDe(c, k);
+      return /*#__PURE__*/React.createElement("label", {
+        key: k,
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          background: "var(--color-background-secondary)",
+          borderRadius: 6,
+          padding: "3px 5px 3px 7px"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 11,
+          color: "var(--color-text-tertiary)"
+        }
+      }, lbl.replace(" 1.5L", "")), /*#__PURE__*/React.createElement("input", {
+        type: "number",
+        value: val,
+        onChange: e => setClientePrestado(c.id, k, e.target.value),
+        style: {
+          ...inNum,
+          width: 36,
+          padding: "3px 2px",
+          fontSize: 12,
+          fontWeight: val !== 0 ? 600 : 400,
+          color: val > 0 ? "var(--color-text-warning)" : val < 0 ? "var(--color-text-success)" : "var(--color-text-tertiary)"
+        }
+      }));
+    }))));
+  })(), /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
       margin: "0 0 10px"
