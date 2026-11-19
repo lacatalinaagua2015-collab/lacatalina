@@ -20,12 +20,42 @@ const PRODUCTOS_CONFIG = [
 const GASTOS_CATEGORIAS = ["propina","mercado","gnc","gaseosa","uber","inflado","frutas","otro"];
 
 const CLIENTES_INICIALES = [];
+// Pedido de Guillermo (19/11/2026): el stock/comodato estaba atado a 4
+// nombres fijos (sifon/bidon10/bidon20/dispenser) en vez de a esta lista de
+// productos, que YA era configurable. Estos 3 campos nuevos son los que
+// permiten agregar un producto nuevo (bidón de 12L, de 15L, sifón de medio
+// litro, dispenser frío-calor, etc.) y que el stock/comodato lo siga solo,
+// sin tocar código:
+//   - trackStock: este producto tiene su propia fila en Stock (Sodería/
+//     Depósito/En clientes). false para productos que no son envases.
+//   - retornable: además tiene comodato (envases prestados a devolver).
+//   - agrupacion: conversión opcional a una unidad más grande para mostrar
+//     (ej. 6 sifones = 1 cajón) — generaliza lo que antes era un caso
+//     especial hardcodeado solo para "sifon".
 const PRODUCTOS_INICIALES = [
-  { id:1, nombre:"Sifón 1.5L", precio:800,  costo:133.33 },
-  { id:2, nombre:"Bidón 10L",  precio:2500, costo:800 },
-  { id:3, nombre:"Bidón 20L",  precio:5000, costo:800 },
-  { id:4, nombre:"Dispenser",  precio:0,    costo:15000, esDispenser:true },
+  { id:1, nombre:"Sifón 1.5L", precio:800,  costo:133.33, trackStock:true, retornable:true, agrupacion:{ factor:6, nombre:"caj" }, capacidadBase:150 },
+  { id:2, nombre:"Bidón 10L",  precio:2500, costo:800, trackStock:true, retornable:true, capacidadBase:70 },
+  { id:3, nombre:"Bidón 20L",  precio:5000, costo:800, trackStock:true, retornable:true, capacidadBase:21 },
+  { id:4, nombre:"Dispenser",  precio:0,    costo:15000, esDispenser:true, trackStock:true, retornable:true, capacidadBase:0 },
 ];
+// Lugares de stock -- lista configurable (reemplaza los 2 lugares fijos que
+// ya existían, soderia/casa). "camion" NO entra en esta lista: es tránsito
+// del día (se carga desde Sodería al iniciar el reparto y vuelve a Sodería
+// al cerrar), no un lugar que el usuario administre a mano.
+const UBICACIONES_STOCK_DEFAULT = [
+  { id:"soderia", nombre:"Sodería", icono:"🏭" },
+  { id:"casa",    nombre:"Depósito", icono:"📦" },
+];
+// Mapa de migración: nombre del producto clásico -> clave vieja fija con la
+// que estaba guardado su stock/comodato antes de esta lista. Se usa UNA
+// SOLA VEZ (ver migrarStockYComodatoAProductoId en 14-app.js) para mover los
+// datos existentes a la nueva clave por id de producto, sin perder nada.
+const CLAVE_LEGACY_POR_NOMBRE = {
+  "Sifón 1.5L": "sifon",
+  "Bidón 10L": "bidon10",
+  "Bidón 20L": "bidon20",
+  "Dispenser": "dispenser",
+};
 
 const planillaDiaVacia = () => ({
   fecha:"", peso:"", bultos:"",
