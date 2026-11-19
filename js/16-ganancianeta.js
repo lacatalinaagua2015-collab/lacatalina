@@ -407,7 +407,17 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
       const diaMejorVenta = filasConProm.reduce((a, f) => f.ventaProm > a.ventaProm ? f : a, filasConProm[0]);
       const mejorClientesProm = Math.max(...filasConProm.map(f => f.clientesProm));
       const mejorVentaProm = diaMejorVenta.ventaProm;
-      return /*#__PURE__*/React.createElement("div", { style: s.card },
+      // "Si emparejás los días con el mejor" — pedido de Guillermo,
+      // 19/11/2026: si TODOS los días facturaran como el mejor día, usando
+      // el mismo % neto que ese día realmente tuvo (no el promedio general),
+      // cuánto daría de ganancia neta por mes.
+      const gananciaNetaRealMesZona = filasZona.reduce((a, f) => a + f.gananciaNeta, 0);
+      const ventaProyectadaMes = mejorVentaProm * diasRepartoMes;
+      const gananciaNetaProyectadaMes = ventaProyectadaMes * (diaMejorVenta.pctNeto / 100);
+      const diferenciaProyeccion = gananciaNetaProyectadaMes - gananciaNetaRealMesZona;
+
+      return /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement("div", { style: s.card },
         /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 10 } },
           "📉 Qué le falta a cada día (promedio por jornada, vs ", diaMejorVenta.dia, ")"),
         filasConProm.map((f, i) => {
@@ -434,6 +444,27 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
         }),
         ventaPorClienteProm > 0 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10.5, color: "var(--color-text-tertiary)", marginTop: 8 } },
           "La venta que falta = clientes que faltan × tu promedio real de ", fmt(ventaPorClienteProm), "/cliente (de los últimos ", diasVentanaObjetivo, " días) — no el promedio propio de cada día.")
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { ...s.card, border: "1px solid #4dd9a0", background: "rgba(77,217,160,0.06)" } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 10 } },
+          "💡 Si emparejás tus ", diasRepartoSemana, " días con ", diaMejorVenta.dia),
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0", color: "var(--color-text-secondary)" } },
+          /*#__PURE__*/React.createElement("span", null, "Venta/jornada al nivel de ", diaMejorVenta.dia),
+          /*#__PURE__*/React.createElement("b", { style: { color: "var(--color-text-primary)" } }, fmt(mejorVentaProm))),
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0", color: "var(--color-text-secondary)" } },
+          /*#__PURE__*/React.createElement("span", null, "Venta proyectada /mes"),
+          /*#__PURE__*/React.createElement("b", { style: { color: "var(--color-text-primary)" } }, fmt(ventaProyectadaMes))),
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 14, fontWeight: 700, padding: "6px 0", marginTop: 4, borderTop: "1px solid var(--color-border-tertiary)" } },
+          /*#__PURE__*/React.createElement("span", { style: { color: "var(--color-text-primary)" } }, "Ganancia neta proyectada /mes (a ", diaMejorVenta.pctNeto, "%)"),
+          /*#__PURE__*/React.createElement("span", { style: { color: "#4dd9a0" } }, fmt(gananciaNetaProyectadaMes))),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 12.5, color: "var(--color-text-secondary)", marginTop: 6 } },
+          "Hoy tenés (los días con zona asignada, este mes): ", fmt(gananciaNetaRealMesZona), " netos — ",
+          diferenciaProyeccion > 0
+            ? /*#__PURE__*/React.createElement("b", { style: { color: "#f5b942" } }, Math.round(diferenciaProyeccion / Math.max(gananciaNetaRealMesZona, 1) * 100), "% más si emparejás (", fmt(diferenciaProyeccion), " extra)")
+            : /*#__PURE__*/React.createElement("b", { style: { color: "#4dd9a0" } }, "ya estás a ese nivel")),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 10.5, color: "var(--color-text-tertiary)", marginTop: 6 } },
+          "Usa el % neto real que tuvo ", diaMejorVenta.dia, " (", diaMejorVenta.pctNeto, "%), no el promedio general — es la hipótesis más fiel a “todos los días rinden como ese día”.")
+      )
       );
     })(),
     sinZona.length > 0 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11.5, color: "var(--color-text-tertiary)", textAlign: "center", marginTop: 6 } },
