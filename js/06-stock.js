@@ -790,32 +790,7 @@ function StockGeneral({
       color: diaArqueo === d ? "#e2eaf4" : "var(--color-text-secondary)",
       fontWeight: diaArqueo === d ? 600 : 400
     }
-  }, d === "todos" ? "Todos" : d.slice(0, 3)))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "grid",
-      gridTemplateColumns: "1fr 42px 42px 42px 42px",
-      gap: 4,
-      fontSize: 12,
-      color: "var(--color-text-tertiary)",
-      marginBottom: 5
-    }
-  }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", {
-    style: {
-      textAlign: "center"
-    }
-  }, "Sif"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      textAlign: "center"
-    }
-  }, "10L"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      textAlign: "center"
-    }
-  }, "20L"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      textAlign: "center"
-    }
-  }, "Disp")), clientesReales.filter(c => diaArqueo === "todos" || c.dia === diaArqueo).filter(c => buscarCliente(c, buscaArqueo) > 0).sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "")).map(c => /*#__PURE__*/React.createElement("div", {
+  }, d === "todos" ? "Todos" : d.slice(0, 3)))), null, clientesReales.filter(c => diaArqueo === "todos" || c.dia === diaArqueo).filter(c => buscarCliente(c, buscaArqueo) > 0).sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "")).map(c => /*#__PURE__*/React.createElement("div", {
     key: c.id,
     style: {
       display: "grid",
