@@ -92,6 +92,7 @@ function StockGeneral({
   const [nuevoProdNombre, setNuevoProdNombre] = React.useState("");
   const [nuevoProdCosto, setNuevoProdCosto] = React.useState("");
   const [nuevoProdPrecio, setNuevoProdPrecio] = React.useState("");
+  const [nuevoProdPeso, setNuevoProdPeso] = React.useState(""); // kg por unidad -- opcional, solo para el detalle de peso/bultos del camión
   const setCarga = (dia, key, val) => {
     const nc = JSON.parse(JSON.stringify(cargasDia || {}));
     if (!nc[dia]) nc[dia] = {};
@@ -1376,6 +1377,23 @@ function StockGeneral({
       width: "100%"
     }
   }))), /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 8 }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      ...s.label,
+      marginBottom: 3
+    }
+  }, "Peso kg por unidad (opcional)"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    value: nuevoProdPeso,
+    placeholder: "Para el detalle de peso del camión",
+    onChange: e => setNuevoProdPeso(e.target.value),
+    style: {
+      ...inNum,
+      fontSize: 12,
+      width: "100%"
+    }
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 6
@@ -1391,6 +1409,7 @@ function StockGeneral({
       setNuevoProdNombre("");
       setNuevoProdCosto("");
       setNuevoProdPrecio("");
+      setNuevoProdPeso("");
     }
   }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
     style: {
@@ -1410,13 +1429,15 @@ function StockGeneral({
         id: Date.now(),
         nombre: nuevoProdNombre.trim(),
         costo: Number(nuevoProdCosto) || 0,
-        precio: Number(nuevoProdPrecio) || 0
+        precio: Number(nuevoProdPrecio) || 0,
+        peso: Number(nuevoProdPeso) || 0
       };
       setProductos([...(productos || []), nuevo]);
       setMostrarNuevoProd(false);
       setNuevoProdNombre("");
       setNuevoProdCosto("");
       setNuevoProdPrecio("");
+      setNuevoProdPeso("");
     }
   }, "✓ Agregar"))))), /*#__PURE__*/React.createElement("div", {
     style: {

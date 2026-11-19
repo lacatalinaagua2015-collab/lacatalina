@@ -77,9 +77,12 @@ function calcularGastoVehiculoDelDia(costosVehiculo, kmDelDia) {
   return { detalle, total };
 }
 
-// ── "Bulto" para la Ganancia neta — definición de Guillermo (18/11/2026):
-//    6 sifones = 1 bulto, bidón 10L = 1 bulto, bidón 20L = 1,5 bultos.
-//    Es DISTINTO del "bulto" que ya existe en la planilla de carga
+// ── "Bulto" para la Ganancia neta — definición de Guillermo (18/11/2026,
+//    ajustado 19/11/2026): 6 sifones = 1 bulto, bidón 10L = 1 bulto, bidón
+//    20L = 1,5 bultos. Un producto NUEVO (no es ninguno de estos 3) cuenta
+//    1 unidad vendida = 1 bulto -- "son las unidades que se venden de cada
+//    cosa, eso es lo que equivale en bulto" (pedido del usuario). Es
+//    DISTINTO del "bulto" que ya existe en la planilla de carga
 //    (07-menu.js, bultosAuto), que es para otra cosa (peso/espacio en la
 //    camioneta) — no se tocan entre sí, viven cada uno en lo suyo.
 function factorBultoPorNombre(nombre) {
@@ -88,7 +91,7 @@ function factorBultoPorNombre(nombre) {
   if (n.includes("20")) return 1.5;
   if (n.includes("10")) return 1;
   if (n.includes("sif") || n.includes("soda")) return 1 / 6;
-  return 0;
+  return 1;
 }
 function bultosDeDetalle(detalle) {
   const det = Array.isArray(detalle) ? detalle : Object.values(detalle || {});
