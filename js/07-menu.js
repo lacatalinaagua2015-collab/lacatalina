@@ -2457,6 +2457,7 @@ function PlanillaDelDia({
   const dispProd = (productos || []).find(p => p.esDispenser);
   const dispNombre = dispProd ? dispProd.nombre : "Dispenser";
   const ceroCarga = () => Object.fromEntries(clavesCarga.map(k => [k, 0]));
+  const ceroCargaSk = () => Object.fromEntries(productosCarga.map(p => [claveStockDeProducto(p), 0]));
   const nombreAPk = Object.fromEntries(productosCarga.map(p => [p.nombre, claveCargaDeProducto(p)]));
   const PROD_A_PK_ENV = { ...nombreAPk, [dispNombre]: "disp" };
   const parseTextoEnv = texto => {
@@ -2559,44 +2560,19 @@ function PlanillaDelDia({
 
   // ── Cálculo de stock para el cierre del día ──────────────────
   const CAJON = 6;
-  const planKeyToSk = {
-    soda: "sifon",
-    b10: "bidon10",
-    b20: "bidon20"
-  };
+  const planKeyToSk = Object.fromEntries(productosCarga.map(p => [claveCargaDeProducto(p), claveStockDeProducto(p)]));
   // Base de referencia de sodería (se edita solo desde la pantalla Stock,
   // acá es de solo lectura). Se usa para saber cuánto es "de más" al
   // cerrar el día — ver calcularMovimientoDeposito más abajo.
   const BASE_DEFAULT_REF = { sifon: 150, bidon10: 70, bidon20: 21 };
   const baseRefFor = sk => stock?.capacidadFija?.[sk] ?? BASE_DEFAULT_REF[sk] ?? 0;
-  const llenosCargados = {
-    soda: Number(datos.productos?.soda?.llenos || 0),
-    b10: Number(datos.productos?.b10?.llenos || 0),
-    b20: Number(datos.productos?.b20?.llenos || 0)
-  };
-  const vendidosDia = {
-    soda: 0,
-    b10: 0,
-    b20: 0,
-    disp: 0
-  };
-  const prestadosDia = {
-    soda: 0,
-    b10: 0,
-    b20: 0,
-    disp: 0
-  };
-  const devueltosDia = {
-    soda: 0,
-    b10: 0,
-    b20: 0,
-    disp: 0
-  };
-  const prodKeyPl = {
-    "Sifón 1.5L": "soda",
-    "Bidón 10L": "b10",
-    "Bidón 20L": "b20"
-  };
+  const llenosCargados = Object.fromEntries(
+    clavesCarga.map(pk => [pk, Number(datos.productos?.[pk]?.llenos || 0)])
+  );
+  const vendidosDia = { ...ceroCarga(), disp: 0 };
+  const prestadosDia = { ...ceroCarga(), disp: 0 };
+  const devueltosDia = { ...ceroCarga(), disp: 0 };
+  const prodKeyPl = nombreAPk;
   ventas.forEach(v => {
     v.detalle.forEach(d => {
       const k = prodKeyPl[d.nombre];
@@ -2623,23 +2599,11 @@ function PlanillaDelDia({
   // de hoy-hoy si se está cerrando un día atrasado) — se compara contra
   // eso, no contra la fecha real del sistema.
   const skToPl = {
-    sifon: "soda",
-    bidon10: "b10",
-    bidon20: "b20",
-    dispenser: "disp"
+    ...Object.fromEntries(productosCarga.map(p => [claveStockDeProducto(p), claveCargaDeProducto(p)])),
+    [dispProd ? claveStockDeProducto(dispProd) : "dispenser"]: "disp"
   };
-  const rotosDia = {
-    soda: 0,
-    b10: 0,
-    b20: 0,
-    disp: 0
-  };
-  const fugadosDia = {
-    soda: 0,
-    b10: 0,
-    b20: 0,
-    disp: 0
-  };
+  const rotosDia = { ...ceroCarga(), disp: 0 };
+  const fugadosDia = { ...ceroCarga(), disp: 0 };
   // Pedido del usuario (2026-10-22): separar "Rotos" (roto/perdido suelto)
   // de "Fugados" (cliente que se fue y no devolvió) — antes las dos eran
   // una sola columna "Perdido". retirarCliente/eliminarCliente dejan
@@ -2652,12 +2616,7 @@ function PlanillaDelDia({
       destino[skToPl[sk]] += Number(p[sk]) || 0;
     });
   });
-  const retiradosDia = {
-    soda: 0,
-    b10: 0,
-    b20: 0,
-    disp: 0
-  };
+  const retiradosDia = { ...ceroCarga(), disp: 0 };
   (movStock || []).forEach(m => {
     if (m.tipo !== "retiro" || (m.fecha || "").slice(0, 10) !== fecha) return;
     Object.keys(skToPl).forEach(sk => {
@@ -2667,18 +2626,8 @@ function PlanillaDelDia({
   // Envases que hoy se le dejaron a un cliente nuevo o al editarle el fijo
   // (ver ajustarStockFijoCliente en 14-app.js) — salen de sodería al toque,
   // sin esperar el cierre, y el usuario también los quiere ver acá.
-  const altaClienteDia = {
-    soda: 0,
-    b10: 0,
-    b20: 0,
-    disp: 0
-  };
-  const fijoCorregidoDia = {
-    soda: 0,
-    b10: 0,
-    b20: 0,
-    disp: 0
-  };
+  const altaClienteDia = { ...ceroCarga(), disp: 0 };
+  const fijoCorregidoDia = { ...ceroCarga(), disp: 0 };
   // Envases que un cliente devolvió hoy porque se le achicó el fijo (no un
   // préstamo) — ej. edición manual en "♻️ Envases → Fijos". BUG REPORTADO:
   // esto SÍ movía el stock bien (ajustarStockFijoCliente ya sumaba de
@@ -2688,12 +2637,7 @@ function PlanillaDelDia({
   // de ventas.envDev) para no duplicar el ajuste de stock que ya se hizo al
   // toque. Se suma aparte y se mezcla solo en la columna "Devuelto" de la
   // tabla de abajo, a efectos de mostrarlo.
-  const devueltosFijoDia = {
-    soda: 0,
-    b10: 0,
-    b20: 0,
-    disp: 0
-  };
+  const devueltosFijoDia = { ...ceroCarga(), disp: 0 };
   (movStock || []).forEach(m => {
     // OJO: solo "Envases fijos de cliente..." — las correcciones de
     // "Envases prestados de cliente..." (✏️ Envases → Prestados) quedan
@@ -2720,42 +2664,18 @@ function PlanillaDelDia({
   // FÓRMULA CORRECTA:
   // Sobrantes llenos = cargados − vendidos (prestados no reducen llenos, se compensan con devueltos)
   // Vacíos del día = vendidos + devueltos − prestados (los prestados de hoy cancelan devueltos de hoy)
-  const sobrantes = {
-    soda: 0,
-    b10: 0,
-    b20: 0
-  };
-  const vaciosRec = {
-    soda: 0,
-    b10: 0,
-    b20: 0
-  };
-  ["soda", "b10", "b20"].forEach(pk => {
+  const sobrantes = ceroCarga();
+  const vaciosRec = ceroCarga();
+  clavesCarga.forEach(pk => {
     sobrantes[pk] = Math.max(0, llenosCargados[pk] - vendidosDia[pk]);
     vaciosRec[pk] = Math.max(0, vendidosDia[pk] + devueltosDia[pk] - prestadosDia[pk]);
   });
   // Sodería después del cierre
-  const soderiaActual = stock?.soderia || {
-    sifon: 0,
-    bidon10: 0,
-    bidon20: 0
-  };
-  const soderiaVaciosActual = stock?.soderia_vacios || {
-    sifon: 0,
-    bidon10: 0,
-    bidon20: 0
-  };
-  const soderiaPost = {
-    soda: 0,
-    b10: 0,
-    b20: 0
-  };
-  const soderiaVaciosPost = {
-    soda: 0,
-    b10: 0,
-    b20: 0
-  };
-  ["soda", "b10", "b20"].forEach(pk => {
+  const soderiaActual = stock?.soderia || ceroCargaSk();
+  const soderiaVaciosActual = stock?.soderia_vacios || ceroCargaSk();
+  const soderiaPost = ceroCarga();
+  const soderiaVaciosPost = ceroCarga();
+  clavesCarga.forEach(pk => {
     const sk = planKeyToSk[pk];
     soderiaPost[pk] = (soderiaActual[sk] || 0) + sobrantes[pk];
     soderiaVaciosPost[pk] = (soderiaVaciosActual[sk] || 0) + vaciosRec[pk];
@@ -2774,17 +2694,9 @@ function PlanillaDelDia({
   // falta llenar para completar lo que se necesita mañana — teniendo en
   // cuenta lo que YA había en sodería de días anteriores, no solo lo de hoy.
   // El resto de los vacíos de hoy queda sin urgencia.
-  const paraLlenarCalc = {
-    soda: 0,
-    b10: 0,
-    b20: 0
-  };
-  const vaciosRestoCalc = {
-    soda: 0,
-    b10: 0,
-    b20: 0
-  };
-  ["soda", "b10", "b20"].forEach(pk => {
+  const paraLlenarCalc = ceroCarga();
+  const vaciosRestoCalc = ceroCarga();
+  clavesCarga.forEach(pk => {
     const sk = planKeyToSk[pk];
     const llenosHoy = pk === "soda" ? Math.floor(sobrantes[pk] / CAJON) : sobrantes[pk];
     const vaciosHoy = pk === "soda" ? Math.floor(vaciosRec[pk] / CAJON) : vaciosRec[pk];
@@ -2795,29 +2707,16 @@ function PlanillaDelDia({
     paraLlenarCalc[pk] = Math.min(falta, vaciosHoy); // no se puede llenar más de lo que vuelve vacío hoy
     vaciosRestoCalc[pk] = Math.max(0, vaciosHoy - paraLlenarCalc[pk]);
   });
-  const planKeyToSkL = {
-    "soda": "sifon",
-    "b10": "bidon10",
-    "b20": "bidon20"
-  };
-  // Calcula cuánto hay que sumar o sacar del Depósito para que sodería
+    // Calcula cuánto hay que sumar o sacar del Depósito para que sodería
   // vuelva a su número fijo (ver notas abajo). Se separa de confirmarCierre
   // para poder mostrar el mismo resultado en el cartel de confirmación
   // ANTES de tocar el stock — pedido del usuario: que la app avise y
   // pregunte antes de mover algo del/al depósito.
   const calcularMovimientoDeposito = () => {
     // Usar valores reales si el usuario los modificó, si no usar los calculados
-    const llenVuelta = {
-      soda: 0,
-      b10: 0,
-      b20: 0
-    };
-    const vacVuelta = {
-      soda: 0,
-      b10: 0,
-      b20: 0
-    };
-    ["soda", "b10", "b20"].forEach(pk => {
+    const llenVuelta = ceroCarga();
+    const vacVuelta = ceroCarga();
+    clavesCarga.forEach(pk => {
       const calcL = sobrantes[pk];
       const calcPL = paraLlenarCalc[pk];
       const calcV = vaciosRestoCalc[pk];
@@ -2842,7 +2741,7 @@ function PlanillaDelDia({
     });
     // Registrar diferencias para auditoría
     const diffs = {};
-    ["soda", "b10", "b20"].forEach(pk => {
+    clavesCarga.forEach(pk => {
       const dl = llenVuelta[pk] - sobrantes[pk];
       const dv = vacVuelta[pk] - vaciosRec[pk];
       if (dl !== 0 || dv !== 0) diffs[pk] = {
@@ -2880,8 +2779,8 @@ function PlanillaDelDia({
       vacVueltaFijo = {};
     const diffBase = {},
       movDeposito = {}; // > 0: entra a Depósito · < 0: sale de Depósito
-    ["soda", "b10", "b20"].forEach(pk => {
-      const sk = planKeyToSkL[pk];
+    clavesCarga.forEach(pk => {
+      const sk = planKeyToSk[pk];
       llenVueltaFijo[pk] = Math.max(0, Math.round(llenVuelta[pk]));
       vacVueltaFijo[pk] = Math.max(0, Math.round(vacVuelta[pk]));
       const baseRef = baseRefFor(sk);
@@ -2938,23 +2837,11 @@ function PlanillaDelDia({
     } = calcularMovimientoDeposito();
     setStock(prev => {
       const s = JSON.parse(JSON.stringify(prev || {}));
-      if (!s.soderia) s.soderia = {
-        sifon: 0,
-        bidon10: 0,
-        bidon20: 0
-      };
-      if (!s.soderia_vacios) s.soderia_vacios = {
-        sifon: 0,
-        bidon10: 0,
-        bidon20: 0
-      };
-      if (!s.casa) s.casa = {
-        sifon: 0,
-        bidon10: 0,
-        bidon20: 0
-      };
-      ["soda", "b10", "b20"].forEach(pk => {
-        const sk = planKeyToSkL[pk];
+      if (!s.soderia) s.soderia = {};
+      if (!s.soderia_vacios) s.soderia_vacios = {};
+      if (!s.casa) s.casa = {};
+      clavesCarga.forEach(pk => {
+        const sk = planKeyToSk[pk];
         s.soderia[sk] = (s.soderia[sk] || 0) + llenVueltaFijo[pk];
         s.soderia_vacios[sk] = (s.soderia_vacios[sk] || 0) + vacVueltaFijo[pk];
         // Depósito se mueve en los dos sentidos acá — ver nota en
@@ -2969,8 +2856,8 @@ function PlanillaDelDia({
     });
     if (window._lcRegistrarMovimientoStock) {
       const detalleCierre = {};
-      ["soda", "b10", "b20"].forEach(pk => {
-        const sk = planKeyToSkL[pk];
+      clavesCarga.forEach(pk => {
+        const sk = planKeyToSk[pk];
         const soderiaVuelta = (llenVueltaFijo[pk] || 0) + (vacVueltaFijo[pk] || 0);
         const dif = diffBase[pk] || 0;
         const aDeposito = movDeposito[pk] || 0;
@@ -2999,7 +2886,7 @@ function PlanillaDelDia({
   const intentarCerrar = () => {
     if (enviandoCierre) return;
     const { diffBase } = calcularMovimientoDeposito();
-    const hayMovimiento = ["soda", "b10", "b20"].some(pk => diffBase[pk] !== 0);
+    const hayMovimiento = clavesCarga.some(pk => diffBase[pk] !== 0);
     if (hayMovimiento) setMostrarConfirmDeposito(true);else confirmarCierre();
   };
   const setProd = (pid, campo, v) => setDatos(d => ({
