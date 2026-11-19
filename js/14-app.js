@@ -1846,6 +1846,26 @@ function App() {
         return [];
       }
     })();
+    // Respaldo desde localStorage para costosVehiculo/casaUbicacion — mismo
+    // patrón que mantVeh/histPrecios arriba. Necesario porque cloudSave hace
+    // .set() (reemplaza el documento config/app entero, no mergea): sin este
+    // respaldo, CUALQUIER otro guardado de config (stock, avisos, etc.) que
+    // no incluya estos 2 campos los borraría de la nube. Agregado 19/11/2026
+    // al sumarlos a LC_CONFIG_KEYS para la herramienta externa de análisis.
+    const costosVehiculoActual = (() => {
+      try {
+        return JSON.parse(localStorage.getItem("cat_costos_vehiculo_v1")) || [];
+      } catch {
+        return [];
+      }
+    })();
+    const casaUbicacionActual = (() => {
+      try {
+        return JSON.parse(localStorage.getItem("cat_casa_ubicacion_v1")) || null;
+      } catch {
+        return null;
+      }
+    })();
     const data = {
       ...estadoRef.current,
       ...overrides,
@@ -1870,7 +1890,9 @@ function App() {
           return ['13:00', '19:00'];
         }
       })(),
-      diasAvisoMant: overrides.diasAvisoMant || (localStorage.getItem('lc_dias_notif_mant') || '3,2,1,0').split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n))
+      diasAvisoMant: overrides.diasAvisoMant || (localStorage.getItem('lc_dias_notif_mant') || '3,2,1,0').split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n)),
+      costosVehiculo: overrides.costosVehiculo || costosVehiculoActual,
+      casaUbicacion: overrides.casaUbicacion !== undefined ? overrides.casaUbicacion : casaUbicacionActual
     };
     estadoRef.current = data;
     // OJO — "sr_offline_pending" antes guardaba una FOTO COMPLETA de `data`
