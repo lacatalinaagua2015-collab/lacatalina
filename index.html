@@ -239,7 +239,7 @@ var firebaseConfig = {
     // SINCRONICE: antes vivía sólo en el localStorage del equipo donde lo
     // cargabas, así que si lo ponías en la PC y cerrabas el reparto desde el
     // celular, el celular no tenía token y no enviaba nada a Emma Control.
-    var LC_CONFIG_KEYS = ['stock','horaAvisoCierre','horasAvisoTrans','diasAvisoMant','ecToken'];
+    var LC_CONFIG_KEYS = ['stock','horaAvisoCierre','horasAvisoTrans','diasAvisoMant','ecToken','costosVehiculo','casaUbicacion'];
 
     function _lcUsuario(){ var u = firebase.auth().currentUser; return (u && !u.isAnonymous) ? u : null; }
     window._lcLastSaved = null;
