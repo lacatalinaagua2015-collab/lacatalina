@@ -353,13 +353,12 @@ function PieEnvases({
   izquierda,
   children
 }) {
-  const KEYS = ["sifon", "bidon10", "bidon20", "dispenser"];
-  const KP = {
-    "Sifón 1.5L": "sifon",
-    "Bidón 10L": "bidon10",
-    "Bidón 20L": "bidon20",
-    "Dispenser": "dispenser"
-  };
+  // Pedido de Guillermo (19/11/2026): antes esto era 4 claves fijas. Ahora
+  // sale de la lista real de productos (window._lcProductos — ver
+  // 14-app.js), así un producto nuevo también se puede ajustar acá.
+  const PRODS = ((typeof window !== "undefined" && window._lcProductos) || []).filter(p => p.trackStock !== false).map(p => [claveStockDeProducto(p), p.nombre.replace(" 1.5L", "")]);
+  const KEYS = PRODS.map(([k]) => k);
+  const NOMBRES = Object.fromEntries(PRODS.map(([k, lbl]) => [k, lbl]));
   const [draft, setDraft] = React.useState(null); // null = panel cerrado
   // Guard anti doble-tap (mismo patrón que registrarVenta/eliminarVenta/
   // editarVenta en 14-app.js): sin esto, tocar "Confirmar" dos veces
@@ -408,12 +407,6 @@ function PieEnvases({
   const confirmar = async () => {
     if (confirmando) return;
     setConfirmando(true);
-    const NOMBRES = {
-      sifon: "Sifón 1.5L",
-      bidon10: "Bidón 10L",
-      bidon20: "Bidón 20L",
-      dispenser: "Dispenser"
-    };
     const cambios = [];
     KEYS.forEach(k => {
       const antesFijo = Number(c[k]) || 0;

@@ -618,6 +618,12 @@ function App() {
   // guardarlo en una variable) ve siempre los productos actuales, incluidos
   // los que se vayan agregando. Ver claveStockDeProducto/actualizarKeyProdEnv.
   actualizarKeyProdEnv(productos);
+  // Expone la lista de productos como global (mismo patrón que
+  // window._lcRegistrarMovimientoStock / window._lcRegistrarAjusteEnvases)
+  // para que PieEnvases (04-componentes.js, compartido por 6 pantallas)
+  // pueda armar sus claves dinámicas sin que haya que pasarle un prop
+  // nuevo en cada una de esas pantallas (19/11/2026).
+  window._lcProductos = productos;
   const BASE_DEFAULT_FIJA = {
     sifon: 150,
     bidon10: 70,
