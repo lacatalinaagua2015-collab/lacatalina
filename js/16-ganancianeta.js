@@ -538,10 +538,16 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
     const diasDeEseDiaSemana = diasObjetivoKeys.filter(k => diaSemanaDeFecha(k) === dia);
     const datosDias = diasDeEseDiaSemana.map(k => calcularDatosDelDia(k, ventas, clientes, costosVehiculo, casaUbicacion)).filter(d => d.totalVendido > 0);
     const n = datosDias.length;
+    const clientesProm = n > 0 ? datosDias.reduce((a, d) => a + d.visitas, 0) / n : 0;
+    const bultosProm = n > 0 ? datosDias.reduce((a, d) => a + d.totalBultos, 0) / n : 0;
     return {
-      dia, diasConDatos: n,
-      bultosProm: n > 0 ? datosDias.reduce((a, d) => a + d.totalBultos, 0) / n : 0,
+      dia, diasConDatos: n, clientesProm, bultosProm,
       ventaProm: n > 0 ? datosDias.reduce((a, d) => a + d.totalVendido, 0) / n : 0,
+      // bultos/cliente REAL de ese día específico — cada día tiene su propia
+      // compra promedio por cliente (Guillermo, 19/11/2026: Jueves es corto
+      // y eficiente con buena compra; Martes es más lejos, menos clientes,
+      // pero compensa con más compra por cliente — no son todos iguales).
+      bultosPorClienteReal: clientesProm > 0 ? bultosProm / clientesProm : 0,
     };
   }).filter(f => f.diasConDatos > 0);
 
@@ -636,6 +642,7 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
           /*#__PURE__*/React.createElement("div", { style: { textAlign: "right", fontWeight: 700, color: "#4dd9a0" } }, "Necesario")),
         filasDiaObjetivo.map((f, i) => {
           const faltan = Math.max(0, Math.round(bultosDiaNecesarios - f.bultosProm));
+          const bultosPorClienteNecesario = f.clientesProm > 0 ? bultosDiaNecesarios / f.clientesProm : null;
           return /*#__PURE__*/React.createElement("div", {
             key: f.dia,
             style: { padding: "6px 0", borderTop: i > 0 ? "1px solid var(--color-border-tertiary)" : "none" }
@@ -644,13 +651,18 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
               /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, color: "var(--color-text-primary)" } }, f.dia),
               /*#__PURE__*/React.createElement("span", { style: { textAlign: "right", color: faltan > 0 ? "#E24B4A" : "#4dd9a0", fontWeight: 700 } }, Math.round(f.bultosProm), " bultos"),
               /*#__PURE__*/React.createElement("span", { style: { textAlign: "right", color: "#4dd9a0", fontWeight: 700 } }, Math.round(bultosDiaNecesarios), " bultos")),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 2 } },
+              "≈", f.clientesProm.toFixed(1), " clientes reales · ", f.bultosPorClienteReal.toFixed(1), " bultos/cliente real",
+              bultosPorClienteNecesario != null && (" · necesitarías ≈" + bultosPorClienteNecesario.toFixed(1) + " bultos/cliente")),
             faltan > 0
               ? /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#f5b942", marginTop: 2 } }, "Le faltan ≈", faltan, " bultos esa jornada para llegar al objetivo")
               : /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#4dd9a0", marginTop: 2 } }, "✅ Ya llega al objetivo"));
         }),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 10.5, color: "var(--color-text-tertiary)", marginTop: 8 } },
+          "Cada día tiene su propia cantidad real de clientes y su propia compra por cliente (un día lejos con pocos clientes puede compensar con compras más grandes, uno corto y eficiente puede tener más clientes) — por eso “necesitarías ≈X bultos/cliente” sale distinto en cada fila, aunque el total de bultos necesarios por jornada sea el mismo."),
         (() => {
           const diasSinDatos = DIAS.filter(d => !filasDiaObjetivo.some(f => f.dia === d));
-          return diasSinDatos.length > 0 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10.5, color: "var(--color-text-tertiary)", marginTop: 8 } },
+          return diasSinDatos.length > 0 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10.5, color: "var(--color-text-tertiary)", marginTop: 6 } },
             "(", diasSinDatos.join(", "), " no ", diasSinDatos.length === 1 ? "tiene" : "tienen", " ventas registradas en los últimos ", diasVentanaObjetivo, " días, por eso no ", diasSinDatos.length === 1 ? "aparece" : "aparecen", " acá)");
         })()
       )
