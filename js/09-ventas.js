@@ -1620,48 +1620,27 @@ function NuevaVenta({
       background: "var(--color-background-success)",
       color: "var(--color-text-success)"
     }
-  }, "A favor ", fmt(cliente.saldo)), cliente.sifon > 0 && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 11,
-      padding: "2px 8px",
-      borderRadius: 5,
-      background: "var(--color-background-info)",
-      color: "var(--color-text-info)"
-    }
-  }, "Sifón×", cliente.sifon), cliente.bidon10 > 0 && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 11,
-      padding: "2px 8px",
-      borderRadius: 5,
-      background: "var(--color-background-info)",
-      color: "var(--color-text-info)"
-    }
-  }, "10L×", cliente.bidon10), cliente.bidon20 > 0 && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 11,
-      padding: "2px 8px",
-      borderRadius: 5,
-      background: "var(--color-background-info)",
-      color: "var(--color-text-info)"
-    }
-  }, "20L×", cliente.bidon20), cliente.dispenser > 0 && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 11,
-      padding: "2px 8px",
-      borderRadius: 5,
-      background: "var(--color-background-tertiary)",
-      color: "var(--color-text-secondary)"
-    }
-  }, "Disp×", cliente.dispenser), (() => {
-    const pres = {
-      sifon: prestadoClienteDe(cliente, "sifon", ventasCliente),
-      bidon10: prestadoClienteDe(cliente, "bidon10", ventasCliente),
-      bidon20: prestadoClienteDe(cliente, "bidon20", ventasCliente)
-    };
+  }, "A favor ", fmt(cliente.saldo)), (() => {
+    // Pedido de Guillermo (19/11/2026): antes esto eran 4 claves fijas.
+    // Ahora recorre la lista real de productos.
+    const PRODS_V = (productos || []).filter(p => p.trackStock !== false).map(p => [claveStockDeProducto(p), p.nombre.replace(" 1.5L", "")]);
+    return PRODS_V.map(([k, lbl]) => (cliente[k] || 0) > 0 ? /*#__PURE__*/React.createElement("span", {
+      key: k,
+      style: {
+        fontSize: 11,
+        padding: "2px 8px",
+        borderRadius: 5,
+        background: "var(--color-background-info)",
+        color: "var(--color-text-info)"
+      }
+    }, `${lbl}×`, cliente[k]) : null);
+  })(), (() => {
+    const PRODS_V = (productos || []).filter(p => p.trackStock !== false).map(p => [claveStockDeProducto(p), p.nombre.replace(" 1.5L", "")]);
     const items = [];
-    if (pres.sifon > 0) items.push(`+${pres.sifon} sif.`);
-    if (pres.bidon10 > 0) items.push(`+${pres.bidon10} 10L`);
-    if (pres.bidon20 > 0) items.push(`+${pres.bidon20} 20L`);
+    PRODS_V.forEach(([k, lbl]) => {
+      const n = prestadoClienteDe(cliente, k, ventasCliente);
+      if (n > 0) items.push(`+${n} ${lbl}`);
+    });
     return items.length > 0 ? /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,

@@ -392,11 +392,8 @@ function GestionClientes({
   }, "Debe ", fmt(Math.abs(c.saldo))), c.saldo > 0 && /*#__PURE__*/React.createElement("span", {
     style: s.badge("success")
   }, "A favor ", fmt(c.saldo)), (() => {
-    const real = {
-      sifon: Math.max(0, (Number(c.sifon) || 0) + prestadoClienteDe(c, "sifon", ventas)),
-      bidon10: Math.max(0, (Number(c.bidon10) || 0) + prestadoClienteDe(c, "bidon10", ventas)),
-      bidon20: Math.max(0, (Number(c.bidon20) || 0) + prestadoClienteDe(c, "bidon20", ventas))
-    };
+    // Pedido de Guillermo (19/11/2026): antes solo contemplaba 4 claves fijas.
+    const PRODS_G = (productos || []).filter(p => p.trackStock !== false).map(p => [claveStockDeProducto(p), p.nombre.replace(" 1.5L", "")]);
     const pill = txt => /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,
@@ -407,7 +404,10 @@ function GestionClientes({
         color: "var(--color-text-info)"
       }
     }, txt);
-    return /*#__PURE__*/React.createElement(React.Fragment, null, real.sifon > 0 && pill(`Sif ×${real.sifon}`), real.bidon10 > 0 && pill(`10L ×${real.bidon10}`), real.bidon20 > 0 && pill(`20L ×${real.bidon20}`), c.dispenser > 0 && pill(`Disp ×${c.dispenser}`));
+    return /*#__PURE__*/React.createElement(React.Fragment, null, PRODS_G.map(([k, lbl]) => {
+      const real = Math.max(0, (Number(c[k]) || 0) + prestadoClienteDe(c, k, ventas));
+      return real > 0 ? /*#__PURE__*/React.createElement(React.Fragment, { key: k }, pill(`${lbl} ×${real}`)) : null;
+    }));
   })())), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",

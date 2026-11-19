@@ -788,6 +788,9 @@ function Resumen({
 }
 function exportarExcel(clientes, ventas, productos, planillas) {
   const wb = XLSX.utils.book_new();
+  // Pedido de Guillermo (19/11/2026): antes solo exportaba 3 productos
+  // fijos. Ahora sale una columna por cada producto real.
+  const PRODS_XLS = (productos || []).filter(p => p.trackStock !== false).map(p => [claveStockDeProducto(p), p.nombre]);
   const wsC = XLSX.utils.json_to_sheet(clientes.map(c => ({
     ID: c.id,
     Nombre: c.nombre,
@@ -797,9 +800,7 @@ function exportarExcel(clientes, ventas, productos, planillas) {
     Lote: c.lote,
     "Teléfono": c.telefono,
     Maps: c.maps,
-    "Sifón": c.sifon,
-    "Bidón 10L": c.bidon10,
-    "Bidón 20L": c.bidon20,
+    ...Object.fromEntries(PRODS_XLS.map(([k, nombre]) => [nombre, c[k]])),
     Saldo: c.saldo
   })));
   XLSX.utils.book_append_sheet(wb, wsC, "Clientes");
