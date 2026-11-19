@@ -3867,6 +3867,15 @@ function App() {
     perdidas: perdidas,
     movStock: movStock,
     promociones: promociones,
+    // Mismos datos (y misma migracion de nombre) que usa GananciaNetaScreen
+    // -- para que "Ganancia real del dia" en la Planilla coincida siempre
+    // con esa pantalla. Pedido de Guillermo, 19/11/2026.
+    costosVehiculo: (() => {
+      let lista;
+      try { lista = JSON.parse(localStorage.getItem("cat_costos_vehiculo_v1")) || COSTOS_VEHICULO_DEFAULT; } catch { lista = COSTOS_VEHICULO_DEFAULT; }
+      return (lista || []).map(it => it.nombre === "Cambio de olla (GNC)" ? { ...it, nombre: "Cambio de oblea (GNC)" } : it);
+    })(),
+    casaUbicacion: (() => { try { return JSON.parse(localStorage.getItem("cat_casa_ubicacion_v1")) || CASA_UBICACION_DEFAULT; } catch { return CASA_UBICACION_DEFAULT; } })(),
     onGuardar: d => {
       savePlanilla(`${diaActual}_${fechaActual}`, d);
       if (!d._diaCerrado) irA(origenFecha === "atajo" ? "atajoPlanillaSemana" : origenFecha === "menu" ? "menu" : "selectorFechaPlanilla");

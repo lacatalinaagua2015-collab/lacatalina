@@ -4180,7 +4180,7 @@ function PlanillaDelDia({
     style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 6 }
   }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)" } }, "Ganancia real del día"), /*#__PURE__*/React.createElement("span", {
     style: { fontSize: 19, fontWeight: 800, color: gananciaRealHoy >= 0 ? "var(--color-text-success)" : "var(--color-text-danger)" }
-  }, fmt(gananciaRealHoy)))), promocionesDia.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, fmt(gananciaRealHoy))))), promocionesDia.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
       margin: "0 0 16px",
