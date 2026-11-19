@@ -35,7 +35,13 @@ function StockGeneral({
   });
   const hoyDia = DIAS[(new Date().getDay() + 6) % 7] || "Lunes";
   const [diaCarga, setDiaCarga] = React.useState(DIAS.includes(hoyDia) ? hoyDia : "Lunes");
-  const PRODS = [["sifon", "Sifón 1.5L"], ["bidon10", "Bidón 10L"], ["bidon20", "Bidón 20L"], ["dispenser", "Dispenser"]];
+  // Pedido de Guillermo (19/11/2026): antes esta lista era fija (siempre
+  // los mismos 4). Ahora sale de los productos reales marcados "controla
+  // stock" — agregar un producto nuevo (bidón 12L, sifón 500ml, dispenser
+  // frío-calor) lo suma acá solo, sin tocar código. Los 4 de siempre
+  // conservan su clave de toda la vida (ver claveStockDeProducto en
+  // 03-utils.js), así los datos guardados no se mueven.
+  const PRODS = (productos || []).filter(p => p.trackStock !== false).map(p => [claveStockDeProducto(p), p.nombre]);
   const setLoc = (loc, key, val) => {
     const ns = JSON.parse(JSON.stringify(stock));
     if (!ns[loc]) ns[loc] = {

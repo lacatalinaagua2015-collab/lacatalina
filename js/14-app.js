@@ -128,7 +128,11 @@ function aplicarMovimientoEnvases(clientesPrev, ventasPrev, clienteId, envPrest,
       const deLoPrestado = Math.min(prestado[k], cant);
       prestado[k] -= deLoPrestado;
       cant -= deLoPrestado;
-      if (cant > 0) fijo[k] = Math.max(0, fijo[k] - cant);
+      // fijo[k] solo existe para sifon/bidon10/bidon20 (lo "fijo" de
+      // productos nuevos queda para una Fase 2 - ver 19/11/2026). Para un
+      // producto nuevo esto no debe romper nada: sencillamente no ajusta
+      // nada fijo, en vez de calcular con undefined.
+      if (cant > 0 && fijo[k] !== undefined) fijo[k] = Math.max(0, fijo[k] - cant);
     });
     ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
       if (prestado[k] === undefined) prestado[k] = c.prestado?.[k] || 0;
