@@ -413,7 +413,13 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
         filasConProm.map((f, i) => {
           const esElMejor = f.dia === diaMejorVenta.dia;
           const faltanClientes = Math.max(0, Math.round(mejorClientesProm - f.clientesProm));
-          const faltaVenta = Math.max(0, mejorVentaProm - f.ventaProm);
+          // La venta que falta se deriva de los clientes que faltan × tu
+          // promedio real de $/cliente (no de restar los promedios de venta
+          // de cada día, que tienen su propio $/cliente y no cierran entre
+          // sí) — corrección pedida por Guillermo, 19/11/2026.
+          const faltaVenta = hayDatosObjetivo && ventaPorClienteProm > 0
+            ? faltanClientes * ventaPorClienteProm
+            : Math.max(0, mejorVentaProm - f.ventaProm);
           return /*#__PURE__*/React.createElement("div", {
             key: f.dia,
             style: { padding: "8px 0", borderTop: i > 0 ? "1px solid var(--color-border-tertiary)" : "none" }
@@ -425,7 +431,9 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
               ? /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: "#4dd9a0", marginTop: 2 } }, "🏆 Tu mejor día")
               : /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: "#f5b942", marginTop: 2 } },
                   "Le faltan ≈", faltanClientes, " cliente", faltanClientes === 1 ? "" : "s", " y ", fmt(faltaVenta), " en venta por jornada para igualar a ", diaMejorVenta.dia));
-        })
+        }),
+        ventaPorClienteProm > 0 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10.5, color: "var(--color-text-tertiary)", marginTop: 8 } },
+          "La venta que falta = clientes que faltan × tu promedio real de ", fmt(ventaPorClienteProm), "/cliente (de los últimos ", diasVentanaObjetivo, " días) — no el promedio propio de cada día.")
       );
     })(),
     sinZona.length > 0 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11.5, color: "var(--color-text-tertiary)", textAlign: "center", marginTop: 6 } },
