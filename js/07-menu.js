@@ -2121,11 +2121,7 @@ function PlanillaDelDia({
   const costB10 = getProdCosto("Bidón 10L") || 800;
   const costB20 = getProdCosto("Bidón 20L") || 1100;
   const COSTO_CAJON_SODA = costSifon * CAJON_SODA;
-  const prodKey = {
-    "Bidón 10L": "b10",
-    "Bidón 20L": "b20",
-    "Sifón 1.5L": "soda"
-  };
+  const prodKey = nombreAPk;
   // BUG RAÍZ 2026-10-17 (reportado por el usuario: "esta planilla está
   // agregando ventas y plata a las listas de los días"): antes esto incluía
   // ventasExtraDia (ventas de clientes de OTRO día que cayeron en esta misma
@@ -2141,24 +2137,10 @@ function PlanillaDelDia({
   // "Ventas de otros días"), pero ya NUNCA se suman a la plata/stock de
   // ESTE día.
   const todasVentasDia = ventasPropias;
-  const totalesPorProd = {
-    b10: {
-      vacios: 0,
-      plata: 0,
-      llenar: 0
-    },
-    b20: {
-      vacios: 0,
-      plata: 0,
-      llenar: 0
-    },
-    soda: {
-      vacios: 0,
-      plata: 0,
-      llenar: 0,
-      cajones: 0
-    }
-  };
+  const totalesPorProd = Object.fromEntries(clavesCarga.map(pk => [
+    pk,
+    pk === "soda" ? { vacios: 0, plata: 0, llenar: 0, cajones: 0 } : { vacios: 0, plata: 0, llenar: 0 }
+  ]));
   todasVentasDia.forEach(v => {
     v.detalle.forEach(d => {
       const k = prodKey[d.nombre];
@@ -2190,8 +2172,11 @@ function PlanillaDelDia({
   const sodaCajones = calcCajones(totalesPorProd.soda.vacios);
   totalesPorProd.soda.cajones = sodaCajones;
   totalesPorProd.soda.llenar = sodaCajones * COSTO_CAJON_SODA;
-  totalesPorProd.b10.llenar = totalesPorProd.b10.vacios * costB10;
-  totalesPorProd.b20.llenar = totalesPorProd.b20.vacios * costB20;
+  productosCarga.forEach(p => {
+    const pk = claveCargaDeProducto(p);
+    if (pk === "soda") return; // la soda ya se calculó arriba, por cajón
+    totalesPorProd[pk].llenar = totalesPorProd[pk].vacios * (p.costo || 0);
+  });
   // Peso desde la CARGA INICIAL del día (lo que salió en el camión — dato de la planilla)
   const sifonesCargados = Number(planilla?.productos?.soda?.llenos || 0);
   const b10Cargados = Number(planilla?.productos?.b10?.llenos || 0);
