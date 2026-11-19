@@ -191,6 +191,12 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
   const [diasRepartoInput, setDiasRepartoInput] = React.useState(() => {
     try { return localStorage.getItem("cat_objetivo_dias_semana_v1") || ""; } catch { return ""; }
   });
+  // Simulador "¿y si vendo X bultos por día?" — pedido de Guillermo,
+  // 19/11/2026: el cálculo inverso al de arriba: no "cuánto necesito
+  // vender", sino "si vendo tanto, cuánto me daría de ganancia".
+  const [simBultosInput, setSimBultosInput] = React.useState(() => {
+    try { return localStorage.getItem("cat_sim_bultos_v1") || ""; } catch { return ""; }
+  });
 
   const sinConfigurar = !costosVehiculo || !costosVehiculo.length;
 
@@ -572,6 +578,37 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
             onChange: e => guardarDiasReparto(e.target.value),
             style: { width: 44, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--color-border-secondary)", background: "var(--color-background-tertiary)", color: "var(--color-text-primary)", fontSize: 14, fontWeight: 700, textAlign: "center", boxSizing: "border-box" }
           }))
+      ),
+      /*#__PURE__*/React.createElement("div", { style: s.card },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 8 } }, "🔢 ¿Y si vendo X bultos por día?"),
+        /*#__PURE__*/React.createElement("input", {
+          type: "number", inputMode: "numeric",
+          value: simBultosInput,
+          onChange: e => { setSimBultosInput(e.target.value); try { localStorage.setItem("cat_sim_bultos_v1", e.target.value); } catch {} },
+          placeholder: "Ej: 90",
+          style: { width: "100%", padding: "11px 12px", borderRadius: 10, border: "1px solid var(--color-border-secondary)", background: "var(--color-background-tertiary)", color: "var(--color-text-primary)", fontSize: 17, fontWeight: 700, boxSizing: "border-box" }
+        }),
+        (() => {
+          const simBultos = Number(simBultosInput) || 0;
+          if (simBultos <= 0 || !hayDatosObjetivo) return null;
+          const simVentaDia = simBultos * precioPorBultoProm;
+          const simGananciaNetaDia = simVentaDia * pctNetoProm;
+          return /*#__PURE__*/React.createElement(React.Fragment, null,
+            /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, padding: "8px 0 2px", marginTop: 8, borderTop: "1px solid var(--color-border-tertiary)", color: "var(--color-text-secondary)" } },
+              /*#__PURE__*/React.createElement("span", null, "Venta estimada /día"),
+              /*#__PURE__*/React.createElement("b", { style: { color: "var(--color-text-primary)" } }, fmt(simVentaDia))),
+            /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 14, fontWeight: 700, padding: "4px 0" } },
+              /*#__PURE__*/React.createElement("span", { style: { color: "var(--color-text-primary)" } }, "Ganancia neta estimada /día (a tu ", Math.round(pctNetoProm * 100), "%)"),
+              /*#__PURE__*/React.createElement("span", { style: { color: "#4dd9a0" } }, fmt(simGananciaNetaDia))),
+            /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0", color: "var(--color-text-secondary)" } },
+              /*#__PURE__*/React.createElement("span", null, "Venta estimada /mes (", diasRepartoSemana, " días/sem.)"),
+              /*#__PURE__*/React.createElement("b", { style: { color: "var(--color-text-primary)" } }, fmt(simVentaDia * diasRepartoMes))),
+            /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 14, fontWeight: 700, padding: "4px 0" } },
+              /*#__PURE__*/React.createElement("span", { style: { color: "var(--color-text-primary)" } }, "Ganancia neta estimada /mes"),
+              /*#__PURE__*/React.createElement("span", { style: { color: "#4dd9a0" } }, fmt(simGananciaNetaDia * diasRepartoMes))));
+        })(),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 10.5, color: "var(--color-text-tertiary)", marginTop: 6 } },
+          "Usa tu precio promedio real por bulto (", fmt(precioPorBultoProm), ") y tu % neto real promedio (", Math.round(pctNetoProm * 100), "%) de los últimos ", diasVentanaObjetivo, " días.")
       ),
       /*#__PURE__*/React.createElement("div", { style: s.card },
         /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 8 } }, "¿Cuánto querés ganar NETO por mes?"),
