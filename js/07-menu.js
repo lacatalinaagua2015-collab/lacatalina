@@ -4172,7 +4172,7 @@ function PlanillaDelDia({
       fontWeight: 500,
       color: ganancia >= 0 ? "var(--color-text-success)" : "var(--color-text-danger)"
     }
-  }, fmt(ganancia)))), datosVehiculoHoy && gastoVehiculoHoy > 0 && /*#__PURE__*/React.createElement("div", {
+  }, fmt(ganancia))), datosVehiculoHoy && gastoVehiculoHoy > 0 && /*#__PURE__*/React.createElement("div", {
     style: { marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--color-border-tertiary)" }
   }, /*#__PURE__*/React.createElement("div", {
     style: { display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "var(--color-text-secondary)" }
