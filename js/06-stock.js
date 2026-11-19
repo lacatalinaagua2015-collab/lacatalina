@@ -99,17 +99,12 @@ function StockGeneral({
     setCargasDia(nc);
   };
   const clientesReales = clientes || [];
-  const totClientes = {
-    sifon: 0,
-    bidon10: 0,
-    bidon20: 0,
-    dispenser: 0
-  };
+  // Pedido de Guillermo (19/11/2026): antes solo sumaba los 4 de siempre.
+  // Ahora recorre la lista real de productos.
+  const totClientes = {};
+  PRODS.forEach(([k]) => { totClientes[k] = 0; });
   clientesReales.forEach(c => {
-    totClientes.sifon += Number(c.sifon) || 0;
-    totClientes.bidon10 += Number(c.bidon10) || 0;
-    totClientes.bidon20 += Number(c.bidon20) || 0;
-    totClientes.dispenser += Number(c.dispenser) || 0;
+    PRODS.forEach(([k]) => { totClientes[k] += Number(c[k]) || 0; });
   });
 
   // ── ARQUEO: envases EXTRA prestados por cliente (calculado desde ventas) ──
@@ -815,7 +810,7 @@ function StockGeneral({
       fontSize: 11,
       color: "var(--color-text-tertiary)"
     }
-  }, c.dia)), /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, modoArqueo === "fijos" ? [["sifon", "Sifón"], ["bidon10", "10L"], ["bidon20", "20L"], ["dispenser", "Disp"]].map(([k, lbl]) => /*#__PURE__*/React.createElement("label", {
+  }, c.dia)), /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, modoArqueo === "fijos" ? PRODS.map(([k, lbl]) => /*#__PURE__*/React.createElement("label", {
     key: k,
     style: {
       display: "flex",
@@ -830,7 +825,7 @@ function StockGeneral({
       fontSize: 11,
       color: "var(--color-text-tertiary)"
     }
-  }, lbl), /*#__PURE__*/React.createElement("input", {
+  }, lbl.replace(" 1.5L", "")), /*#__PURE__*/React.createElement("input", {
     type: "number",
     value: c[k] || 0,
     onChange: e => setClienteEnv(c.id, k, e.target.value),
