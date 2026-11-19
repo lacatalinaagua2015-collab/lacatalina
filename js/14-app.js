@@ -2615,11 +2615,7 @@ function App() {
     // Auto-detectar envases prestados (solo si no es cobro de deuda)
     const envAutoDetect = [];
     if (opcionSaldo !== "cobro_deuda" && opcionSaldo !== "cambio_envase" && opcionSaldo !== "devolucion_envase") {
-      const mapa = {
-        sifon: "Sifón 1.5L",
-        bidon10: "Bidón 10L",
-        bidon20: "Bidón 20L"
-      };
+
       // BUG REPORTADO 2026-10-23 (caso real: "Villa" con 16 sifones
       // prestados cuando tenía 2 fijos + 2 agregados): esto comparaba la
       // cantidad comprada contra el FIJO nomás (c.sifon), sin contar lo que
@@ -2633,7 +2629,11 @@ function App() {
       // eso es préstamo nuevo de verdad.
       detalle.forEach(d => {
         const k = KEY_PROD_ENV[d.nombre];
-        const fijo = d.nombre === "Sifón 1.5L" ? c.sifon || 0 : d.nombre === "Bidón 10L" ? c.bidon10 || 0 : d.nombre === "Bidón 20L" ? c.bidon20 || 0 : 0;
+        // Pedido de Guillermo (19/11/2026): antes el FIJO solo se miraba
+        // para sifón/bidón 10L/bidón 20L (un producto nuevo quedaba afuera
+        // y cualquier compra suya se marcaba de más como prestado, aunque
+        // fuera solo reponer lo que ya tenía de fijo).
+        const fijo = k && k !== "dispenser" ? Number(c[k]) || 0 : 0;
         const yaPrestado = k ? prestadoClienteDe(c, k, ventas) : 0;
         const asignado = fijo + yaPrestado;
         const extra = d.cantidad - asignado;
