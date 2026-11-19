@@ -508,13 +508,30 @@ function NuevoRecordatorioForm({
       margin: "2px 0",
       padding: "8px 12px",
       cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
       background: "var(--color-background-tertiary)"
     },
     onClick: () => {
       setClienteId(c.id);
       setBusq("");
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, diaFiltro && /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 20,
+      height: 20,
+      borderRadius: "50%",
+      background: "var(--color-background-primary)",
+      color: "var(--color-text-info)",
+      fontSize: 10.5,
+      fontWeight: 700,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0
+    }
+  }, c.orden || "·"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 13,
       fontWeight: 500,
@@ -525,7 +542,7 @@ function NuevoRecordatorioForm({
       fontSize: 11,
       color: "var(--color-text-secondary)"
     }
-  }, c.dia, direccionCliente(c) && " · ", direccionCliente(c)))))), /*#__PURE__*/React.createElement("div", {
+  }, c.dia, direccionCliente(c) && " · ", direccionCliente(c))))))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 14
     }
