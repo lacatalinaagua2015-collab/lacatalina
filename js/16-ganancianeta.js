@@ -102,6 +102,29 @@ function diaSemanaDeFecha(fechaKey) {
   return DIAS_SEMANA_TODAS[new Date(y, m - 1, d).getDay()];
 }
 
+// ── Promedio de días entre cobros (_esCobro), de todo el historial — para
+//    saber "cada cuánto se cobra" el fiado en promedio. Pedido de Guillermo,
+//    19/11/2026. No usa la ventana de 60 días: el fiado se cobra espaciado,
+//    conviene mirar todo el historial para tener una muestra razonable.
+function promedioDiasEntreCobros(ventas) {
+  const porCliente = {};
+  (ventas || []).forEach(v => {
+    if (v._esCobro && v.clienteId != null && v.fechaKey) {
+      (porCliente[v.clienteId] = porCliente[v.clienteId] || []).push(v.fechaKey);
+    }
+  });
+  const gaps = [];
+  Object.values(porCliente).forEach(fechas => {
+    const ordenadas = [...new Set(fechas)].sort();
+    for (let i = 1; i < ordenadas.length; i++) {
+      const dias = Math.round((new Date(ordenadas[i]) - new Date(ordenadas[i - 1])) / 86400000);
+      if (dias > 0) gaps.push(dias);
+    }
+  });
+  if (!gaps.length) return null;
+  return gaps.reduce((a, b) => a + b, 0) / gaps.length;
+}
+
 // ── Todo lo de un día: ventas, ganancia bruta, km, gasto vehículo, neta ──
 function calcularDatosDelDia(fechaKey, ventas, clientes, costosVehiculo, casaUbicacion) {
   const ventasReales = (ventas || []).filter(v => v.fechaKey === fechaKey && !v._esCobro && !v._esAjuste && !v._esAjusteEnvases && !v._esCambio && !v._esMixtoTrans);
@@ -457,6 +480,12 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
   const bultosMensualObjetivo = bultosDiaNecesarios * diasRepartoMes;
   const faltaGananciaNeta = objetivoNum - gananciaNetaMensualReal;
 
+  // Info aparte (no entra en la comparación ni en "te faltan"): el fiado ya
+  // cuenta como ganancia (la venta ya se hizo), esto es solo referencia de
+  // cuánta plata está "a plazo" sin cobrar todavía, y cada cuánto se cobra.
+  const fiadoPendienteTotal = (clientes || []).filter(c => (c.saldo || 0) < 0).reduce((a, c) => a + Math.abs(c.saldo), 0);
+  const promedioDiasCobro = React.useMemo(() => promedioDiasEntreCobros(ventas), [ventas]);
+
   const vistaObjetivo = () => /*#__PURE__*/React.createElement(React.Fragment, null,
     tabs,
     !hayDatosObjetivo && /*#__PURE__*/React.createElement("div", { style: { padding: 30, textAlign: "center", color: "var(--color-text-tertiary)", fontSize: 13 } },
@@ -523,7 +552,17 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
           /*#__PURE__*/React.createElement("span", { style: { textAlign: "right", color: "#4dd9a0", fontWeight: 700 } }, formatear(b)))),
         /*#__PURE__*/React.createElement("div", {
           style: { marginTop: 10, textAlign: "center", fontSize: 13, fontWeight: 700, color: faltaGananciaNeta > 0 ? "#f5b942" : "#4dd9a0" }
-        }, faltaGananciaNeta > 0 ? `Te faltan ${fmt(faltaGananciaNeta)} netos más por mes para llegar` : "🎉 Ya estás llegando a tu objetivo")
+        }, faltaGananciaNeta > 0 ? `Te faltan ${fmt(faltaGananciaNeta)} netos más por mes para llegar` : "🎉 Ya estás llegando a tu objetivo"),
+        /*#__PURE__*/React.createElement("div", { style: { marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--color-border-tertiary)" } },
+          /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 12.5, padding: "3px 0", color: "var(--color-text-secondary)" } },
+            /*#__PURE__*/React.createElement("span", null, "Fiado pendiente de cobro"),
+            /*#__PURE__*/React.createElement("b", { style: { color: "var(--color-text-primary)" } }, fmt(fiadoPendienteTotal))),
+          promedioDiasCobro != null && /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 12.5, padding: "3px 0", color: "var(--color-text-secondary)" } },
+            /*#__PURE__*/React.createElement("span", null, "Promedio de cobro"),
+            /*#__PURE__*/React.createElement("b", { style: { color: "var(--color-text-primary)" } }, "cada ~", Math.round(promedioDiasCobro), " días")),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 10.5, color: "var(--color-text-tertiary)", marginTop: 4 } },
+            "El fiado ya cuenta como ganancia (la venta ya se hizo) — esto es solo para que sepas cuánta plata está ‘a plazo’ sin cobrar.")
+        )
       )
     )
   );
