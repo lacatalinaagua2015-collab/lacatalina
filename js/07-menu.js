@@ -2111,6 +2111,18 @@ function PlanillaDelDia({
   const ceroCargaSk = () => Object.fromEntries(productosCarga.map(p => [claveStockDeProducto(p), 0]));
   const nombreAPk = Object.fromEntries(productosCarga.map(p => [p.nombre, claveCargaDeProducto(p)]));
   const PROD_A_PK_ENV = { ...nombreAPk, [dispNombre]: "disp" };
+  // Lista con la MISMA forma que PRODUCTOS_CONFIG (id/nombre/costoUnit) pero
+  // armada desde los productos reales -- así la tabla de carga del cierre
+  // ("Producto/Llenos/Vacíos/Plata/Llenar") muestra cualquier producto nuevo,
+  // no solo los 3 de siempre.
+  const prodsCargaUI = productosCarga.map(p => ({ id: claveCargaDeProducto(p), nombre: p.nombre, costoUnit: p.costo || 0 }));
+  // Etiquetas cortas para las tarjetas de "Movimiento de la sodería" /
+  // "Movimiento de envases de hoy" -- antes 2 copias hardcodeadas a los 3
+  // de siempre (+ dispenser en una de ellas), ahora UNA sola fuente.
+  const labelCorto = p => (p && p.nombre || "").replace(" 1.5L", "");
+  const movSoderia = productosCarga.map(p => [labelCorto(p), claveCargaDeProducto(p)]);
+  const movLabels = [...movSoderia, [labelCorto(dispProd) || dispNombre, "disp"]];
+  const PROD_LBL = { ...Object.fromEntries(movSoderia.map(([lbl, pk]) => [pk, lbl])), disp: labelCorto(dispProd) || dispNombre };
   // Auto-calcular desde ventas del dia
   const CAJON_SODA = 6;
   const getProdCosto = nombre => {
@@ -2954,7 +2966,6 @@ function PlanillaDelDia({
   // de "Diferencia respecto a la Base" de antes (el ajuste automático
   // contra Depósito sigue pasando igual adentro de confirmarCierre()).
   if (mostrarCierre) {
-    const movSoderia = [["Sifón", "soda"], ["Bidón 10L", "b10"], ["Bidón 20L", "b20"]];
     return /*#__PURE__*/React.createElement("div", {
       style: s.screen
     }, /*#__PURE__*/React.createElement(HeaderApp, {
@@ -2988,9 +2999,7 @@ function PlanillaDelDia({
       // Misma tarjeta "Movimiento de envases de hoy" (con Detalle por
       // cliente) que ya se ve en la planilla normal — se reusa tal cual
       // para que el cierre muestre exactamente lo mismo.
-      const movLabels = [["Sifón", "soda"], ["Bidón 10L", "b10"], ["Bidón 20L", "b20"], ["Dispenser", "disp"]];
       const dv = (pk, n) => n;
-      const PROD_LBL = { soda: "Sifón", b10: "Bidón 10L", b20: "Bidón 20L", disp: "Dispenser" };
       const porClienteEnv = {};
       const addMovCliente = (nombre, tipo, texto) => {
         const key = (nombre || "").trim() || "Sin nombre";
@@ -3201,7 +3210,7 @@ function PlanillaDelDia({
       fontWeight: 500,
       textAlign: h === "Producto" ? "left" : "right"
     }
-  }, h))), PRODUCTOS_CONFIG.map(p => {
+  }, h))), prodsCargaUI.map(p => {
     const auto = totalesPorProd[p.id];
     const esSoda = p.id === "soda";
     return /*#__PURE__*/React.createElement("div", {
@@ -4148,7 +4157,6 @@ function PlanillaDelDia({
     // (prestadosDia/devueltosDia/rotosDia/fugadosDia/retiradosDia/
     // altaClienteDia/fijoCorregidoDia/devueltosFijoDia), filtrados por "fecha" (la de
     // esta planilla), para que coincida con la tarjeta del cierre.
-    const movLabels = [["Sifón", "soda"], ["Bidón 10L", "b10"], ["Bidón 20L", "b20"], ["Dispenser", "disp"]];
     // OJO: acá se muestra en UNIDADES para los 4 productos (antes el Sifón
     // se dividía por CAJON=6, como en la pantalla de Cierre) — pedido del
     // usuario: "la parte de arriba no coincide con lo de abajo". El detalle
@@ -4158,7 +4166,6 @@ function PlanillaDelDia({
     const dv = (pk, n) => n;
     // Detalle por cliente — pedido del usuario: "que se vea quien fue el
     // que devolvio y a quien se le presto", no solo el total agregado.
-    const PROD_LBL = { soda: "Sifón", b10: "Bidón 10L", b20: "Bidón 20L", disp: "Dispenser" };
     const porClienteEnv = {};
     const addMovCliente = (nombre, tipo, texto) => {
       const key = (nombre || "").trim() || "Sin nombre";
