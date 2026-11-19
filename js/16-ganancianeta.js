@@ -486,6 +486,27 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
   const fiadoPendienteTotal = (clientes || []).filter(c => (c.saldo || 0) < 0).reduce((a, c) => a + Math.abs(c.saldo), 0);
   const promedioDiasCobro = React.useMemo(() => promedioDiasEntreCobros(ventas), [ventas]);
 
+  // Detalle día por día (Martes, Miércoles, Jueves, Viernes...) — pedido de
+  // Guillermo, 19/11/2026: ver bultos reales por jornada de CADA día de la
+  // semana, no solo un promedio mensual, y cuántos bultos necesitaría cada
+  // jornada para el objetivo, manteniendo los días actuales o sumando uno más.
+  const filasDiaObjetivo = DIAS.map(dia => {
+    const diasDeEseDiaSemana = diasObjetivoKeys.filter(k => diaSemanaDeFecha(k) === dia);
+    const datosDias = diasDeEseDiaSemana.map(k => calcularDatosDelDia(k, ventas, clientes, costosVehiculo, casaUbicacion)).filter(d => d.totalVendido > 0);
+    const n = datosDias.length;
+    return {
+      dia, diasConDatos: n,
+      bultosProm: n > 0 ? datosDias.reduce((a, d) => a + d.totalBultos, 0) / n : 0,
+      ventaProm: n > 0 ? datosDias.reduce((a, d) => a + d.totalVendido, 0) / n : 0,
+    };
+  }).filter(f => f.diasConDatos > 0);
+
+  const diasRepartoSemanaAlt = Math.min(diasRepartoSemana + 1, 7);
+  const diasRepartoMesAlt = diasRepartoSemanaAlt * (30.44 / 7);
+  const gananciaNetaDiaNecesariaAlt = objetivoNum > 0 && hayDatosObjetivo ? objetivoNum / diasRepartoMesAlt : 0;
+  const ventaDiaNecesariaAlt = pctNetoProm > 0 ? gananciaNetaDiaNecesariaAlt / pctNetoProm : 0;
+  const bultosDiaNecesariosAlt = precioPorBultoProm > 0 ? ventaDiaNecesariaAlt / precioPorBultoProm : 0;
+
   const vistaObjetivo = () => /*#__PURE__*/React.createElement(React.Fragment, null,
     tabs,
     !hayDatosObjetivo && /*#__PURE__*/React.createElement("div", { style: { padding: 30, textAlign: "center", color: "var(--color-text-tertiary)", fontSize: 13 } },
@@ -563,6 +584,32 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
           /*#__PURE__*/React.createElement("div", { style: { fontSize: 10.5, color: "var(--color-text-tertiary)", marginTop: 4 } },
             "El fiado ya cuenta como ganancia (la venta ya se hizo) — esto es solo para que sepas cuánta plata está ‘a plazo’ sin cobrar.")
         )
+      ),
+      objetivoNum > 0 && filasDiaObjetivo.length > 0 && /*#__PURE__*/React.createElement("div", { style: s.card },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 10 } },
+          "📅 Detalle por día (bultos)"),
+        /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 0.9fr 0.9fr 0.9fr", gap: 4, fontSize: 10, color: "var(--color-text-tertiary)", marginBottom: 4 } },
+          /*#__PURE__*/React.createElement("div", null),
+          /*#__PURE__*/React.createElement("div", { style: { textAlign: "right", fontWeight: 700 } }, "Real"),
+          /*#__PURE__*/React.createElement("div", { style: { textAlign: "right", fontWeight: 700 } }, "Nec. (", diasRepartoSemana, "d)"),
+          /*#__PURE__*/React.createElement("div", { style: { textAlign: "right", fontWeight: 700, color: "#4dd9a0" } }, "Nec. (", diasRepartoSemanaAlt, "d)")),
+        filasDiaObjetivo.map((f, i) => {
+          const faltan = Math.max(0, Math.round(bultosDiaNecesarios - f.bultosProm));
+          return /*#__PURE__*/React.createElement("div", {
+            key: f.dia,
+            style: { padding: "6px 0", borderTop: i > 0 ? "1px solid var(--color-border-tertiary)" : "none" }
+          },
+            /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 0.9fr 0.9fr 0.9fr", gap: 4, fontSize: 13, alignItems: "center" } },
+              /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, color: "var(--color-text-primary)" } }, f.dia),
+              /*#__PURE__*/React.createElement("span", { style: { textAlign: "right", color: faltan > 0 ? "#E24B4A" : "#4dd9a0", fontWeight: 700 } }, Math.round(f.bultosProm)),
+              /*#__PURE__*/React.createElement("span", { style: { textAlign: "right", color: "var(--color-text-secondary)" } }, Math.round(bultosDiaNecesarios)),
+              /*#__PURE__*/React.createElement("span", { style: { textAlign: "right", color: "#4dd9a0" } }, Math.round(bultosDiaNecesariosAlt))),
+            faltan > 0
+              ? /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#f5b942", marginTop: 2 } }, "Le faltan ≈", faltan, " bultos para llegar al objetivo a ", diasRepartoSemana, " días")
+              : /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#4dd9a0", marginTop: 2 } }, "✅ Ya llega al objetivo a ", diasRepartoSemana, " días"));
+        }),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 10.5, color: "var(--color-text-tertiary)", marginTop: 8 } },
+          "“Real” es el promedio de bultos vendidos en ese día específico (últimos ", diasVentanaObjetivo, " días). “Nec.” es lo mismo para todos los días: el objetivo repartido en partes iguales entre tus jornadas.")
       )
     )
   );
