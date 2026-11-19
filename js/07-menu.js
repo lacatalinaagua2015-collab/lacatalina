@@ -2194,9 +2194,19 @@ function PlanillaDelDia({
   const b10Cargados = Number(planilla?.productos?.b10?.llenos || 0);
   const b20Cargados = Number(planilla?.productos?.b20?.llenos || 0);
   const cajonesCargados = calcCajones(sifonesCargados);
-  const pesoAuto = cajonesCargados * 13 + b10Cargados * 10 + b20Cargados * 20;
-  // Bultos = cajones vendidos + bidones vendidos (con la misma regla de cajones)
-  const bultosAuto = cajonesCargados + b10Cargados + b20Cargados;
+  // Pedido de Guillermo (19/11/2026): el peso/bultos es solo un detalle
+  // informativo de cuánto lleva el camión -- "se puede calcular a ojo,
+  // pero está bueno que la app lo muestre". Para sifón/10L/20L el peso por
+  // unidad ya está calibrado a mano (13/10/20 kg); un producto NUEVO suma
+  // su propio peso SOLO si Guillermo lo cargó al crearlo (campo opcional
+  // "peso" del producto, kg por unidad) -- si no lo puso, no inventa un
+  // número, simplemente no suma nada (como pasaba antes de que existiera).
+  const otrosProdsPeso = productosCarga.filter(p => !["soda", "b10", "b20"].includes(claveCargaDeProducto(p)));
+  const pesoExtra = otrosProdsPeso.reduce((acc, p) => acc + Number(planilla?.productos?.[claveCargaDeProducto(p)]?.llenos || 0) * (Number(p.peso) || 0), 0);
+  const bultosExtra = otrosProdsPeso.reduce((acc, p) => acc + Number(planilla?.productos?.[claveCargaDeProducto(p)]?.llenos || 0), 0);
+  const pesoAuto = cajonesCargados * 13 + b10Cargados * 10 + b20Cargados * 20 + pesoExtra;
+  // Bultos = cajones vendidos + bidones vendidos (con la misma regla de cajones) + productos nuevos cargados
+  const bultosAuto = cajonesCargados + b10Cargados + b20Cargados + bultosExtra;
   const totalVentaPlata = Object.values(totalesPorProd).reduce((a, p) => a + p.plata, 0);
   const totalVentaLlenar = Object.values(totalesPorProd).reduce((a, p) => a + p.llenar, 0);
   // Totales ventas de otros días
@@ -3183,7 +3193,7 @@ function PlanillaDelDia({
       borderRadius: 8,
       padding: "6px 10px"
     }
-  }, bultosAuto > 0 && /*#__PURE__*/React.createElement("div", null, "📦 ", /*#__PURE__*/React.createElement("b", null, "Bultos auto:"), " ", cajonesCargados, " cajones soda + ", b10Cargados, " bid.10L + ", b20Cargados, " bid.20L = ", /*#__PURE__*/React.createElement("b", null, bultosAuto)), pesoAuto > 0 && /*#__PURE__*/React.createElement("div", null, "⚖️ ", /*#__PURE__*/React.createElement("b", null, "Peso auto:"), " ", cajonesCargados, "×13kg + ", b10Cargados, "×10kg + ", b20Cargados, "×20kg = ", /*#__PURE__*/React.createElement("b", null, pesoAuto, " kg"))), /*#__PURE__*/React.createElement("span", {
+  }, bultosAuto > 0 && /*#__PURE__*/React.createElement("div", null, "📦 ", /*#__PURE__*/React.createElement("b", null, "Bultos auto:"), " ", cajonesCargados, " cajones soda + ", b10Cargados, " bid.10L + ", b20Cargados, " bid.20L", bultosExtra > 0 ? ` + ${bultosExtra} nuevos` : "", " = ", /*#__PURE__*/React.createElement("b", null, bultosAuto)), pesoAuto > 0 && /*#__PURE__*/React.createElement("div", null, "⚖️ ", /*#__PURE__*/React.createElement("b", null, "Peso auto:"), " ", cajonesCargados, "×13kg + ", b10Cargados, "×10kg + ", b20Cargados, "×20kg", pesoExtra > 0 ? ` + ${pesoExtra}kg nuevos` : "", " = ", /*#__PURE__*/React.createElement("b", null, pesoAuto, " kg"))), /*#__PURE__*/React.createElement("span", {
     style: {
       ...s.sectionTitle,
       padding: "12px 0 8px"
