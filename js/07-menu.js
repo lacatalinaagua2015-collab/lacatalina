@@ -2445,7 +2445,20 @@ function PlanillaDelDia({
   // cliente" (con sus correcciones aplicadas), parseando el texto de cada
   // badge ("2 Sifón 1.5L", "1 Bidón 10L (fijo)", "2 Sifón 1.5L, 1 Bidón 10L
   // (baja de cliente)") para saber cuánto es de cada producto.
-  const PROD_A_PK_ENV = { "Sifón 1.5L": "soda", "Bidón 10L": "b10", "Bidón 20L": "b20", "Dispenser": "disp" };
+  // ── Pedido de Guillermo (19/11/2026, "terminalo completo"): el cierre del
+  //    día usaba 3 claves cortas fijas (soda/b10/b20) sin relación con las
+  //    de stock, y dejaba afuera cualquier producto nuevo. Ahora se arma
+  //    solo, a partir de los productos reales marcados para ir al camión
+  //    (ver productosDeCarga/claveCargaDeProducto en 03-utils.js) — los 3
+  //    de siempre quedan con sus claves de toda la vida, cualquier producto
+  //    nuevo entra con su propia clave de stock (ya única).
+  const productosCarga = productosDeCarga(productos);
+  const clavesCarga = productosCarga.map(claveCargaDeProducto);
+  const dispProd = (productos || []).find(p => p.esDispenser);
+  const dispNombre = dispProd ? dispProd.nombre : "Dispenser";
+  const ceroCarga = () => Object.fromEntries(clavesCarga.map(k => [k, 0]));
+  const nombreAPk = Object.fromEntries(productosCarga.map(p => [p.nombre, claveCargaDeProducto(p)]));
+  const PROD_A_PK_ENV = { ...nombreAPk, [dispNombre]: "disp" };
   const parseTextoEnv = texto => {
     const sinAnotacion = (texto || "").replace(/\s*\([^)]*\)\s*$/, "");
     const partes = {};
