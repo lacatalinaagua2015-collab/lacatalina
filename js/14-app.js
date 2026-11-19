@@ -614,37 +614,48 @@ function App() {
     localStorage.setItem("lc_cobros_dia_migrados_v1", "1");
   }, [ventas, clientes]);
   const [productos, setProductos] = useLS("cat_productos_v3", PRODUCTOS_INICIALES);
+  // KEY_PROD_ENV (03-utils.js) se mantiene al día con la lista real de
+  // productos en cada render, así cualquier función que lo lea (sin
+  // guardarlo en una variable) ve siempre los productos actuales, incluidos
+  // los que se vayan agregando. Ver claveStockDeProducto/actualizarKeyProdEnv.
+  actualizarKeyProdEnv(productos);
   const BASE_DEFAULT_FIJA = {
     sifon: 150,
     bidon10: 70,
     bidon20: 21,
     dispenser: 0
   };
+  // Pedido de Guillermo (19/11/2026): el stock antes solo conocía estas 4
+  // claves fijas. Ahora se arma SOLO a partir de la lista real de productos
+  // (los 4 de siempre quedan con la misma clave de toda la vida, así no se
+  // pierde ni se mueve ningún dato guardado) — cualquier producto nuevo que
+  // se agregue con "controla stock" activado aparece acá automáticamente.
+  const clavesStock = productos.filter(p => p.trackStock !== false).map(p => ({
+    clave: claveStockDeProducto(p),
+    capacidadBase: p.capacidadBase ?? BASE_DEFAULT_FIJA[claveStockDeProducto(p)] ?? 0
+  }));
   const normStock = s => {
-    const e = () => ({
-      sifon: 0,
-      bidon10: 0,
-      bidon20: 0,
-      dispenser: 0
-    });
-    const pick = o => ({
-      sifon: o?.sifon || 0,
-      bidon10: o?.bidon10 || 0,
-      bidon20: o?.bidon20 || 0,
-      dispenser: o?.dispenser || 0
-    });
-    const pickFija = o => ({
-      sifon: o?.sifon ?? BASE_DEFAULT_FIJA.sifon,
-      bidon10: o?.bidon10 ?? BASE_DEFAULT_FIJA.bidon10,
-      bidon20: o?.bidon20 ?? BASE_DEFAULT_FIJA.bidon20,
-      dispenser: o?.dispenser ?? BASE_DEFAULT_FIJA.dispenser
-    });
+    const e = () => {
+      const o = {};
+      clavesStock.forEach(c => { o[c.clave] = 0; });
+      return o;
+    };
+    const pick = o => {
+      const r = {};
+      clavesStock.forEach(c => { r[c.clave] = Number(o?.[c.clave]) || 0; });
+      return r;
+    };
+    const pickFija = o => {
+      const r = {};
+      clavesStock.forEach(c => { r[c.clave] = o?.[c.clave] ?? c.capacidadBase; });
+      return r;
+    };
     const base = {
       soderia: e(),
       soderia_vacios: e(),
       casa: e(),
       camion: e(),
-      capacidadFija: { ...BASE_DEFAULT_FIJA }
+      capacidadFija: pickFija({})
     };
     if (!s || typeof s !== "object") return base;
     if (s.soderia && typeof s.soderia === "object") {
