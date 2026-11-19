@@ -31,12 +31,43 @@ function direccionCliente(c) {
   if (c.barrio) partes.push(c.barrio);
   return partes.join(" · ");
 }
-const KEY_PROD_ENV = {
+let KEY_PROD_ENV = {
   "Sifón 1.5L": "sifon",
   "Bidón 10L": "bidon10",
   "Bidón 20L": "bidon20",
   "Dispenser": "dispenser"
 };
+// ── Pedido de Guillermo (19/11/2026): poder agregar un producto nuevo
+//    (bidón 12L, sifón 500ml, dispenser frío-calor...) y que el stock y los
+//    envases prestados lo manejen solos, sin tocar código. Antes, stock y
+//    comodato SOLO conocían estas 4 claves fijas.
+//
+//    claveStockDeProducto(p): la "clave" con la que se guarda el stock/
+//    comodato de un producto. Para los 4 de siempre, es la MISMA clave de
+//    toda la vida (sifon/bidon10/bidon20/dispenser) — así los datos ya
+//    guardados no se tocan. Para cualquier producto nuevo, se genera sola
+//    ("prod_<id>"), sin que yo tenga que tocar código.
+function claveStockDeProducto(p) {
+  if (!p) return null;
+  if (typeof CLAVE_LEGACY_POR_NOMBRE !== "undefined" && CLAVE_LEGACY_POR_NOMBRE[p.nombre]) {
+    return CLAVE_LEGACY_POR_NOMBRE[p.nombre];
+  }
+  return "prod_" + p.id;
+}
+// Reconstruye KEY_PROD_ENV (nombre de producto -> clave de stock) para TODOS
+// los productos actuales, no solo los 4 de siempre. Se llama cada vez que
+// cambia la lista de productos (ver 14-app.js). Como KEY_PROD_ENV se
+// reasigna (no se muta), cualquier función que lo lea en el momento (todas
+// lo hacen así, ninguna lo guarda en una variable al cargar) ve siempre la
+// versión más nueva.
+function actualizarKeyProdEnv(productos) {
+  const nuevo = {};
+  (productos || []).forEach(p => {
+    if (p.trackStock === false) return;
+    nuevo[p.nombre] = claveStockDeProducto(p);
+  });
+  KEY_PROD_ENV = nuevo;
+}
 // ── Cuánto tiene PRESTADO un cliente de un producto ("sifon"|"bidon10"|
 //    "bidon20"|"dispenser"). Se lee directo de c.prestado (campo que se
 //    mantiene solo, sumando/restando en cada venta — ver
