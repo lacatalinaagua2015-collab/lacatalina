@@ -1056,17 +1056,6 @@ function Config({
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1500);
   };
-  const prestados = {
-    sifon: clientes.reduce((a, c) => a + (c.sifon || 0), 0),
-    bidon10: clientes.reduce((a, c) => a + (c.bidon10 || 0), 0),
-    bidon20: clientes.reduce((a, c) => a + (c.bidon20 || 0), 0)
-  };
-  const stockKeys = {
-    "Sifón 1.5L": "sifon",
-    "Bidón 10L": "bidon10",
-    "Bidón 20L": "bidon20",
-    "Dispenser": "dispenser"
-  };
   return /*#__PURE__*/React.createElement("div", {
     style: s.screen
   }, /*#__PURE__*/React.createElement(HeaderApp, {

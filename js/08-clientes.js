@@ -2774,7 +2774,7 @@ function DetalleCliente({
       fontSize: 13
     },
     onClick: () => {
-      const tieneEnv = (Number(cliente.sifon) || 0) + (Number(cliente.bidon10) || 0) + (Number(cliente.bidon20) || 0) > 0;
+      const tieneEnv = (productos || []).filter(p => p.trackStock !== false).some(p => (Number(cliente[claveStockDeProducto(p)]) || 0) > 0);
       const aviso = tieneEnv ? "\n\n(Como tiene envases a su nombre, después te va a preguntar aparte si los devolvió — eso no cancela el borrado, es solo para el stock)" : "";
       if (window.confirm(`¿Eliminar a ${cliente.nombre}? Se borrarán también sus ventas.${aviso}`)) onEliminarCliente();
     }
