@@ -1483,7 +1483,7 @@ function StockGeneral({
       gridTemplateColumns: "1fr 1fr",
       gap: 7
     }
-  }, [["soda", "Sifón"], ["b10", "Bidón 10L"], ["b20", "Bidón 20L"], ["disp", "Dispenser"]].map(([k, lbl]) => /*#__PURE__*/React.createElement("div", {
+  }, [...productosDeCarga(productos).map(p => [claveCargaDeProducto(p), p.nombre.replace(" 1.5L", "")]), ["disp", "Dispenser"]].map(([k, lbl]) => /*#__PURE__*/React.createElement("div", {
     key: k,
     style: {
       display: "flex",
