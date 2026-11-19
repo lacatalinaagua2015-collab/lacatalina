@@ -92,7 +92,24 @@ function MenuDias({
     if (!esHoyDia && !(esPasado && cur.getTime() >= inicioSemana.getTime())) return;
     // Mismo criterio que ListaClientes (08-clientes.js): un cliente recién
     // creado HOY no cuenta para el total — cargarlo YA fue la visita.
-    const clientesD = (clientes || []).filter(c => c.dia === d && !c._retirado && c.creadoFecha !== hoyFechaKey);
+    // BUG REPORTADO 19/11/2026 (Guillermo, cliente Bazán -- quincenal, no
+    // le tocaba esta semana): este conteo no excluía a los clientes
+    // quincenales que esta semana NO les toca (ListaClientes sí los excluye,
+    // por eso ahí no aparecían para atender). Acá seguían contando como
+    // pendientes, así que el ícono del día quedaba en rojo aunque la lista
+    // ya estuviera completa de verdad -- obligaba a entrar al cliente y
+    // marcarlo "no quiere" (dato falso) solo para que cierre en verde.
+    // Mismo cálculo que noLeTocaQuincenal de 08-clientes.js, usando la
+    // fecha de ESTE día de la semana como referencia.
+    const noLeTocaQuincenalMenu = c => {
+      if (c.frecuencia !== "quincenal") return false;
+      const reales = (ventas || []).filter(v => v.clienteId === c.id && !v._esCobro && !v._esAjuste && !v._esAjusteEnvases && !v._esCambio && !v._esMixtoTrans && v.fechaKey);
+      if (!reales.length) return false;
+      const ultimaFk = reales.reduce((a, v) => v.fechaKey > a ? v.fechaKey : a, reales[0].fechaKey);
+      const diasDesde = Math.floor((new Date(ultimaFechaKey + "T12:00:00") - new Date(ultimaFk + "T12:00:00")) / 86400000);
+      return diasDesde < 10;
+    };
+    const clientesD = (clientes || []).filter(c => c.dia === d && !c._retirado && c.creadoFecha !== hoyFechaKey && !noLeTocaQuincenalMenu(c));
     // BUG REPORTADO 2026-10-16: un día sin ningún cliente cargado (ej.
     // "Lunes" con 0 clientes) quedaba igual con el ícono en rojo
     // "Pendiente 0/0" — no hay nada que entregar, no corresponde mostrar
@@ -4763,7 +4780,19 @@ function AtajoPlanillaSemana({
     // está cerrado de hecho, pero en otro dispositivo se va a seguir viendo abierto.
     const cierreNoRegistrado = cerradaLocal && !cerradaEnPlanilla;
     const iniciada = !!(pl && pl.iniciado);
-    const clientesDia = (clientes || []).filter(c => c.dia === dia);
+    // Mismo arreglo del 19/11/2026 que en estadoPorDia más arriba: excluir
+    // de "pendientes" a los clientes quincenales que esta fecha puntual no
+    // les toca -- sino "faltan X clientes por atender" los sigue contando
+    // aunque la app ya sepa que no corresponde visitarlos.
+    const noLeTocaQuincenalHist = c => {
+      if (c.frecuencia !== "quincenal") return false;
+      const reales = (ventas || []).filter(v => v.clienteId === c.id && !v._esCobro && !v._esAjuste && !v._esAjusteEnvases && !v._esCambio && !v._esMixtoTrans && v.fechaKey);
+      if (!reales.length) return false;
+      const ultimaFk = reales.reduce((a, v) => v.fechaKey > a ? v.fechaKey : a, reales[0].fechaKey);
+      const diasDesde = Math.floor((new Date(fechaKey + "T12:00:00") - new Date(ultimaFk + "T12:00:00")) / 86400000);
+      return diasDesde < 10;
+    };
+    const clientesDia = (clientes || []).filter(c => c.dia === dia && !noLeTocaQuincenalHist(c));
     const totalClientes = clientesDia.length;
     const esPasado = fecha.getTime() < hoy0.getTime();
     // BUG 2026-10-17: antes filtraba sólo por fechaKey, sin exigir que la
