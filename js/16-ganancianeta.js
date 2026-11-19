@@ -487,7 +487,12 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
   const ventaPorClienteProm = hayDatosObjetivo ? totalVendidoVentana / totalClientesVentana : 0;
   const precioPorBultoProm = hayDatosObjetivo ? totalVendidoVentana / totalBultosVentana : 0;
   const bultosPorClienteProm = hayDatosObjetivo ? totalBultosVentana / totalClientesVentana : 0;
-  const diasRepartoSemana = Number(diasRepartoInput) > 0 ? Number(diasRepartoInput) : DIAS.length;
+  // Días de reparto reales detectados (cuántos días de la semana distintos
+  // tuvieron ventas en los últimos 60 días) — si el campo de abajo está
+  // vacío, arrancamos de acá en vez de asumir los 5 días de DIAS. Corrección
+  // pedida por Guillermo, 19/11/2026 (él reparte 4 días, no 5).
+  const diasRepartoDetectado = new Set(datosVentanaObjetivo.map(d => diaSemanaDeFecha(d.fechaKey))).size || DIAS.length;
+  const diasRepartoSemana = Number(diasRepartoInput) > 0 ? Number(diasRepartoInput) : diasRepartoDetectado;
   const guardarDiasReparto = valor => {
     setDiasRepartoInput(valor);
     try { localStorage.setItem("cat_objetivo_dias_semana_v1", valor); } catch {}
@@ -540,11 +545,7 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
     };
   }).filter(f => f.diasConDatos > 0);
 
-  const diasRepartoSemanaAlt = Math.min(diasRepartoSemana + 1, 7);
-  const diasRepartoMesAlt = diasRepartoSemanaAlt * (30.44 / 7);
-  const gananciaNetaDiaNecesariaAlt = objetivoNum > 0 && hayDatosObjetivo ? objetivoNum / diasRepartoMesAlt : 0;
-  const ventaDiaNecesariaAlt = pctNetoProm > 0 ? gananciaNetaDiaNecesariaAlt / pctNetoProm : 0;
-  const bultosDiaNecesariosAlt = precioPorBultoProm > 0 ? ventaDiaNecesariaAlt / precioPorBultoProm : 0;
+
 
   const vistaObjetivo = () => /*#__PURE__*/React.createElement(React.Fragment, null,
     tabs,
@@ -561,7 +562,7 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
           /*#__PURE__*/React.createElement("span", null, "Días de reparto por semana"),
           /*#__PURE__*/React.createElement("input", {
             type: "number", min: 1, max: 7, inputMode: "numeric",
-            value: diasRepartoInput || String(DIAS.length),
+            value: diasRepartoInput || String(diasRepartoDetectado),
             onChange: e => guardarDiasReparto(e.target.value),
             style: { width: 44, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--color-border-secondary)", background: "var(--color-background-tertiary)", color: "var(--color-text-primary)", fontSize: 14, fontWeight: 700, textAlign: "center", boxSizing: "border-box" }
           }))
@@ -625,30 +626,33 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
         )
       ),
       objetivoNum > 0 && filasDiaObjetivo.length > 0 && /*#__PURE__*/React.createElement("div", { style: s.card },
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 10 } },
-          "📅 Detalle por día (bultos)"),
-        /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 0.9fr 0.9fr 0.9fr", gap: 4, fontSize: 10, color: "var(--color-text-tertiary)", marginBottom: 4 } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 4 } },
+          "📅 Bultos por día: lo real vs. lo que necesitás"),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--color-text-tertiary)", marginBottom: 10 } },
+          "Cuántos bultos vendés, en promedio, CADA jornada de ese día (últimos ", diasVentanaObjetivo, " días) — contra cuántos necesitarías vender en CADA jornada para llegar a tu objetivo repartido en tus ", diasRepartoSemana, " días de reparto por semana."),
+        /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, fontSize: 10.5, color: "var(--color-text-tertiary)", marginBottom: 4 } },
           /*#__PURE__*/React.createElement("div", null),
-          /*#__PURE__*/React.createElement("div", { style: { textAlign: "right", fontWeight: 700 } }, "Real"),
-          /*#__PURE__*/React.createElement("div", { style: { textAlign: "right", fontWeight: 700 } }, "Nec. (", diasRepartoSemana, "d)"),
-          /*#__PURE__*/React.createElement("div", { style: { textAlign: "right", fontWeight: 700, color: "#4dd9a0" } }, "Nec. (", diasRepartoSemanaAlt, "d)")),
+          /*#__PURE__*/React.createElement("div", { style: { textAlign: "right", fontWeight: 700 } }, "Real/jornada"),
+          /*#__PURE__*/React.createElement("div", { style: { textAlign: "right", fontWeight: 700, color: "#4dd9a0" } }, "Necesario")),
         filasDiaObjetivo.map((f, i) => {
           const faltan = Math.max(0, Math.round(bultosDiaNecesarios - f.bultosProm));
           return /*#__PURE__*/React.createElement("div", {
             key: f.dia,
             style: { padding: "6px 0", borderTop: i > 0 ? "1px solid var(--color-border-tertiary)" : "none" }
           },
-            /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 0.9fr 0.9fr 0.9fr", gap: 4, fontSize: 13, alignItems: "center" } },
+            /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, fontSize: 13, alignItems: "center" } },
               /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, color: "var(--color-text-primary)" } }, f.dia),
-              /*#__PURE__*/React.createElement("span", { style: { textAlign: "right", color: faltan > 0 ? "#E24B4A" : "#4dd9a0", fontWeight: 700 } }, Math.round(f.bultosProm)),
-              /*#__PURE__*/React.createElement("span", { style: { textAlign: "right", color: "var(--color-text-secondary)" } }, Math.round(bultosDiaNecesarios)),
-              /*#__PURE__*/React.createElement("span", { style: { textAlign: "right", color: "#4dd9a0" } }, Math.round(bultosDiaNecesariosAlt))),
+              /*#__PURE__*/React.createElement("span", { style: { textAlign: "right", color: faltan > 0 ? "#E24B4A" : "#4dd9a0", fontWeight: 700 } }, Math.round(f.bultosProm), " bultos"),
+              /*#__PURE__*/React.createElement("span", { style: { textAlign: "right", color: "#4dd9a0", fontWeight: 700 } }, Math.round(bultosDiaNecesarios), " bultos")),
             faltan > 0
-              ? /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#f5b942", marginTop: 2 } }, "Le faltan ≈", faltan, " bultos para llegar al objetivo a ", diasRepartoSemana, " días")
-              : /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#4dd9a0", marginTop: 2 } }, "✅ Ya llega al objetivo a ", diasRepartoSemana, " días"));
+              ? /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#f5b942", marginTop: 2 } }, "Le faltan ≈", faltan, " bultos esa jornada para llegar al objetivo")
+              : /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#4dd9a0", marginTop: 2 } }, "✅ Ya llega al objetivo"));
         }),
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: 10.5, color: "var(--color-text-tertiary)", marginTop: 8 } },
-          "“Real” es el promedio de bultos vendidos en ese día específico (últimos ", diasVentanaObjetivo, " días). “Nec.” es lo mismo para todos los días: el objetivo repartido en partes iguales entre tus jornadas.")
+        (() => {
+          const diasSinDatos = DIAS.filter(d => !filasDiaObjetivo.some(f => f.dia === d));
+          return diasSinDatos.length > 0 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10.5, color: "var(--color-text-tertiary)", marginTop: 8 } },
+            "(", diasSinDatos.join(", "), " no ", diasSinDatos.length === 1 ? "tiene" : "tienen", " ventas registradas en los últimos ", diasVentanaObjetivo, " días, por eso no ", diasSinDatos.length === 1 ? "aparece" : "aparecen", " acá)");
+        })()
       )
     )
   );
