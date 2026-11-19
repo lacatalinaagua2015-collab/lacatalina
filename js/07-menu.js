@@ -4332,11 +4332,7 @@ function InicioReparto({
   onGuardar,
   onVolver
 }) {
-  const prodKeys = {
-    "Sifón 1.5L": "soda",
-    "Bidón 10L": "b10",
-    "Bidón 20L": "b20"
-  };
+  const prodKeys = Object.fromEntries(productosDeCarga(productos).map(p => [p.nombre, claveCargaDeProducto(p)]));
   const CAJON = 6; // sifones por cajón
   const [llenos, setLlenos] = useState(() => {
     const precarga = (cargasDia || CARGA_DIA_DEFAULT)[dia] || CARGA_DIA_DEFAULT[dia] || {};
@@ -4389,8 +4385,7 @@ function InicioReparto({
   }, "Envases llenos al salir"), productos.map(p => {
     const k = prodKeys[p.nombre];
     if (!k) return null;
-    const pkToSk = { soda: "sifon", b10: "bidon10", b20: "bidon20" };
-    const sk = pkToSk[k];
+    const sk = claveStockDeProducto(p);
     const necesario = Number(llenos[k]) || 0;
     const disponibleLleno = stock?.soderia?.[sk] || 0;
     const disponibleVacio = stock?.soderia_vacios?.[sk] || 0;
@@ -4527,7 +4522,7 @@ function InicioReparto({
       display: "flex",
       gap: 16
     }
-  }, [["Sifón", stock?.soderia?.sifon || 0, stock?.soderia_vacios?.sifon || 0], ["Bidón 10L", stock?.soderia?.bidon10 || 0, stock?.soderia_vacios?.bidon10 || 0], ["Bidón 20L", stock?.soderia?.bidon20 || 0, stock?.soderia_vacios?.bidon20 || 0]].map(([l, lleno, vacio]) => /*#__PURE__*/React.createElement("div", {
+  }, productosDeCarga(productos).map(p => { const sk = claveStockDeProducto(p); return [p.nombre.replace(" 1.5L", ""), stock?.soderia?.[sk] || 0, stock?.soderia_vacios?.[sk] || 0]; }).map(([l, lleno, vacio]) => /*#__PURE__*/React.createElement("div", {
     key: l,
     style: {
       textAlign: "center"
