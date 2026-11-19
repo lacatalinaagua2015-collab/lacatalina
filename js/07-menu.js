@@ -2070,7 +2070,9 @@ function PlanillaDelDia({
   perdidas,
   movStock,
   promociones,
-  ecToken
+  ecToken,
+  costosVehiculo,
+  casaUbicacion
 }) {
   // Separar ventas del día propio vs ventas de clientes de otro día
   const clientesDia = new Set((clientes || []).filter(c => c.dia === dia).map(c => c.id));
@@ -3008,6 +3010,17 @@ function PlanillaDelDia({
     retenciones = num(datos.retenciones);
   const sobrante = efectivo - (totalVentaPlata - fiado); // retenciones es informativo, no afecta el sobrante
   const ganancia = cobEfectivo - totalVentaLlenar - totalGastos + cobTransNeto;
+  // Gasto vehiculo estimado de HOY (segun los km reales recorridos) y la
+  // ganancia real que quedaria despues de descontarlo -- pedido de
+  // Guillermo, 19/11/2026, para verlo aca mismo al cerrar el dia sin tener
+  // que ir a "Ganancia neta". Mismo calculo que esa pantalla
+  // (16-ganancianeta.js), asi los numeros siempre coinciden.
+  const datosVehiculoHoy = (costosVehiculo && costosVehiculo.length && typeof calcularDatosDelDia === "function")
+    ? calcularDatosDelDia(fecha, todasVentasDia, clientes, costosVehiculo, casaUbicacion)
+    : null;
+  const gastoVehiculoHoy = datosVehiculoHoy ? datosVehiculoHoy.gastoVehiculo : 0;
+  const pctGastoVehiculoHoy = (datosVehiculoHoy && ganancia > 0) ? Math.round(gastoVehiculoHoy / ganancia * 100) : 0;
+  const gananciaRealHoy = ganancia - gastoVehiculoHoy;
   // Pedido del usuario (2026-11-03): promociones (envases que se dejan a
   // un cliente NUEVO con un cobro aparte, ej. 2 sifones + 1 bidón 10L por
   // $2000) — NO es venta, por eso vive en su propia lista ("promociones",
@@ -4159,7 +4172,15 @@ function PlanillaDelDia({
       fontWeight: 500,
       color: ganancia >= 0 ? "var(--color-text-success)" : "var(--color-text-danger)"
     }
-  }, fmt(ganancia)))), promocionesDia.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, fmt(ganancia)))), datosVehiculoHoy && gastoVehiculoHoy > 0 && /*#__PURE__*/React.createElement("div", {
+    style: { marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--color-border-tertiary)" }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "var(--color-text-secondary)" }
+  }, /*#__PURE__*/React.createElement("span", null, "− ", pctGastoVehiculoHoy, "% gasto vehículo"), /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, color: "#f5b942" } }, fmt(gastoVehiculoHoy))), /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 6 }
+  }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)" } }, "Ganancia real del día"), /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 19, fontWeight: 800, color: gananciaRealHoy >= 0 ? "var(--color-text-success)" : "var(--color-text-danger)" }
+  }, fmt(gananciaRealHoy)))), promocionesDia.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       ...s.card,
       margin: "0 0 16px",
