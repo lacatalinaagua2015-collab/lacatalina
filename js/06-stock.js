@@ -113,28 +113,19 @@ function StockGeneral({
   });
 
   // ── ARQUEO: envases EXTRA prestados por cliente (calculado desde ventas) ──
-  const KEY_PROD = {
-    "Sifón 1.5L": "sifon",
-    "Bidón 10L": "bidon10",
-    "Bidón 20L": "bidon20",
-    "Dispenser": "dispenser"
-  };
+  // (usa el KEY_PROD_ENV global — se mantiene al día con los productos
+  // reales, ver 03-utils.js/14-app.js — en vez de una copia fija acá.)
   const extraPorCliente = React.useMemo(() => {
     const m = {};
     (ventas || []).forEach(v => {
-      if (!m[v.clienteId]) m[v.clienteId] = {
-        sifon: 0,
-        bidon10: 0,
-        bidon20: 0,
-        dispenser: 0
-      };
+      if (!m[v.clienteId]) m[v.clienteId] = {};
       (v.envPrest || []).forEach(e => {
-        const k = KEY_PROD[e.prod];
-        if (k) m[v.clienteId][k] += Number(e.cant) || 0;
+        const k = KEY_PROD_ENV[e.prod];
+        if (k) m[v.clienteId][k] = (m[v.clienteId][k] || 0) + (Number(e.cant) || 0);
       });
       (v.envDev || []).forEach(e => {
-        const k = KEY_PROD[e.prod];
-        if (k) m[v.clienteId][k] -= Number(e.cant) || 0;
+        const k = KEY_PROD_ENV[e.prod];
+        if (k) m[v.clienteId][k] = (m[v.clienteId][k] || 0) - (Number(e.cant) || 0);
       });
     });
     return m;
@@ -169,14 +160,10 @@ function StockGeneral({
   const [modoArqueo, setModoArqueo] = React.useState("fijos"); // fijos | prestados
   const [buscaArqueo, setBuscaArqueo] = React.useState("");
   const [diaArqueo, setDiaArqueo] = React.useState("todos");
-  const totPrestados = {
-    sifon: 0,
-    bidon10: 0,
-    bidon20: 0,
-    dispenser: 0
-  };
+  const totPrestados = {};
+  PRODS.forEach(([k]) => { totPrestados[k] = 0; });
   clientesReales.forEach(c => {
-    ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
+    PRODS.forEach(([k]) => {
       totPrestados[k] += prestadoDe(c, k);
     });
   });
@@ -209,17 +196,10 @@ function StockGeneral({
       motivo: "Roto en el reparto"
     });
   };
-  const totalPerdidas = {
-    sifon: 0,
-    bidon10: 0,
-    bidon20: 0,
-    dispenser: 0
-  };
+  const totalPerdidas = {};
+  PRODS.forEach(([k]) => { totalPerdidas[k] = 0; });
   (perdidas || []).forEach(p => {
-    totalPerdidas.sifon += p.sifon || 0;
-    totalPerdidas.bidon10 += p.bidon10 || 0;
-    totalPerdidas.bidon20 += p.bidon20 || 0;
-    totalPerdidas.dispenser += p.dispenser || 0;
+    PRODS.forEach(([k]) => { totalPerdidas[k] += p[k] || 0; });
   });
   const chipResumen = (lbl, val, color) => /*#__PURE__*/React.createElement("span", {
     style: {
@@ -240,6 +220,7 @@ function StockGeneral({
     bidon20: "20L",
     dispenser: "Dispenser"
   };
+  PRODS.forEach(([k, lbl]) => { if (!MOV_LBL[k]) MOV_LBL[k] = lbl; });
   const MOV_TIPO_LBL = {
     cierre: "🔁 Cierre del día",
     carga: "🚚 Carga del camión",
