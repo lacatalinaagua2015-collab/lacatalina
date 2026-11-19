@@ -422,9 +422,18 @@ function NuevoRecordatorioForm({
   const [fecha, setFecha] = React.useState(() => inicial && inicial.fecha || hoy);
   const [hora, setHora] = React.useState(() => inicial && inicial.hora || "10:00");
   const [busq, setBusq] = React.useState("");
+  // Pedido de Guillermo (19/11/2026): a veces no se acuerda el nombre ni la
+  // dirección exacta del cliente, solo se acuerda "más o menos dónde cae"
+  // en la lista del día -- antes la única forma de encontrarlo era salir
+  // de Agenda, ir a Clientes del día y volver con el nombre ya sabido.
+  // Con el chip de día acá mismo se puede ver la lista completa de ese
+  // día, EN EL MISMO ORDEN de visita (c.orden) que ya usa Clientes del
+  // día, para reconocerlo sin necesitar el nombre.
+  const [diaFiltro, setDiaFiltro] = React.useState(null);
   const [clienteId, setClienteId] = React.useState(() => inicial && inicial.clienteId || null);
   const [motivo, setMotivo] = React.useState(() => inicial && inicial.motivo || "");
-  const clientesFilt = busq.length > 1 ? clientes.filter(c => buscarCliente(c, busq) > 0).slice(0, 6) : [];
+  const clientesDelDia = diaFiltro ? [...clientes].filter(c => c.dia === diaFiltro).sort((a, b) => (a.orden || 9999) - (b.orden || 9999)) : null;
+  const clientesFilt = busq.length > 1 ? (clientesDelDia || clientes).filter(c => buscarCliente(c, busq) > 0).slice(0, diaFiltro ? 40 : 6) : clientesDelDia || [];
   const clienteSel = clientes.find(c => c.id === clienteId);
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(TipoRecordatorioSelector, {
     tipo: tipo,
@@ -470,13 +479,29 @@ function NuevoRecordatorioForm({
     onClick: () => {
       setClienteId(null);
       setBusq("");
+      setDiaFiltro(null);
     }
   }, "✕")) : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("input", {
     style: s.input,
-    placeholder: "Escribí el nombre del cliente...",
+    placeholder: "Escribí el nombre del cliente... (opcional)",
     value: busq,
     onChange: e => setBusq(e.target.value)
-  }), clientesFilt.map(c => /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", gap: 6, margin: "8px 0", flexWrap: "wrap" }
+  }, DIAS.map(d => /*#__PURE__*/React.createElement("button", {
+    key: d,
+    onClick: () => setDiaFiltro(diaFiltro === d ? null : d),
+    style: {
+      fontSize: 12,
+      padding: "5px 10px",
+      borderRadius: 7,
+      border: "none",
+      cursor: "pointer",
+      background: diaFiltro === d ? "#185FA5" : "var(--color-background-tertiary)",
+      color: diaFiltro === d ? "#e2eaf4" : "var(--color-text-secondary)",
+      fontWeight: diaFiltro === d ? 500 : 400
+    }
+  }, d.slice(0, 3)))), clientesFilt.map(c => /*#__PURE__*/React.createElement("div", {
     key: c.id,
     style: {
       ...s.card,
