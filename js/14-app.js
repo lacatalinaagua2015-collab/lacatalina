@@ -745,7 +745,7 @@ function App() {
   const cerrarCamion = (sobrLlenos, vacios) => {
     setStock(prev => {
       const s = JSON.parse(JSON.stringify(normStock(prev)));
-      ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
+      clavesStock.map(c => c.clave).forEach(k => {
         s.soderia[k] = (s.soderia[k] || 0) + (sobrLlenos[k] || 0);
         s.soderia_vacios[k] = (s.soderia_vacios[k] || 0) + (vacios[k] || 0);
         s.camion[k] = Math.max(0, (s.camion[k] || 0) - (sobrLlenos[k] || 0) - (vacios[k] || 0));
@@ -2898,12 +2898,13 @@ function App() {
     // compartían la misma nota y la Planilla no podía distinguirlas
     // ("Cliente nuevo" contaba cualquiera de las dos).
     const esAlta = !antes;
-    const delta = {
-      sifon: (Number(d.sifon) || 0) - (Number(a.sifon) || 0),
-      bidon10: (Number(d.bidon10) || 0) - (Number(a.bidon10) || 0),
-      bidon20: (Number(d.bidon20) || 0) - (Number(a.bidon20) || 0),
-      dispenser: (Number(d.dispenser) || 0) - (Number(a.dispenser) || 0)
-    };
+    // Pedido de Guillermo (19/11/2026): antes esto solo contemplaba los 4
+    // productos de siempre — un producto nuevo se podía editar en ✏️
+    // Envases pero el stock de Sodería/Depósito no se enteraba. Ahora
+    // recorre la lista real de productos (misma que usa el Stock).
+    const CLAVES_AJUSTE = clavesStock.map(c => c.clave);
+    const delta = {};
+    CLAVES_AJUSTE.forEach(k => { delta[k] = (Number(d[k]) || 0) - (Number(a[k]) || 0); });
     // TERCERA VUELTA 2026-10-14 (pedido del usuario: "necesito que todo el
     // círculo cierre, que esos envases se vean reflejados en la sodería y
     // no solo en el cliente"): corregir "Prestados" a mano (✏️ Envases)
@@ -2917,24 +2918,15 @@ function App() {
     // lavarlo/llenarlo antes de poder vender con él.
     const ap = a.prestado || {};
     const dp = d.prestado || {};
-    const deltaPrest = {
-      sifon: (Number(dp.sifon) || 0) - (Number(ap.sifon) || 0),
-      bidon10: (Number(dp.bidon10) || 0) - (Number(ap.bidon10) || 0),
-      bidon20: (Number(dp.bidon20) || 0) - (Number(ap.bidon20) || 0),
-      dispenser: (Number(dp.dispenser) || 0) - (Number(ap.dispenser) || 0)
-    };
-    if (!delta.sifon && !delta.bidon10 && !delta.bidon20 && !delta.dispenser && !deltaPrest.sifon && !deltaPrest.bidon10 && !deltaPrest.bidon20 && !deltaPrest.dispenser) return;
+    const deltaPrest = {};
+    CLAVES_AJUSTE.forEach(k => { deltaPrest[k] = (Number(dp[k]) || 0) - (Number(ap[k]) || 0); });
+    if (CLAVES_AJUSTE.every(k => !delta[k] && !deltaPrest[k])) return;
     setStock(prev => {
       const s = JSON.parse(JSON.stringify(normStock(prev)));
-      if (!s.casa) s.casa = {
-        sifon: 0,
-        bidon10: 0,
-        bidon20: 0,
-        dispenser: 0
-      };
+      if (!s.casa) s.casa = {};
       const detSoderia = {};
       const detDeposito = {};
-      ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
+      CLAVES_AJUSTE.forEach(k => {
         const dk = delta[k];
         if (!dk) return;
         if (dk > 0) {
@@ -2957,7 +2949,7 @@ function App() {
       const detSoderiaPrest = {};
       const detDepositoPrest = {};
       const detSoderiaVaciosPrest = {};
-      ["sifon", "bidon10", "bidon20", "dispenser"].forEach(k => {
+      CLAVES_AJUSTE.forEach(k => {
         const dk = deltaPrest[k];
         if (!dk) return;
         if (dk > 0) {
