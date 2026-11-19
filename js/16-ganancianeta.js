@@ -370,6 +370,41 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
           /*#__PURE__*/React.createElement("div", null, "Km prom./día", /*#__PURE__*/React.createElement("b", { style: { display: "block", color: "var(--color-text-primary)", fontSize: 13 } }, f.kmPromedioDia.toFixed(0), " km")),
           /*#__PURE__*/React.createElement("div", null, "Km/cliente", /*#__PURE__*/React.createElement("b", { style: { display: "block", color: "var(--color-text-primary)", fontSize: 13 } }, f.kmPorCliente.toFixed(1)))));
     }),
+    (() => {
+      // “Qué le falta a cada día” — pedido de Guillermo, 19/11/2026:
+      // comparar, promedio por jornada (no total del mes, para que sea
+      // parejo aunque un día haya caído más o menos veces este mes), cuántos
+      // clientes y cuánta venta le faltan a cada día para igualar al mejor.
+      const filasConProm = filasZona.map(f => ({
+        ...f,
+        clientesProm: f.diasConDatos > 0 ? f.clientes / f.diasConDatos : 0,
+        ventaProm: f.diasConDatos > 0 ? f.totalVendido / f.diasConDatos : 0,
+      }));
+      if (filasConProm.length < 2) return null;
+      const diaMejorVenta = filasConProm.reduce((a, f) => f.ventaProm > a.ventaProm ? f : a, filasConProm[0]);
+      const mejorClientesProm = Math.max(...filasConProm.map(f => f.clientesProm));
+      const mejorVentaProm = diaMejorVenta.ventaProm;
+      return /*#__PURE__*/React.createElement("div", { style: s.card },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 10 } },
+          "📉 Qué le falta a cada día (promedio por jornada, vs ", diaMejorVenta.dia, ")"),
+        filasConProm.map((f, i) => {
+          const esElMejor = f.dia === diaMejorVenta.dia;
+          const faltanClientes = Math.max(0, Math.round(mejorClientesProm - f.clientesProm));
+          const faltaVenta = Math.max(0, mejorVentaProm - f.ventaProm);
+          return /*#__PURE__*/React.createElement("div", {
+            key: f.dia,
+            style: { padding: "8px 0", borderTop: i > 0 ? "1px solid var(--color-border-tertiary)" : "none" }
+          },
+            /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13 } },
+              /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, color: "var(--color-text-primary)" } }, f.dia),
+              /*#__PURE__*/React.createElement("span", { style: { color: "var(--color-text-secondary)" } }, "≈", f.clientesProm.toFixed(1), " clientes · ", fmt(f.ventaProm), "/jornada")),
+            esElMejor
+              ? /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: "#4dd9a0", marginTop: 2 } }, "🏆 Tu mejor día")
+              : /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: "#f5b942", marginTop: 2 } },
+                  "Le faltan ≈", faltanClientes, " cliente", faltanClientes === 1 ? "" : "s", " y ", fmt(faltaVenta), " en venta por jornada para igualar a ", diaMejorVenta.dia));
+        })
+      );
+    })(),
     sinZona.length > 0 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11.5, color: "var(--color-text-tertiary)", textAlign: "center", marginTop: 6 } },
       "(", sinZona.join(", "), " ", sinZona.length === 1 ? "no tiene" : "no tienen", " zona asignada todavía)")
   );
