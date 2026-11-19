@@ -408,6 +408,21 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
   const clientesDiaNecesarios = ventaPorClienteProm > 0 ? ventaDiaNecesaria / ventaPorClienteProm : 0;
   const bultosDiaNecesarios = precioPorBultoProm > 0 ? ventaDiaNecesaria / precioPorBultoProm : 0;
 
+  // Comparativa "X días vs X+1 días de reparto" — pedido de Guillermo,
+  // 19/11/2026: ver cómo cambia la exigencia diaria si suma un día más,
+  // con el mismo objetivo mensual y el mismo promedio real.
+  const diasRepartoSemanaAlt = Math.min(diasRepartoSemana + 1, 7);
+  const necesidadParaDias = dias => {
+    const diasMes = dias * (30.44 / 7);
+    const gnDia = objetivoNum > 0 ? objetivoNum / diasMes : 0;
+    const vDia = pctNetoProm > 0 ? gnDia / pctNetoProm : 0;
+    const cDia = ventaPorClienteProm > 0 ? vDia / ventaPorClienteProm : 0;
+    const bDia = precioPorBultoProm > 0 ? vDia / precioPorBultoProm : 0;
+    return { gnDia, vDia, cDia, bDia };
+  };
+  const compA = necesidadParaDias(diasRepartoSemana);
+  const compB = necesidadParaDias(diasRepartoSemanaAlt);
+
   const vistaObjetivo = () => /*#__PURE__*/React.createElement(React.Fragment, null,
     tabs,
     !hayDatosObjetivo && /*#__PURE__*/React.createElement("div", { style: { padding: 30, textAlign: "center", color: "var(--color-text-tertiary)", fontSize: 13 } },
@@ -452,6 +467,28 @@ function GananciaNetaScreen({ ventas, clientes, costosVehiculo, casaUbicacion, z
         },
           /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, color: "var(--color-text-secondary)" } }, label),
           /*#__PURE__*/React.createElement("span", { style: { fontSize: 19, fontWeight: 800, color: "#4dd9a0" } }, val)))
+      ),
+      objetivoNum > 0 && diasRepartoSemanaAlt > diasRepartoSemana && /*#__PURE__*/React.createElement("div", { style: s.card },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 10 } },
+          "Comparativa: ", diasRepartoSemana, " vs ", diasRepartoSemanaAlt, " días de reparto por semana"),
+        /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr", gap: 4, fontSize: 11, color: "var(--color-text-tertiary)", marginBottom: 4 } },
+          /*#__PURE__*/React.createElement("div", null),
+          /*#__PURE__*/React.createElement("div", { style: { textAlign: "right", fontWeight: 700 } }, diasRepartoSemana, " días"),
+          /*#__PURE__*/React.createElement("div", { style: { textAlign: "right", fontWeight: 700, color: "#4dd9a0" } }, diasRepartoSemanaAlt, " días")),
+        [
+          ["Ganancia neta/día", compA.gnDia, compB.gnDia, v => fmt(v)],
+          ["Venta/día", compA.vDia, compB.vDia, v => fmt(v)],
+          ["Clientes/día", compA.cDia, compB.cDia, v => "≈" + Math.round(v)],
+          ["Bultos/día", compA.bDia, compB.bDia, v => "≈" + Math.round(v)],
+        ].map(([label, a, b, formatear], i) => /*#__PURE__*/React.createElement("div", {
+          key: i,
+          style: { display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr", gap: 4, fontSize: 13, padding: "6px 0", borderTop: "1px solid var(--color-border-tertiary)", alignItems: "center" }
+        },
+          /*#__PURE__*/React.createElement("span", { style: { color: "var(--color-text-secondary)" } }, label),
+          /*#__PURE__*/React.createElement("span", { style: { textAlign: "right", color: "var(--color-text-primary)", fontWeight: 700 } }, formatear(a)),
+          /*#__PURE__*/React.createElement("span", { style: { textAlign: "right", color: "#4dd9a0", fontWeight: 700 } }, formatear(b)))),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 8 } },
+          "Mismo objetivo mensual y mismo promedio real — con un día más se reparte entre más jornadas y exige menos por día.")
       )
     )
   );
