@@ -496,47 +496,39 @@ function PieEnvases({
       padding: "8px 10px"
     },
     onClick: e => e.stopPropagation()
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "grid",
-      gridTemplateColumns: "82px 1fr 1fr 1fr 1fr",
-      gap: 4,
-      fontSize: 10,
-      color: "var(--color-text-tertiary)",
-      marginBottom: 4
-    }
-  }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", {
-    style: {
-      textAlign: "center"
-    }
-  }, "Sifón"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      textAlign: "center"
-    }
-  }, "10L"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      textAlign: "center"
-    }
-  }, "20L"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      textAlign: "center"
-    }
-  }, "Disp")), [["fijos", "🏠 Fijos"], ["prest", "📦 Prestados"]].map(([t, l]) => /*#__PURE__*/React.createElement("div", {
+  }, null, [["fijos", "🏠 Fijos"], ["prest", "📦 Prestados"]].map(([t, l]) => /*#__PURE__*/React.createElement("div", {
     key: t,
     style: {
-      display: "grid",
-      gridTemplateColumns: "82px 1fr 1fr 1fr 1fr",
-      gap: 4,
-      alignItems: "center",
+      marginBottom: 7
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: t === "prest" ? "var(--color-text-warning)" : "var(--color-text-secondary)",
       marginBottom: 4
+    }
+  }, l), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 5
+    }
+  }, KEYS.map(k => /*#__PURE__*/React.createElement("label", {
+    key: k,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 4,
+      background: "var(--color-background-secondary)",
+      borderRadius: 6,
+      padding: "3px 5px 3px 7px"
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: 11,
-      color: t === "prest" ? "var(--color-text-warning)" : "var(--color-text-secondary)"
+      fontSize: 10.5,
+      color: "var(--color-text-tertiary)"
     }
-  }, l), KEYS.map(k => /*#__PURE__*/React.createElement("input", {
-    key: k,
+  }, NOMBRES[k]), /*#__PURE__*/React.createElement("input", {
     type: "number",
     value: draft[t][k],
     onChange: e => {
@@ -551,13 +543,14 @@ function PieEnvases({
     },
     style: {
       ...s.inputNum,
-      padding: "6px 2px",
-      fontSize: 14,
+      width: 38,
+      padding: "4px 2px",
+      fontSize: 13,
       textAlign: "center",
       fontWeight: t === "prest" && draft[t][k] !== 0 ? 600 : 400,
       color: t === "prest" ? draft[t][k] > 0 ? "var(--color-text-warning)" : draft[t][k] < 0 ? "var(--color-text-success)" : "var(--color-text-primary)" : "var(--color-text-primary)"
     }
-  })))), /*#__PURE__*/React.createElement("div", {
+  })))))), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 10,
       color: "var(--color-text-tertiary)",
@@ -611,15 +604,10 @@ function PieEnvases({
       fontSize: 12,
       textAlign: "left"
     }
-  }, /*#__PURE__*/React.createElement("option", {
-    value: "sifon"
-  }, "Sifón 1.5L"), /*#__PURE__*/React.createElement("option", {
-    value: "bidon10"
-  }, "Bidón 10L"), /*#__PURE__*/React.createElement("option", {
-    value: "bidon20"
-  }, "Bidón 20L"), /*#__PURE__*/React.createElement("option", {
-    value: "dispenser"
-  }, "Dispenser")), /*#__PURE__*/React.createElement("input", {
+  }, PRODS.map(([k, lbl]) => /*#__PURE__*/React.createElement("option", {
+    key: k,
+    value: k
+  }, lbl))), /*#__PURE__*/React.createElement("input", {
     type: "number",
     min: 1,
     placeholder: "Cant.",
