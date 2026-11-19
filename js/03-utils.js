@@ -68,6 +68,30 @@ function actualizarKeyProdEnv(productos) {
   });
   KEY_PROD_ENV = nuevo;
 }
+// ── Pedido de Guillermo (19/11/2026, "terminalo completo"): lo mismo para
+//    el cierre del día / carga por día (07-menu.js, 06-stock.js,
+//    12-config.js), que usaba sus propias 3 claves fijas (soda/b10/b20) sin
+//    relación con las de stock. Un producto nuevo que se carga al camión
+//    participa del mismo cierre que sifón/bidón10/bidón20: se suma a la
+//    carga diaria, vuelve, se compara contra su Base de sodería y mueve
+//    Depósito igual que los de siempre.
+//
+//    productosDeCarga(productos): productos que van al camión y entran al
+//    cierre del día — todos los que tienen stock propio, MENOS el
+//    dispenser (no se carga ni se "llena" a diario, es un caso aparte).
+//    claveCargaDeProducto(p): la clave corta de siempre (soda/b10/b20) para
+//    los 3 de siempre; para cualquier producto nuevo, usa directamente su
+//    propia clave de stock (prod_<id> o la legacy), que ya es única.
+function productosDeCarga(productos) {
+  return (productos || []).filter(p => p.trackStock !== false && !p.esDispenser);
+}
+function claveCargaDeProducto(p) {
+  if (!p) return null;
+  if (typeof PL_LEGACY_POR_NOMBRE !== "undefined" && PL_LEGACY_POR_NOMBRE[p.nombre]) {
+    return PL_LEGACY_POR_NOMBRE[p.nombre];
+  }
+  return claveStockDeProducto(p);
+}
 // ── Cuánto tiene PRESTADO un cliente de un producto ("sifon"|"bidon10"|
 //    "bidon20"|"dispenser"). Se lee directo de c.prestado (campo que se
 //    mantiene solo, sumando/restando en cada venta — ver

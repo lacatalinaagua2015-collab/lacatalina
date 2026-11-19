@@ -57,6 +57,18 @@ const CLAVE_LEGACY_POR_NOMBRE = {
   "Dispenser": "dispenser",
 };
 
+// Lo mismo que CLAVE_LEGACY_POR_NOMBRE pero para el "cierre del día" /
+// "carga por día" (planilla, 07-menu.js) — ese subsistema usa sus propias
+// claves cortas de siempre (soda/b10/b20), distintas de sifon/bidon10/
+// bidon20. Un producto nuevo no tiene clave corta: usa directamente su
+// propia clave de stock (prod_<id>), que ya es única — ver
+// claveCargaDeProducto en 03-utils.js.
+const PL_LEGACY_POR_NOMBRE = {
+  "Sifón 1.5L": "soda",
+  "Bidón 10L": "b10",
+  "Bidón 20L": "b20",
+};
+
 const planillaDiaVacia = () => ({
   fecha:"", peso:"", bultos:"",
   productos:{ b10:{llenos:"",vacios:"",plata:"",llenar:""}, b20:{llenos:"",vacios:"",plata:"",llenar:""}, soda:{llenos:"",vacios:"",plata:"",llenar:""} },
