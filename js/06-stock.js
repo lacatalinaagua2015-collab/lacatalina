@@ -674,12 +674,12 @@ function StockGeneral({
       flexShrink: 0
     }
   }, abiertoEnClientes ? "▲" : "▼")), abiertoEnClientes && /*#__PURE__*/React.createElement(React.Fragment, null, (() => {
-    const totGeneral = {
-      sifon: totClientes.sifon + totPrestados.sifon,
-      bidon10: totClientes.bidon10 + totPrestados.bidon10,
-      bidon20: totClientes.bidon20 + totPrestados.bidon20,
-      dispenser: totClientes.dispenser + totPrestados.dispenser
-    };
+    // Pedido de Guillermo (19/11/2026): esto antes era una grilla de 4
+    // columnas fijas. Con la lista de productos ya abierta, se cambia a
+    // chips que se van acomodando solos en la línea — así entran 4 o 10
+    // productos sin apretarse ni romper el diseño.
+    const totGeneral = {};
+    PRODS.forEach(([k]) => { totGeneral[k] = (totClientes[k] || 0) + (totPrestados[k] || 0); });
     const filas = [["🏠 Fijos", totClientes, "var(--color-text-primary)"], ["📦 Prestados", totPrestados, "var(--color-text-warning)"], ["Σ Total", totGeneral, "var(--color-text-info)"]];
     return /*#__PURE__*/React.createElement("div", {
       style: {
@@ -688,62 +688,41 @@ function StockGeneral({
         borderRadius: 8,
         padding: "7px 9px"
       }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "grid",
-        gridTemplateColumns: "80px 1fr 1fr 1fr 1fr",
-        gap: 4,
-        fontSize: 12,
-        color: "var(--color-text-tertiary)",
-        marginBottom: 3
-      }
-    }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", {
-      style: {
-        textAlign: "center"
-      }
-    }, "Sifón"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        textAlign: "center"
-      }
-    }, "10L"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        textAlign: "center"
-      }
-    }, "20L"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        textAlign: "center"
-      }
-    }, "Disp")), filas.map(([l, t, col], i) => /*#__PURE__*/React.createElement("div", {
+    }, filas.map(([l, t, col], i) => /*#__PURE__*/React.createElement("div", {
       key: l,
       style: {
-        display: "grid",
-        gridTemplateColumns: "80px 1fr 1fr 1fr 1fr",
-        gap: 4,
-        padding: "3px 0",
-        borderTop: i === 2 ? "0.5px solid var(--color-border-secondary)" : "none",
-        alignItems: "center"
+        marginBottom: i < 2 ? 8 : 0,
+        paddingTop: i === 2 ? 7 : 0,
+        borderTop: i === 2 ? "0.5px solid var(--color-border-secondary)" : "none"
       }
-    }, /*#__PURE__*/React.createElement("span", {
+    }, /*#__PURE__*/React.createElement("div", {
       style: {
-        color: "var(--color-text-secondary)",
-        fontSize: 12
+        fontSize: 12,
+        color: "var(--color-text-tertiary)",
+        marginBottom: 4,
+        fontWeight: i === 2 ? 600 : 400
       }
-    }, l), ["sifon", "bidon10", "bidon20", "dispenser"].map(k => /*#__PURE__*/React.createElement("span", {
+    }, l), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 5
+      }
+    }, PRODS.map(([k, lbl]) => /*#__PURE__*/React.createElement("span", {
       key: k,
       style: {
-        textAlign: "center",
-        fontSize: 13,
-        fontWeight: i === 2 ? 600 : 400,
-        color: col
+        background: "var(--color-background-secondary)",
+        borderRadius: 6,
+        padding: "3px 8px",
+        fontSize: 11.5,
+        color: "var(--color-text-secondary)"
       }
-    }, t[k] || 0, k === "sifon" && i === 2 && /*#__PURE__*/React.createElement("span", {
+    }, lbl.replace(" 1.5L", ""), " ", /*#__PURE__*/React.createElement("b", {
       style: {
-        display: "block",
-        fontSize: 11,
-        color: "var(--color-text-tertiary)",
-        fontWeight: 400
+        color: col,
+        fontWeight: i === 2 ? 700 : 600
       }
-    }, Math.floor((t[k] || 0) / 6), " caj"))))));
+    }, t[k] || 0, k === "sifon" && i === 2 && (t[k] || 0) > 0 ? ` (${Math.floor((t[k] || 0) / 6)} caj)` : "")))))));
   })(), /*#__PURE__*/React.createElement("button", {
     onClick: () => setClientesAbierto(o => !o),
     style: {
