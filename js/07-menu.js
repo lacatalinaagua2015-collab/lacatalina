@@ -2208,7 +2208,13 @@ function PlanillaDelDia({
   // Bultos = cajones vendidos + bidones vendidos (con la misma regla de cajones) + productos nuevos cargados
   const bultosAuto = cajonesCargados + b10Cargados + b20Cargados + bultosExtra;
   const totalVentaPlata = Object.values(totalesPorProd).reduce((a, p) => a + p.plata, 0);
-  const totalVentaLlenar = Object.values(totalesPorProd).reduce((a, p) => a + p.llenar, 0);
+  // Pedido de Guillermo (20/11/2026): totalVentaLlenar pasa a ser el NETO
+  // (ya descontado el crédito sodería aplicado hoy, si corresponde) -- se
+  // redefine mas abajo, despues de calcular totalCreditoAplicadoHoy, para
+  // que ganancia/efectivo en mano usen siempre el neto sin tocar esas
+  // lineas. El bruto (sin descuento) queda en totalVentaLlenarBruto, que es
+  // lo que se sigue mostrando en la fila "Totales" de Envases cargados.
+  const totalVentaLlenarBruto = Object.values(totalesPorProd).reduce((a, p) => a + p.llenar, 0);
   // Totales ventas de otros días
   // v.pagadoNum || v.neto || 0 trataba un pago totalmente cubierto con saldo
   // a favor (pagadoNum === 0, un valor real y válido) igual que un pagadoNum
@@ -2918,17 +2924,56 @@ function PlanillaDelDia({
       gastos: g
     }));
   };
+  // Pedido de Guillermo (20/11/2026): créditos pendientes con la sodería
+  // (cobro de más que queda a favor para la próxima carga). Mientras no se
+  // apliquen siguen apareciendo acá, en cualquier día, como aviso.
+  const _lblTipoCred = t => ({ sifon: "Sifón", bidon10: "Bidón 10L", bidon20: "Bidón 20L", otro: "Otro" })[t] || t || "";
+  const _lblCatGasto = c => c === "credito_soderia" ? "💳 Crédito sodería" : (c || "").charAt(0).toUpperCase() + (c || "").slice(1);
+  const creditosPendientes = (creditosSoderia || []).filter(c => !c.usado);
+  const creditosAplicadosHoyIds = datos.creditosSoderiaAplicados || [];
+  const creditosAplicadosHoy = (creditosSoderia || []).filter(c => creditosAplicadosHoyIds.includes(c.id));
+  const totalCreditoAplicadoHoy = creditosAplicadosHoy.reduce((a, c) => a + (Number(c.monto) || 0), 0);
+  const aplicarCreditoHoy = credito => {
+    const next = [...creditosAplicadosHoyIds, credito.id];
+    setDatos(d => ({
+      ...d,
+      creditosSoderiaAplicados: next
+    }));
+    aplicarCreditoSoderia && aplicarCreditoSoderia(credito.id, fecha);
+    onAutoGuardar && onAutoGuardar({
+      ...datos,
+      creditosSoderiaAplicados: next
+    });
+  };
+  const deshacerCreditoHoy = credito => {
+    const next = creditosAplicadosHoyIds.filter(id => id !== credito.id);
+    setDatos(d => ({
+      ...d,
+      creditosSoderiaAplicados: next
+    }));
+    revertirCreditoSoderia && revertirCreditoSoderia(credito.id);
+    onAutoGuardar && onAutoGuardar({
+      ...datos,
+      creditosSoderiaAplicados: next
+    });
+  };
   const addGasto = () => setDatos(d => ({
     ...d,
     gastos: [...(d.gastos || []), {
       cat: "propina",
-      monto: ""
+      monto: "",
+      esCredito: false,
+      tipoEnvase: "sifon",
+      cantidadEnvases: ""
     }]
   }));
   const delGasto = i => setDatos(d => ({
     ...d,
     gastos: d.gastos.filter((_, j) => j !== i)
   }));
+  // El credito soderia ahora descuenta del costo de llenado (lo que se le
+  // paga a la sodería), no de "Gastos extras" -- ver mas arriba.
+  const totalVentaLlenar = totalVentaLlenarBruto - totalCreditoAplicadoHoy;
   const totalGastos = (datos.gastos || []).filter(g => g.confirmado).reduce((a, g) => a + num(g.monto), 0);
   const efectivo = num(datos.efectivo),
     fiado = num(datos.fiado),
@@ -3319,7 +3364,58 @@ function PlanillaDelDia({
       fontWeight: 500,
       color: "var(--color-text-danger)"
     }
-  }, totalVentaLlenar ? fmt(totalVentaLlenar).replace("$", "") : "—"))), /*#__PURE__*/React.createElement("p", {
+  }, totalVentaLlenarBruto ? fmt(totalVentaLlenarBruto).replace("$", "") : "—"))), creditosPendientes.map(c => /*#__PURE__*/React.createElement("div", {
+    key: "cred_" + c.id,
+    onClick: () => aplicarCreditoHoy(c),
+    style: {
+      ...s.card,
+      margin: "8px 0 0",
+      padding: "10px 12px",
+      background: "var(--color-background-success)",
+      border: "0.5px solid var(--color-border-success)",
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 500,
+      color: "var(--color-text-success)"
+    }
+  }, "💳 Tenés ", fmt(c.monto), " a favor de la sodería", c.cantidad ? ` (${c.cantidad} ${_lblTipoCred(c.tipo)})` : "", " — tocá para aplicarlo hoy")))), creditosAplicadosHoy.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      margin: "8px 0 0",
+      padding: "8px 10px",
+      borderRadius: 8,
+      background: "var(--color-background-tertiary)"
+    }
+  }, creditosAplicadosHoy.map(c => /*#__PURE__*/React.createElement("div", {
+    key: "aplic_" + c.id,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      fontSize: 12,
+      color: "var(--color-text-success)",
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Descontando crédito sodería", c.cantidad ? ` (${c.cantidad} ${_lblTipoCred(c.tipo)})` : "", ": −", fmt(c.monto)), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      fontSize: 10,
+      padding: "2px 8px"
+    },
+    onClick: () => deshacerCreditoHoy(c)
+  }, "Deshacer"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: 13,
+      fontWeight: 600,
+      color: "var(--color-text-primary)",
+      paddingTop: 4,
+      borderTop: "0.5px solid var(--color-border-tertiary)"
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Subtotal a llenar"), /*#__PURE__*/React.createElement("span", null, fmt(totalVentaLlenar)))), /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 11,
       color: "var(--color-text-tertiary)",
@@ -3376,7 +3472,7 @@ function PlanillaDelDia({
       fontWeight: 500,
       color: "var(--color-text-primary)"
     }
-  }, g.cat.charAt(0).toUpperCase() + g.cat.slice(1), g.desc ? ` · ${g.desc}` : ""), /*#__PURE__*/React.createElement("div", {
+  }, _lblCatGasto(g.cat), g.desc ? ` · ${g.desc}` : ""), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
       color: "var(--color-text-danger)",
@@ -3410,7 +3506,16 @@ function PlanillaDelDia({
       gap: 6,
       marginBottom: 6
     }
-  }, /*#__PURE__*/React.createElement("select", {
+  }, g.esCredito ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...s.select,
+      flex: 1,
+      display: "flex",
+      alignItems: "center",
+      color: "var(--color-text-success)",
+      fontWeight: 500
+    }
+  }, "💳 Crédito sodería") : /*#__PURE__*/React.createElement("select", {
     style: {
       ...s.select,
       flex: 1
@@ -3437,7 +3542,55 @@ function PlanillaDelDia({
     placeholder: "Descripción (opcional)",
     value: g.desc || "",
     onChange: e => setGasto(i, "desc", e.target.value)
-  }), /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      marginBottom: 6,
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: !!g.esCredito,
+    onChange: e => {
+      const checked = e.target.checked;
+      const nuevosGastos = (datos.gastos || []).map((g2, j) => j === i ? {
+        ...g2,
+        esCredito: checked,
+        cat: checked ? "credito_soderia" : "otro"
+      } : g2);
+      setDatos(d => ({ ...d, gastos: nuevosGastos }));
+    },
+    style: { width: 15, height: 15, cursor: "pointer" }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 12, color: "var(--color-text-secondary)" }
+  }, "💳 Es un crédito a favor (se recupera después)")), g.esCredito && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("select", {
+    style: {
+      ...s.select,
+      flex: 1
+    },
+    value: g.tipoEnvase || "sifon",
+    onChange: e => setGasto(i, "tipoEnvase", e.target.value)
+  }, [["sifon", "Sifón"], ["bidon10", "Bidón 10L"], ["bidon20", "Bidón 20L"], ["otro", "Otro"]].map(([k, l]) => /*#__PURE__*/React.createElement("option", {
+    key: k,
+    value: k
+  }, l))), /*#__PURE__*/React.createElement("input", {
+    style: {
+      ...s.inputNum,
+      flex: 1
+    },
+    type: "number",
+    placeholder: "Cantidad",
+    value: g.cantidadEnvases || "",
+    onChange: e => setGasto(i, "cantidadEnvases", e.target.value)
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 6
@@ -3461,6 +3614,15 @@ function PlanillaDelDia({
         ...g2,
         confirmado: true
       } : g2);
+      if (g.esCredito && registrarCreditoSoderia) {
+        registrarCreditoSoderia({
+          monto: num(g.monto),
+          tipo: g.tipoEnvase || "",
+          cantidad: g.cantidadEnvases,
+          fecha,
+          nota: g.desc || ""
+        });
+      }
       setDatos(d => ({
         ...d,
         gastos: nuevosGastos
