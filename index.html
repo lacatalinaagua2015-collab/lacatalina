@@ -224,6 +224,9 @@ var firebaseConfig = {
       // préstamo/retiro vivía en un solo teléfono y no entraba ni en el
       // respaldo. Si se borraban los datos del sitio, se perdía entero.
       dispMovs:      function(it){ return it.id!=null ? String(it.id) : null; },
+      // Creditos pendientes con la sodería (cuando cobran de más y queda a
+      // favor para la próxima carga) — pedido de Guillermo 20/11/2026.
+      creditosSoderia: function(it){ return it.id!=null ? String(it.id) : null; },
       // MARCAS DE BORRADO COMPARTIDAS. Antes vivían sólo en el localStorage del
       // equipo donde borrabas, así que los demás no se enteraban: veían el
       // registro "faltando" en la nube, lo tomaban por nuevo y lo RESUCITABAN,

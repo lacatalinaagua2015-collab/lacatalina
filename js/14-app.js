@@ -363,6 +363,58 @@ function App() {
       return next;
     });
   };
+  // Pedido de Guillermo (20/11/2026): cuando la sodería le cobra de más al
+  // llenar, queda un crédito a favor (en envases) para la próxima carga.
+  // Se registra acá (lista aparte, sincronizada) y la Planilla del día lo
+  // muestra como aviso en cualquier día posterior hasta que lo aplique.
+  const [creditosSoderia, setCreditosSoderia] = useLS("cat_creditos_soderia_v1", []);
+  const registrarCreditoSoderia = (item) => {
+    setCreditosSoderia(prev => {
+      const next = [...prev, {
+        id: Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+        fecha: item.fecha || new Date().toISOString().slice(0, 10),
+        tipo: item.tipo || "",
+        cantidad: Number(item.cantidad) || 0,
+        monto: Number(item.monto) || 0,
+        nota: item.nota || "",
+        usado: false,
+        usadoEnFecha: null,
+        _upd: Date.now()
+      }];
+      syncData({
+        creditosSoderia: next
+      });
+      return next;
+    });
+  };
+  const aplicarCreditoSoderia = (id, fechaAplicacion) => {
+    setCreditosSoderia(prev => {
+      const next = prev.map(c => c.id === id ? {
+        ...c,
+        usado: true,
+        usadoEnFecha: fechaAplicacion || null,
+        _upd: Date.now()
+      } : c);
+      syncData({
+        creditosSoderia: next
+      });
+      return next;
+    });
+  };
+  const revertirCreditoSoderia = id => {
+    setCreditosSoderia(prev => {
+      const next = prev.map(c => c.id === id ? {
+        ...c,
+        usado: false,
+        usadoEnFecha: null,
+        _upd: Date.now()
+      } : c);
+      syncData({
+        creditosSoderia: next
+      });
+      return next;
+    });
+  };
   // Registro de movimientos de dispenser (comodato) — préstamo/retiro directo
   // al cliente, por día. Antes esto solo tocaba cliente.dispenser sin dejar
   // rastro; para poder informar cuánto se prestó/retiró en el Cierre del día
@@ -1314,6 +1366,43 @@ function App() {
           }), 2000);
         }
       }
+      // ── Creditos sodería: MERGEAR por id + _upd (mismo criterio que perdidas) ──
+      if (data.creditosSoderia?.length) {
+        const creditosLocales = (() => {
+          try {
+            return JSON.parse(localStorage.getItem("cat_creditos_soderia_v1") || "[]");
+          } catch {
+            return [];
+          }
+        })();
+        const porIdCred = {};
+        (data.creditosSoderia || []).forEach(c => {
+          porIdCred[c.id] = c;
+        });
+        let cambiosLocalesCred = 0;
+        creditosLocales.forEach(c => {
+          const enNube = porIdCred[c.id];
+          if (!enNube) {
+            porIdCred[c.id] = c;
+            cambiosLocalesCred++;
+            return;
+          }
+          const uL = Number(c._upd) || 0,
+            uN = Number(enNube._upd) || 0;
+          if (uL > uN) {
+            porIdCred[c.id] = c;
+            cambiosLocalesCred++;
+          }
+        });
+        const mergedCred = Object.values(porIdCred);
+        setCreditosSoderia(mergedCred);
+        if (cambiosLocalesCred > 0) {
+          console.log("Merge: " + cambiosLocalesCred + " créditos sodería locales más nuevos, sincronizando...");
+          setTimeout(() => syncData({
+            creditosSoderia: mergedCred
+          }), 2000);
+        }
+      }
       // ── dispMovs y prospectos: MERGEAR por id + _upd ─────────────────────
       // Los dos se SUBÍAN pero nunca se BAJABAN, así que cada equipo veía sólo
       // lo suyo. Peor con dispMovs, que encima ni siquiera subía. Mismo
@@ -1618,7 +1707,8 @@ function App() {
       // ni a lo que "Restaurar" vuelve a subir a la nube.
       dispMovs,
       prospectos,
-      promociones
+      promociones,
+      creditosSoderia
     };
   });
 
@@ -2207,6 +2297,7 @@ function App() {
         if (data.productos !== undefined) setProductos(data.productos || []);
         if (data.noVisitas !== undefined) setNoVisitas(data.noVisitas || []);
         if (data.perdidas !== undefined) setPerdidas(data.perdidas || []);
+        if (data.creditosSoderia !== undefined) setCreditosSoderia(data.creditosSoderia || []);
         if (data.recordatorios !== undefined) setRecordatorios(data.recordatorios || []);
         if (data.mantVeh !== undefined) localStorage.setItem("cat_mant_vehiculo_v1", JSON.stringify(_lcDedupMantVeh(data.mantVeh || [])));
         if (data.costosVehiculo !== undefined) localStorage.setItem("cat_costos_vehiculo_v1", JSON.stringify(data.costosVehiculo || []));
@@ -3875,6 +3966,10 @@ function App() {
     perdidas: perdidas,
     movStock: movStock,
     promociones: promociones,
+    creditosSoderia: creditosSoderia,
+    registrarCreditoSoderia: registrarCreditoSoderia,
+    aplicarCreditoSoderia: aplicarCreditoSoderia,
+    revertirCreditoSoderia: revertirCreditoSoderia,
     // Mismos datos (y misma migracion de nombre) que usa GananciaNetaScreen
     // -- para que "Ganancia real del dia" en la Planilla coincida siempre
     // con esa pantalla. Pedido de Guillermo, 19/11/2026.
