@@ -2089,7 +2089,11 @@ function PlanillaDelDia({
   promociones,
   ecToken,
   costosVehiculo,
-  casaUbicacion
+  casaUbicacion,
+  creditosSoderia,
+  registrarCreditoSoderia,
+  aplicarCreditoSoderia,
+  revertirCreditoSoderia
 }) {
   // Separar ventas del día propio vs ventas de clientes de otro día
   const clientesDia = new Set((clientes || []).filter(c => c.dia === dia).map(c => c.id));
@@ -3381,7 +3385,7 @@ function PlanillaDelDia({
       fontWeight: 500,
       color: "var(--color-text-success)"
     }
-  }, "💳 Tenés ", fmt(c.monto), " a favor de la sodería", c.cantidad ? ` (${c.cantidad} ${_lblTipoCred(c.tipo)})` : "", " — tocá para aplicarlo hoy")))), creditosAplicadosHoy.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "💳 Tenés ", fmt(c.monto), " a favor de la sodería", c.cantidad ? ` (${c.cantidad} ${_lblTipoCred(c.tipo)})` : "", " — tocá para aplicarlo hoy"))), creditosAplicadosHoy.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       margin: "8px 0 0",
       padding: "8px 10px",

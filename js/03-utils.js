@@ -491,11 +491,21 @@ function buscarCliente(c, q) {
 //    que el cliente tenga cargado como fijo (sifón = soda; bidón 10L/20L
 //    o dispenser = agua) arma la pregunta con lo que corresponde.
 // ════════════════════════════════════════════════════════════════════
+// Pedido de Guillermo (21/11/2026): los mensajes de WhatsApp siempre
+// decían "Buen día" sin importar la hora real a la que se mandan (de
+// tarde, de siesta, de noche). Saludo según franja horaria, compartido
+// por cualquier mensaje armado acá.
+function saludoSegunHora() {
+  const h = new Date().getHours();
+  if (h >= 6 && h < 12) return "Buen día";
+  if (h >= 12 && h < 20) return "Buenas tardes";
+  return "Buenas noches";
+}
 function armarMsjPedidoWA(c) {
   const tieneAgua = Number(c?.bidon10) > 0 || Number(c?.bidon20) > 0 || Number(c?.dispenser) > 0;
   const tieneSoda = Number(c?.sifon) > 0;
   const que = tieneAgua && tieneSoda ? "que te lleve agua y soda esta semana" : tieneAgua ? "que te lleve agua esta semana" : tieneSoda ? "que te lleve soda esta semana" : "que te pase a dejar algo esta semana";
-  const texto = `Buen día, estimado cliente de La Catalina! ¿Necesitás ${que}?`;
+  const texto = `${saludoSegunHora()}, estimado cliente de La Catalina! ¿Necesitás ${que}?`;
   return encodeURIComponent(texto);
 }
 function armarMsjTransferWA(ventas) {
@@ -513,7 +523,7 @@ function armarMsjTransferWA(ventas) {
   const items = Object.keys(porNombre).map(nombre => `${porNombre[nombre]} ${nombre}`);
   const itemsTxt = items.length ? items.reduce((acc, txt, i) => i === 0 ? txt : i === items.length - 1 ? `${acc} y ${txt}` : `${acc}, ${txt}`, "") : "";
   const total = lista.reduce((a, v) => a + ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0), 0);
-  const texto = itemsTxt ? `Buen día, estimado cliente! Hoy le dejé ${itemsTxt}, lo que da un total de ${fmt(total)}. Muchas gracias!` : `Buen día, estimado cliente! Le escribo de La Catalina por la transferencia de hoy, de ${fmt(total)}. Muchas gracias!`;
+  const texto = itemsTxt ? `${saludoSegunHora()}, estimado cliente! Hoy le dejé ${itemsTxt}, lo que da un total de ${fmt(total)}. Muchas gracias!` : `${saludoSegunHora()}, estimado cliente! Le escribo de La Catalina por la transferencia de hoy, de ${fmt(total)}. Muchas gracias!`;
   return encodeURIComponent(texto);
 }
 

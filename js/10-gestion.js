@@ -609,7 +609,7 @@ function BarraSeleccionWA({
   cantidad,
   onEnviar
 }) {
-  const [mensaje, setMensaje] = useState("Buen día! Le escribo de La Catalina.");
+  const [mensaje, setMensaje] = useState(() => `${saludoSegunHora()}! Le escribo de La Catalina.`);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
