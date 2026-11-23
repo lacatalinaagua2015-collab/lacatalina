@@ -1542,6 +1542,7 @@ function ConfirmacionesDia({
   onConfirmar,
   onEditarMontoCobro,
   onEditarMontoVenta,
+  onPasarAEfectivo,
   onVolver
 }) {
   const [abiertos, setAbiertos] = React.useState({});
@@ -1728,7 +1729,25 @@ function ConfirmacionesDia({
       cursor: "pointer"
     },
     onClick: () => onConfirmar(v.id)
-  }, "✓ Confirmar transferencia"), v._esCobro && onEditarMontoCobro && /*#__PURE__*/React.createElement("button", {
+  }, "✓ Confirmar transferencia"), onPasarAEfectivo && /*#__PURE__*/React.createElement("button", {
+    style: {
+      width: "100%",
+      padding: "7px",
+      marginTop: 6,
+      borderRadius: 8,
+      border: "1px solid var(--color-border-success)",
+      background: "none",
+      color: "var(--color-text-success)",
+      fontSize: 12,
+      fontWeight: 500,
+      cursor: "pointer"
+    },
+    onClick: () => {
+      if (window.confirm("¿Nunca llegó la transferencia y te pagó en efectivo? Se va a registrar como cobrado en efectivo.")) {
+        onPasarAEfectivo(v.id);
+      }
+    }
+  }, "💵 Pasar a efectivo"), v._esCobro && onEditarMontoCobro && /*#__PURE__*/React.createElement("button", {
     style: {
       width: "100%",
       padding: "7px",

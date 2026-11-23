@@ -3690,6 +3690,74 @@ function App() {
     const detalleArr = Array.isArray(vE.detalle) ? vE.detalle : Object.values(vE.detalle || {});
     editarVenta(ventaId, detalleArr, vE.pago, String(nm), vE.saldoAplicado, vE.obs, vE.montoTrans);
   };
+  // Pedido de Guillermo (23/11/2026): muchas veces el cliente dice "ya te
+  // transfiero", queda la transferencia pendiente de confirmar, nunca llega
+  // y en la próxima visita paga en efectivo. Antes no había forma de dejar
+  // eso bien registrado: quedaba para siempre como transferencia pendiente,
+  // o había que confirmarla "en falso" (lo cual ensucia la plata real
+  // cobrada por transferencia). Este atajo pasa esa transferencia pendiente
+  // a efectivo, dejando todo (saldo del cliente, auditoría, totales del
+  // día) consistente con que en realidad se cobró en mano.
+  const pasarTransferenciaAEfectivo = ventaId => {
+    const v0 = ventas.find(v => v.id === ventaId);
+    if (!v0) return;
+    const NOTA = " [Pasado a efectivo: nunca llegó la transferencia]";
+    // Caso 1: cobro de una deuda vieja (fiado) que se iba a saldar por
+    // transferencia. El saldo del cliente ya se resolvió al cargar el
+    // cobro (aplicarCobroAVentasFiado) — acá solo cambia la etiqueta de
+    // cómo se cobró, no hay plata que recalcular.
+    if (v0._esCobro) {
+      registrarAuditoria("editada", {
+        clienteId: v0.clienteId,
+        cliente: v0.cliente || "",
+        fechaVenta: v0.fecha || "",
+        pagoAntes: "Cobro de deuda (transferencia)",
+        pagoDespues: "Cobro de deuda (efectivo)",
+        montoAntes: (v0.pagadoNum != null ? v0.pagadoNum : v0.neto) || 0,
+        montoDespues: (v0.pagadoNum != null ? v0.pagadoNum : v0.neto) || 0
+      });
+      saveVentas(prev => prev.map(v => v.id === ventaId ? {
+        ...v,
+        pago: "contado",
+        transConfirmada: true,
+        obs: (v.obs || "") + NOTA,
+        _upd: Date.now()
+      } : v));
+      return;
+    }
+    // Caso 2: la parte-transferencia de un pago mixto (registro satélite
+    // ligado a una venta con efectivo + transferencia). Se mueve ese monto
+    // de "montoTrans" a "montoEfec" en la venta principal, y el satélite
+    // queda resuelto.
+    if (v0._esMixtoTrans) {
+      const monto = (v0.pagadoNum != null ? v0.pagadoNum : v0.neto) || 0;
+      saveVentas(prev => prev.map(v => {
+        if (v.id === v0._mixtoDe) return {
+          ...v,
+          montoEfec: (Number(v.montoEfec) || 0) + monto,
+          montoTrans: Math.max(0, (Number(v.montoTrans) || 0) - monto),
+          _upd: Date.now()
+        };
+        if (v.id === ventaId) return {
+          ...v,
+          pago: "contado",
+          transConfirmada: true,
+          obs: (v.obs || "") + NOTA,
+          _upd: Date.now()
+        };
+        return v;
+      }));
+      return;
+    }
+    // Caso 3 (el pedido original): una venta normal del día con pago =
+    // "transferencia" directo. Reusa editarVenta tal cual — misma lógica
+    // que ya recalcula saldo/ganancia correctamente al cambiar la forma de
+    // pago (y deja constancia en Auditoría) — solo que el destino es
+    // "contado" en vez de elegido a mano.
+    const detalleArr = Array.isArray(v0.detalle) ? v0.detalle : Object.values(v0.detalle || {});
+    const monto = (v0.pagadoNum != null ? v0.pagadoNum : v0.neto) || 0;
+    editarVenta(ventaId, detalleArr, "contado", String(monto), v0.saldoAplicado, (v0.obs || "") + NOTA, undefined);
+  };
   // Acceso biométrico: solo se interpone si está activado en Config. Si no, la
   // app abre directo. Al confirmar la huella se saltea la portada y entra
   // derecho al menú: la huella ya cumple la función del botón "Ingresar".
@@ -3895,6 +3963,7 @@ function App() {
     },
     onEditarMontoCobro: editarMontoCobro,
     onEditarMontoVenta: editarMontoVenta,
+    onPasarAEfectivo: pasarTransferenciaAEfectivo,
     onVolver: () => {
       setMostrarTransferencias(true);
       irA("menu");
@@ -4008,6 +4077,7 @@ function App() {
         _upd: Date.now()
       } : v));
     },
+    onPasarAEfectivo: pasarTransferenciaAEfectivo,
     // Volver a "Inicio del reparto" para corregir la cantidad de envases con
     // la que se salió, incluso si el día ya estaba iniciado (antes, una vez
     // iniciado, no había forma de volver a esa pantalla).
@@ -4231,6 +4301,7 @@ function App() {
         _upd: Date.now()
       } : v));
     },
+    onPasarAEfectivo: pasarTransferenciaAEfectivo,
     onEditarMontoCobro: editarMontoCobro,
     onEditarMontoVenta: editarMontoVenta,
     onAbrirMapa: () => irA("mapaClientes"),

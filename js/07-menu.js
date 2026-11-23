@@ -1303,7 +1303,8 @@ function DetalleTransferencias({
   clientes,
   onConfirmarTransfer,
   onEditarMontoCobro,
-  onEditarMontoVenta
+  onEditarMontoVenta,
+  onPasarAEfectivo
 }) {
   const [abierto, setAbierto] = React.useState(false);
   const pendientes = (ventasPendTrans || []).length;
@@ -1462,7 +1463,26 @@ function DetalleTransferencias({
         if (!nuevo || nuevo <= 0) return;
         onEditarMontoVenta(v.id, nuevo);
       }
-    }, "✏️ Editar monto"), !confirmada && tel && /*#__PURE__*/React.createElement("a", {
+    }, "✏️ Editar monto"), !confirmada && onPasarAEfectivo && /*#__PURE__*/React.createElement("button", {
+      style: {
+        marginLeft: 6,
+        fontSize: 10,
+        padding: "1px 6px",
+        borderRadius: 4,
+        background: "var(--color-background-tertiary)",
+        color: "var(--color-text-success)",
+        fontWeight: 600,
+        border: "none",
+        cursor: "pointer"
+      },
+      title: "Nunca llegó la transferencia y pagó en efectivo",
+      onClick: e => {
+        e.stopPropagation();
+        if (window.confirm(`¿"${v.cliente}" te pagó en efectivo en vez de transferir? Se va a registrar como cobrado en efectivo.`)) {
+          onPasarAEfectivo(v.id);
+        }
+      }
+    }, "💵 Efectivo"), !confirmada && tel && /*#__PURE__*/React.createElement("a", {
       href: `https://wa.me/54${tel}?text=${msjWA}`,
       target: "_blank",
       rel: "noreferrer",
@@ -2080,6 +2100,7 @@ function PlanillaDelDia({
   onConfirmarTransfer,
   onEditarMontoCobro,
   onEditarMontoVenta,
+  onPasarAEfectivo,
   onEditarCarga,
   onCargarVenta,
   onRegistrarNoVisita,
@@ -4160,7 +4181,8 @@ function PlanillaDelDia({
       clientes: clientes,
       onConfirmarTransfer: onConfirmarTransfer,
       onEditarMontoCobro: onEditarMontoCobro,
-      onEditarMontoVenta: onEditarMontoVenta
+      onEditarMontoVenta: onEditarMontoVenta,
+      onPasarAEfectivo: onPasarAEfectivo
     });
   })()), /*#__PURE__*/React.createElement("div", {
     style: {

@@ -11,7 +11,7 @@
 // del cierre de ListaClientes ahora llega explícito por props (mismos
 // nombres, así el cuerpo de abajo no tuvo que tocarse).
 const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
-  c, atendidos, noVMap, visitados, clienteExpandidoId, setClienteExpandidoId, pendientes, clienteMoviendo, setClienteMoviendo, moverCliente, onSeleccionar, recordatorios, ventas, fecha, onConfirmarTransfer, todasVentas, marcarNoVisita, onGuardarVenta, productos, onNoQuiereConEnvases, onCambiarDispenserCliente, onQuitarNoVisita, clientes, onReordenar, onRetirarCliente
+  c, atendidos, noVMap, visitados, clienteExpandidoId, setClienteExpandidoId, pendientes, clienteMoviendo, setClienteMoviendo, moverCliente, onSeleccionar, recordatorios, ventas, fecha, onConfirmarTransfer, onPasarAEfectivo, todasVentas, marcarNoVisita, onGuardarVenta, productos, onNoQuiereConEnvases, onCambiarDispenserCliente, onQuitarNoVisita, clientes, onReordenar, onRetirarCliente
 }) {
     const [fotoOpen, setFotoOpen] = React.useState(false);
     const [mostrarMas, setMostrarMas] = React.useState(false);
@@ -202,7 +202,24 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
           fontWeight: 500,
           color: "#f5b942"
         }
-      }, fmt((vt.pagadoNum != null ? vt.pagadoNum : vt.neto) || 0))), !vt.transConfirmada && c.telefono && /*#__PURE__*/React.createElement("a", {
+      }, fmt((vt.pagadoNum != null ? vt.pagadoNum : vt.neto) || 0))), !vt.transConfirmada && onPasarAEfectivo && /*#__PURE__*/React.createElement("button", {
+        style: {
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          padding: "2px 4px",
+          lineHeight: 1,
+          flexShrink: 0,
+          fontSize: 15
+        },
+        onClick: e => {
+          e.stopPropagation();
+          if (window.confirm(`¿"${c.nombre}" te pagó en efectivo en vez de transferir? Se va a registrar como cobrado en efectivo.`)) {
+            onPasarAEfectivo(vt.id);
+          }
+        },
+        title: "Nunca llegó la transferencia y pagó en efectivo"
+      }, "💵"), !vt.transConfirmada && c.telefono && /*#__PURE__*/React.createElement("a", {
         href: `https://wa.me/54${c.telefono}?text=${armarMsjTransferWA([vt])}`,
         target: "_blank",
         rel: "noreferrer",
@@ -598,6 +615,7 @@ function ListaClientes({
   productos,
   onSeleccionar,
   onEntregar,
+  onPasarAEfectivo,
   onGuardarVenta,
   onNoQuiereConEnvases,
   onCambiarDispenserCliente,
@@ -892,7 +910,7 @@ function ListaClientes({
   // Props estables para ClienteCard (ver comentario arriba de su definición) —
   // spreadeadas en cada React.createElement(ClienteCard, {key, ...cardProps(c)}).
   const cardProps = c => ({
-    c, atendidos, noVMap, visitados, clienteExpandidoId, setClienteExpandidoId, pendientes, clienteMoviendo, setClienteMoviendo, moverCliente, onSeleccionar, recordatorios, ventas, fecha, onConfirmarTransfer, todasVentas, marcarNoVisita, onGuardarVenta, productos, onNoQuiereConEnvases, onCambiarDispenserCliente, onQuitarNoVisita, clientes, onReordenar, onRetirarCliente
+    c, atendidos, noVMap, visitados, clienteExpandidoId, setClienteExpandidoId, pendientes, clienteMoviendo, setClienteMoviendo, moverCliente, onSeleccionar, recordatorios, ventas, fecha, onConfirmarTransfer, onPasarAEfectivo, todasVentas, marcarNoVisita, onGuardarVenta, productos, onNoQuiereConEnvases, onCambiarDispenserCliente, onQuitarNoVisita, clientes, onReordenar, onRetirarCliente
   });
   return /*#__PURE__*/React.createElement("div", {
     style: s.screen
