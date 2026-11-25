@@ -649,6 +649,12 @@ function ListaClientes({
   onRetirarCliente
 }) {
   const [busqueda, setBusqueda] = useState("");
+  // 25/11/2026: pedido de Guillermo -- achicar la cabecera de "Clientes del
+  // día": Buscar / Ruta y mapa / Nuevo en una sola fila compacta de 3
+  // columnas, en vez de 3 filas separadas (buscador + fila de 4 botones +
+  // texto de ayuda). "Ruta óptima", "Sugerir ruta" y "Mapa" quedan
+  // unificados en un solo botón que despliega las 3 opciones.
+  const [menuRutaAbierto, setMenuRutaAbierto] = useState(false);
   const [clienteMoviendo, setClienteMoviendo] = useState(null); // id del cliente "levantado", esperando destino
   const [rutaSugerida, setRutaSugerida] = useState(null); // preview de sugerirRuta(); null = cerrado
   // Tarjeta de venta compacta expandida in-place (una sola a la vez). Antes
