@@ -1162,7 +1162,25 @@ function NuevaVenta({
         border: mostrarRotoCompacto ? "none" : undefined
       },
       onClick: () => setMostrarRotoCompacto(r => !r)
-    }, "💔 Dispenser roto"), /*#__PURE__*/React.createElement("button", {
+    }, "💔 Dispenser roto"),
+    // 25/11/2026: Guillermo no encontraba dónde anotar "le entrego un
+    // bidón/sifón nuevo y me devuelve el viejo roto" mientras entregaba.
+    // Reusa el mismo circuito que ya existía (onPerdidaCliente, visible
+    // antes solo desde el perfil del cliente) pero ahora queda a mano en
+    // la pantalla de venta misma, al lado de los otros botones de "más
+    // opciones".
+    /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        flex: 1,
+        fontSize: 11,
+        padding: "7px",
+        color: mostrarEnvRotoCompacto ? "#fff" : "var(--color-text-danger)",
+        background: mostrarEnvRotoCompacto ? "#a32d2d" : undefined,
+        border: mostrarEnvRotoCompacto ? "none" : undefined
+      },
+      onClick: () => setMostrarEnvRotoCompacto(r => !r)
+    }, "🔨 Envase roto"), /*#__PURE__*/React.createElement("button", {
       style: {
         ...s.btn,
         flex: 1,
@@ -1202,6 +1220,68 @@ function NuevaVenta({
         setMostrarRotoCompacto(false);
       }
     }, "Cancelar")),
+    mostrarMas && !ventaEditar && mostrarEnvRotoCompacto && /*#__PURE__*/React.createElement("div", {
+      style: {
+        ...s.card,
+        margin: "0 0 8px",
+        padding: 10,
+        border: "1px solid var(--color-border-danger)"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--color-text-secondary)",
+        marginBottom: 6
+      }
+    }, "Qué te devolvió roto (se da de baja, no se cobra):"), envRoto.map((_, i) => /*#__PURE__*/React.createElement(ER, {
+      key: i,
+      list: envRoto,
+      setList: setEnvRoto,
+      i: i
+    })), /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        width: "100%",
+        fontSize: 11,
+        marginBottom: 6
+      },
+      onClick: () => setEnvRoto(l => [...l, { prod: "", cant: "" }])
+    }, "+ Otro producto roto"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        flex: 1,
+        fontSize: 11
+      },
+      onClick: () => {
+        setEnvRoto([{ prod: "", cant: "" }]);
+        setMostrarEnvRotoCompacto(false);
+      }
+    }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...s.btn,
+        flex: 1,
+        fontSize: 11,
+        background: "#a32d2d",
+        color: "#fff",
+        border: "none"
+      },
+      onClick: () => {
+        (envRoto || []).forEach(({ prod, cant }) => {
+          const cantNum = Number(cant) || 0;
+          if (!prod || cantNum <= 0 || !onPerdidaCliente) return;
+          const p = (productos || []).find(pp => pp.nombre === prod);
+          if (!p) return;
+          onPerdidaCliente(cliente.id, claveStockDeProducto(p), cantNum);
+        });
+        setEnvRoto([{ prod: "", cant: "" }]);
+        setMostrarEnvRotoCompacto(false);
+      }
+    }, "✓ Registrar roto"))),
     mostrarMas && !ventaEditar && mostrarCambio && /*#__PURE__*/React.createElement(CambioEnvasePanel, {
       productos: productos,
       onConfirmar: (productoViejo, productoNuevo, motivo) => {
