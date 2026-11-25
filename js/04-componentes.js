@@ -347,6 +347,7 @@ function FechaHoraRow({
 function PieEnvases({
   c,
   ventas,
+  productos,
   onEditar,
   onPerdida,
   onPerdidaCliente,
@@ -354,9 +355,13 @@ function PieEnvases({
   children
 }) {
   // Pedido de Guillermo (19/11/2026): antes esto era 4 claves fijas. Ahora
-  // sale de la lista real de productos (window._lcProductos — ver
-  // 14-app.js), así un producto nuevo también se puede ajustar acá.
-  const PRODS = ((typeof window !== "undefined" && window._lcProductos) || []).filter(p => p.trackStock !== false).map(p => [claveStockDeProducto(p), p.nombre.replace(" 1.5L", "")]);
+  // sale de la lista real de productos. Se recibe como prop (preferido,
+  // todas las pantallas que usan PieEnvases ya tienen "productos" a mano) y
+  // si alguna no lo pasara, cae a window._lcProductos (ver 14-app.js) como
+  // respaldo — antes dependía SOLO del global, y si por cualquier motivo
+  // (ej. desfasaje de caché entre archivos) no estaba poblado a tiempo, el
+  // panel de Fijos/Prestados quedaba sin productos, es decir en blanco.
+  const PRODS = ((productos && productos.length ? productos : (typeof window !== "undefined" && window._lcProductos)) || []).filter(p => p.trackStock !== false).map(p => [claveStockDeProducto(p), p.nombre.replace(" 1.5L", "")]);
   const KEYS = PRODS.map(([k]) => k);
   const NOMBRES = Object.fromEntries(PRODS.map(([k, lbl]) => [k, lbl]));
   const [draft, setDraft] = React.useState(null); // null = panel cerrado

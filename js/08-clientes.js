@@ -2638,6 +2638,7 @@ function DetalleCliente({
   }, /*#__PURE__*/React.createElement(PieEnvases, {
     c: cliente,
     ventas: ventas,
+    productos: productos,
     onEditar: (id, cambios) => onEditar(cambios),
     onPerdida: onPerdida,
     izquierda: /*#__PURE__*/React.createElement("span", {
@@ -2809,6 +2810,7 @@ function DetalleCliente({
 function FiadosPendientes({
   clientes,
   ventas,
+  productos,
   onCobrar,
   onVolver,
   onEditarCliente,
@@ -2955,6 +2957,7 @@ function FiadosPendientes({
   }, "💰 Cobrar deuda"), onEditarCliente && /*#__PURE__*/React.createElement(PieEnvases, {
     c: c,
     ventas: ventas,
+    productos: productos,
     onEditar: onEditarCliente,
     onPerdida: onPerdida
   }))));
@@ -2962,6 +2965,7 @@ function FiadosPendientes({
 function ClientesDormidos({
   clientes,
   ventas,
+  productos,
   onVolver,
   onSeleccionar,
   onEditarCliente,
@@ -3132,6 +3136,7 @@ function ClientesDormidos({
   }, "📍"))), onEditarCliente && /*#__PURE__*/React.createElement(PieEnvases, {
     c: c,
     ventas: ventas,
+    productos: productos,
     onEditar: onEditarCliente,
     onPerdida: onPerdida,
     izquierda: onEliminar && /*#__PURE__*/React.createElement("button", {

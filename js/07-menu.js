@@ -1671,6 +1671,7 @@ function DetalleVentasDia({
     const accionesRow = cli ? /*#__PURE__*/React.createElement(PieEnvases, {
       c: cli,
       ventas: todasLasVentas || [],
+      productos: productos,
       onEditar: onEditarCliente,
       onPerdidaCliente: onPerdidaCliente
     }, esCompraReal && /*#__PURE__*/React.createElement("button", {
@@ -2001,6 +2002,7 @@ function DetalleVentasDia({
       }, p.id && /*#__PURE__*/React.createElement(PieEnvases, {
         c: p,
         ventas: todasLasVentas || [],
+        productos: productos,
         onEditar: onEditarCliente,
         onPerdidaCliente: onPerdidaCliente
       }), (onRegistrarNoVisita || onQuitarNoVisita) && /*#__PURE__*/React.createElement("button", {
