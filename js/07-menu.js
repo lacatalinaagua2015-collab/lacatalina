@@ -2384,6 +2384,15 @@ function PlanillaDelDia({
   // cliente tiene que buscar en la lista real de clientes de la app (no
   // texto libre, para no desalinearse del nombre real del cliente).
   const [agregarClienteUI, setAgregarClienteUI] = useState(null);
+  // 25/11/2026: Guillermo marcó que el "+" de prestado/devuelto en el
+  // Detalle por cliente abría un prompt de texto vacío, sin ningún
+  // desplegable de productos — "tendría que aparecer un desplegable con
+  // las cantidades para que yo directamente lo agregue, no para que lo
+  // tenga que escribir". Este estado reemplaza ese prompt por un mini
+  // selector inline (producto + cantidad) que arma el mismo formato de
+  // texto ("2 Bidón 10L") que ya entendía parseTextoEnv, así no hay que
+  // tocar el resto del parseo/acumulado.
+  const [agregandoEnv, setAgregandoEnv] = useState(null); // {nombre, tipo, prod, cant} o null
   const envOverride = datos.envMovOverride || {};
   const envVal = (pk, campo, calc) => {
     const ov = envOverride[pk];
@@ -2470,15 +2479,43 @@ function PlanillaDelDia({
       onClick: () => guardarDetalleCliente(nombre, tipo, lista.filter((_, j) => j !== i)),
       style: { cursor: "pointer", color: "#ff6b6b", fontWeight: 800, fontSize: 11 }
     }, "✕")));
-    chips.push(/*#__PURE__*/React.createElement("span", {
-      key: `${tipo}-add`,
-      onClick: () => {
-        const texto = window.prompt(tipo === "prestado" ? "Agregar prestado (ej: 1 Bidón 10L):" : "Agregar devuelto (ej: 1 Sifón 1.5L):", "");
-        if (!texto || !texto.trim()) return;
-        guardarDetalleCliente(nombre, tipo, [...(lista || []), texto.trim()]);
-      },
-      style: { fontSize: 10.5, fontWeight: 700, color: "var(--color-text-tertiary)", border: "1px dashed var(--color-border-tertiary)", padding: "2px 7px", borderRadius: 6, cursor: "pointer" }
-    }, "+ ", tipo === "prestado" ? "prestado" : "devuelto"));
+    const keyAdd = `${nombre}__${tipo}`;
+    const opcionesProd = [...productosCarga.map(p => p.nombre), dispNombre];
+    if (agregandoEnv && agregandoEnv.nombre === nombre && agregandoEnv.tipo === tipo) {
+      chips.push(/*#__PURE__*/React.createElement("span", {
+        key: `${tipo}-picker`,
+        style: { display: "inline-flex", gap: 4, alignItems: "center" }
+      }, /*#__PURE__*/React.createElement("select", {
+        autoFocus: true,
+        value: agregandoEnv.prod,
+        onChange: e => setAgregandoEnv(u => ({ ...u, prod: e.target.value })),
+        style: { fontSize: 10.5, padding: "2px 3px", borderRadius: 6, background: "var(--color-background-tertiary)", color: "var(--color-text-primary)", border: "0.5px solid var(--color-border-secondary)" }
+      }, /*#__PURE__*/React.createElement("option", { value: "" }, "— Producto —"), opcionesProd.map(n => /*#__PURE__*/React.createElement("option", { key: n, value: n }, n))), /*#__PURE__*/React.createElement("input", {
+        type: "number",
+        inputMode: "numeric",
+        placeholder: "Cant",
+        value: agregandoEnv.cant,
+        onChange: e => setAgregandoEnv(u => ({ ...u, cant: e.target.value })),
+        style: { width: 38, fontSize: 10.5, padding: "2px 3px", borderRadius: 6, background: "var(--color-background-tertiary)", color: "var(--color-text-primary)", border: "0.5px solid var(--color-border-secondary)" }
+      }), /*#__PURE__*/React.createElement("span", {
+        onClick: () => {
+          const cantNum = Math.round(Number(agregandoEnv.cant) || 0);
+          if (!agregandoEnv.prod || cantNum <= 0) return;
+          guardarDetalleCliente(nombre, tipo, [...(lista || []), `${cantNum} ${agregandoEnv.prod}`]);
+          setAgregandoEnv(null);
+        },
+        style: { cursor: "pointer", color: "var(--color-text-success)", fontWeight: 800, fontSize: 13 }
+      }, "✓"), /*#__PURE__*/React.createElement("span", {
+        onClick: () => setAgregandoEnv(null),
+        style: { cursor: "pointer", color: "#ff6b6b", fontWeight: 800, fontSize: 11 }
+      }, "✕")));
+    } else {
+      chips.push(/*#__PURE__*/React.createElement("span", {
+        key: `${tipo}-add`,
+        onClick: () => setAgregandoEnv({ nombre, tipo, prod: "", cant: "" }),
+        style: { fontSize: 10.5, fontWeight: 700, color: "var(--color-text-tertiary)", border: "1px dashed var(--color-border-tertiary)", padding: "2px 7px", borderRadius: 6, cursor: "pointer" }
+      }, "+ ", tipo === "prestado" ? "prestado" : "devuelto"));
+    }
     return chips;
   };
   const movForCliente = (porClienteEnv, nombre) => {

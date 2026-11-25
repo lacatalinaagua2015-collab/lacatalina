@@ -453,9 +453,10 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
     }, /*#__PURE__*/React.createElement("button", {
       style: {
         ...s.btn,
-        flex: 1,
-        height: 76,
-        fontSize: 30,
+        flex: "0 0 149px",
+        width: 149,
+        height: 38,
+        fontSize: 20,
         fontWeight: 700,
         padding: 0,
         background: mostrarMas ? "var(--color-background-info)" : "var(--color-background-warning)",
