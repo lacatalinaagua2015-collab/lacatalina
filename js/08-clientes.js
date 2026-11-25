@@ -967,58 +967,84 @@ function ListaClientes({
     style: {
       padding: "10px 16px 6px"
     }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 7
+    }
   }, /*#__PURE__*/React.createElement("input", {
-    style: s.input,
-    placeholder: "Buscar por domicilio o nombre...",
+    style: { ...s.input, flex: 1, minWidth: 0, fontSize: 12.5, padding: "9px 8px" },
+    placeholder: "🔍 Buscar",
     value: busqueda,
     onChange: e => setBusqueda(e.target.value)
-  }), /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...s.btn,
+      flex: 1,
+      minWidth: 0,
+      fontSize: 11.5,
+      fontWeight: 700,
+      padding: "9px 4px",
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      background: menuRutaAbierto ? "var(--color-background-info)" : undefined,
+      color: menuRutaAbierto ? "var(--color-text-info)" : undefined
+    },
+    onClick: () => setMenuRutaAbierto(m => !m)
+  }, "🗺️ Ruta y mapa ", menuRutaAbierto ? "▴" : "▾"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      flex: 1,
+      minWidth: 0,
+      background: "linear-gradient(180deg, #2a79cf, #185FA5)",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      fontSize: 11.5,
+      fontWeight: 800,
+      padding: "9px 4px",
+      cursor: "pointer",
+      whiteSpace: "nowrap"
+    },
+    onClick: onNuevoCliente
+  }, "＋ Nuevo")), menuRutaAbierto && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 6,
+      background: "var(--color-background-secondary)",
+      border: "0.5px solid var(--color-border-secondary)",
+      borderRadius: 12,
+      overflow: "hidden"
+    }
+  }, [["🎯", "Ruta óptima", abrirRutaOptima], ["✨", "Sugerir ruta", sugerirRuta], ["📍", "Ver mapa", onAbrirMapa]].map(([ic, lbl, fn], i) => /*#__PURE__*/React.createElement("div", {
+    key: lbl,
+    onClick: () => {
+      fn && fn();
+      setMenuRutaAbierto(false);
+    },
+    style: {
+      padding: "11px 14px",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      fontSize: 13,
+      color: "var(--color-text-primary)",
+      borderBottom: i < 2 ? "0.5px solid var(--color-border-tertiary)" : "none",
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 15 }
+  }, ic), lbl))), (volverAlFinal.length > 0 || sinEntrega.length > 0) && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 6,
-      marginTop: 8,
       flexWrap: "wrap",
-      alignItems: "center"
+      marginTop: 8
     }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: s.badge("success")
-  }, clientesReales.filter(c => visitados.has(c.id)).length, "/", clientesReales.length, " visitados"), volverAlFinal.length > 0 && /*#__PURE__*/React.createElement("span", {
+  }, volverAlFinal.length > 0 && /*#__PURE__*/React.createElement("span", {
     style: s.badge("warning")
   }, volverAlFinal.length, " volver al final"), sinEntrega.length > 0 && /*#__PURE__*/React.createElement("span", {
     style: s.badge("danger")
-  }, sinEntrega.length, " sin entrega"), /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...s.btn,
-      fontSize: 11,
-      padding: "3px 10px",
-      marginLeft: "auto",
-      background: "#185FA5",
-      color: "#e2eaf4",
-      border: "none"
-    },
-    onClick: onNuevoCliente
-  }, "+ Nuevo"), /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...s.btn,
-      fontSize: 11,
-      padding: "3px 10px"
-    },
-    onClick: abrirRutaOptima
-  }, "🧭 Ruta óptima"), /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...s.btn,
-      fontSize: 11,
-      padding: "3px 10px"
-    },
-    onClick: sugerirRuta
-  }, "✨ Sugerir ruta"), /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...s.btn,
-      fontSize: 11,
-      padding: "3px 10px"
-    },
-    onClick: onAbrirMapa
-  }, "🗺 Mapa")), /*#__PURE__*/React.createElement("p", {
+  }, sinEntrega.length, " sin entrega")), /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 11,
       color: clienteMoviendo ? "var(--color-text-warning)" : "var(--color-text-tertiary)",
@@ -1031,7 +1057,19 @@ function ListaClientes({
       background: "var(--color-background-secondary)",
       border: "0.5px solid var(--color-border-secondary)",
       borderRadius: 14,
-      padding: "10px 14px",
+      padding: "10px 14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10.5,
+      fontWeight: 700,
+      color: "var(--color-text-success)",
+      paddingBottom: 8,
+      marginBottom: 10,
+      borderBottom: "0.5px solid var(--color-border-tertiary)"
+    }
+  }, "✓ ", clientesReales.filter(c => visitados.has(c.id)).length, "/", clientesReales.length, " VISITADOS"), /*#__PURE__*/React.createElement("div", {
+    style: {
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
@@ -1054,7 +1092,7 @@ function ListaClientes({
     style: { fontSize: 16, fontWeight: 800, color: "var(--color-text-primary)" }
   }, contadorDia.envases[k]), /*#__PURE__*/React.createElement("span", {
     style: { fontSize: 9, color: "var(--color-text-tertiary)", fontWeight: 600 }
-  }, lbl))))), filtrados.length === 0 && /*#__PURE__*/React.createElement("div", {
+  }, lbl)))))), filtrados.length === 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
       padding: "40px 20px",
