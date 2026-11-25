@@ -907,6 +907,29 @@ function ListaClientes({
     } : c));
     setRutaSugerida(null);
   };
+  // Contador en vivo de efectivo cobrado + envases vendidos HOY, fijo
+  // arriba de la lista mientras se reparte (pedido de Guillermo
+  // 25/11/2026). Efectivo = solo la parte en efectivo (un pago mixto solo
+  // suma su parte montoEfec, igual criterio que "cobEfectivo" en la
+  // Planilla). Envases = solo entregas reales de hoy (se excluyen cobros
+  // de deuda, ajustes y la parte-transferencia de un pago mixto, que no
+  // representan envases físicamente entregados hoy).
+  const contadorDia = React.useMemo(() => {
+    let efectivo = 0;
+    const envases = { soda: 0, b10: 0, b20: 0 };
+    (ventas || []).forEach(v => {
+      if (v.pago === "contado") {
+        const esMixto = (Number(v.montoTrans) || 0) > 0;
+        efectivo += esMixto ? (Number(v.montoEfec) || 0) : ((v.pagadoNum != null ? v.pagadoNum : v.neto) || 0);
+      }
+      if (v._esCobro || v._esAjuste || v._esMixtoTrans) return;
+      (v.detalle || []).forEach(d => {
+        const cant = Number(d.cantidad) || 0;
+        if (d.nombre === "Sifón 1.5L") envases.soda += cant;else if (d.nombre === "Bidón 10L") envases.b10 += cant;else if (d.nombre === "Bidón 20L") envases.b20 += cant;
+      });
+    });
+    return { efectivo, envases };
+  }, [ventas]);
   // Props estables para ClienteCard (ver comentario arriba de su definición) —
   // spreadeadas en cada React.createElement(ClienteCard, {key, ...cardProps(c)}).
   const cardProps = c => ({
@@ -979,7 +1002,36 @@ function ListaClientes({
       marginTop: 6,
       fontWeight: clienteMoviendo ? 600 : 400
     }
-  }, clienteMoviendo ? `📍 Tocá el # de dónde debería ir "${clientesReales.find(c => c.id === clienteMoviendo)?.nombre || ""}" (tocá el mismo para cancelar)` : "Tocá el # de un cliente para moverlo, después tocá dónde debería ir")), filtrados.length === 0 && /*#__PURE__*/React.createElement("div", {
+  }, clienteMoviendo ? `📍 Tocá el # de dónde debería ir "${clientesReales.find(c => c.id === clienteMoviendo)?.nombre || ""}" (tocá el mismo para cancelar)` : "Tocá el # de un cliente para moverlo, después tocá dónde debería ir")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      margin: "0 16px 10px",
+      background: "var(--color-background-secondary)",
+      border: "0.5px solid var(--color-border-secondary)",
+      borderRadius: 14,
+      padding: "10px 14px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", flexDirection: "column" }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 10, color: "var(--color-text-tertiary)", fontWeight: 600, letterSpacing: 0.3, textTransform: "uppercase" }
+  }, "💵 Efectivo cobrado"), /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 19, color: "var(--color-text-success)", fontWeight: 800 }
+  }, fmt(contadorDia.efectivo))), /*#__PURE__*/React.createElement("div", {
+    style: { width: 0.5, alignSelf: "stretch", background: "var(--color-border-tertiary)" }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", gap: 12 }
+  }, [["soda", "Sifón"], ["b10", "Bidón 10L"], ["b20", "Bidón 20L"]].map(([k, lbl]) => /*#__PURE__*/React.createElement("div", {
+    key: k,
+    style: { display: "flex", flexDirection: "column", alignItems: "center" }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 16, fontWeight: 800, color: "var(--color-text-primary)" }
+  }, contadorDia.envases[k]), /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 9, color: "var(--color-text-tertiary)", fontWeight: 600 }
+  }, lbl))))), filtrados.length === 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
       padding: "40px 20px",
