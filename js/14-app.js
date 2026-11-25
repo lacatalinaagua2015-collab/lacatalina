@@ -4840,6 +4840,7 @@ function App() {
     onIr: irA
   }), /*#__PURE__*/React.createElement(FiadosPendientes, {
     clientes: clientes,
+    productos: productos,
     onPerdida: registrarPerdida,
     onPerdidaCliente: registrarPerdidaCliente,
     onCobrar: (clienteId, monto, pago) => {
@@ -4902,6 +4903,7 @@ function App() {
   }), /*#__PURE__*/React.createElement(ClientesDormidos, {
     clientes: clientes,
     ventas: ventas,
+    productos: productos,
     onPerdida: registrarPerdida,
     onPerdidaCliente: registrarPerdidaCliente,
     onVolver: () => irA("menu"),

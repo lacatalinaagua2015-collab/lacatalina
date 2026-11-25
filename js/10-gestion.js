@@ -447,6 +447,7 @@ function GestionClientes({
   }, "📷"))), /*#__PURE__*/React.createElement(PieEnvases, {
     c: c,
     ventas: ventas,
+    productos: productos,
     onEditar: onEditar,
     onPerdida: onPerdida,
     izquierda: /*#__PURE__*/React.createElement("button", {
