@@ -434,28 +434,42 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
         borderTop: "0.5px solid var(--color-border-tertiary)"
       }
     }, /*#__PURE__*/React.createElement("div", {
+      // 25/11/2026: el botón "⋮ Más opciones" era chico y sin color,
+      // Guillermo no lo encontraba a simple vista (ahí vive, entre otras
+      // cosas, Dispenser roto / Cambio-Devolución / Envase roto). Se lo
+      // agranda al doble y se le da color propio para que resalte; la "X"
+      // de cerrar queda del mismo tamaño de siempre pero se corre al
+      // costado derecho (queda debajo de los íconos 📍/💬/📷 de arriba),
+      // alineados por el centro para no romper la línea divisoria de
+      // arriba (borderTop) que sigue marcando la mitad entre el bloque de
+      // datos del cliente y el formulario de venta.
       style: {
         display: "flex",
         gap: 8,
-        marginBottom: 10
+        marginBottom: 10,
+        alignItems: "center",
+        justifyContent: "space-between"
       }
     }, /*#__PURE__*/React.createElement("button", {
       style: {
         ...s.btn,
-        flex: "0 0 38px",
-        width: 38,
-        fontSize: 15,
+        flex: 1,
+        height: 76,
+        fontSize: 30,
+        fontWeight: 700,
         padding: 0,
-        background: mostrarMas ? "var(--color-background-info)" : undefined,
-        color: mostrarMas ? "var(--color-text-info)" : undefined
+        background: mostrarMas ? "var(--color-background-info)" : "var(--color-background-warning)",
+        color: mostrarMas ? "var(--color-text-info)" : "var(--color-text-warning)",
+        border: mostrarMas ? "1px solid var(--color-border-info)" : "1px solid var(--color-border-warning)"
       },
-      title: "Más opciones",
+      title: "Más opciones (Dispenser roto, Cambio/Devolución, Envase roto)",
       onClick: () => setMostrarMas(m => !m)
     }, "⋮"), /*#__PURE__*/React.createElement("button", {
       style: {
         ...s.btn,
         flex: "0 0 38px",
         width: 38,
+        height: 38,
         fontSize: 15,
         padding: 0
       },
