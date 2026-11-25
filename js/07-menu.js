@@ -2596,13 +2596,50 @@ function PlanillaDelDia({
     }
     const q = (agregarClienteUI.query || "").trim().toLowerCase();
     const resultados = q ? (clientes || []).filter(c => (c.nombre || "").toLowerCase().includes(q)).slice(0, 8) : [];
-    const elegirCliente = c => {
-      const texto = window.prompt(agregarClienteUI.tipo === "prestado" ? "¿Qué prestó? (ej: 1 Bidón 10L)" : "¿Qué devolvió? (ej: 1 Sifón 1.5L)", "");
-      if (!texto || !texto.trim()) return;
-      const actual = movForCliente(porClienteEnv, c.nombre)[agregarClienteUI.tipo] || [];
-      guardarDetalleCliente(c.nombre, agregarClienteUI.tipo, [...actual, texto.trim()]);
-      setAgregarClienteUI(null);
-    };
+    // 25/11/2026: antes, elegir un cliente acá abría un prompt de texto
+    // vacío para escribir qué prestó/devolvió ("Esto es lo que me
+    // aparece si yo quiero editar... Tendría que aparecer un desplegable").
+    // Ahora elegir cliente pasa a un segundo paso con desplegable de
+    // producto + cantidad, sin texto libre.
+    const elegirCliente = c => setAgregarClienteUI(u => ({ ...u, cliente: c, prod: "", cant: "" }));
+    const opcionesProd = [...productosCarga.map(p => p.nombre), dispNombre];
+    if (agregarClienteUI.cliente) {
+      const confirmarAgregado = () => {
+        const cantNum = Math.round(Number(agregarClienteUI.cant) || 0);
+        if (!agregarClienteUI.prod || cantNum <= 0) return;
+        const actual = movForCliente(porClienteEnv, agregarClienteUI.cliente.nombre)[agregarClienteUI.tipo] || [];
+        guardarDetalleCliente(agregarClienteUI.cliente.nombre, agregarClienteUI.tipo, [...actual, `${cantNum} ${agregarClienteUI.prod}`]);
+        setAgregarClienteUI(null);
+      };
+      return /*#__PURE__*/React.createElement("div", {
+        key: "agregar-cliente",
+        style: { marginTop: 6, background: "var(--color-background-secondary)", border: "0.5px solid var(--color-border-secondary)", borderRadius: 10, padding: "10px 12px" }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: { fontSize: 12.5, fontWeight: 700, marginBottom: 8, color: "var(--color-text-primary)" }
+      }, (agregarClienteUI.tipo === "prestado" ? "📦 Prestó — " : "↩️ Devolvió — "), agregarClienteUI.cliente.nombre), /*#__PURE__*/React.createElement("div", {
+        style: { display: "flex", gap: 6, marginBottom: 8 }
+      }, /*#__PURE__*/React.createElement("select", {
+        autoFocus: true,
+        value: agregarClienteUI.prod,
+        onChange: e => setAgregarClienteUI(u => ({ ...u, prod: e.target.value })),
+        style: { ...s.select, flex: 2 }
+      }, /*#__PURE__*/React.createElement("option", { value: "" }, "— Producto —"), opcionesProd.map(n => /*#__PURE__*/React.createElement("option", { key: n, value: n }, n))), /*#__PURE__*/React.createElement("input", {
+        type: "number",
+        inputMode: "numeric",
+        placeholder: "Cant",
+        value: agregarClienteUI.cant,
+        onChange: e => setAgregarClienteUI(u => ({ ...u, cant: e.target.value })),
+        style: { ...s.input, flex: 1 }
+      })), /*#__PURE__*/React.createElement("div", {
+        style: { display: "flex", gap: 6 }
+      }, /*#__PURE__*/React.createElement("button", {
+        onClick: () => setAgregarClienteUI(u => ({ ...u, cliente: null })),
+        style: { ...s.btn, flex: 1 }
+      }, "← Volver"), /*#__PURE__*/React.createElement("button", {
+        onClick: confirmarAgregado,
+        style: { ...s.btn, flex: 1, background: "#185FA5", color: "#fff", border: "none" }
+      }, "✓ Agregar")));
+    }
     return /*#__PURE__*/React.createElement("div", {
       key: "agregar-cliente",
       style: { marginTop: 6, background: "var(--color-background-secondary)", border: "0.5px solid var(--color-border-secondary)", borderRadius: 10, padding: "10px 12px" }
