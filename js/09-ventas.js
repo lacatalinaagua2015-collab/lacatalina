@@ -685,6 +685,7 @@ function NuevaVenta({
   progressData,
   compacto,
   onCambiarDispenser,
+  onPerdidaCliente,
   mostrarMas,
   mostrarDeuda,
   ventaEditar,
@@ -700,6 +701,8 @@ function NuevaVenta({
   // uno. No es un producto que se cobra — solo mueve cliente.dispenser.
   const [dispDelta, setDispDelta] = React.useState(0);
   const [mostrarRotoCompacto, setMostrarRotoCompacto] = React.useState(false);
+  const [mostrarEnvRotoCompacto, setMostrarEnvRotoCompacto] = React.useState(false);
+  const [envRoto, setEnvRoto] = React.useState([{ prod: "", cant: "" }]);
   const [mostrarMasInterno, setMostrarMasInterno] = React.useState(false);
   if (mostrarMas === undefined) mostrarMas = mostrarMasInterno;
   if (mostrarDeuda === undefined) mostrarDeuda = mostrarMasInterno;
