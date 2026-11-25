@@ -11,7 +11,7 @@
 // del cierre de ListaClientes ahora llega explícito por props (mismos
 // nombres, así el cuerpo de abajo no tuvo que tocarse).
 const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
-  c, atendidos, noVMap, visitados, clienteExpandidoId, setClienteExpandidoId, pendientes, clienteMoviendo, setClienteMoviendo, moverCliente, onSeleccionar, recordatorios, ventas, fecha, onConfirmarTransfer, onPasarAEfectivo, todasVentas, marcarNoVisita, onGuardarVenta, productos, onNoQuiereConEnvases, onCambiarDispenserCliente, onQuitarNoVisita, clientes, onReordenar, onRetirarCliente
+  c, atendidos, noVMap, visitados, clienteExpandidoId, setClienteExpandidoId, pendientes, clienteMoviendo, setClienteMoviendo, moverCliente, onSeleccionar, recordatorios, ventas, fecha, onConfirmarTransfer, onPasarAEfectivo, todasVentas, marcarNoVisita, onGuardarVenta, productos, onNoQuiereConEnvases, onCambiarDispenserCliente, onQuitarNoVisita, clientes, onReordenar, onRetirarCliente, onPerdidaCliente
 }) {
     const [fotoOpen, setFotoOpen] = React.useState(false);
     const [mostrarMas, setMostrarMas] = React.useState(false);
@@ -481,6 +481,7 @@ const ClienteCard = /*#__PURE__*/React.memo(function ClienteCard({
       cliente: c,
       productos: productos,
       fecha: fecha,
+      onPerdidaCliente: onPerdidaCliente,
       ventasCliente: (todasVentas || ventas).filter(v => v.clienteId === c.id),
       onGuardar: (...args) => {
         onGuardarVenta(c.id, ...args);
@@ -643,6 +644,7 @@ function ListaClientes({
   onAbrirMapa,
   onPlanilla,
   onPerdida,
+  onPerdidaCliente,
   onRetirarCliente
 }) {
   const [busqueda, setBusqueda] = useState("");
@@ -947,7 +949,7 @@ function ListaClientes({
   // Props estables para ClienteCard (ver comentario arriba de su definición) —
   // spreadeadas en cada React.createElement(ClienteCard, {key, ...cardProps(c)}).
   const cardProps = c => ({
-    c, atendidos, noVMap, visitados, clienteExpandidoId, setClienteExpandidoId, pendientes, clienteMoviendo, setClienteMoviendo, moverCliente, onSeleccionar, recordatorios, ventas, fecha, onConfirmarTransfer, onPasarAEfectivo, todasVentas, marcarNoVisita, onGuardarVenta, productos, onNoQuiereConEnvases, onCambiarDispenserCliente, onQuitarNoVisita, clientes, onReordenar, onRetirarCliente
+    c, atendidos, noVMap, visitados, clienteExpandidoId, setClienteExpandidoId, pendientes, clienteMoviendo, setClienteMoviendo, moverCliente, onSeleccionar, recordatorios, ventas, fecha, onConfirmarTransfer, onPasarAEfectivo, todasVentas, marcarNoVisita, onGuardarVenta, productos, onNoQuiereConEnvases, onCambiarDispenserCliente, onQuitarNoVisita, clientes, onReordenar, onRetirarCliente, onPerdidaCliente
   });
   return /*#__PURE__*/React.createElement("div", {
     style: s.screen

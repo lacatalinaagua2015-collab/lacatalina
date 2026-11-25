@@ -4244,6 +4244,7 @@ function App() {
     productos: productos,
     onGuardarVenta: (clienteIdVenta, ...args) => registrarVenta(clienteIdVenta, ...args),
     onNoQuiereConEnvases: registrarNoQuiereConEnvases,
+    onPerdidaCliente: registrarPerdidaCliente,
     onEditarCliente: (id, cambios) => {
       const antes = clientes.find(c => c.id === id);
       saveClientes(prev => prev.map(c => c.id === id ? {
