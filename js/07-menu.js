@@ -2935,6 +2935,30 @@ function PlanillaDelDia({
       vacVueltaFijo
     };
   };
+  // Manda a Emma Control los ingresos (efectivo y transferencia por separado) y los gastos confirmados del día.
+  // Se llama al guardar la planilla Y automáticamente al cerrar el día. Los ids son fijos por fecha, así que
+  // reenviar sobrescribe y nunca duplica; si falla (sin señal, cuota) queda en la cola con reintento.
+  const enviarIngresosAControl = () => {
+    if (!(ecToken && (window._lcEncolarEC || window.enviarAEmmaControl))) return;
+    try {
+      const efectivoNeto = Math.round(cobEfectivoConExtra - totalVentaLlenar);
+      const transferenciaNeta = Math.round(cobTransNetoConExtra);
+      const gastosData = (datos.gastos || []).filter(g => g.confirmado && Number(g.monto) > 0).map(g => ({
+        desc: g.desc || 'Gasto reparto',
+        monto: Number(g.monto),
+        cat: g.cat || 'Otros',
+        metodo: g.metodo || 'efectivo'
+      }));
+      const ingresosEC = {
+        total: efectivoNeto + transferenciaNeta,
+        efectivo: efectivoNeto,
+        transferencia: transferenciaNeta
+      };
+      if (window._lcEncolarEC) window._lcEncolarEC(fecha, ingresosEC, gastosData);else window.enviarAEmmaControl(ecToken, fecha, ingresosEC, gastosData);
+    } catch (e) {
+      console.error('Envío a Emma Control:', e);
+    }
+  };
   const confirmarCierre = () => {
     if (enviandoCierre) return;
     // Bloquear el botón de inmediato: sin este freno, un doble-toque podía
@@ -2992,6 +3016,8 @@ function PlanillaDelDia({
       _stockActualizado: true,
       _cierreDiffs: Object.keys(diffs).length > 0 ? diffs : null
     });
+    // Cierre confirmado: los ingresos del día pasan solos a Emma Control (sin tener que tocar «Guardar planilla»).
+    enviarIngresosAControl();
     setMostrarCierre(false);
     setMostrarConfirmDeposito(false);
   };
@@ -4546,27 +4572,7 @@ function PlanillaDelDia({
       // registro anterior en vez de duplicar. El efectivo y la transferencia
       // van como DOS registros separados, cada uno con su método, para que Emma
       // Control impute bien cada forma de cobro.
-      if (ecToken && (window._lcEncolarEC || window.enviarAEmmaControl)) {
-        // Mismo total "con extra" que ya se ve en pantalla (Total
-        // cobrado/Efectivo en mano/Transferencias) — ver cobEfectivoConExtra
-        // / cobTransNetoConExtra más arriba.
-        const efectivoNeto = Math.round(cobEfectivoConExtra - totalVentaLlenar);
-        const transferenciaNeta = Math.round(cobTransNetoConExtra);
-        const gastosData = (datos.gastos || []).filter(g => g.confirmado && Number(g.monto) > 0).map(g => ({
-          desc: g.desc || 'Gasto reparto',
-          monto: Number(g.monto),
-          cat: g.cat || 'Otros',
-          metodo: g.metodo || 'efectivo'
-        }));
-        const ingresosEC = {
-          total: efectivoNeto + transferenciaNeta,
-          efectivo: efectivoNeto,
-          transferencia: transferenciaNeta
-        };
-        // Vía la cola: si el envío falla (sin señal, permisos, cuota) el día
-        // queda pendiente y se reintenta solo, en vez de perderse en silencio.
-        if (window._lcEncolarEC) window._lcEncolarEC(fecha, ingresosEC, gastosData);else window.enviarAEmmaControl(ecToken, fecha, ingresosEC, gastosData);
-      }
+      enviarIngresosAControl();
       onGuardar({...datos, efectivo: String(Math.round(cobEfectivo)), fiado: String(Math.round(cobFiado)), retenciones: String(cobTransDesc)});
     }
   }, "Guardar planilla"), !yaCerrado ? /*#__PURE__*/React.createElement("button", {
