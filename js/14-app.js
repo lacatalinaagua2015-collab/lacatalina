@@ -4070,6 +4070,7 @@ function App() {
       if (antes) ajustarStockFijoCliente(antes, { ...antes, ...cambios });
     },
     onPerdidaCliente: registrarPerdidaCliente,
+    onPerdida: registrarPerdida,
     onConfirmarTransfer: (clienteId, ventaId) => {
       saveVentas(prev => prev.map(v => v.id === ventaId ? {
         ...v,
