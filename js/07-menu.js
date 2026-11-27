@@ -2099,6 +2099,7 @@ function PlanillaDelDia({
   onEliminarVenta,
   onEditarCliente,
   onPerdidaCliente,
+  onPerdida,
   onConfirmarTransfer,
   onEditarMontoCobro,
   onEditarMontoVenta,
@@ -2384,6 +2385,11 @@ function PlanillaDelDia({
   // cliente tiene que buscar en la lista real de clientes de la app (no
   // texto libre, para no desalinearse del nombre real del cliente).
   const [agregarClienteUI, setAgregarClienteUI] = useState(null);
+  // Pedido del usuario (27/11/2026): poder anotar un envase roto/perdido
+  // (se cayo, se rompio durante el reparto, etc) directo desde aca, sin
+  // tener que entrar al perfil de un cliente -- usa el mismo registro real
+  // de perdidas (onPerdida/registrarPerdida) pero con clienteNombre null.
+  const [agregarPerdidaUI, setAgregarPerdidaUI] = useState(null);
   // 25/11/2026: Guillermo marcó que el "+" de prestado/devuelto en el
   // Detalle por cliente abría un prompt de texto vacío, sin ningún
   // desplegable de productos — "tendría que aparecer un desplegable con
