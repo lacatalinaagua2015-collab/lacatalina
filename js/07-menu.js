@@ -2678,6 +2678,60 @@ function PlanillaDelDia({
       style: { fontSize: 11.5, color: "var(--color-text-tertiary)", padding: "4px 2px" }
     }, "Sin coincidencias")));
   };
+  // Panel "+ Roto/perdido" -- mismo patron que renderAgregarCliente, pero
+  // sin paso de cliente: elige producto + cantidad y listo. Llama a
+  // onPerdida (= registrarPerdida) con clienteNombre null, que ya soporta
+  // ese caso (perdidas.clienteNombre: clienteNombre || null). Se guarda
+  // como perdida real (afecta stock), no como override de display.
+  const renderAgregarPerdida = () => {
+    const PRODS_PERDIDA = (productos || []).filter(p => p.trackStock !== false).map(p => [claveStockDeProducto(p), p.nombre]);
+    if (!agregarPerdidaUI) {
+      return /*#__PURE__*/React.createElement("button", {
+        key: "agregar-perdida",
+        onClick: () => setAgregarPerdidaUI({ prod: PRODS_PERDIDA[0] ? PRODS_PERDIDA[0][0] : "", cant: "", motivo: "" }),
+        style: { marginTop: 6, width: "100%", fontSize: 11.5, fontWeight: 700, color: "#ff6b6b", background: "none", border: "1px dashed rgba(255,107,107,0.5)", borderRadius: 8, padding: "7px 0", cursor: "pointer" }
+      }, "+ Roto / perdido (sin cliente)");
+    }
+    const confirmarPerdida = () => {
+      const cantNum = Math.round(Number(agregarPerdidaUI.cant) || 0);
+      if (!agregarPerdidaUI.prod || cantNum <= 0) return;
+      onPerdida && onPerdida({ [agregarPerdidaUI.prod]: cantNum }, agregarPerdidaUI.motivo?.trim() || "Roto/perdido durante el reparto", null);
+      setAgregarPerdidaUI(null);
+    };
+    return /*#__PURE__*/React.createElement("div", {
+      key: "agregar-perdida",
+      style: { marginTop: 6, background: "var(--color-background-secondary)", border: "0.5px solid rgba(255,107,107,0.4)", borderRadius: 10, padding: "10px 12px" }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 12.5, fontWeight: 700, marginBottom: 8, color: "#ff6b6b" }
+    }, "💥 Roto / perdido (sin cliente)"), /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", gap: 6, marginBottom: 8 }
+    }, /*#__PURE__*/React.createElement("select", {
+      autoFocus: true,
+      value: agregarPerdidaUI.prod,
+      onChange: e => setAgregarPerdidaUI(u => ({ ...u, prod: e.target.value })),
+      style: { ...s.select, flex: 2 }
+    }, PRODS_PERDIDA.map(([k, nombre]) => /*#__PURE__*/React.createElement("option", { key: k, value: k }, nombre))), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      inputMode: "numeric",
+      placeholder: "Cant",
+      value: agregarPerdidaUI.cant,
+      onChange: e => setAgregarPerdidaUI(u => ({ ...u, cant: e.target.value })),
+      style: { ...s.input, flex: 1 }
+    })), /*#__PURE__*/React.createElement("input", {
+      value: agregarPerdidaUI.motivo,
+      onChange: e => setAgregarPerdidaUI(u => ({ ...u, motivo: e.target.value })),
+      placeholder: "Motivo (opcional, ej: se cayó)",
+      style: { ...s.input, marginBottom: 8, width: "100%" }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", gap: 6 }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => setAgregarPerdidaUI(null),
+      style: { ...s.btn, flex: 1 }
+    }, "✕ Cancelar"), /*#__PURE__*/React.createElement("button", {
+      onClick: confirmarPerdida,
+      style: { ...s.btn, flex: 1, background: "#ff6b6b", color: "#fff", border: "none" }
+    }, "✓ Agregar")));
+  };
 
   // ── Cálculo de stock para el cierre del día ──────────────────
   const CAJON = 6;
@@ -3274,7 +3328,7 @@ function PlanillaDelDia({
         }, nombre), /*#__PURE__*/React.createElement("div", {
           style: { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }
         }, ...chipsListaEnv(nombre, "prestado", mov.prestado), ...chipsListaEnv(nombre, "devuelto", mov.devuelto)));
-      }).concat([renderAgregarCliente(porClienteEnv)]))));
+      }).concat([renderAgregarCliente(porClienteEnv), renderAgregarPerdida()]))));
     })(), /*#__PURE__*/React.createElement("button", {
       style: {
         width: "100%",
@@ -4563,7 +4617,7 @@ function PlanillaDelDia({
       }, nombre), /*#__PURE__*/React.createElement("div", {
         style: { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }
       }, ...chipsListaEnv(nombre, "prestado", mov.prestado), ...chipsListaEnv(nombre, "devuelto", mov.devuelto)));
-    }).concat([renderAgregarCliente(porClienteEnv)]))));
+    }).concat([renderAgregarCliente(porClienteEnv), renderAgregarPerdida()]))));
   })(), /*#__PURE__*/React.createElement("button", {
     style: s.btnPrimary,
     onClick: () => {
