@@ -1254,7 +1254,7 @@ function StockGeneral({
       color: "var(--color-text-success)"
     }
   }, "Stock")), draftProductos.map(p => {
-    const k = KEY_PROD[p.nombre];
+    const k = KEY_PROD_ENV[p.nombre];
     return /*#__PURE__*/React.createElement("div", {
       key: p.id,
       style: {
